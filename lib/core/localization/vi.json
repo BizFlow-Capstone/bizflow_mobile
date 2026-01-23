@@ -1,0 +1,66 @@
+{
+  "app_name": "BizFlow",
+  "common": {
+    "ok": "OK",
+    "cancel": "Hủy",
+    "save": "Lưu",
+    "delete": "Xóa",
+    "edit": "Chỉnh sửa",
+    "close": "Đóng",
+    "back": "Quay lại",
+    "next": "Tiếp theo",
+    "done": "Hoàn tất",
+    "confirm": "Xác nhận",
+    "loading": "Đang tải...",
+    "retry": "Thử lại",
+    "search": "Tìm kiếm",
+    "no_data": "Không có dữ liệu",
+    "error": "Lỗi",
+    "success": "Thành công",
+    "warning": "Cảnh báo"
+  },
+  "auth": {
+    "login": "Đăng nhập",
+    "logout": "Đăng xuất",
+    "register": "Đăng ký",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "confirm_password": "Xác nhận mật khẩu",
+    "forgot_password": "Quên mật khẩu?",
+    "remember_me": "Ghi nhớ đăng nhập",
+    "login_success": "Đăng nhập thành công",
+    "login_failed": "Đăng nhập thất bại",
+    "logout_confirm": "Bạn có chắc muốn đăng xuất?"
+  },
+  "validation": {
+    "required": "Trường này bắt buộc",
+    "invalid_email": "Email không hợp lệ",
+    "invalid_password": "Mật khẩu không hợp lệ",
+    "password_min_length": "Mật khẩu tối thiểu {min} ký tự",
+    "password_not_match": "Mật khẩu không khớp"
+  },
+  "error": {
+    "network": "Lỗi kết nối mạng",
+    "server": "Lỗi máy chủ",
+    "timeout": "Hết thời gian chờ",
+    "unknown": "Lỗi không xác định"
+  },
+  "home": {
+    "title": "Trang chủ",
+    "welcome": "Chào mừng bạn"
+  },
+  "profile": {
+    "title": "Hồ sơ",
+    "edit_profile": "Chỉnh sửa hồ sơ",
+    "change_password": "Đổi mật khẩu",
+    "settings": "Cài đặt"
+  },
+  "settings": {
+    "title": "Cài đặt",
+    "language": "Ngôn ngữ",
+    "theme": "Giao diện",
+    "notifications": "Thông báo",
+    "about": "Giới thiệu",
+    "version": "Phiên bản"
+  }
+}

@@ -1,0 +1,234 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
+import '../../core/theme/app_text_styles.dart';
+
+/// AppTextField - Shared TextField Widget
+/// Stateless, nhận config qua constructor, không import bloc/provider/api
+class AppTextField extends StatelessWidget {
+  final TextEditingController? controller;
+  final String? label;
+  final String? hintText;
+  final String? errorText;
+  final String? helperText;
+  final bool obscureText;
+  final bool enabled;
+  final bool readOnly;
+  final bool autofocus;
+  final int maxLines;
+  final int? maxLength;
+  final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
+  final List<TextInputFormatter>? inputFormatters;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onTap;
+  final ValueChanged<String>? onSubmitted;
+  final Widget? prefixIcon;
+  final Widget? suffixIcon;
+  final FocusNode? focusNode;
+  final String? Function(String?)? validator;
+  final AutovalidateMode? autovalidateMode;
+  final EdgeInsetsGeometry? contentPadding;
+
+  const AppTextField({
+    super.key,
+    this.controller,
+    this.label,
+    this.hintText,
+    this.errorText,
+    this.helperText,
+    this.obscureText = false,
+    this.enabled = true,
+    this.readOnly = false,
+    this.autofocus = false,
+    this.maxLines = 1,
+    this.maxLength,
+    this.keyboardType,
+    this.textInputAction,
+    this.inputFormatters,
+    this.onChanged,
+    this.onTap,
+    this.onSubmitted,
+    this.prefixIcon,
+    this.suffixIcon,
+    this.focusNode,
+    this.validator,
+    this.autovalidateMode,
+    this.contentPadding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (label != null) ...[
+          Text(
+            label!,
+            style: AppTextStyles.labelMedium,
+          ),
+          SizedBox(height: AppSpacing.xs),
+        ],
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          enabled: enabled,
+          readOnly: readOnly,
+          autofocus: autofocus,
+          maxLines: maxLines,
+          maxLength: maxLength,
+          keyboardType: keyboardType,
+          textInputAction: textInputAction,
+          inputFormatters: inputFormatters,
+          onChanged: onChanged,
+          onTap: onTap,
+          onFieldSubmitted: onSubmitted,
+          focusNode: focusNode,
+          validator: validator,
+          autovalidateMode: autovalidateMode,
+          style: AppTextStyles.bodyMedium,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textHint,
+            ),
+            errorText: errorText,
+            helperText: helperText,
+            prefixIcon: prefixIcon,
+            suffixIcon: suffixIcon,
+            contentPadding: contentPadding ??
+                EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+            filled: true,
+            fillColor: enabled ? AppColors.surface : AppColors.divider,
+            border: OutlineInputBorder(
+              borderRadius: AppSpacing.borderRadiusSm,
+              borderSide: BorderSide(color: AppColors.divider),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: AppSpacing.borderRadiusSm,
+              borderSide: BorderSide(color: AppColors.divider),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: AppSpacing.borderRadiusSm,
+              borderSide: BorderSide(color: AppColors.primary, width: 2),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: AppSpacing.borderRadiusSm,
+              borderSide: BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: AppSpacing.borderRadiusSm,
+              borderSide: BorderSide(color: AppColors.error, width: 2),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: AppSpacing.borderRadiusSm,
+              borderSide: BorderSide(color: AppColors.divider),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// AppPasswordField - Password TextField với toggle visibility
+class AppPasswordField extends StatefulWidget {
+  final TextEditingController? controller;
+  final String? label;
+  final String? hintText;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+  final String? Function(String?)? validator;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+
+  const AppPasswordField({
+    super.key,
+    this.controller,
+    this.label,
+    this.hintText,
+    this.errorText,
+    this.onChanged,
+    this.validator,
+    this.textInputAction,
+    this.onSubmitted,
+  });
+
+  @override
+  State<AppPasswordField> createState() => _AppPasswordFieldState();
+}
+
+class _AppPasswordFieldState extends State<AppPasswordField> {
+  bool _obscureText = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppTextField(
+      controller: widget.controller,
+      label: widget.label,
+      hintText: widget.hintText,
+      errorText: widget.errorText,
+      obscureText: _obscureText,
+      onChanged: widget.onChanged,
+      validator: widget.validator,
+      textInputAction: widget.textInputAction,
+      onSubmitted: widget.onSubmitted,
+      keyboardType: TextInputType.visiblePassword,
+      suffixIcon: IconButton(
+        icon: Icon(
+          _obscureText ? Icons.visibility_off : Icons.visibility,
+          color: AppColors.textHint,
+        ),
+        onPressed: () {
+          setState(() {
+            _obscureText = !_obscureText;
+          });
+        },
+      ),
+    );
+  }
+}
+
+/// AppSearchField - Search TextField
+class AppSearchField extends StatelessWidget {
+  final TextEditingController? controller;
+  final String? hintText;
+  final ValueChanged<String>? onChanged;
+  final VoidCallback? onClear;
+  final ValueChanged<String>? onSubmitted;
+
+  const AppSearchField({
+    super.key,
+    this.controller,
+    this.hintText,
+    this.onChanged,
+    this.onClear,
+    this.onSubmitted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppTextField(
+      controller: controller,
+      hintText: hintText ?? 'Search...',
+      onChanged: onChanged,
+      onSubmitted: onSubmitted,
+      textInputAction: TextInputAction.search,
+      prefixIcon: Icon(Icons.search, color: AppColors.textHint),
+      suffixIcon: controller?.text.isNotEmpty == true
+          ? IconButton(
+              icon: Icon(Icons.clear, color: AppColors.textHint),
+              onPressed: () {
+                controller?.clear();
+                onClear?.call();
+              },
+            )
+          : null,
+    );
+  }
+}
