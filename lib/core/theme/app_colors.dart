@@ -11,9 +11,12 @@ class AppColors {
   static const Color primaryDark = Color(0xFF004BA0);
 
   // Secondary
-  static const Color secondary = Color(0xFF26A69A);
+  static const Color secondary = Color(0xFF23C4C1);
   static const Color secondaryLight = Color(0xFF64D8CB);
   static const Color secondaryDark = Color(0xFF00766C);
+
+  // Brand Teal
+  static const Color brandTeal = Color(0xFF23C4C1);
 
   // Semantic
   static const Color success = Color(0xFF4CAF50);

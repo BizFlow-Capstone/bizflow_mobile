@@ -1,0 +1,29 @@
+# Icons Folder
+
+Store custom icons and icon graphics here.
+
+## Files Example
+- `google.png` - Google logo/icon
+- `icon_home.svg` - Home icon
+- `icon_profile.svg` - Profile icon
+- `icon_settings.svg` - Settings icon
+- `icon_logout.svg` - Logout icon
+
+## Formats Supported
+- `.png` - Raster images
+- `.svg` - Vector graphics (recommended for icons)
+
+## Usage
+
+```dart
+// PNG icon
+Image.asset('assets/images/icons/google.png', width: 24, height: 24)
+
+// SVG icon (requires flutter_svg package)
+SvgPicture.asset('assets/images/icons/icon_home.svg', width: 24, height: 24)
+```
+
+## Icon Size Guidelines
+- Thumbnail: 24x24 - 32x32 dp
+- Standard: 48x48 - 56x56 dp
+- Large: 96x96 - 128x128 dp

@@ -1,0 +1,21 @@
+# Illustrations Folder
+
+Store illustrations and graphics here.
+
+## Subfolders
+- Auth illustrations (registration, login, OTP, etc.)
+- Empty states (no data, error, etc.)
+- Success illustrations
+- Error illustrations
+
+## Files Example
+- `auth_illustration_register.png` - Registration illustration
+- `auth_illustration_otp.png` - OTP verification illustration
+- `empty_state_no_data.png` - No data empty state
+- `success_illustration.png` - Success screen illustration
+
+## Usage
+
+```dart
+Image.asset('assets/images/illustrations/auth_illustration_register.png')
+```

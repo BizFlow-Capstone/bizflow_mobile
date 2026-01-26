@@ -8,43 +8,53 @@
 
 ```
 report/
+├── 00_GUIDES/                      (Hướng dẫn & Guidelines)
+│   ├── README.md                   (Folder structure explanation)
+│   └── MODULE_REPORT_CREATION_GUIDE.md (How to create reports)
+│
 ├── 01_SYSTEM_ARCHITECTURE.md       ⭐ START HERE (System design)
-├── 02_IMPLEMENTATION_PLAN.md        (Detailed implementation roadmap)
-├── 03_PHASE_REPORTS/
-│   ├── PHASE_1_FOUNDATION.md
-│   ├── PHASE_2_STATE_MANAGEMENT.md
-│   ├── PHASE_3_FEATURES.md
-│   ├── PHASE_4_QUALITY.md
-│   └── PHASE_5_DEPLOYMENT.md
-├── 04_MODULE_REPORTS/
-│   ├── MODULE_CORE_THEME.md
-│   ├── MODULE_CORE_NETWORK.md
-│   ├── MODULE_CORE_ROUTING.md
-│   ├── MODULE_CORE_STORAGE.md
-│   ├── MODULE_CORE_LOCALIZATION.md
-│   ├── MODULE_CORE_NOTIFICATIONS.md
-│   ├── MODULE_SHARED_WIDGETS.md
-│   ├── MODULE_SHARED_EXTENSIONS.md
-│   ├── MODULE_SHARED_UTILS.md
-│   └── MODULE_SHARED_DIALOGS.md
-├── 05_FEATURE_REPORTS/
-│   ├── FEATURE_AUTH.md
-│   ├── FEATURE_HOME.md
-│   └── FEATURE_PROFILE.md
-├── 06_TESTING_REPORTS/
-│   ├── TEST_COVERAGE.md
-│   ├── TEST_RESULTS.md
-│   └── BUG_TRACKING.md
-├── 07_PERFORMANCE_REPORTS/
-│   ├── PERFORMANCE_METRICS.md
-│   ├── OPTIMIZATION_LOG.md
-│   └── BUILD_TIMES.md
-├── 08_ARCHIVE/ (Old reports)
+│
+├── 02_PROJECT_OVERVIEW/            (Project summaries)
+│   ├── PROJECT_COMPLETION_REPORT.md
+│   ├── PROJECT_PROGRESS_TRACKER.md
+│   ├── FINAL_SUMMARY.md
+│   └── START_HERE.md
+│
+├── 03_PHASE_REPORTS/               (Phase-based reports)
+│   ├── (Empty - for future phases)
+│   └── README.md
+│
+├── 04_MODULE_REPORTS/              (Module implementation reports)
+│   ├── MODULE_AUTH_SC_AUT_01_02.md ✅ SC-AUT-01 & SC-AUT-02
+│   └── (More modules to come)
+│
+├── 05_FEATURE_REPORTS/             (Feature completion reports)
+│   ├── FEATURE_AUTH.md ✅ Auth feature
+│   ├── (More features to come)
+│   └── README.md
+│
+├── 06_DOCUMENTATION/               (Technical documentation)
+│   ├── QUICK_START.md ✅ 5-minute overview
+│   ├── SC_AUT_01_02_DOCUMENTATION.md ✅ Full auth docs
+│   ├── DATA_FLOW_DIAGRAM.md ✅ Data flows & APIs
+│   ├── TESTING_GUIDE.md ✅ Testing checklists
+│   ├── USAGE_EXAMPLE.md ✅ Code examples
+│   └── README.md
+│
+├── 07_TECHNICAL/                   (Technical references)
+│   ├── DEBUG_AND_TESTING_GUIDE.md
+│   ├── DOCUMENTATION_CHEATSHEET.md
+│   ├── QUICK_REFERENCE.md
+│   └── README.md
+│
+├── 08_TRACKING/                    (Tracking & history)
+│   ├── CHANGELOG.md                (What changed - Updated regularly)
+│   ├── INDEX.md                    (Navigation - File này)
+│   └── VISUAL_OVERVIEW.md
+│
+├── 09_ARCHIVE/                     (Old reports)
 │   └── (Lưu trữ các reports cũ)
 │
-├── INDEX.md                        (Navigation - File này)
-├── CHANGELOG.md                    (What changed - Updated regularly)
-├── README.md                       (How to use reports)
 └── TEMPLATE.md                     (Template for new reports)
 ```
 

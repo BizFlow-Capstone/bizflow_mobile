@@ -1,0 +1,15 @@
+# Logos Folder
+
+Store app logos and branding images here.
+
+## Files
+- `app_logo.png` - Main app logo
+- `app_logo_white.png` - White variant for dark backgrounds
+- `bizflow_logo.png` - Full BizFlow branding logo
+- `bizflow_icon.png` - App icon
+
+## Usage
+
+```dart
+Image.asset('assets/images/logos/app_logo.png')
+```
