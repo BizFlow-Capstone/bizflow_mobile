@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -6,7 +7,9 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
-import '../../data/auth_api_service.dart';
+import '../bloc/auth_bloc.dart';
+import '../bloc/auth_event.dart';
+import '../bloc/auth_state.dart';
 import 'verify_otp_page.dart';
 import 'login_page.dart';
 
@@ -36,7 +39,6 @@ class _RegisterPageState extends State<RegisterPage> {
   late FocusNode _nameFocus;
 
   bool _isPasswordVisible = false;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -66,7 +68,7 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  void _handleRegister() async {
+  void _handleRegister() {
     final l10n = AppLocalizations.of(context);
 
     // Validate inputs
@@ -90,50 +92,27 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final apiService = AuthApiService();
-      final response = await apiService.register(
+    // Call BLoC to handle signup
+    context.read<AuthBloc>().add(
+      SignupRequested(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-
-      if (response['success'] == true) {
-        _showSuccess(l10n.translate('auth.register_success'));
-
-        // Navigate to VerifyOtpPage
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => VerifyOtpPage(
-                  phoneNumber: _phoneController.text.trim(),
-                ),
-              ),
-            );
-          }
-        });
-      } else {
-        _showError(response['message'] ?? l10n.translate('auth.register_failed'));
-      }
-    } catch (e) {
-      _showError('${l10n.translate('common.error')}: ${e.toString().replaceAll('Exception: ', '')}');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+        password: _passwordController.text.trim(),
+      ),
+    );
   }
 
   void _handleGoogleRegister() {
-    // TODO: Implement Google Sign Up
-    _showSuccess('Đang xử lý Google Sign Up...');
+    // Call BLoC to handle Google signup
+    // TODO: Get idToken từ Google Sign-In
+    // context.read<AuthBloc>().add(
+    //   GoogleSignupRequested(
+    //     idToken: idToken,
+    //     email: email,
+    //     name: name,
+    //   ),
+    // );
   }
 
   void _showError(String message) {
@@ -175,12 +154,30 @@ class _RegisterPageState extends State<RegisterPage> {
           SizedBox(width: AppSpacing.md),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.lg,
-          ),
+      body: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is SignupSuccess) {
+            _showSuccess(l10n.translate('auth.register_success'));
+            // Navigate to OTP verification
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => VerifyOtpPage(
+                  phoneNumber: _phoneController.text.trim(),
+                  onLocaleChange: widget.onLocaleChange,
+                ),
+              ),
+            );
+          } else if (state is SignupFailure) {
+            _showError(state.message);
+          }
+        },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.lg,
+            ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -277,13 +274,17 @@ class _RegisterPageState extends State<RegisterPage> {
               SizedBox(height: AppSpacing.xl),
 
               // Register Button
-              AppButton(
-                label: l10n.translate('auth.sign_up'),
-                isFullWidth: true,
-                isLoading: _isLoading,
-                onPressed: _isLoading ? null : _handleRegister,
-                type: AppButtonType.primary,
-                size: AppButtonSize.large,
+              BlocBuilder<AuthBloc, AuthState>(
+                builder: (context, state) {
+                  return AppButton(
+                    label: l10n.translate('auth.sign_up'),
+                    isFullWidth: true,
+                    isLoading: state is SignupInProgress,
+                    onPressed: state is SignupInProgress ? null : _handleRegister,
+                    type: AppButtonType.primary,
+                    size: AppButtonSize.large,
+                  );
+                },
               ),
               SizedBox(height: AppSpacing.md),
 
@@ -338,8 +339,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                       );
-
-
                     },
                     child: Text(
                       l10n.translate('auth.sign_in'),
@@ -354,6 +353,7 @@ class _RegisterPageState extends State<RegisterPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

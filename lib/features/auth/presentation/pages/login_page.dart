@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -6,7 +7,9 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
-import '../../data/auth_api_service.dart';
+import '../bloc/auth_bloc.dart';
+import '../bloc/auth_event.dart';
+import '../bloc/auth_state.dart';
 import 'register_page.dart';
 
 /// SC-AUT-03: Login Page
@@ -35,7 +38,6 @@ class _LoginPageState extends State<LoginPage> {
   late FocusNode _passwordFocus;
 
   bool _isPasswordVisible = false;
-  bool _isLoading = false;
   bool _rememberMe = false;
 
   @override
@@ -58,7 +60,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _handleLogin() async {
+  void _handleLogin() {
     final l10n = AppLocalizations.of(context);
 
     // Validate inputs
@@ -78,60 +80,26 @@ class _LoginPageState extends State<LoginPage> {
     final isPhone = _isValidPhone(input);
 
     if (!isEmail && !isPhone) {
-      _showError(l10n.translate('validation.invalid_email')); // Email hoặc số điện thoại không hợp lệ
+      _showError(l10n.translate('validation.invalid_email'));
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final apiService = AuthApiService();
-      final response = await apiService.login(
+    // Call BLoC to handle login
+    context.read<AuthBloc>().add(
+      LoginRequested(
+        email: isEmail ? input : '',
         password: _passwordController.text.trim(),
-        email: isEmail ? input : '', // Gửi email nếu là email
-        phone: isPhone ? input : '', // Gửi phone nếu là số điện thoại
-      );
-
-      if (response['success'] == true) {
-        _showSuccess(l10n.translate('auth.login_success'));
-        // TODO: Navigate to home screen
-      } else {
-        _showError(response['message'] ?? l10n.translate('auth.login_failed'));
-      }
-    } catch (e) {
-      _showError(l10n.translate('auth.login_failed'));
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+        phone: isPhone ? input : '',
+      ),
+    );
   }
 
-  void _handleGoogleLogin() async {
-    final l10n = AppLocalizations.of(context);
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final apiService = AuthApiService();
-      final response = await apiService.googleLogin();
-
-      if (response['success'] == true) {
-        _showSuccess(l10n.translate('auth.login_success'));
-        // TODO: Navigate to home screen
-      } else {
-        _showError(response['message'] ?? l10n.translate('auth.login_failed'));
-      }
-    } catch (e) {
-      _showError(l10n.translate('auth.login_failed'));
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+  void _handleGoogleLogin() {
+    // Call BLoC to handle Google login
+    // TODO: Get idToken từ Google Sign-In
+    // context.read<AuthBloc>().add(
+    //   GoogleLoginRequested(idToken: idToken),
+    // );
   }
 
   void _handleForgotPassword() {
@@ -158,7 +126,7 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red.shade400,
+        backgroundColor: AppColors.danger,
         duration: const Duration(seconds: 2),
       ),
     );
@@ -168,7 +136,7 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green.shade400,
+        backgroundColor: AppColors.success,
         duration: const Duration(seconds: 2),
       ),
     );
@@ -192,11 +160,20 @@ class _LoginPageState extends State<LoginPage> {
           SizedBox(width: AppSpacing.md),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
+      body: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is LoginSuccess) {
+            _showSuccess(l10n.translate('auth.login_success'));
+            // TODO: Navigate to home screen
+          } else if (state is LoginFailure) {
+            _showError(state.message);
+          }
+        },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
             children: [
               SizedBox(height: AppSpacing.xl),
 
@@ -304,13 +281,17 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(height: AppSpacing.xl),
 
               // Login Button
-              AppButton(
-                label: l10n.translate('auth.login_button'),
-                isFullWidth: true,
-                isLoading: _isLoading,
-                onPressed: _isLoading ? null : _handleLogin,
-                type: AppButtonType.primary,
-                size: AppButtonSize.large,
+              BlocBuilder<AuthBloc, AuthState>(
+                builder: (context, state) {
+                  return AppButton(
+                    label: l10n.translate('auth.login_button'),
+                    isFullWidth: true,
+                    isLoading: state is LoginInProgress,
+                    onPressed: state is LoginInProgress ? null : _handleLogin,
+                    type: AppButtonType.primary,
+                    size: AppButtonSize.large,
+                  );
+                },
               ),
               SizedBox(height: AppSpacing.md),
 
@@ -380,6 +361,7 @@ class _LoginPageState extends State<LoginPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

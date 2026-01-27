@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/widgets/app_button.dart';
-import '../../data/auth_api_service.dart';
+import '../../../../shared/widgets/language_switcher.dart';
+import '../bloc/auth_bloc.dart';
+import '../bloc/auth_event.dart';
+import '../bloc/auth_state.dart';
 
 /// SC-AUT-02: Verify OTP Page
 /// Trang xác thực mã OTP gồm 6 ô nhập liệu
 class VerifyOtpPage extends StatefulWidget {
   final String phoneNumber;
+  final Function(Locale)? onLocaleChange;
 
   const VerifyOtpPage({
     super.key,
     required this.phoneNumber,
+    this.onLocaleChange,
   });
 
   @override
@@ -24,7 +30,6 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   late List<TextEditingController> _otpControllers;
   late List<FocusNode> _otpFocusNodes;
 
-  bool _isLoading = false;
   bool _canResend = false;
   int _remainingSeconds = 60;
 
@@ -78,7 +83,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
     return _otpControllers.map((c) => c.text).join();
   }
 
-  void _handleVerify() async {
+  void _handleVerify() {
     final l10n = AppLocalizations.of(context);
     final otpCode = _getOtpCode();
 
@@ -87,67 +92,33 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final apiService = AuthApiService();
-      final response = await apiService.verifyOtp(
+    // Call BLoC to handle OTP verification
+    context.read<AuthBloc>().add(
+      VerifyOtpRequested(
         phone: widget.phoneNumber,
         otpCode: otpCode,
-      );
-
-      if (response['success'] == true) {
-        _showSuccess(l10n.translate('auth.verify_success'));
-
-        // TODO: Save token to local storage
-        // TODO: Navigate to home screen
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/home');
-          }
-        });
-      } else {
-        _showError(response['message'] ?? l10n.translate('auth.verify_failed'));
-      }
-    } catch (e) {
-      _showError('${l10n.translate('common.error')}: ${e.toString().replaceAll('Exception: ', '')}');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+      ),
+    );
   }
 
-  void _handleResend() async {
+  void _handleResend() {
     final l10n = AppLocalizations.of(context);
     if (!_canResend) return;
 
-    try {
-      final apiService = AuthApiService();
-      final response = await apiService.resendOtp(
-        phone: widget.phoneNumber,
-      );
+    // Call BLoC to handle resend OTP
+    context.read<AuthBloc>().add(
+      ResendOtpRequested(phone: widget.phoneNumber),
+    );
 
-      if (response['success'] == true) {
-        _showSuccess(l10n.translate('auth.resend_success'));
+    setState(() {
+      _canResend = false;
+      _remainingSeconds = 60;
+    });
+    _startResendTimer();
 
-        setState(() {
-          _canResend = false;
-          _remainingSeconds = 60;
-        });
-        _startResendTimer();
-
-        // Clear OTP fields
-        for (var controller in _otpControllers) {
-          controller.clear();
-        }
-      } else {
-        _showError(response['message'] ?? l10n.translate('auth.resend_failed'));
-      }
-    } catch (e) {
-      _showError('${l10n.translate('common.error')}: ${e.toString().replaceAll('Exception: ', '')}');
+    // Clear OTP fields
+    for (var controller in _otpControllers) {
+      controller.clear();
     }
   }
 
@@ -188,16 +159,35 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
         titleTextStyle: AppTextStyles.titleLarge.copyWith(
           color: AppColors.textPrimary,
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.lg,
+        actions: [
+          LanguageSwitcher(
+            currentLocale: Localizations.localeOf(context),
+            onLanguageChanged: (locale) {
+              widget.onLocaleChange?.call(locale);
+            },
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
+          SizedBox(width: AppSpacing.md),
+        ],
+      ),
+      body: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is OtpVerificationSuccess) {
+            _showSuccess(l10n.translate('auth.verify_success'));
+            // TODO: Navigate to home screen
+            // Navigator.pushReplacementNamed(context, '/home');
+          } else if (state is OtpVerificationFailure) {
+            _showError(state.message);
+          }
+        },
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.lg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
               // Icon
               Container(
                 width: 80,
@@ -243,13 +233,17 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
               SizedBox(height: AppSpacing.xl),
 
               // Verify Button
-              AppButton(
-                label: _isLoading ? l10n.translate('common.loading') : l10n.translate('auth.verify_button'),
-                isFullWidth: true,
-                isLoading: _isLoading,
-                onPressed: _isLoading ? null : _handleVerify,
-                type: AppButtonType.primary,
-                size: AppButtonSize.large,
+              BlocBuilder<AuthBloc, AuthState>(
+                builder: (context, state) {
+                  return AppButton(
+                    label: l10n.translate('auth.verify_button'),
+                    isFullWidth: true,
+                    isLoading: state is OtpVerificationInProgress,
+                    onPressed: state is OtpVerificationInProgress ? null : _handleVerify,
+                    type: AppButtonType.primary,
+                    size: AppButtonSize.large,
+                  );
+                },
               ),
               SizedBox(height: AppSpacing.xl),
 
@@ -294,6 +288,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

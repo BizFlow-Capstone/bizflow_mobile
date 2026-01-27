@@ -1,0 +1,80 @@
+// Auth Events - User actions
+abstract class AuthEvent {
+  const AuthEvent();
+}
+
+// Signup Events
+class SignupRequested extends AuthEvent {
+  final String name;
+  final String phone;
+  final String email;
+  final String password;
+
+  const SignupRequested({
+    required this.name,
+    required this.phone,
+    required this.email,
+    required this.password,
+  });
+}
+
+class GoogleSignupRequested extends AuthEvent {
+  final String idToken;
+  final String email;
+  final String name;
+
+  const GoogleSignupRequested({
+    required this.idToken,
+    required this.email,
+    required this.name,
+  });
+}
+
+// OTP Events
+class VerifyOtpRequested extends AuthEvent {
+  final String phone;
+  final String otpCode;
+
+  const VerifyOtpRequested({
+    required this.phone,
+    required this.otpCode,
+  });
+}
+
+class ResendOtpRequested extends AuthEvent {
+  final String phone;
+
+  const ResendOtpRequested({
+    required this.phone,
+  });
+}
+
+// Login Events
+class LoginRequested extends AuthEvent {
+  final String email;
+  final String password;
+  final String phone;
+
+  const LoginRequested({
+    this.email = '',
+    required this.password,
+    this.phone = '',
+  });
+}
+
+class GoogleLoginRequested extends AuthEvent {
+  final String? idToken;
+
+  const GoogleLoginRequested({
+    this.idToken,
+  });
+}
+
+// General Auth Events
+class LogoutRequested extends AuthEvent {
+  const LogoutRequested();
+}
+
+class ClearAuthError extends AuthEvent {
+  const ClearAuthError();
+}
