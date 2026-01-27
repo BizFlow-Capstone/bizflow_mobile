@@ -4,6 +4,7 @@ import 'core/localization/app_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/pages/register_page.dart';
 import 'features/auth/presentation/pages/verify_otp_page.dart';
+import 'features/auth/presentation/pages/login_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -44,8 +45,9 @@ class _MyAppState extends State<MyApp> {
       ],
       supportedLocales: AppLocalizations.supportedLocales,
       locale: _locale,
-      home: RegisterPage(onLocaleChange: _setLocale),
+      // home: RegisterPage(onLocaleChange: _setLocale),
       // home: VerifyOtpPage(phoneNumber: '0123456789'),
+      home: LoginPage( onLocaleChange: _setLocale  ),
     );
   }
 }

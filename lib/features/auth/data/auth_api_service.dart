@@ -6,6 +6,8 @@ class AuthApiService {
   // API Endpoints
   static const String _baseUrl = 'https://api.bizflow.com/api';
   static const String _registerEndpoint = '$_baseUrl/auth/register';
+  static const String _loginEndpoint = '$_baseUrl/auth/login';
+  static const String _googleLoginEndpoint = '$_baseUrl/auth/google-login';
   static const String _verifyOtpEndpoint = '$_baseUrl/auth/verify-otp';
   static const String _resendOtpEndpoint = '$_baseUrl/auth/resend-otp';
   static const String _googleRegisterEndpoint = '$_baseUrl/auth/google-register';
@@ -115,6 +117,69 @@ class AuthApiService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw _handleError(response.statusCode, response.data);
+      }
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  /// Login with email/phone and password
+  /// Returns token and user data on success
+  /// Có thể đăng nhập bằng email hoặc số điện thoại
+  Future<Map<String, dynamic>> login({
+    required String password,
+    String email = '',
+    String phone = '',
+  }) async {
+    try {
+      // Kiểm tra phải có email hoặc phone
+      if (email.isEmpty && phone.isEmpty) {
+        throw Exception('Email hoặc số điện thoại là bắt buộc');
+      }
+
+      final requestData = {
+        'password': password,
+      };
+
+      // Thêm email hoặc phone vào request
+      if (email.isNotEmpty) {
+        requestData['email'] = email;
+      } else if (phone.isNotEmpty) {
+        requestData['phone'] = phone;
+      }
+
+      final response = await _dio.post(
+        _loginEndpoint,
+        data: requestData,
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw _handleError(response.statusCode, response.data);
+      }
+    } on DioException catch (e) {
+      throw _handleDioError(e);
+    }
+  }
+
+  /// Login with Google account
+  /// Returns token and user data on success
+  Future<Map<String, dynamic>> googleLogin({
+    String? idToken,
+  }) async {
+    try {
+      final response = await _dio.post(
+        _googleLoginEndpoint,
+        data: {
+          if (idToken != null) 'idToken': idToken,
+        },
+      );
+
+      if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;
       } else {
         throw _handleError(response.statusCode, response.data);

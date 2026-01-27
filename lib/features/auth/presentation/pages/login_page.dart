@@ -7,75 +7,63 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
 import '../../data/auth_api_service.dart';
-import 'verify_otp_page.dart';
-import 'login_page.dart';
+import 'register_page.dart';
 
-/// SC-AUT-01: Register Page
-/// Trang đăng ký gồm 4 ô input (Name, Phone, Email, Password)
-class RegisterPage extends StatefulWidget {
+/// SC-AUT-03: Login Page
+/// Trang đăng nhập gồm 2 ô input (Email/Phone, Password) + Forgot Password link
+/// Hỗ trợ đăng nhập bằng:
+/// - Email + mật khẩu
+/// - Số điện thoại + mật khẩu
+/// - Google sign-in
+class LoginPage extends StatefulWidget {
   final Function(Locale)? onLocaleChange;
 
-  const RegisterPage({
+  const LoginPage({
     super.key,
     this.onLocaleChange,
   });
 
   @override
-  State<RegisterPage> createState() => _RegisterPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _RegisterPageState extends State<RegisterPage> {
-  late TextEditingController _phoneController;
-  late TextEditingController _emailController;
+class _LoginPageState extends State<LoginPage> {
+  late TextEditingController _emailPhoneController;
   late TextEditingController _passwordController;
-  late TextEditingController _nameController;
 
-  late FocusNode _phoneFocus;
-  late FocusNode _emailFocus;
+  late FocusNode _emailPhoneFocus;
   late FocusNode _passwordFocus;
-  late FocusNode _nameFocus;
 
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  bool _rememberMe = false;
 
   @override
   void initState() {
     super.initState();
-    _phoneController = TextEditingController();
-    _emailController = TextEditingController();
+    _emailPhoneController = TextEditingController();
     _passwordController = TextEditingController();
-    _nameController = TextEditingController();
 
-    _phoneFocus = FocusNode();
-    _emailFocus = FocusNode();
+    _emailPhoneFocus = FocusNode();
     _passwordFocus = FocusNode();
-    _nameFocus = FocusNode();
   }
 
   @override
   void dispose() {
-    _phoneController.dispose();
-    _emailController.dispose();
+    _emailPhoneController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
 
-    _phoneFocus.dispose();
-    _emailFocus.dispose();
+    _emailPhoneFocus.dispose();
     _passwordFocus.dispose();
-    _nameFocus.dispose();
     super.dispose();
   }
 
-  void _handleRegister() async {
+  void _handleLogin() async {
     final l10n = AppLocalizations.of(context);
 
     // Validate inputs
-    if (_phoneController.text.isEmpty) {
-      _showError(l10n.translate('auth.phone_required'));
-      return;
-    }
-
-    if (_emailController.text.isEmpty) {
+    final input = _emailPhoneController.text.trim();
+    if (input.isEmpty) {
       _showError(l10n.translate('auth.email_required'));
       return;
     }
@@ -85,8 +73,12 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    if (_nameController.text.isEmpty) {
-      _showError(l10n.translate('auth.name_required'));
+    // Validate email or phone format
+    final isEmail = _isValidEmail(input);
+    final isPhone = _isValidPhone(input);
+
+    if (!isEmail && !isPhone) {
+      _showError(l10n.translate('validation.invalid_email')); // Email hoặc số điện thoại không hợp lệ
       return;
     }
 
@@ -96,34 +88,20 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final apiService = AuthApiService();
-      final response = await apiService.register(
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final response = await apiService.login(
+        password: _passwordController.text.trim(),
+        email: isEmail ? input : '', // Gửi email nếu là email
+        phone: isPhone ? input : '', // Gửi phone nếu là số điện thoại
       );
 
       if (response['success'] == true) {
-        _showSuccess(l10n.translate('auth.register_success'));
-
-        // Navigate to VerifyOtpPage
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => VerifyOtpPage(
-                  phoneNumber: _phoneController.text.trim(),
-                ),
-              ),
-            );
-          }
-        });
+        _showSuccess(l10n.translate('auth.login_success'));
+        // TODO: Navigate to home screen
       } else {
-        _showError(response['message'] ?? l10n.translate('auth.register_failed'));
+        _showError(response['message'] ?? l10n.translate('auth.login_failed'));
       }
     } catch (e) {
-      _showError('${l10n.translate('common.error')}: ${e.toString().replaceAll('Exception: ', '')}');
+      _showError(l10n.translate('auth.login_failed'));
     } finally {
       setState(() {
         _isLoading = false;
@@ -131,16 +109,57 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
-  void _handleGoogleRegister() {
-    // TODO: Implement Google Sign Up
-    _showSuccess('Đang xử lý Google Sign Up...');
+  void _handleGoogleLogin() async {
+    final l10n = AppLocalizations.of(context);
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final apiService = AuthApiService();
+      final response = await apiService.googleLogin();
+
+      if (response['success'] == true) {
+        _showSuccess(l10n.translate('auth.login_success'));
+        // TODO: Navigate to home screen
+      } else {
+        _showError(response['message'] ?? l10n.translate('auth.login_failed'));
+      }
+    } catch (e) {
+      _showError(l10n.translate('auth.login_failed'));
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _handleForgotPassword() {
+    final l10n = AppLocalizations.of(context);
+    // TODO: Navigate to forgot password page
+    _showSuccess(l10n.translate('auth.forgot_password'));
+  }
+
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(
+      r'^[a-zA-Z0-9.!#$%&*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$',
+    );
+    return emailRegex.hasMatch(email);
+  }
+
+  bool _isValidPhone(String phone) {
+    // Validate Vietnamese phone number or international format
+    // Vietnam: 10 digits (0xxxxxxxxx), +84xxxxxxxxx
+    final phoneRegex = RegExp(r'^(\+84|0)[1-9]\d{8}$');
+    return phoneRegex.hasMatch(phone.replaceAll('-', '').replaceAll(' ', ''));
   }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.danger,
+        backgroundColor: Colors.red.shade400,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -149,7 +168,8 @@ class _RegisterPageState extends State<RegisterPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.success,
+        backgroundColor: Colors.green.shade400,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -157,14 +177,11 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final size = MediaQuery.of(context).size;
-    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
 
     return Scaffold(
-      backgroundColor: AppColors.white,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppColors.white,
+        backgroundColor: Colors.transparent,
         actions: [
           LanguageSwitcher(
             currentLocale: Localizations.localeOf(context),
@@ -177,27 +194,15 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.lg,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              // Logo / Header
-              if (!isKeyboardOpen) ...[
-                SizedBox(height: AppSpacing.lg),
-                const Icon(
-                  Icons.business,
-                  size: 60,
-                  color: Color(0xFF23C4C1),
-                ),
-                SizedBox(height: AppSpacing.md),
-              ],
+              SizedBox(height: AppSpacing.xl),
 
-              // Title
+              // Logo or Title
               Text(
-                l10n.translate('auth.create_account'),
+                l10n.translate('auth.login_title'),
                 style: AppTextStyles.headlineSmall,
                 textAlign: TextAlign.center,
               ),
@@ -205,7 +210,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
               // Subtitle
               Text(
-                l10n.translate('auth.register_subtitle'),
+                l10n.translate('auth.login_subtitle'),
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -213,38 +218,12 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               SizedBox(height: AppSpacing.xl),
 
-              // Form
+              // Email/Phone Field
               AppTextField(
-                controller: _nameController,
-                focusNode: _nameFocus,
-                label: l10n.translate('auth.name'),
-                hintText: l10n.translate('auth.enter_name'),
-                keyboardType: TextInputType.name,
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) {
-                  FocusScope.of(context).requestFocus(_phoneFocus);
-                },
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              AppTextField(
-                controller: _phoneController,
-                focusNode: _phoneFocus,
-                label: l10n.translate('auth.phone'),
-                hintText: l10n.translate('auth.enter_phone'),
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) {
-                  FocusScope.of(context).requestFocus(_emailFocus);
-                },
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              AppTextField(
-                controller: _emailController,
-                focusNode: _emailFocus,
-                label: l10n.translate('auth.email'),
-                hintText: l10n.translate('auth.enter_email'),
+                controller: _emailPhoneController,
+                focusNode: _emailPhoneFocus,
+                label: l10n.translate('auth.email_or_phone'),
+                hintText: l10n.translate('auth.enter_email_or_phone'),
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 onSubmitted: (_) {
@@ -253,6 +232,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               SizedBox(height: AppSpacing.md),
 
+              // Password Field
               AppTextField(
                 controller: _passwordController,
                 focusNode: _passwordFocus,
@@ -274,14 +254,61 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
               ),
+              SizedBox(height: AppSpacing.md),
+
+              // Remember Me & Forgot Password Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Remember Me Checkbox
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Checkbox(
+                          value: _rememberMe,
+                          onChanged: (value) {
+                            setState(() {
+                              _rememberMe = value ?? false;
+                            });
+                          },
+                          activeColor: const Color(0xFF23C4C1),
+                          side: BorderSide(
+                            color: _rememberMe
+                                ? const Color(0xFF23C4C1)
+                                : AppColors.divider,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: AppSpacing.sm),
+                      Text(
+                        l10n.translate('auth.remember_me'),
+                        style: AppTextStyles.bodySmall,
+                      ),
+                    ],
+                  ),
+                  // Forgot Password Link
+                  GestureDetector(
+                    onTap: _handleForgotPassword,
+                    child: Text(
+                      l10n.translate('auth.forgot_password'),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: const Color(0xFF23C4C1),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               SizedBox(height: AppSpacing.xl),
 
-              // Register Button
+              // Login Button
               AppButton(
-                label: l10n.translate('auth.sign_up'),
+                label: l10n.translate('auth.login_button'),
                 isFullWidth: true,
                 isLoading: _isLoading,
-                onPressed: _isLoading ? null : _handleRegister,
+                onPressed: _isLoading ? null : _handleLogin,
                 type: AppButtonType.primary,
                 size: AppButtonSize.large,
               ),
@@ -317,32 +344,31 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               SizedBox(height: AppSpacing.md),
 
-              // Google Sign Up Button
+              // Google Login Button
               _buildGoogleButton(l10n),
               SizedBox(height: AppSpacing.lg),
 
-              // Already have account
+              // Don't have account
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '${l10n.translate('auth.already_have_account')} ',
+                    '${l10n.translate('auth.dont_have_account')} ',
                     style: AppTextStyles.bodyMedium,
                   ),
                   GestureDetector(
                     onTap: () {
-                      Navigator.push(context,
-                      MaterialPageRoute(
-                        builder: (context) => LoginPage(
-                          onLocaleChange: widget.onLocaleChange,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => RegisterPage(
+                            onLocaleChange: widget.onLocaleChange,
+                          ),
                         ),
-                      ),
                       );
-
-
                     },
                     child: Text(
-                      l10n.translate('auth.sign_in'),
+                      l10n.translate('auth.dont_have_account_signup'),
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: const Color(0xFF23C4C1),
                         fontWeight: FontWeight.w600,
@@ -368,7 +394,7 @@ class _RegisterPageState extends State<RegisterPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: _handleGoogleRegister,
+          onTap: _handleGoogleLogin,
           borderRadius: AppSpacing.borderRadiusMd,
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -392,7 +418,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
                 SizedBox(width: AppSpacing.md),
                 Text(
-                  l10n.translate('auth.sign_up_google'),
+                  l10n.translate('auth.or_login_google'),
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                     fontWeight: FontWeight.w500,

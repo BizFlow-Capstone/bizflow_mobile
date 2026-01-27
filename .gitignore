@@ -43,3 +43,27 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Old report files (consolidated to 6 files)
+report/CHANGELOG.md
+report/PROJECT_COMPLETION_REPORT.md
+report/IMPLEMENTATION_REPORT.md
+report/FINAL_SUMMARY.md
+report/LANGUAGE_SWITCHER_ASSETS_COMPLETE.md
+report/LOCALIZATION_IMPLEMENTATION.md
+report/MODULE_REPORT_CREATION_GUIDE.md
+report/DOCUMENTATION_CHEATSHEET.md
+report/TEMPLATE.md
+report/REORGANIZATION_COMPLETE.md
+report/SUMMARY.md
+report/DOCUMENTATION_INDEX.md
+report/01_SYSTEM_ARCHITECTURE.md
+report/DEBUG_AND_TESTING_GUIDE.md
+report/PROJECT_PROGRESS_TRACKER.md
+report/START_HERE.md
+report/QUICK_REFERENCE.md
+report/00_GUIDES/
+report/03_PHASE_REPORTS/
+report/04_MODULE_REPORTS/
+report/05_FEATURE_REPORTS/
+report/06_DOCUMENTATION/
