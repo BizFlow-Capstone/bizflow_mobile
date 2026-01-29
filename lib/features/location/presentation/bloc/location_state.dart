@@ -1,0 +1,112 @@
+import 'package:equatable/equatable.dart';
+import '../../domain/domain.dart';
+
+/// Location States
+abstract class LocationState extends Equatable {
+  const LocationState();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class LocationInitial extends LocationState {
+  const LocationInitial();
+}
+
+class LocationLoading extends LocationState {
+  const LocationLoading();
+}
+
+class LocationsLoaded extends LocationState {
+  final List<LocationEntity> locations;
+
+  const LocationsLoaded({required this.locations});
+
+  @override
+  List<Object?> get props => [locations];
+}
+
+class LocationToggleInProgress extends LocationState {
+  final String locationId;
+
+  const LocationToggleInProgress({required this.locationId});
+
+  @override
+  List<Object?> get props => [locationId];
+}
+
+class LocationToggleSuccess extends LocationState {
+  final LocationEntity updatedLocation;
+
+  const LocationToggleSuccess({required this.updatedLocation});
+
+  @override
+  List<Object?> get props => [updatedLocation];
+}
+
+class LocationAddInProgress extends LocationState {
+  const LocationAddInProgress();
+}
+
+class LocationAddSuccess extends LocationState {
+  final LocationEntity newLocation;
+
+  const LocationAddSuccess({required this.newLocation});
+
+  @override
+  List<Object?> get props => [newLocation];
+}
+
+class LocationEditInProgress extends LocationState {
+  final String locationId;
+
+  const LocationEditInProgress({required this.locationId});
+
+  @override
+  List<Object?> get props => [locationId];
+}
+
+class LocationEditSuccess extends LocationState {
+  final LocationEntity updatedLocation;
+
+  const LocationEditSuccess({required this.updatedLocation});
+
+  @override
+  List<Object?> get props => [updatedLocation];
+}
+
+class LocationDeleteInProgress extends LocationState {
+  final String locationId;
+
+  const LocationDeleteInProgress({required this.locationId});
+
+  @override
+  List<Object?> get props => [locationId];
+}
+
+class LocationDeleteSuccess extends LocationState {
+  final String locationId;
+
+  const LocationDeleteSuccess({required this.locationId});
+
+  @override
+  List<Object?> get props => [locationId];
+}
+
+class LocationFailure extends LocationState {
+  final String message;
+
+  const LocationFailure({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
+class LocationError extends LocationState {
+  final String message;
+
+  const LocationError({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}

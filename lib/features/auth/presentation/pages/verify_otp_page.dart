@@ -9,6 +9,7 @@ import '../../../../shared/widgets/language_switcher.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import 'register_page.dart';
 
 /// SC-AUT-02: Verify OTP Page
 /// Trang xác thực mã OTP gồm 6 ô nhập liệu
@@ -94,10 +95,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
 
     // Call BLoC to handle OTP verification
     context.read<AuthBloc>().add(
-      VerifyOtpRequested(
-        phone: widget.phoneNumber,
-        otpCode: otpCode,
-      ),
+      VerifyOtpRequested(phone: widget.phoneNumber, otpCode: otpCode),
     );
   }
 
@@ -106,9 +104,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
     if (!_canResend) return;
 
     // Call BLoC to handle resend OTP
-    context.read<AuthBloc>().add(
-      ResendOtpRequested(phone: widget.phoneNumber),
-    );
+    context.read<AuthBloc>().add(ResendOtpRequested(phone: widget.phoneNumber));
 
     setState(() {
       _canResend = false;
@@ -124,19 +120,13 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
     );
   }
 
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.success),
     );
   }
 
@@ -188,78 +178,113 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-              // Icon
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF23C4C1).withOpacity(0.1),
-                  shape: BoxShape.circle,
+                // Icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF23C4C1).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.phonelink_lock,
+                    size: 40,
+                    color: Color(0xFF23C4C1),
+                  ),
                 ),
-                child: const Icon(
-                  Icons.phonelink_lock,
-                  size: 40,
-                  color: Color(0xFF23C4C1),
+                SizedBox(height: AppSpacing.lg),
+
+                // Title
+                Text(
+                  l10n.translate('auth.verify_phone_title'),
+                  style: AppTextStyles.headlineSmall,
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              SizedBox(height: AppSpacing.lg),
+                SizedBox(height: AppSpacing.md),
 
-              // Title
-              Text(
-                l10n.translate('auth.verify_phone_title'),
-                style: AppTextStyles.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              // Description
-              Text(
-                '${l10n.translate('auth.verify_otp_subtitle')}\n${widget.phoneNumber}',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+                // Description
+                Text(
+                  '${l10n.translate('auth.verify_otp_subtitle')}\n${widget.phoneNumber}',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: AppSpacing.xl),
+                SizedBox(height: AppSpacing.xl),
 
-              // OTP Input Boxes
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  6,
-                  (index) => _buildOtpBox(index),
+                // OTP Input Boxes
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(6, (index) => _buildOtpBox(index)),
                 ),
-              ),
-              SizedBox(height: AppSpacing.xl),
+                SizedBox(height: AppSpacing.xl),
 
-              // Verify Button
-              BlocBuilder<AuthBloc, AuthState>(
-                builder: (context, state) {
-                  return AppButton(
-                    label: l10n.translate('auth.verify_button'),
-                    isFullWidth: true,
-                    isLoading: state is OtpVerificationInProgress,
-                    onPressed: state is OtpVerificationInProgress ? null : _handleVerify,
-                    type: AppButtonType.primary,
-                    size: AppButtonSize.large,
-                  );
-                },
-              ),
-              SizedBox(height: AppSpacing.xl),
+                // Verify Button
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    return AppButton(
+                      label: l10n.translate('auth.verify_button'),
+                      isFullWidth: true,
+                      isLoading: state is OtpVerificationInProgress,
+                      onPressed: state is OtpVerificationInProgress
+                          ? null
+                          : _handleVerify,
+                      type: AppButtonType.secondary,
+                      size: AppButtonSize.large,
+                    );
+                  },
+                ),
+                SizedBox(height: AppSpacing.xl),
 
-              // Resend Section
-              if (_canResend)
-                GestureDetector(
-                  onTap: _handleResend,
-                  child: Row(
+                // Resend Section
+                if (_canResend)
+                  GestureDetector(
+                    onTap: _handleResend,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Text(
+                        //   '${l10n.translate('auth.didnt_receive')} ',
+                        //   style: AppTextStyles.bodyMedium,
+                        // ),
+                        Text(
+                          l10n.translate('auth.resend_otp'),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: const Color(0xFF23C4C1),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(' • ', style: AppTextStyles.bodyMedium),
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RegisterPage(
+                                onLocaleChange: widget.onLocaleChange,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            l10n.translate('auth.change_phone_number'),
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: const Color(0xFF23C4C1),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '${l10n.translate('auth.didnt_receive')} ',
+                        '${l10n.translate('auth.resend_after')} ',
                         style: AppTextStyles.bodyMedium,
                       ),
                       Text(
-                        l10n.translate('auth.resend_otp'),
+                        '$_remainingSeconds${l10n.translate('auth.seconds')}',
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: const Color(0xFF23C4C1),
                           fontWeight: FontWeight.w600,
@@ -267,28 +292,10 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
                       ),
                     ],
                   ),
-                )
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${l10n.translate('auth.resend_after')} ',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                    Text(
-                      '$_remainingSeconds${l10n.translate('auth.seconds')}',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: const Color(0xFF23C4C1),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -299,10 +306,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
       height: 60,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: AppColors.divider,
-          width: 2,
-        ),
+        border: Border.all(color: AppColors.divider, width: 2),
         borderRadius: AppSpacing.borderRadiusMd,
       ),
       child: TextField(

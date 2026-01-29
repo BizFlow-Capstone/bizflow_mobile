@@ -79,7 +79,8 @@
     "forgot_password_button": "Send Reset Link",
     "email_not_registered": "This email is not registered",
     "invalid_credentials": "Invalid email or password",
-    "account_not_verified": "Please verify your account first"
+    "account_not_verified": "Please verify your account first",
+    "change_phone_number": "Change Phone Number"
   },
   "validation": {
     "required": "This field is required",
@@ -111,5 +112,32 @@
     "notifications": "Notifications",
     "about": "About",
     "version": "Version"
+  },
+  "location": {
+    "title": "Business Location Management",
+    "subtitle": "Manage your business locations",
+    "search_placeholder": "Search business locations",
+    "active_status": "Active",
+    "inactive_status": "Inactive",
+    "no_locations": "No business locations yet",
+    "no_manager": "No manager assigned",
+    "add_manager": "Add Manager",
+    "manage_products": "Manage Products",
+    "edit_location": "Edit",
+    "create_location_title": "Create New Warehouse",
+    "edit_location_title": "Edit Warehouse",
+    "location_name": "Warehouse Name",
+    "location_name_hint": "Enter warehouse name",
+    "location_address": "Address",
+    "location_address_hint": "Enter address",
+    "location_manager": "Add Warehouse Manager",
+    "location_manager_hint": "Enter manager name",
+    "create_button": "Create Warehouse",
+    "update_button": "Update",
+    "status_updated": "Status updated successfully",
+    "location_added": "Location added successfully",
+    "location_updated": "Location updated successfully",
+    "location_deleted": "Location deleted successfully",
+    "validation_error": "Please fill in all required fields"
   }
 }

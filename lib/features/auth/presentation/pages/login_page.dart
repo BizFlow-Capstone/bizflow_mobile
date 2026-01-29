@@ -288,7 +288,7 @@ class _LoginPageState extends State<LoginPage> {
                     isFullWidth: true,
                     isLoading: state is LoginInProgress,
                     onPressed: state is LoginInProgress ? null : _handleLogin,
-                    type: AppButtonType.primary,
+                    type: AppButtonType.secondary,
                     size: AppButtonSize.large,
                   );
                 },

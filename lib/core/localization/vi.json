@@ -79,7 +79,8 @@
     "forgot_password_button": "Gửi liên kết đặt lại",
     "email_not_registered": "Email này chưa được đăng ký",
     "invalid_credentials": "Email hoặc mật khẩu không hợp lệ",
-    "account_not_verified": "Vui lòng xác thực tài khoản trước tiên"
+    "account_not_verified": "Vui lòng xác thực tài khoản trước tiên",
+    "change_phone_number": "Đổi số điện thoại"
   },
   "validation": {
     "required": "Trường này bắt buộc",
@@ -111,5 +112,32 @@
     "notifications": "Thông báo",
     "about": "Giới thiệu",
     "version": "Phiên bản"
+  },
+  "location": {
+    "title": "Quản lý địa điểm kinh doanh",
+    "subtitle": "Quản lý các ĐDKD của bạn",
+    "search_placeholder": "Tìm kiếm địa điểm kinh doanh",
+    "active_status": "Đang hoạt động",
+    "inactive_status": "Không hoạt động",
+    "no_locations": "Chưa có địa điểm kinh doanh",
+    "no_manager": "Chưa có quản lý",
+    "add_manager": "Thêm Nhân Viên",
+    "manage_products": "Quản lý sản phẩm",
+    "edit_location": "Chỉnh sửa",
+    "create_location_title": "Tạo Kho Mới",
+    "edit_location_title": "Sửa Kho",
+    "location_name": "Tên Kho",
+    "location_name_hint": "Nhập tên kho",
+    "location_address": "Địa Chỉ",
+    "location_address_hint": "Nhập địa chỉ",
+    "location_manager": "Thêm Nhân Viên Quản Lý Kho",
+    "location_manager_hint": "Nhập tên nhân viên",
+    "create_button": "Tạo kho",
+    "update_button": "Cập nhật",
+    "status_updated": "Cập nhật trạng thái thành công",
+    "location_added": "Thêm địa điểm thành công",
+    "location_updated": "Cập nhật địa điểm thành công",
+    "location_deleted": "Xóa địa điểm thành công",
+    "validation_error": "Vui lòng điền đầy đủ thông tin"
   }
 }

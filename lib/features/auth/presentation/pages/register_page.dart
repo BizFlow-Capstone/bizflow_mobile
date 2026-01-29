@@ -281,7 +281,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     isFullWidth: true,
                     isLoading: state is SignupInProgress,
                     onPressed: state is SignupInProgress ? null : _handleRegister,
-                    type: AppButtonType.primary,
+                    type: AppButtonType.secondary,
                     size: AppButtonSize.large,
                   );
                 },

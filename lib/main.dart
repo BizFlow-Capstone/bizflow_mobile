@@ -3,10 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/theme/app_theme.dart';
-import 'features/auth/presentation/pages/login_page.dart';
-import 'features/auth/presentation/pages/register_page.dart';
-import 'features/auth/presentation/pages/verify_otp_page.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/location/presentation/bloc/location_bloc.dart';
+import 'features/location/presentation/pages/location_management_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,8 +35,11 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => AuthBloc(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (context) => AuthBloc()),
+        BlocProvider(create: (context) => LocationBloc()),
+      ],
       child: MaterialApp(
         title: 'BizFlow',
         theme: AppTheme.light,
@@ -50,9 +52,7 @@ class _MyAppState extends State<MyApp> {
         supportedLocales: AppLocalizations.supportedLocales,
         locale: _locale,
         // Thay đổi page ở đây để test từng trang:
-        home: LoginPage(onLocaleChange: _setLocale),
-        // home: RegisterPage(onLocaleChange: _setLocale),
-        
+        home: LocationManagementPage(onLocaleChange: _setLocale),
       ),
     );
   }
