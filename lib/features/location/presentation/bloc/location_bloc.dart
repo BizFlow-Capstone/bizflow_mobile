@@ -61,10 +61,10 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       final index = _locations.indexWhere((loc) => loc.id == event.locationId);
       if (index != -1) {
         _locations[index] = _locations[index].copyWith(isActive: event.isActive);
-
+        
         // Emit LocationToggleSuccess trước để BlocListener capture
         emit(LocationToggleSuccess(updatedLocation: _locations[index]));
-
+        
         // Sau đó emit LocationsLoaded để UI update
         emit(LocationsLoaded(locations: List.from(_locations)));
       }

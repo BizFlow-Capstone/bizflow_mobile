@@ -37,11 +37,17 @@ class AppLocalizations {
 
   /// Load JSON file
   Future<bool> load() async {
-    final jsonString = await rootBundle.loadString(
-      'lib/core/localization/${locale.languageCode}.json',
-    );
-    _localizedStrings = json.decode(jsonString) as Map<String, dynamic>;
-    return true;
+    try {
+      final jsonString = await rootBundle.loadString(
+        'assets/localization/${locale.languageCode}.json',
+      );
+      _localizedStrings = json.decode(jsonString) as Map<String, dynamic>;
+      return true;
+    } catch (e) {
+      print('Error loading localization: $e');
+      _localizedStrings = {};
+      return false;
+    }
   }
 
   /// Translate key

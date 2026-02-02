@@ -2,22 +2,39 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
+/// Error codes for auth operations
+/// These codes are mapped to localization keys in UI layer
+enum AuthErrorCode {
+  signupFailed,
+  loginFailed,
+  invalidCredentials,
+  emailNotRegistered,
+  accountNotVerified,
+  otpFailed,
+  invalidOtp,
+  otpExpired,
+  networkError,
+  serverError,
+  unknownError,
+}
+
 /// Auth BLoC - State Management for Authentication
 /// Xử lý tất cả auth events: signup, login, verify OTP, logout
+/// NOTE: Bloc không biết về localization - chỉ return error code
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   AuthBloc() : super(AuthInitial()) {
     // Handle Signup Events
     on<SignupRequested>(_onSignupRequested);
     on<GoogleSignupRequested>(_onGoogleSignupRequested);
-
+    
     // Handle Login Events
     on<LoginRequested>(_onLoginRequested);
     on<GoogleLoginRequested>(_onGoogleLoginRequested);
-
+    
     // Handle OTP Events
     on<VerifyOtpRequested>(_onVerifyOtpRequested);
     on<ResendOtpRequested>(_onResendOtpRequested);
-
+    
     // Handle General Events
     on<LogoutRequested>(_onLogoutRequested);
     on<ClearAuthError>(_onClearAuthError);
@@ -37,12 +54,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   email: event.email,
       //   password: event.password,
       // );
-
+      
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       emit(SignupSuccess(phoneNumber: event.phone));
     } catch (e) {
-      emit(SignupFailure(message: e.toString()));
+      // Return error code, not message - UI will localize
+      emit(const SignupFailure(errorCode: AuthErrorCode.signupFailed));
     }
   }
 
@@ -59,12 +77,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   email: event.email,
       //   name: event.name,
       // );
-
+      
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       emit(SignupSuccess(phoneNumber: '+84123456789'));
     } catch (e) {
-      emit(SignupFailure(message: e.toString()));
+      emit(const SignupFailure(errorCode: AuthErrorCode.signupFailed));
     }
   }
 
@@ -81,7 +99,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   phone: event.phone.isNotEmpty ? event.phone : null,
       //   password: event.password,
       // );
-
+      
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       emit(LoginSuccess(
@@ -89,7 +107,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         user: {'id': '1', 'email': event.email, 'phone': event.phone},
       ));
     } catch (e) {
-      emit(LoginFailure(message: e.toString()));
+      emit(const LoginFailure(errorCode: AuthErrorCode.loginFailed));
     }
   }
 
@@ -104,7 +122,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // final result = await _authRepository.googleLogin(
       //   idToken: event.idToken,
       // );
-
+      
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       emit(LoginSuccess(
@@ -112,7 +130,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         user: {'id': '1', 'email': 'user@google.com'},
       ));
     } catch (e) {
-      emit(LoginFailure(message: e.toString()));
+      emit(const LoginFailure(errorCode: AuthErrorCode.loginFailed));
     }
   }
 
@@ -128,11 +146,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   phone: event.phone,
       //   otpCode: event.otpCode,
       // );
-
+      
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       if (event.otpCode == '000000') {
-        emit(OtpVerificationFailure(message: 'Invalid OTP code'));
+        emit(const OtpVerificationFailure(errorCode: AuthErrorCode.invalidOtp));
       } else {
         emit(OtpVerificationSuccess(
           token: 'mock_token_after_otp',
@@ -140,7 +158,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         ));
       }
     } catch (e) {
-      emit(OtpVerificationFailure(message: e.toString()));
+      emit(const OtpVerificationFailure(errorCode: AuthErrorCode.otpFailed));
     }
   }
 
@@ -154,7 +172,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // final result = await _authRepository.resendOtp(
       //   phone: event.phone,
       // );
-
+      
       // Mock success - just show success message in UI
       await Future.delayed(const Duration(seconds: 1));
     } catch (e) {
@@ -170,11 +188,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       // TODO: Call repository to logout
       // await _authRepository.logout();
-
+      
       // Mock success
       emit(AuthUnauthenticated());
     } catch (e) {
-      emit(AuthError(message: e.toString()));
+      emit(const AuthError(errorCode: AuthErrorCode.unknownError));
     }
   }
 

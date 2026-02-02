@@ -1,9 +1,7 @@
+/// Auth Feature Exports
 
-
-// Presentation
-export 'presentation/pages/register_page.dart';
-export 'presentation/pages/verify_otp_page.dart';
-export 'presentation/pages/pages.dart';
+// Presentation (all: bloc, pages, widgets)
+export 'presentation/presentation.dart';
 
 // Domain
 export 'domain/domain.dart';

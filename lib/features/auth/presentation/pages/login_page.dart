@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/providers/localization_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
@@ -12,6 +14,9 @@ import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 import 'register_page.dart';
 
+// Import AuthErrorCode from bloc
+export '../bloc/auth_bloc.dart' show AuthErrorCode;
+
 /// SC-AUT-03: Login Page
 /// Trang đăng nhập gồm 2 ô input (Email/Phone, Password) + Forgot Password link
 /// Hỗ trợ đăng nhập bằng:
@@ -19,12 +24,7 @@ import 'register_page.dart';
 /// - Số điện thoại + mật khẩu
 /// - Google sign-in
 class LoginPage extends StatefulWidget {
-  final Function(Locale)? onLocaleChange;
-
-  const LoginPage({
-    super.key,
-    this.onLocaleChange,
-  });
+  const LoginPage({super.key});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -60,9 +60,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    final l10n = AppLocalizations.of(context);
-
+  void _handleLogin(AppLocalizations l10n) {
     // Validate inputs
     final input = _emailPhoneController.text.trim();
     if (input.isEmpty) {
@@ -80,7 +78,7 @@ class _LoginPageState extends State<LoginPage> {
     final isPhone = _isValidPhone(input);
 
     if (!isEmail && !isPhone) {
-      _showError(l10n.translate('validation.invalid_email'));
+      _showError(l10n.translate('auth.invalid_email_or_phone'));
       return;
     }
 
@@ -102,8 +100,7 @@ class _LoginPageState extends State<LoginPage> {
     // );
   }
 
-  void _handleForgotPassword() {
-    final l10n = AppLocalizations.of(context);
+  void _handleForgotPassword(AppLocalizations l10n) {
     // TODO: Navigate to forgot password page
     _showSuccess(l10n.translate('auth.forgot_password'));
   }
@@ -145,6 +142,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final localizationProvider = Provider.of<LocalizationProvider>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -152,28 +150,87 @@ class _LoginPageState extends State<LoginPage> {
         backgroundColor: Colors.transparent,
         actions: [
           LanguageSwitcher(
-            currentLocale: Localizations.localeOf(context),
+            currentLocale: localizationProvider.currentLocale,
             onLanguageChanged: (locale) {
-              widget.onLocaleChange?.call(locale);
+              localizationProvider.setLocale(locale);
             },
           ),
           SizedBox(width: AppSpacing.md),
         ],
       ),
-      body: BlocListener<AuthBloc, AuthState>(
-        listener: (context, state) {
-          if (state is LoginSuccess) {
-            _showSuccess(l10n.translate('auth.login_success'));
-            // TODO: Navigate to home screen
-          } else if (state is LoginFailure) {
-            _showError(state.message);
-          }
+      body: _LoginPageContent(
+        l10n: l10n,
+        emailPhoneController: _emailPhoneController,
+        passwordController: _passwordController,
+        emailPhoneFocus: _emailPhoneFocus,
+        passwordFocus: _passwordFocus,
+        isPasswordVisible: _isPasswordVisible,
+        rememberMe: _rememberMe,
+        onPasswordVisibilityChanged: (value) {
+          setState(() {
+            _isPasswordVisible = value;
+          });
         },
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
+        onRememberMeChanged: (value) {
+          setState(() {
+            _rememberMe = value;
+          });
+        },
+        onLogin: () => _handleLogin(l10n),
+        onForgotPassword: () => _handleForgotPassword(l10n),
+        onGoogleLogin: _handleGoogleLogin,
+      ),
+    );
+  }
+}
+
+/// Wrapper widget that provides content for login page
+class _LoginPageContent extends StatelessWidget {
+  final AppLocalizations l10n;
+  final TextEditingController emailPhoneController;
+  final TextEditingController passwordController;
+  final FocusNode emailPhoneFocus;
+  final FocusNode passwordFocus;
+  final bool isPasswordVisible;
+  final bool rememberMe;
+  final Function(bool) onPasswordVisibilityChanged;
+  final Function(bool) onRememberMeChanged;
+  final VoidCallback onLogin;
+  final VoidCallback onForgotPassword;
+  final VoidCallback onGoogleLogin;
+
+  const _LoginPageContent({
+    required this.l10n,
+    required this.emailPhoneController,
+    required this.passwordController,
+    required this.emailPhoneFocus,
+    required this.passwordFocus,
+    required this.isPasswordVisible,
+    required this.rememberMe,
+    required this.onPasswordVisibilityChanged,
+    required this.onRememberMeChanged,
+    required this.onLogin,
+    required this.onForgotPassword,
+    required this.onGoogleLogin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is LoginSuccess) {
+          _showSuccess(context, l10n.translate('auth.login_success'));
+          // TODO: Navigate to home screen
+        } else if (state is LoginFailure) {
+          final errorMessage = _mapErrorCodeToLocalization(state.errorCode);
+          _showError(context, errorMessage);
+        }
+      },
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               SizedBox(height: AppSpacing.xl),
 
@@ -197,34 +254,30 @@ class _LoginPageState extends State<LoginPage> {
 
               // Email/Phone Field
               AppTextField(
-                controller: _emailPhoneController,
-                focusNode: _emailPhoneFocus,
+                controller: emailPhoneController,
+                focusNode: emailPhoneFocus,
                 label: l10n.translate('auth.email_or_phone'),
                 hintText: l10n.translate('auth.enter_email_or_phone'),
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 onSubmitted: (_) {
-                  FocusScope.of(context).requestFocus(_passwordFocus);
+                  FocusScope.of(context).requestFocus(passwordFocus);
                 },
               ),
               SizedBox(height: AppSpacing.md),
 
               // Password Field
               AppTextField(
-                controller: _passwordController,
-                focusNode: _passwordFocus,
+                controller: passwordController,
+                focusNode: passwordFocus,
                 label: l10n.translate('auth.password'),
                 hintText: l10n.translate('auth.enter_password'),
-                obscureText: !_isPasswordVisible,
+                obscureText: !isPasswordVisible,
                 textInputAction: TextInputAction.done,
                 suffixIcon: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isPasswordVisible = !_isPasswordVisible;
-                    });
-                  },
+                  onTap: () => onPasswordVisibilityChanged(!isPasswordVisible),
                   child: Icon(
-                    _isPasswordVisible
+                    isPasswordVisible
                         ? Icons.visibility
                         : Icons.visibility_off,
                     color: AppColors.textSecondary,
@@ -244,15 +297,13 @@ class _LoginPageState extends State<LoginPage> {
                         width: 20,
                         height: 20,
                         child: Checkbox(
-                          value: _rememberMe,
+                          value: rememberMe,
                           onChanged: (value) {
-                            setState(() {
-                              _rememberMe = value ?? false;
-                            });
+                            onRememberMeChanged(value ?? false);
                           },
                           activeColor: const Color(0xFF23C4C1),
                           side: BorderSide(
-                            color: _rememberMe
+                            color: rememberMe
                                 ? const Color(0xFF23C4C1)
                                 : AppColors.divider,
                           ),
@@ -267,7 +318,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   // Forgot Password Link
                   GestureDetector(
-                    onTap: _handleForgotPassword,
+                    onTap: onForgotPassword,
                     child: Text(
                       l10n.translate('auth.forgot_password'),
                       style: AppTextStyles.bodySmall.copyWith(
@@ -287,8 +338,8 @@ class _LoginPageState extends State<LoginPage> {
                     label: l10n.translate('auth.login_button'),
                     isFullWidth: true,
                     isLoading: state is LoginInProgress,
-                    onPressed: state is LoginInProgress ? null : _handleLogin,
-                    type: AppButtonType.secondary,
+                    onPressed: state is LoginInProgress ? null : onLogin,
+                    type: AppButtonType.primary,
                     size: AppButtonSize.large,
                   );
                 },
@@ -326,7 +377,7 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(height: AppSpacing.md),
 
               // Google Login Button
-              _buildGoogleButton(l10n),
+              _buildGoogleButton(context),
               SizedBox(height: AppSpacing.lg),
 
               // Don't have account
@@ -342,9 +393,7 @@ class _LoginPageState extends State<LoginPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => RegisterPage(
-                            onLocaleChange: widget.onLocaleChange,
-                          ),
+                          builder: (context) => const RegisterPage(),
                         ),
                       );
                     },
@@ -362,11 +411,10 @@ class _LoginPageState extends State<LoginPage> {
           ),
         ),
       ),
-      ),
     );
   }
 
-  Widget _buildGoogleButton(AppLocalizations l10n) {
+  Widget _buildGoogleButton(BuildContext context) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -376,7 +424,7 @@ class _LoginPageState extends State<LoginPage> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: _handleGoogleLogin,
+          onTap: onGoogleLogin,
           borderRadius: AppSpacing.borderRadiusMd,
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -386,17 +434,35 @@ class _LoginPageState extends State<LoginPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset(
-                  'assets/icons/google.png',
+                // Google Icon - using local asset with fallback
+                SizedBox(
                   width: 24,
                   height: 24,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.g_mobiledata,
-                      size: 24,
-                      color: AppColors.textPrimary,
-                    );
-                  },
+                  child: Image.asset(
+                    'assets/icons/google.png',
+                    width: 24,
+                    height: 24,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'G',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
                 SizedBox(width: AppSpacing.md),
                 Text(
@@ -412,5 +478,45 @@ class _LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  void _showError(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.danger,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showSuccess(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Map error code from bloc to localization key
+  String _mapErrorCodeToLocalization(AuthErrorCode errorCode) {
+    switch (errorCode) {
+      case AuthErrorCode.loginFailed:
+        return l10n.translate('auth.login_failed');
+      case AuthErrorCode.invalidCredentials:
+        return l10n.translate('auth.invalid_credentials');
+      case AuthErrorCode.emailNotRegistered:
+        return l10n.translate('auth.email_not_registered');
+      case AuthErrorCode.accountNotVerified:
+        return l10n.translate('auth.account_not_verified');
+      case AuthErrorCode.networkError:
+        return l10n.translate('error.network');
+      case AuthErrorCode.serverError:
+        return l10n.translate('error.server');
+      default:
+        return l10n.translate('error.unknown');
+    }
   }
 }

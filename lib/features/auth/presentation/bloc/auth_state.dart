@@ -1,3 +1,5 @@
+import 'auth_bloc.dart';
+
 // Auth States - UI states
 abstract class AuthState {
   const AuthState();
@@ -25,9 +27,9 @@ class SignupSuccess extends AuthState {
 }
 
 class SignupFailure extends AuthState {
-  final String message;
+  final AuthErrorCode errorCode;
 
-  const SignupFailure({required this.message});
+  const SignupFailure({required this.errorCode});
 }
 
 // OTP Verification States
@@ -46,9 +48,9 @@ class OtpVerificationSuccess extends AuthState {
 }
 
 class OtpVerificationFailure extends AuthState {
-  final String message;
+  final AuthErrorCode errorCode;
 
-  const OtpVerificationFailure({required this.message});
+  const OtpVerificationFailure({required this.errorCode});
 }
 
 // Login States
@@ -67,9 +69,9 @@ class LoginSuccess extends AuthState {
 }
 
 class LoginFailure extends AuthState {
-  final String message;
+  final AuthErrorCode errorCode;
 
-  const LoginFailure({required this.message});
+  const LoginFailure({required this.errorCode});
 }
 
 // Authenticated State
@@ -90,7 +92,7 @@ class AuthUnauthenticated extends AuthState {
 
 // Error State
 class AuthError extends AuthState {
-  final String message;
+  final AuthErrorCode errorCode;
 
-  const AuthError({required this.message});
+  const AuthError({required this.errorCode});
 }

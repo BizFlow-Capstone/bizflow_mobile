@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/domain.dart';
+import '../../domain/entities/location_entity.dart';
 
 /// Location States
 abstract class LocationState extends Equatable {

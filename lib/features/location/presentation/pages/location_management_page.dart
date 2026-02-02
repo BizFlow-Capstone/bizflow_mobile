@@ -5,7 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
-import '../../../../shared/widgets/language_switcher.dart';
+import '../../../../shared/widgets/sidebar_widget.dart';
 import '../bloc/location_bloc.dart';
 import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
@@ -28,6 +28,8 @@ class LocationManagementPage extends StatefulWidget {
 }
 
 class _LocationManagementPageState extends State<LocationManagementPage> {
+  LocationItem? _selectedLocation;
+
   @override
   void initState() {
     super.initState();
@@ -38,206 +40,179 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.textPrimary,
-        title: Text(
-          l10n.translate('location.title'),
-          style: AppTextStyles.titleLarge.copyWith(
-            color: AppColors.textPrimary,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          LanguageSwitcher(
-            currentLocale: Localizations.localeOf(context),
-            onLanguageChanged: (locale) {
-              widget.onLocaleChange?.call(locale);
-            },
-          ),
-          SizedBox(width: AppSpacing.md),
-        ],
-      ),
-      body: BlocListener<LocationBloc, LocationState>(
-        listener: (context, state) {
-          if (state is LocationToggleSuccess) {
-            AppSnackBar.show(
-              context,
-              message: l10n.translate('location.status_updated'),
-              type: AppSnackBarType.success,
-            );
-          } else if (state is LocationAddSuccess) {
-            AppSnackBar.show(
-              context,
-              message: l10n.translate('location.location_added'),
-              type: AppSnackBarType.success,
-            );
-          } else if (state is LocationEditSuccess) {
-            AppSnackBar.show(
-              context,
-              message: l10n.translate('location.location_updated'),
-              type: AppSnackBarType.success,
-            );
-          } else if (state is LocationDeleteSuccess) {
-            AppSnackBar.show(
-              context,
-              message: l10n.translate('location.location_deleted'),
-              type: AppSnackBarType.success,
-            );
-          } else if (state is LocationFailure || state is LocationError) {
-            final message = state is LocationFailure
+    // Return a wrapper widget that contains both body and drawer
+    // _GlobalAppBarShell will wrap this with Scaffold
+    return _LocationPageContent(
+      l10n: l10n,
+      selectedLocation: _selectedLocation,
+      onLocationSelected: (location) {
+        setState(() {
+          _selectedLocation = location;
+        });
+      },
+    );
+  }
+}
+
+/// Wrapper widget that provides body content
+/// Drawer will be managed by _GlobalAppBarShell
+class _LocationPageContent extends StatelessWidget {
+  final AppLocalizations l10n;
+  final LocationItem? selectedLocation;
+  final Function(LocationItem) onLocationSelected;
+
+  const _LocationPageContent({
+    required this.l10n,
+    required this.selectedLocation,
+    required this.onLocationSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<LocationBloc, LocationState>(
+      listener: (context, state) {
+        if (state is LocationToggleSuccess) {
+          AppSnackBar.show(
+            context,
+            message: l10n.translate('location.status_updated'),
+            type: AppSnackBarType.success,
+          );
+        } else if (state is LocationAddSuccess) {
+          AppSnackBar.show(
+            context,
+            message: l10n.translate('location.location_added'),
+            type: AppSnackBarType.success,
+          );
+        } else if (state is LocationEditSuccess) {
+          AppSnackBar.show(
+            context,
+            message: l10n.translate('location.location_updated'),
+            type: AppSnackBarType.success,
+          );
+        } else if (state is LocationDeleteSuccess) {
+          AppSnackBar.show(
+            context,
+            message: l10n.translate('location.location_deleted'),
+            type: AppSnackBarType.success,
+          );
+        } else if (state is LocationFailure || state is LocationError) {
+          final message = state is LocationFailure
               ? state.message
               : (state as LocationError).message;
-            AppSnackBar.show(
-              context,
-              message: message,
-              type: AppSnackBarType.error,
-            );
-          }
-        },
-        child: SafeArea(
-          child: BlocBuilder<LocationBloc, LocationState>(
-            builder: (context, state) {
-              if (state is LocationLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(
-                    color: Color(0xFF23C4C1),
+          AppSnackBar.show(
+            context,
+            message: message,
+            type: AppSnackBarType.error,
+          );
+        }
+      },
+      child: SafeArea(
+        child: BlocBuilder<LocationBloc, LocationState>(
+          builder: (context, state) {
+            if (state is LocationLoading) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFF23C4C1)),
+              );
+            }
+
+            if (state is LocationsLoaded) {
+              final locations = state.locations;
+
+              if (locations.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.location_city_outlined, size: 64, color: AppColors.textSecondary),
+                      SizedBox(height: AppSpacing.lg),
+                      Text(
+                        l10n.translate('location.no_locations'),
+                        style: AppTextStyles.titleSmall.copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
                   ),
                 );
               }
 
-              if (state is LocationsLoaded) {
-                final locations = state.locations;
-
-                if (locations.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.location_city_outlined,
-                          size: 64,
-                          color: AppColors.textSecondary,
+              return Column(
+                children: [
+                  // Search Bar
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: l10n.translate('location.search_placeholder'),
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          borderSide: BorderSide(color: AppColors.divider),
                         ),
-                        SizedBox(height: AppSpacing.lg),
-                        Text(
-                          l10n.translate('location.no_locations'),
-                          style: AppTextStyles.titleSmall.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return Column(
-                  children: [
-                    // Search Bar
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: l10n.translate('location.search_placeholder'),
-                          prefixIcon: const Icon(Icons.search),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                            borderSide: BorderSide(color: AppColors.divider),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                            borderSide: BorderSide(color: AppColors.divider),
-                          ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          borderSide: BorderSide(color: AppColors.divider),
                         ),
                       ),
                     ),
-
-                    // Location List
-                    Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.sm,
-                        ),
-                        itemCount: locations.length,
-                        itemBuilder: (context, index) {
-                          final location = locations[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                            child: LocationCard(
-                              location: location,
-                              onTap: () {
-                                // Navigate to product management page
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ProductManagementPage(
-                                      locationId: location.id,
-                                      locationName: location.name,
-                                    ),
-                                  ),
-                                );
-                              },
-                              onToggleStatus: (isActive) {
-                                context.read<LocationBloc>().add(
-                                  ToggleLocationStatusRequested(
+                  ),
+                  // Location List
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      itemCount: locations.length,
+                      itemBuilder: (context, index) {
+                        final location = locations[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: LocationCard(
+                            location: location,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProductManagementPage(
                                     locationId: location.id,
-                                    isActive: isActive,
+                                    locationName: location.name,
                                   ),
-                                );
-                              },
-                              onEdit: () {
-                                // Navigate to edit location page
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => AddEditLocationPage(
-                                      location: location,
+                                ),
+                              );
+                            },
+                            onToggleStatus: (isActive) {
+                              context.read<LocationBloc>().add(
+                                    ToggleLocationStatusRequested(
+                                      locationId: location.id,
+                                      isActive: isActive,
                                     ),
-                                  ),
-                                );
-                              },
-                              onAddManager: () {
-                                // Show dialog to add manager
-                                // TODO: Implement dialog
-                                AppSnackBar.show(
-                                  context,
-                                  message: 'Thêm nhân viên quản lý',
-                                  type: AppSnackBarType.info,
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
+                                  );
+                            },
+                            onEdit: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => AddEditLocationPage(location: location),
+                                ),
+                              );
+                            },
+                            onAddManager: () {
+                              AppSnackBar.show(
+                                context,
+                                message: 'Thêm nhân viên quản lý',
+                                type: AppSnackBarType.info,
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
-                  ],
-                );
-              }
+                  ),
+                ],
+              );
+            }
 
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-      ),
-
-      // Floating Action Button - Add new location
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF23C4C1),
-        onPressed: () {
-          // Navigate to add location page
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AddEditLocationPage(),
-            ),
-          );
-        },
-        child: const Icon(
-          Icons.add,
-          color: Colors.white,
+            return const SizedBox.shrink();
+          },
         ),
       ),
     );

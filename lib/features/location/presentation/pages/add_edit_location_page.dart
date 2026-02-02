@@ -94,8 +94,9 @@ class _AddEditLocationPageState extends State<AddEditLocationPage> {
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary,),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
+          color: Colors.black,
         ),
         title: Text(
           isEditMode
