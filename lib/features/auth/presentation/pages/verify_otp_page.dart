@@ -6,8 +6,6 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/language_switcher.dart';
-import 'package:provider/provider.dart';
-import '../../../../core/providers/localization_provider.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -134,7 +132,6 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final localizationProvider = Provider.of<LocalizationProvider>(context);
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -142,7 +139,10 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
         elevation: 0,
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Text(l10n.translate('auth.verify_otp_title')),
         centerTitle: true,
         titleTextStyle: AppTextStyles.titleLarge.copyWith(
@@ -150,9 +150,9 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
         ),
         actions: [
           LanguageSwitcher(
-            currentLocale: localizationProvider.currentLocale,
+            currentLocale: Localizations.localeOf(context),
             onLanguageChanged: (locale) {
-              localizationProvider.setLocale(locale);
+              widget.onLocaleChange?.call(locale);
             },
           ),
           SizedBox(width: AppSpacing.md),
@@ -285,10 +285,10 @@ class _VerifyOtpPageContent extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Text(
-                      //   '${l10n.translate('auth.didnt_receive')} ',
-                      //   style: AppTextStyles.bodyMedium,
-                      // ),
+                      Text(
+                        '${l10n.translate('auth.didnt_receive')} ',
+                        style: AppTextStyles.bodyMedium,
+                      ),
                       Text(
                         l10n.translate('auth.resend_otp'),
                         style: AppTextStyles.bodyMedium.copyWith(
@@ -301,7 +301,7 @@ class _VerifyOtpPageContent extends StatelessWidget {
                         style: AppTextStyles.bodyMedium,
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, '/register'),
+                        onTap: () => Navigator.pop(context),
                         child: Text(
                           l10n.translate('auth.change_phone_number'),
                           style: AppTextStyles.bodyMedium.copyWith(

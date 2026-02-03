@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'core/config/app_config.dart';
 import 'core/localization/app_localizations.dart';
+import 'core/network/api_client.dart';
 import 'core/providers/localization_provider.dart';
 import 'core/routing/app_router.dart';
+import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/employee/data/employee_api_service.dart';
+import 'features/employee/data/employee_repository.dart';
+import 'features/location/data/location_api_service.dart';
+import 'features/location/data/location_repository.dart';
 import 'features/location/presentation/bloc/location_bloc.dart';
 
 void main() {
@@ -22,16 +29,52 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late LocalizationProvider _localizationProvider;
+  late ApiClient _apiClient;
+  late LocationApiService _locationApiService;
+  late LocationRepository _locationRepository;
+  late EmployeeApiService _employeeApiService;
+  late EmployeeRepository _employeeRepository;
 
   @override
   void initState() {
     super.initState();
     _localizationProvider = LocalizationProvider();
+
+    // Initialize API Client with interceptors
+    _apiClient = ApiClient(
+      baseUrl: AppConfig.baseUrl,
+      timeout: AppConfig.apiTimeout,
+      requestInterceptors: [
+        // Auth interceptor
+        AuthInterceptor(
+          getToken: () async {
+            final token = await SecureStorage().read(key: 'access_token');
+            return token;
+          },
+        ),
+        // Language interceptor - reads from LocalizationProvider
+        LanguageInterceptor(
+          getCurrentLanguage: () => _localizationProvider.currentLocale.languageCode,
+        ),
+      ],
+      responseInterceptors: AppConfig.enableLogging
+          ? [LoggingInterceptor()]
+          : [],
+    );
+
+    // Initialize Services (calls ApiClient)
+    _locationApiService = LocationApiService(apiClient: _apiClient);
+    _employeeApiService = EmployeeApiService(apiClient: _apiClient);
+
+    // Initialize Repositories (calls Services)
+    _locationRepository = LocationRepository(service: _locationApiService);
+    _employeeRepository = EmployeeRepository(service: _employeeApiService);
   }
 
   @override
   void dispose() {
     _localizationProvider.dispose();
+    _apiClient.close();
     super.dispose();
   }
 
@@ -41,7 +84,12 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider.value(value: _localizationProvider),
         BlocProvider(create: (context) => AuthBloc()),
-        BlocProvider(create: (context) => LocationBloc()),
+        BlocProvider(
+          create: (context) => LocationBloc(
+            repository: _locationRepository,
+            employeeRepository: _employeeRepository,
+          ),
+        ),
       ],
       child: Consumer<LocalizationProvider>(
         builder: (context, localizationProvider, _) {

@@ -109,9 +109,65 @@ class _LocationPageContent extends StatelessWidget {
       child: SafeArea(
         child: BlocBuilder<LocationBloc, LocationState>(
           builder: (context, state) {
+            // Loading state
             if (state is LocationLoading) {
-              return const Center(
-                child: CircularProgressIndicator(color: Color(0xFF23C4C1)),
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CircularProgressIndicator(color: Color(0xFF23C4C1)),
+                    SizedBox(height: AppSpacing.md),
+                    Text(
+                      l10n.translate('location.loading_locations'),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Error state
+            if (state is LocationFailure || state is LocationError) {
+              final message = state is LocationFailure
+                  ? state.message
+                  : (state as LocationError).message;
+              
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: AppColors.error,
+                    ),
+                    SizedBox(height: AppSpacing.lg),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                      child: Text(
+                        message,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.xl),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        context.read<LocationBloc>().add(const LoadLocationsRequested());
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: Text(l10n.translate('common.retry')),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.white,
+                      ),
+                    ),
+                  ],
+                ),
               );
             }
 

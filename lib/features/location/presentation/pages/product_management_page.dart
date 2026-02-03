@@ -33,6 +33,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
+          color: Colors.black,
         ),
         title: Text(
           widget.locationName,

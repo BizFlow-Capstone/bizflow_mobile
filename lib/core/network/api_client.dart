@@ -81,6 +81,22 @@ class AuthInterceptor implements RequestInterceptor {
   }
 }
 
+/// Language Interceptor - Tự động thêm Accept-Language header
+class LanguageInterceptor implements RequestInterceptor {
+  final String Function() getCurrentLanguage;
+
+  LanguageInterceptor({required this.getCurrentLanguage});
+
+  @override
+  Future<Map<String, String>> onRequest(Map<String, String> headers) async {
+    final language = getCurrentLanguage();
+    if (language.isNotEmpty) {
+      headers['Accept-Language'] = language;
+    }
+    return headers;
+  }
+}
+
 /// Logging Interceptor
 class LoggingInterceptor implements ResponseInterceptor {
   @override
@@ -109,7 +125,17 @@ class ApiClient {
     this.requestInterceptors = const [],
     this.responseInterceptors = const [],
   }) {
-    _client = HttpClient()..connectionTimeout = timeout;
+    _client = HttpClient()
+      ..connectionTimeout = timeout
+      // ✅ DEVELOPMENT ONLY: Bypass SSL certificate validation
+      // ⚠️ NEVER use this in production!
+      ..badCertificateCallback = (cert, host, port) {
+        // Allow self-signed certificates in development
+        if (kDebugMode && (host == 'localhost' || host == '10.0.2.2')) {
+          return true;
+        }
+        return false;
+      };
   }
 
   /// GET request

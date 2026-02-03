@@ -16,11 +16,14 @@ class AppConfig {
   static String get baseUrl {
     switch (environment) {
       case 'production':
-        return 'https://api.bizflow.com/v1';
+        return 'https://api.bizflow.com';
       case 'staging':
-        return 'https://staging-api.bizflow.com/v1';
+        return 'https://staging-api.bizflow.com';
       default:
-        return 'https://dev-api.bizflow.com/v1';
+        // Android emulator: Use 10.0.2.2 (not localhost)
+        // HTTPS - Backend đang force HTTPS
+        // Note: Cần trust self-signed certificate
+        return 'https://10.0.2.2:7270';
     }
   }
 

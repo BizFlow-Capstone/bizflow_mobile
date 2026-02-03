@@ -95,7 +95,11 @@
     "network": "Lỗi kết nối mạng",
     "server": "Lỗi máy chủ",
     "timeout": "Hết thời gian chờ",
-    "unknown": "Lỗi không xác định"
+    "unknown": "Lỗi không xác định",
+    "no_internet": "Không có kết nối mạng. Vui lòng kiểm tra kết nối và thử lại",
+    "connection_failed": "Không thể kết nối đến máy chủ",
+    "backend_not_running": "Không thể kết nối. Vui lòng đảm bảo backend đang chạy",
+    "request_timeout": "Yêu cầu hết thời gian chờ. Vui lòng thử lại"
   },
   "home": {
     "title": "Trang chủ",
@@ -132,15 +136,29 @@
     "location_name_hint": "Nhập tên Địa Điểm Kinh Doanh",
     "location_address": "Địa Chỉ",
     "location_address_hint": "Nhập địa chỉ",
+    "location_district": "Quận/Huyện",
+    "location_district_hint": "Nhập quận/huyện",
+    "location_city": "Thành Phố/Tỉnh",
+    "location_city_hint": "Nhập thành phố/tỉnh",
+    "location_phone": "Số Điện Thoại",
+    "location_phone_hint": "Nhập số điện thoại",
+    "location_tax_code": "Mã Số Thuế",
+    "location_tax_code_hint": "Nhập mã số thuế",
     "location_manager": "Thêm Nhân Viên Quản Lý Địa Điểm Kinh Doanh",
     "location_manager_hint": "Nhập tên nhân viên",
+    "location_owner": "Chủ Sở Hữu",
+    "location_owner_hint": "Tên chủ sở hữu địa điểm",
     "create_button": "Tạo Địa Điểm Kinh Doanh",
     "update_button": "Cập nhật",
     "status_updated": "Cập nhật trạng thái thành công",
     "location_added": "Thêm địa điểm thành công",
     "location_updated": "Cập nhật địa điểm thành công",
     "location_deleted": "Xóa địa điểm thành công",
-    "validation_error": "Vui lòng điền đầy đủ thông tin"
+    "validation_error": "Vui lòng điền đầy đủ thông tin",
+    "employee_section_title": "Phân công nhân viên",
+    "employee_dropdown_hint": "Chọn nhân viên",
+    "employee_no_results": "Không có nhân viên nào",
+    "loading_locations": "Đang tải danh sách địa điểm..."
   },
   "appbar": {
     "greeting": "Xin chào,"

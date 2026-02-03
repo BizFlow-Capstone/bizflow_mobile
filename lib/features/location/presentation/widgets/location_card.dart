@@ -59,7 +59,7 @@ class LocationCard extends StatelessWidget {
                     ),
                     SizedBox(height: AppSpacing.sm),
 
-                    // Address
+                    // Full Address (address, district, city)
                     Row(
                       children: [
                         Icon(
@@ -72,7 +72,7 @@ class LocationCard extends StatelessWidget {
                         SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
-                            location.address,
+                            location.fullAddress,
                             style: AppTextStyles.bodySmall.copyWith(
                               color: location.isActive
                                 ? AppColors.textSecondary
@@ -84,9 +84,32 @@ class LocationCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    SizedBox(height: AppSpacing.md),
+                    SizedBox(height: AppSpacing.xs),
 
-                    // Manager Info
+                    // Phone Number
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_outlined,
+                          size: 16,
+                          color: location.isActive
+                            ? AppColors.textSecondary
+                            : AppColors.textDisabled,
+                        ),
+                        SizedBox(width: AppSpacing.xs),
+                        Text(
+                          location.phone,
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: location.isActive
+                              ? AppColors.textSecondary
+                              : AppColors.textDisabled,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: AppSpacing.xs),
+
+                    // Owner Info
                     Row(
                       children: [
                         Icon(
@@ -99,7 +122,7 @@ class LocationCard extends StatelessWidget {
                         SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
-                            location.managerName,
+                            '${location.ownerName}',
                             style: AppTextStyles.bodySmall.copyWith(
                               color: location.isActive
                                 ? AppColors.textSecondary
@@ -156,7 +179,7 @@ class LocationCard extends StatelessWidget {
               ),
 
               // Bottom: Add Manager Button (if no manager)
-              if (location.managerName.isEmpty)
+              if (location.ownerName.isEmpty)
                 Positioned(
                   bottom: AppSpacing.md,
                   left: AppSpacing.md,
