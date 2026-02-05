@@ -11,7 +11,7 @@ import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
 import '../widgets/location_card.dart';
 import 'add_edit_location_page.dart';
-import 'product_management_page.dart';
+import '../../../product/presentation/pages/product_management_page.dart';
 
 /// Location Management Page
 /// SC-LOC-01: Quản lý địa điểm kinh doanh

@@ -26,15 +26,15 @@ class LocationApiService {
         ApiEndpoints.myOwnedLocations,
       );
 
-      debugPrint('🔍 API Response Status: ${response.statusCode}');
-      debugPrint('🔍 API Response Success: ${response.isSuccess}');
-      debugPrint('🔍 API Response Data Type: ${response.data.runtimeType}');
-      debugPrint('🔍 API Response Data: ${response.data}');
+      debugPrint('API Response Status: ${response.statusCode}');
+      debugPrint('API Response Success: ${response.isSuccess}');
+      debugPrint('API Response Data Type: ${response.data.runtimeType}');
+      debugPrint('API Response Data: ${response.data}');
 
       if (response.isSuccess && response.data != null) {
         // Check if response.data is Map
         if (response.data is! Map<String, dynamic>) {
-          throw Exception('❌ Response không đúng format\n\n'
+          throw Exception('Response không đúng format\n\n'
               'Expected: Map<String, dynamic>\n'
               'Got: ${response.data.runtimeType}\n'
               'Data: ${response.data}');
@@ -50,27 +50,27 @@ class LocationApiService {
     } on ApiException catch (e) {
       // Transform ApiException to domain exception with user-friendly messages
       if (e.statusCode == -1) {
-        throw Exception('❌ No network connection\n\n'
-            '📌 Check:\n'
+        throw Exception('No network connection\n\n'
+            'Check:\n'
             '• Is backend running?\n'
             '• Port: 7270\n'
             '• URL: https://10.0.2.2:7270');
       } else if (e.statusCode == -2) {
-        throw Exception('⏱️ Connection timeout\n\n'
+        throw Exception('Connection timeout\n\n'
             'Backend did not respond within 30 seconds');
       } else if (e.statusCode == -3) {
         // HttpException or connection error
-        throw Exception('🔌 Backend connection error\n\n'
+        throw Exception('Backend connection error\n\n'
             '${e.message}\n\n'
-            '📌 Solutions:\n'
+            'Solutions:\n'
             '1. Check backend is running: dotnet run\n'
             '2. Ensure port 7270 is not blocked\n'
             '3. Hot restart app (press R)\n'
             '4. Check URL: https://10.0.2.2:7270');
       } else if (e.statusCode == 401) {
-        throw Exception('🔒 Session expired\n\nPlease login again');
+        throw Exception('Session expired\n\nPlease login again');
       } else if (e.statusCode == 404) {
-        throw Exception('🔍 Data not found');
+        throw Exception('Data not found');
       }
       throw Exception('API Error: ${e.message}');
     } catch (e) {
@@ -100,7 +100,7 @@ class LocationApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
-        throw Exception('🔒 Session expired');
+        throw Exception('Session expired');
       }
       throw Exception('API Error: ${e.message}');
     } catch (e) {
@@ -128,7 +128,7 @@ class LocationApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 400) {
-        throw Exception('❌ Invalid data');
+        throw Exception('Invalid data');
       }
       throw Exception('Error creating location: ${e.message}');
     } catch (e) {
@@ -152,8 +152,8 @@ class LocationApiService {
         body: UpdateStatusRequestDto(isActive: isActive).toJson(),
       );
 
-      debugPrint('🔍 Update Status Response: ${response.isSuccess}');
-      debugPrint('🔍 Update Status Message: ${response.message}');
+      debugPrint('Update Status Response: ${response.isSuccess}');
+      debugPrint('Update Status Message: ${response.message}');
 
       if (response.isSuccess) {
         // Backend only returns {success, message}, no data field
@@ -183,8 +183,8 @@ class LocationApiService {
         body: request.toJson(),
       );
 
-      debugPrint('🔍 Update Location Response: ${response.isSuccess}');
-      debugPrint('🔍 Update Location Data: ${response.data}');
+      debugPrint('Update Location Response: ${response.isSuccess}');
+      debugPrint('Update Location Data: ${response.data}');
 
       if (response.isSuccess) {
         // Check if backend returns data field
@@ -207,9 +207,9 @@ class LocationApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 400) {
-        throw Exception('❌ Invalid data');
+        throw Exception('Invalid data');
       } else if (e.statusCode == 404) {
-        throw Exception('🔍 Location not found');
+        throw Exception('Location not found');
       }
       throw Exception('Error updating location: ${e.message}');
     } catch (e) {
@@ -237,7 +237,7 @@ class LocationApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 404) {
-        throw Exception('🔍 Location or employees not found');
+        throw Exception('Location or employees not found');
       }
       throw Exception('Error adding employees: ${e.message}');
     } catch (e) {

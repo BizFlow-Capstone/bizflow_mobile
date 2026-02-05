@@ -15,6 +15,7 @@ import 'features/employee/data/employee_repository.dart';
 import 'features/location/data/location_api_service.dart';
 import 'features/location/data/location_repository.dart';
 import 'features/location/presentation/bloc/location_bloc.dart';
+import 'features/product/presentation/bloc/product_bloc.dart';
 
 void main() {
   runApp(const MyApp());
@@ -89,6 +90,9 @@ class _MyAppState extends State<MyApp> {
             repository: _locationRepository,
             employeeRepository: _employeeRepository,
           ),
+        ),
+        BlocProvider(
+          create: (context) => ProductBloc(),
         ),
       ],
       child: Consumer<LocalizationProvider>(

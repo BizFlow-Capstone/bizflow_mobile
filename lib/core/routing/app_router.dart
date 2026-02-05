@@ -6,7 +6,7 @@ import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/verify_otp_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
-import '../../features/location/presentation/pages/product_management_page.dart';
+import '../../features/product/presentation/pages/product_management_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
 import '../../shared/widgets/app_bar_custom.dart';
