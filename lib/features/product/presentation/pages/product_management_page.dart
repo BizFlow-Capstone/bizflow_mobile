@@ -10,6 +10,7 @@ import '../bloc/product_state.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
 import 'add_product_page.dart';
+import 'stock_import_page.dart';
 
 /// Product Management by Location Page
 /// SC-INV-03.1: Quản lý sản phẩm theo địa điểm kinh doanh
@@ -46,17 +47,14 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
   void _loadProducts() {
     context.read<ProductBloc>().add(
-          LoadProductsByLocationRequested(locationId: widget.locationId),
-        );
+      LoadProductsByLocationRequested(locationId: widget.locationId),
+    );
   }
 
   void _searchProducts(String query) {
     context.read<ProductBloc>().add(
-          SearchProductsRequested(
-            locationId: widget.locationId,
-            query: query,
-          ),
-        );
+      SearchProductsRequested(locationId: widget.locationId, query: query),
+    );
   }
 
   void _openAddProductPage() {
@@ -64,9 +62,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddProductPage(
-          locationId: widget.locationId,
-        ),
+        builder: (context) => AddProductPage(locationId: widget.locationId),
       ),
     );
   }
@@ -102,7 +98,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
               ),
             ),
             Text(
-              l10n.translate('location.address') ?? 'Address',
+              l10n.translate('location.address'),
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -123,7 +119,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     controller: _searchController,
                     onChanged: _searchProducts,
                     decoration: InputDecoration(
-                      hintText: l10n.translate('common.search_products') ?? 'Tìm kiếm sản phẩm...',
+                      hintText: l10n.translate('common.search_products'),
                       hintStyle: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textDisabled,
                       ),
@@ -133,21 +129,15 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.divider,
-                        ),
+                        borderSide: BorderSide(color: AppColors.divider),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.divider,
-                        ),
+                        borderSide: BorderSide(color: AppColors.divider),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: AppColors.secondary,
-                        ),
+                        borderSide: BorderSide(color: AppColors.secondary),
                       ),
                       contentPadding: EdgeInsets.symmetric(
                         vertical: AppSpacing.md,
@@ -212,14 +202,14 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                           ),
                           SizedBox(height: AppSpacing.lg),
                           Text(
-                            l10n.translate('location.manage_products') ?? 'Quản lý sản phẩm',
+                            l10n.translate('location.manage_products'),
                             style: AppTextStyles.titleSmall.copyWith(
                               color: AppColors.textSecondary,
                             ),
                           ),
                           SizedBox(height: AppSpacing.md),
                           Text(
-                            l10n.translate('common.no_data') ?? 'Không có dữ liệu',
+                            l10n.translate('common.no_data'),
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -232,8 +222,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   return RefreshIndicator(
                     onRefresh: () async {
                       context.read<ProductBloc>().add(
-                            RefreshProductsRequested(locationId: widget.locationId),
-                          );
+                        RefreshProductsRequested(locationId: widget.locationId),
+                      );
                     },
                     child: ListView.builder(
                       padding: EdgeInsets.symmetric(
@@ -262,7 +252,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         ),
                         SizedBox(height: AppSpacing.lg),
                         Text(
-                          l10n.translate('common.error') ?? 'Lỗi',
+                          l10n.translate('common.error'),
                           style: AppTextStyles.titleSmall.copyWith(
                             color: AppColors.error,
                           ),
@@ -292,7 +282,13 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         onAddProduct: _openAddProductPage,
         onImportInventory: () {
           _toggleFabMenu();
-          // TODO: Navigate to import inventory page
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  StockImportPage(locationId: widget.locationId),
+            ),
+          );
         },
       ),
     );

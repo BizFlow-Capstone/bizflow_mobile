@@ -126,7 +126,7 @@ lib/
 
 ### 4. **localization/** - Localization Module
 - i18n/l10n setup
-- Translation files (.arb)
+- Translation files (.json)
 - Multi-language support
 - Language switching logic
 
@@ -435,7 +435,7 @@ User Action:
 
 ### Localization
 - **Languages:** English, Vietnamese
-- **Format:** .arb files
+- **Format:** .json files
 - **Switching:** Runtime language change
 
 ---

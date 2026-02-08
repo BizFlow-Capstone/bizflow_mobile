@@ -18,7 +18,8 @@
     "no_data": "No data",
     "error": "Error",
     "success": "Success",
-    "warning": "Warning"
+    "warning": "Warning",
+    "add": "+ Add"
   },
   "auth": {
     "login": "Login",
@@ -215,5 +216,28 @@
     "inventory_label": "In Stock",
     "create_product_option": "Create new product",
     "import_warehouse_option": "Create import receipt"
+  },
+  "stock_import": {
+    "title": "Create Stock Import Receipt",
+    "status_draft": "Draft - Not Contacted",
+    "status_contacted": "Supplier Contacted",
+    "status_imported": "Imported",
+    "step_input": "Input",
+    "step_contacted": "Contacted",
+    "step_imported": "Imported",
+    "import_type": "Import Type",
+    "with_invoice": "With Invoice",
+    "without_invoice": "Without Invoice",
+    "low_stock_title": "Low Stock Product Suggestions",
+    "low_stock_subtitle": "The following products are below minimum stock level",
+    "product_list": "Product List",
+    "no_products": "No products added yet",
+    "note": "Note",
+    "note_hint": "Enter order notes...",
+    "select_product": "Select Product",
+    "add_product_required": "Please add at least one product",
+    "confirm_title": "Confirm Stock Import",
+    "confirm_message": "Are you sure you want to import {count} products to inventory?",
+    "success": "Stock imported successfully!"
   }
 }

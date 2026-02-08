@@ -19,7 +19,8 @@
     "error": "Lỗi",
     "success": "Thành công",
     "warning": "Cảnh báo",
-    "required_field": "Vui lòng nhập tên sản phẩm"
+    "required_field": "Vui lòng nhập tên sản phẩm",
+    "add": "+ Thêm"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -220,5 +221,28 @@
     "inventory_label": "Tồn kho",
     "create_product_option": "Tạo sản phẩm mới",
     "import_warehouse_option": "Tạo phiếu nhập kho"
+  },
+  "stock_import": {
+    "title": "Tạo phiếu nhập kho",
+    "status_draft": "Bản nháp - Chưa liên hệ",
+    "status_contacted": "Đã liên hệ nhà cung cấp",
+    "status_imported": "Đã nhập kho",
+    "step_input": "Nhập",
+    "step_contacted": "Đã liên hệ",
+    "step_imported": "Đã nhập",
+    "import_type": "Loại đơn nhập hàng",
+    "with_invoice": "Có hóa đơn",
+    "without_invoice": "Không hóa đơn",
+    "low_stock_title": "Gợi ý sản phẩm sắp hết hàng",
+    "low_stock_subtitle": "Các sản phẩm sau đang dưới mức tồn kho tối thiểu",
+    "product_list": "Danh sách sản phẩm",
+    "no_products": "Chưa có sản phẩm nào",
+    "note": "Ghi chú",
+    "note_hint": "Nhập ghi chú về đơn hàng...",
+    "select_product": "Chọn sản phẩm",
+    "add_product_required": "Vui lòng thêm ít nhất một sản phẩm",
+    "confirm_title": "Xác nhận nhập kho",
+    "confirm_message": "Bạn có chắc chắn muốn nhập {count} sản phẩm vào kho?",
+    "success": "Nhập kho thành công!"
   }
 }

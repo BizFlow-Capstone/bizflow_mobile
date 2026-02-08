@@ -104,7 +104,7 @@ class _AddProductPageState extends State<AddProductPage> {
           color: Colors.black,
         ),
         title: Text(
-          l10n.translate('product.add_new') ?? 'Thêm sản phẩm mới',
+          l10n.translate('product.add_new'),
           style: AppTextStyles.titleLarge.copyWith(
             color: AppColors.textPrimary,
           ),
@@ -116,7 +116,7 @@ class _AddProductPageState extends State<AddProductPage> {
           if (state is ProductAddSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(l10n.translate('product.add_success') ?? 'Thêm sản phẩm thành công'),
+                content: Text(l10n.translate('product.add_success')),
               ),
             );
             Navigator.pop(context);
@@ -153,7 +153,7 @@ class _AddProductPageState extends State<AddProductPage> {
                       ),
                       SizedBox(height: AppSpacing.md),
                       Text(
-                        l10n.translate('product.upload_image') ?? 'Kéo thả ảnh vào đây\nhoặc nhấn để chọn ảnh',
+                        l10n.translate('product.upload_image'),
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -172,14 +172,14 @@ class _AddProductPageState extends State<AddProductPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          l10n.translate('product.status') ?? 'Trạng thái',
+                          l10n.translate('product.status'),
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.textPrimary,
                           ),
                         ),
                         SizedBox(height: AppSpacing.sm),
                         Text(
-                          l10n.translate('product.status_active') ?? 'Sản phẩm có thể được bán',
+                          l10n.translate('product.status_active'),
                           style: AppTextStyles.bodySmall.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -201,7 +201,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
                 // Basic Information Section
                 Text(
-                  l10n.translate('product.basic_info') ?? 'Thông tin cơ bản',
+                  l10n.translate('product.basic_info'),
                   style: AppTextStyles.titleSmall.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -210,32 +210,32 @@ class _AddProductPageState extends State<AddProductPage> {
 
                 // Product Name
                 _buildTextFieldWithLabel(
-                  label: l10n.translate('product.name') ?? 'Tên sản phẩm',
+                  label: l10n.translate('product.name'),
                   controller: _productNameController,
-                  hint: l10n.translate('product.name_hint') ?? 'Nhập tên sản phẩm',
+                  hint: l10n.translate('product.name_hint'),
                   isRequired: true,
                 ),
                 SizedBox(height: AppSpacing.lg),
 
                 // Barcode
                 _buildTextFieldWithLabel(
-                  label: l10n.translate('product.barcode') ?? 'Mã vạch',
+                  label: l10n.translate('product.barcode'),
                   controller: _barcodeController,
-                  hint: l10n.translate('product.barcode_hint') ?? 'Nhập hoặc quét mã vạch',
+                  hint: l10n.translate('product.barcode_hint'),
                 ),
                 SizedBox(height: AppSpacing.lg),
 
                 // Category
                 _buildDropdownWithLabel(
-                  label: l10n.translate('product.category') ?? 'Danh mục',
+                  label: l10n.translate('product.category'),
                   controller: _categoryController,
-                  hint: l10n.translate('product.category_hint') ?? 'Chọn Danh mục',
+                  hint: l10n.translate('product.category_hint'),
                 ),
                 SizedBox(height: AppSpacing.lg),
 
                 // Price & Inventory Section
                 Text(
-                  l10n.translate('product.price_inventory') ?? 'Giá & tồn kho',
+                  l10n.translate('product.price_inventory'),
                   style: AppTextStyles.titleSmall.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -246,7 +246,7 @@ class _AddProductPageState extends State<AddProductPage> {
                   children: [
                     Expanded(
                       child: _buildTextFieldWithLabel(
-                        label: l10n.translate('product.cost_price') ?? 'Giá vốn',
+                        label: l10n.translate('product.cost_price'),
                         controller: _costPriceController,
                         hint: '0',
                         keyboardType: TextInputType.number,
@@ -255,7 +255,7 @@ class _AddProductPageState extends State<AddProductPage> {
                     SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: _buildTextFieldWithLabel(
-                        label: l10n.translate('product.sale_price') ?? 'Giá bán',
+                        label: l10n.translate('product.sale_price'),
                         controller: _salePriceController,
                         hint: '0',
                         keyboardType: TextInputType.number,
@@ -269,7 +269,7 @@ class _AddProductPageState extends State<AddProductPage> {
                   children: [
                     Expanded(
                       child: _buildTextFieldWithLabel(
-                        label: l10n.translate('product.quantity') ?? 'Số lượng',
+                        label: l10n.translate('product.quantity'),
                         controller: _quantityController,
                         hint: '0',
                         keyboardType: TextInputType.number,
@@ -278,7 +278,7 @@ class _AddProductPageState extends State<AddProductPage> {
                     SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: _buildTextFieldWithLabel(
-                        label: l10n.translate('product.unit') ?? 'Đơn vị có bán',
+                        label: l10n.translate('product.unit'),
                         controller: _unitController,
                         hint: 'cái',
                       ),
@@ -289,7 +289,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
                 // Unit Conversion Section
                 _buildSectionTitle(
-                  l10n.translate('product.unit_conversion') ?? 'Quy đổi đơn vị',
+                  l10n.translate('product.unit_conversion'),
                 ),
                 SizedBox(height: AppSpacing.md),
                 Container(
@@ -303,7 +303,7 @@ class _AddProductPageState extends State<AddProductPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        l10n.translate('product.add_conversion') ?? '+ Thêm',
+                        l10n.translate('product.add_conversion'),
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.secondary,
                         ),
@@ -321,7 +321,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
                 // Wholesale Price Section
                 _buildSectionTitle(
-                  l10n.translate('product.wholesale_price') ?? 'Giá sỉ',
+                  l10n.translate('product.wholesale_price'),
                 ),
                 SizedBox(height: AppSpacing.md),
                 Container(
@@ -335,7 +335,7 @@ class _AddProductPageState extends State<AddProductPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        l10n.translate('product.add_wholesale') ?? '+ Thêm',
+                        l10n.translate('product.add_wholesale'),
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.secondary,
                         ),
@@ -353,9 +353,9 @@ class _AddProductPageState extends State<AddProductPage> {
 
                 // Description
                 _buildTextFieldWithLabel(
-                  label: l10n.translate('product.description') ?? 'Mô tả',
+                  label: l10n.translate('product.description'),
                   controller: _descriptionController,
-                  hint: l10n.translate('product.description_hint') ?? 'Nhập mô tả sản phẩm',
+                  hint: l10n.translate('product.description_hint'),
                   maxLines: 3,
                 ),
                 SizedBox(height: AppSpacing.xl),
@@ -367,7 +367,7 @@ class _AddProductPageState extends State<AddProductPage> {
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(context),
                         child: Text(
-                          l10n.translate('common.cancel') ?? 'Hủy',
+                          l10n.translate('common.cancel'),
                           style: AppTextStyles.labelLarge.copyWith(
                             color: AppColors.textPrimary,
                           ),
@@ -390,7 +390,7 @@ class _AddProductPageState extends State<AddProductPage> {
                                     ),
                                   )
                                 : Text(
-                                    l10n.translate('product.add_button') ?? 'Thêm sản phẩm',
+                                    l10n.translate('product.add_button'),
                                     style: AppTextStyles.labelLarge.copyWith(
                                       color: AppColors.white,
                                     ),
