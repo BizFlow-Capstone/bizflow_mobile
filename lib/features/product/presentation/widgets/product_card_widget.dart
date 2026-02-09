@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../bloc/product_state.dart';
+import '../pages/edit_product_page.dart';
+import '../pages/product_detail_page.dart';
 
 /// Product Card Widget
 /// Hiển thị thông tin sản phẩm dưới dạng card
@@ -16,11 +19,12 @@ class ProductCardWidget extends StatelessWidget {
     required this.locationId,
   });
 
-  String _getStatusBadgeText() {
+  String _getStatusBadgeText(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (product.isActive) {
-      return 'Kích hoạt';
+      return l10n.translate('product.status_active_label');
     }
-    return 'Vô hiệu hóa';
+    return l10n.translate('product.status_inactive_label');
   }
 
   Color _getStatusBadgeColor() {
@@ -32,6 +36,7 @@ class ProductCardWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       margin: EdgeInsets.only(bottom: AppSpacing.md),
       decoration: BoxDecoration(
@@ -96,7 +101,7 @@ class ProductCardWidget extends StatelessWidget {
                       // Barcode
                       if (product.barcode != null)
                         Text(
-                          'Mã vạch: ${product.barcode}',
+                          '${l10n.translate('product.barcode_label')}: ${product.barcode}',
                           style: AppTextStyles.bodySmall.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -113,7 +118,7 @@ class ProductCardWidget extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          _getStatusBadgeText(),
+                          _getStatusBadgeText(context),
                           style: AppTextStyles.labelSmall.copyWith(
                             color: _getStatusBadgeColor(),
                           ),
@@ -134,7 +139,7 @@ class ProductCardWidget extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Giá bán',
+                      l10n.translate('product.sale_price_label'),
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -154,7 +159,7 @@ class ProductCardWidget extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      'Tồn kho',
+                      l10n.translate('product.inventory_label'),
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -164,6 +169,106 @@ class ProductCardWidget extends StatelessWidget {
                       '${product.quantity ?? 0} ${product.unit ?? 'cái'}',
                       style: AppTextStyles.titleSmall.copyWith(
                         color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            SizedBox(height: AppSpacing.md),
+
+            // Action Buttons
+            Column(
+              children: [
+                // Detail Button - Full Width
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProductDetailPage(
+                            product: product,
+                            locationId: locationId,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.info_outline, size: 18),
+                    label: Text(l10n.translate('product.detail_title')),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.sm),
+                // Edit and Delete Buttons - Side by Side
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditProductPage(
+                                productId: product.id,
+                                locationId: locationId,
+                                productName: product.name,
+                                barcode: product.barcode,
+                                category: product.category,
+                                costPrice: product.costPrice,
+                                salePrice: product.salePrice,
+                                quantity: product.quantity,
+                                unit: product.unit,
+                                description: product.description,
+                                isActive: product.isActive,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.edit, size: 18),
+                        label: Text(l10n.translate('product.edit_button_label')),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.secondary,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          // Show confirmation dialog for delete
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text(l10n.translate('product.confirm_delete_title')),
+                              content: Text(l10n.translate('product.confirm_delete_message')),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: Text(l10n.translate('common.cancel')),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    Navigator.pop(context);
+                                    // TODO: Dispatch DeleteProductRequested event
+                                  },
+                                  child: Text(
+                                    l10n.translate('product.delete_button_label'),
+                                    style: const TextStyle(color: Colors.red),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: Text(l10n.translate('product.delete_button_label')),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                        ),
                       ),
                     ),
                   ],

@@ -102,7 +102,7 @@ class ProductFabMenuWidget extends StatelessWidget {
                                       ),
                                       SizedBox(height: AppSpacing.xs),
                                       Text(
-                                        'Tạo sản phẩm mới',
+                                        l10n.translate('product.create_product_option'),
                                         style: AppTextStyles.bodySmall.copyWith(
                                           color: AppColors.textSecondary,
                                         ),
@@ -153,7 +153,7 @@ class ProductFabMenuWidget extends StatelessWidget {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        l10n.translate('product.import_inventory') ?? 'Nhập kho',
+                                        l10n.translate('product.import_inventory'),
                                         style: AppTextStyles.bodyMedium.copyWith(
                                           color: AppColors.textPrimary,
                                           fontWeight: FontWeight.w500,
@@ -161,7 +161,7 @@ class ProductFabMenuWidget extends StatelessWidget {
                                       ),
                                       SizedBox(height: AppSpacing.xs),
                                       Text(
-                                        'Tạo phiếu nhập kho',
+                                        l10n.translate('stock_import.title'),
                                         style: AppTextStyles.bodySmall.copyWith(
                                           color: AppColors.textSecondary,
                                         ),

@@ -127,11 +127,11 @@ class ApiClient {
   }) {
     _client = HttpClient()
       ..connectionTimeout = timeout
-      // ✅ DEVELOPMENT ONLY: Bypass SSL certificate validation
-      // ⚠️ NEVER use this in production!
+      //  DEVELOPMENT ONLY: Bypass SSL certificate validation
+      //  NEVER use this in production!
       ..badCertificateCallback = (cert, host, port) {
         // Allow self-signed certificates in development
-        if (kDebugMode && (host == 'localhost' || host == '10.0.2.2')) {
+        if (kDebugMode && (host == 'localhost' || host == '10.0.2.2' || host == '192.168.1.16')) {
           return true;
         }
         return false;

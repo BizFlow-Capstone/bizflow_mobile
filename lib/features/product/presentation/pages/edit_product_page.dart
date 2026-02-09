@@ -8,21 +8,41 @@ import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
 
-/// Add New Product Page
-/// SC-PRO-01: Thêm sản phẩm mới
-class AddProductPage extends StatefulWidget {
+/// Edit Product Page
+/// SC-PRO-02: Chỉnh sửa sản phẩm
+class EditProductPage extends StatefulWidget {
+  final String productId;
   final String locationId;
+  final String productName;
+  final String? barcode;
+  final String? category;
+  final double? costPrice;
+  final double? salePrice;
+  final int? quantity;
+  final String? unit;
+  final String? description;
+  final bool isActive;
 
-  const AddProductPage({
+  const EditProductPage({
     super.key,
+    required this.productId,
     required this.locationId,
+    required this.productName,
+    this.barcode,
+    this.category,
+    this.costPrice,
+    this.salePrice,
+    this.quantity,
+    this.unit,
+    this.description,
+    this.isActive = true,
   });
 
   @override
-  State<AddProductPage> createState() => _AddProductPageState();
+  State<EditProductPage> createState() => _EditProductPageState();
 }
 
-class _AddProductPageState extends State<AddProductPage> {
+class _EditProductPageState extends State<EditProductPage> {
   // Form controllers
   late TextEditingController _productNameController;
   late TextEditingController _barcodeController;
@@ -33,19 +53,26 @@ class _AddProductPageState extends State<AddProductPage> {
   late TextEditingController _unitController;
   late TextEditingController _descriptionController;
 
-  bool _isActive = true;
+  late bool _isActive;
 
   @override
   void initState() {
     super.initState();
-    _productNameController = TextEditingController();
-    _barcodeController = TextEditingController();
-    _categoryController = TextEditingController();
-    _costPriceController = TextEditingController();
-    _salePriceController = TextEditingController();
-    _quantityController = TextEditingController();
-    _unitController = TextEditingController();
-    _descriptionController = TextEditingController();
+    _productNameController = TextEditingController(text: widget.productName);
+    _barcodeController = TextEditingController(text: widget.barcode ?? '');
+    _categoryController = TextEditingController(text: widget.category ?? '');
+    _costPriceController = TextEditingController(
+      text: widget.costPrice != null ? widget.costPrice.toString() : '',
+    );
+    _salePriceController = TextEditingController(
+      text: widget.salePrice != null ? widget.salePrice.toString() : '',
+    );
+    _quantityController = TextEditingController(
+      text: widget.quantity != null ? widget.quantity.toString() : '',
+    );
+    _unitController = TextEditingController(text: widget.unit ?? '');
+    _descriptionController = TextEditingController(text: widget.description ?? '');
+    _isActive = widget.isActive;
   }
 
   @override
@@ -72,7 +99,8 @@ class _AddProductPageState extends State<AddProductPage> {
     }
 
     context.read<ProductBloc>().add(
-          AddProductRequested(
+          UpdateProductRequested(
+            productId: widget.productId,
             locationId: widget.locationId,
             productName: _productNameController.text,
             barcode: _barcodeController.text.isNotEmpty ? _barcodeController.text : null,
@@ -104,7 +132,7 @@ class _AddProductPageState extends State<AddProductPage> {
           color: Colors.black,
         ),
         title: Text(
-          l10n.translate('product.add_new'),
+          l10n.translate('product.edit'),
           style: AppTextStyles.titleLarge.copyWith(
             color: AppColors.textPrimary,
           ),
@@ -113,11 +141,11 @@ class _AddProductPageState extends State<AddProductPage> {
       ),
       body: BlocListener<ProductBloc, ProductState>(
         listener: (context, state) {
-          if (state is ProductAddSuccess) {
+          if (state is ProductUpdateSuccess) {
             // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(l10n.translate('product.add_success')),
+                content: Text(l10n.translate('product.edit_success')),
               ),
             );
             // Reload product list
@@ -187,7 +215,9 @@ class _AddProductPageState extends State<AddProductPage> {
                         ),
                         SizedBox(height: AppSpacing.sm),
                         Text(
-                          l10n.translate('product.status_active'),
+                          _isActive
+                              ? l10n.translate('product.status_active')
+                              : l10n.translate('product.status_inactive'),
                           style: AppTextStyles.bodySmall.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -389,8 +419,8 @@ class _AddProductPageState extends State<AddProductPage> {
                       child: BlocBuilder<ProductBloc, ProductState>(
                         builder: (context, state) {
                           return ElevatedButton(
-                            onPressed: state is ProductAddInProgress ? null : _submitForm,
-                            child: state is ProductAddInProgress
+                            onPressed: state is ProductUpdateInProgress ? null : _submitForm,
+                            child: state is ProductUpdateInProgress
                                 ? SizedBox(
                                     height: 20,
                                     width: 20,
@@ -400,7 +430,7 @@ class _AddProductPageState extends State<AddProductPage> {
                                     ),
                                   )
                                 : Text(
-                                    l10n.translate('product.add_button'),
+                                    l10n.translate('product.edit_button'),
                                     style: AppTextStyles.labelLarge.copyWith(
                                       color: AppColors.white,
                                     ),
