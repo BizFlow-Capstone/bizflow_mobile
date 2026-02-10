@@ -99,10 +99,6 @@
     "timeout": "Request timeout",
     "unknown": "Unknown error"
   },
-  "home": {
-    "title": "Home",
-    "welcome": "Welcome"
-  },
   "profile": {
     "title": "Profile",
     "edit_profile": "Edit Profile",
@@ -279,5 +275,104 @@
     "confirm_title": "Confirm Stock Import",
     "confirm_message": "Are you sure you want to import {count} products to inventory?",
     "success": "Stock imported successfully!"
+  },
+  "home": {
+    "title": "Home",
+    "welcome": "Welcome",
+    "greeting": "Hello",
+    "todays_orders": "Today's Orders",
+    "todays_revenue": "Today's Revenue",
+    "create_order": "Create Order",
+    "orders": "Orders",
+    "debt": "Debt",
+    "reports": "Reports",
+    "upgrade_premium": "Upgrade Premium",
+    "unlock_all_features": "Unlock all features",
+    "manage_locations": "Manage Locations",
+    "locations_active": "{count} locations active",
+    "manage_employees": "Manage Employees",
+    "employees_count": "{count} employees"
+  },
+  "subscription": {
+    "appbar_title": "Subscription",
+    "header_title": "Choose The Plan That Fits You",
+    "header_subtitle": "Upgrade to unlock all\nfeatures and grow your business",
+    "per_month": "/month",
+    "free": {
+      "name": "Free",
+      "desc": "Try the basic features",
+      "price": "0đ",
+      "current": "Current plan",
+      "f1": "Up to 50 orders/month",
+      "f2": "Basic debt management",
+      "f3": "1 warehouse",
+      "f4": "Basic reports",
+      "f5": "Voice AI",
+      "f6": "Export Excel/PDF",
+      "f7": "Priority support"
+    },
+    "premium": {
+      "badge": "Most popular",
+      "name": "Premium",
+      "desc": "All features for businesses",
+      "price": "299,000đ",
+      "cta": "Upgrade now",
+      "f1": "Unlimited orders",
+      "f2": "Advanced debt management",
+      "f3": "Unlimited warehouses",
+      "f4": "Detailed reports & analytics",
+      "f5": "Voice AI",
+      "f6": "Export Excel/PDF",
+      "f7": "24/7 priority support",
+      "f8": "Custom invoice templates"
+    },
+    "business": {
+      "name": "Business",
+      "desc": "Custom solutions for large companies",
+      "price": "Contact",
+      "cta": "Contact",
+      "f1": "All Premium features",
+      "f2": "Multiple branches/stores",
+      "f3": "Employee management",
+      "f4": "Detailed permissions",
+      "f5": "Custom integrations",
+      "f6": "24/7 hotline support"
+    },
+    "benefits": {
+      "fast_title": "Fast",
+      "fast_subtitle": "Create orders in seconds with voice AI",
+      "secure_title": "Secure",
+      "secure_subtitle": "Data is encrypted and backed up daily",
+      "support_title": "Caring support",
+      "support_subtitle": "Our team is available 24/7 to help"
+    },
+    "faq": {
+      "title": "FAQ",
+      "q1": "Can I cancel anytime?",
+      "a1": "Yes, you can cancel anytime. No cancellation fees.",
+      "q2": "Which payment methods are supported?",
+      "a2": "We support bank transfer, e-wallets, and international payments.",
+      "q3": "Can I upgrade or downgrade my plan?",
+      "a3": "Yes, you can change your plan anytime. Charges are prorated."
+    }
+  },
+  "payment": {
+    "appbar_title": "Premium Payment",
+    "appbar_subtitle": "Choose a payment method",
+    "details_title": "Payment Details",
+    "month": "month",
+    "vat": "VAT",
+    "total": "Total",
+    "methods_title": "Payment Method",
+    "method_qr_title": "Scan QR",
+    "method_qr_subtitle": "Pay via VietQR, Momo, ZaloPay",
+    "method_card_title": "Credit / Debit Card",
+    "method_card_subtitle": "Visa, Mastercard, JCB",
+    "qr_hint": "Scan the QR code to pay",
+    "amount": "Amount",
+    "content": "Content",
+    "content_value": "PREMIUM SUB123456",
+    "confirm": "Confirm\npayment",
+    "security_note": "Your payment information is encrypted and\nprotected under PCI DSS standards"
   }
 }

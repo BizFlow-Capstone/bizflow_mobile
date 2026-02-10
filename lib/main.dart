@@ -113,7 +113,7 @@ class _MyAppState extends State<MyApp> {
                 locale: localizationProvider.currentLocale,
                 navigatorKey: AppRouter.navigatorKey,
                 onGenerateRoute: AppRouter.generateRoute,
-                initialRoute: AppRoutes.locationManagement,
+                initialRoute: AppRoutes.home,
               );
             },
           );

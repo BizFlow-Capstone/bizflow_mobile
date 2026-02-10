@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -119,6 +120,8 @@ class _RegisterPageState extends State<RegisterPage> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: AppColors.white,
+        surfaceTintColor: AppColors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         actions: [
           LanguageSwitcher(
             currentLocale: localizationProvider.currentLocale,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -42,14 +43,26 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
 
     // Return a wrapper widget that contains both body and drawer
     // _GlobalAppBarShell will wrap this with Scaffold
-    return _LocationPageContent(
-      l10n: l10n,
-      selectedLocation: _selectedLocation,
-      onLocationSelected: (location) {
-        setState(() {
-          _selectedLocation = location;
-        });
+    return WillPopScope(
+      onWillPop: () async {
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) {
+          navigator.pop();
+          return false;
+        }
+
+        AppRouter.replaceTo(AppRoutes.home);
+        return false;
       },
+      child: _LocationPageContent(
+        l10n: l10n,
+        selectedLocation: _selectedLocation,
+        onLocationSelected: (location) {
+          setState(() {
+            _selectedLocation = location;
+          });
+        },
+      ),
     );
   }
 }

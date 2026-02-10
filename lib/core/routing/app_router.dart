@@ -4,9 +4,12 @@ import 'package:bizflow_mobile/core/localization/app_localizations.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/verify_otp_page.dart';
+import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
 import '../../features/product/presentation/pages/product_management_page.dart';
+import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
+import '../../features/subscription/presentation/pages/premium_payment_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
 import '../../shared/widgets/app_bar_custom.dart';
@@ -29,6 +32,8 @@ class AppRoutes {
   static const String locationManagement = '/location-management';
   static const String addEditLocation = '/add-edit-location';
   static const String productManagement = '/product-management';
+  static const String subscriptionPlans = '/subscription-plans';
+  static const String premiumPayment = '/premium-payment';
   static const String profile = '/profile';
   static const String settings = '/settings';
 }
@@ -64,7 +69,6 @@ class AppRouter {
 
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final GlobalAppBarState globalAppBarState = GlobalAppBarState();
-  static final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
   /// Lấy context hiện tại
   static BuildContext? get context => navigatorKey.currentContext;
@@ -88,10 +92,17 @@ class AppRouter {
 
       // Main Routes - With Global AppBar
       case AppRoutes.home:
+        return _buildRoute(
+          settings,
+          _GlobalAppBarShell(child: const HomePage()),
+        );
       case AppRoutes.locationManagement:
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const LocationManagementPage()),
+          _GlobalAppBarShell(
+            child: const LocationManagementPage(),
+            showAddLocationFab: true,
+          ),
         );
 
       case AppRoutes.addEditLocation:
@@ -109,6 +120,22 @@ class AppRouter {
               locationId: args?['locationId'] ?? '',
               locationName: args?['locationName'] ?? 'Location',
             ),
+          ),
+        );
+
+      case AppRoutes.subscriptionPlans:
+        return _buildRoute(settings, const SubscriptionPlansPage());
+
+      case AppRoutes.premiumPayment:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          PremiumPaymentPage(
+            planName: args?['planName'] ?? 'Premium',
+            price: args?['price'] ?? 299000,
+            period: args?['period'] ?? '/tháng',
+            vatPercent: args?['vatPercent'] ?? 10,
+            total: args?['total'] ?? 328900,
           ),
         );
 
@@ -185,8 +212,12 @@ class AppRouter {
 /// Global AppBar Shell - Wraps pages để cung cấp AppBar global + Drawer
 class _GlobalAppBarShell extends StatefulWidget {
   final Widget child;
+  final bool showAddLocationFab;
 
-  const _GlobalAppBarShell({required this.child});
+  const _GlobalAppBarShell({
+    required this.child,
+    this.showAddLocationFab = false,
+  });
 
   @override
   State<_GlobalAppBarShell> createState() => _GlobalAppBarShellState();
@@ -194,6 +225,7 @@ class _GlobalAppBarShell extends StatefulWidget {
 
 class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
   LocationItem? _selectedLocation;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
@@ -201,11 +233,11 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
       listenable: AppRouter.globalAppBarState,
       builder: (context, _) {
         return Scaffold(
-          key: AppRouter.scaffoldKey,
+          key: _scaffoldKey,
           // Global AppBar
           appBar: CustomAppBar(
             userName: AppRouter.globalAppBarState.userName,
-            scaffoldKey: AppRouter.scaffoldKey,
+            scaffoldKey: _scaffoldKey,
             onLocaleChange: (locale) {
               AppRouter.globalAppBarState.setLocale(locale);
             },
@@ -278,18 +310,20 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           // Body
           body: widget.child,
           // FAB - positioned at bottom-right
-          floatingActionButton: FloatingActionButton(
-            backgroundColor: const Color(0xFF23C4C1),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddEditLocationPage(),
-                ),
-              );
-            },
-            child: const Icon(Icons.add, color: Colors.white),
-          ),
+          floatingActionButton: widget.showAddLocationFab
+              ? FloatingActionButton(
+                  backgroundColor: const Color(0xFF23C4C1),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddEditLocationPage(),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.add, color: Colors.white),
+                )
+              : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         );
       },

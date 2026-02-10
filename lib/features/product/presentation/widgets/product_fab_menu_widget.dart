@@ -94,7 +94,7 @@ class ProductFabMenuWidget extends StatelessWidget {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        l10n.translate('product.add_product') ?? 'Thêm sản phẩm',
+                                        l10n.translate('product.add_product'),
                                         style: AppTextStyles.bodyMedium.copyWith(
                                           color: AppColors.textPrimary,
                                           fontWeight: FontWeight.w500,

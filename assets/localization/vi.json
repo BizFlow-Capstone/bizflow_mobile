@@ -104,10 +104,6 @@
     "backend_not_running": "Không thể kết nối. Vui lòng đảm bảo backend đang chạy",
     "request_timeout": "Yêu cầu hết thời gian chờ. Vui lòng thử lại"
   },
-  "home": {
-    "title": "Trang chủ",
-    "welcome": "Chào mừng bạn"
-  },
   "profile": {
     "title": "Hồ sơ",
     "edit_profile": "Chỉnh sửa hồ sơ",
@@ -284,5 +280,104 @@
     "confirm_title": "Xác nhận nhập kho",
     "confirm_message": "Bạn có chắc chắn muốn nhập {count} sản phẩm vào kho?",
     "success": "Nhập kho thành công!"
+  },
+  "home": {
+    "title": "Trang chủ",
+    "welcome": "Chào mừng bạn",
+    "greeting": "Xin chào",
+    "todays_orders": "Đơn hàng hôm nay",
+    "todays_revenue": "Doanh thu hôm nay",
+    "create_order": "Tạo đơn",
+    "orders": "Đơn hàng",
+    "debt": "Công nợ",
+    "reports": "Báo cáo",
+    "upgrade_premium": "Nâng cấp Premium",
+    "unlock_all_features": "Mở khóa tất cả tính năng",
+    "manage_locations": "Quản lý Địa điểm",
+    "locations_active": "{count} địa điểm đang hoạt động",
+    "manage_employees": "Quản lý Nhân viên",
+    "employees_count": "{count} nhân viên"
+  },
+  "subscription": {
+    "appbar_title": "Gói Đăng Ký",
+    "header_title": "Chọn Gói Phù Hợp Với Bạn",
+    "header_subtitle": "Nâng cấp để mở khóa tất cả\n tính năng và phát triển kinh doanh",
+    "per_month": "/tháng",
+    "free": {
+      "name": "Miễn Phí",
+      "desc": "Dùng thử các tính năng cơ bản",
+      "price": "0đ",
+      "current": "Đang sử dụng",
+      "f1": "Tối đa 50 đơn hàng/tháng",
+      "f2": "Quản lý công nợ cơ bản",
+      "f3": "1 kho hàng",
+      "f4": "Báo cáo cơ bản",
+      "f5": "AI nhận diện giọng nói",
+      "f6": "Xuất file Excel/PDF",
+      "f7": "Hỗ trợ ưu tiên"
+    },
+    "premium": {
+      "badge": "Phổ biến nhất",
+      "name": "Premium",
+      "desc": "Tất cả tính năng cho doanh nghiệp",
+      "price": "299,000đ",
+      "cta": "Nâng cấp ngay",
+      "f1": "Không giới hạn đơn hàng",
+      "f2": "Quản lý công nợ nâng cao",
+      "f3": "Không giới hạn kho hàng",
+      "f4": "Báo cáo chi tiết & phân tích",
+      "f5": "AI nhận diện giọng nói",
+      "f6": "Xuất file Excel/PDF",
+      "f7": "Hỗ trợ ưu tiên 24/7",
+      "f8": "Tùy chỉnh mẫu hóa đơn"
+    },
+    "business": {
+      "name": "Doanh Nghiệp",
+      "desc": "Giải pháp tùy chỉnh cho doanh nghiệp lớn",
+      "price": "Liên hệ",
+      "cta": "Liên hệ",
+      "f1": "Tất cả tính năng Premium",
+      "f2": "Nhiều chi nhánh/cửa hàng",
+      "f3": "Quản lý nhân viên",
+      "f4": "Phân quyền chi tiết",
+      "f5": "Tích hợp hệ thống riêng",
+      "f6": "Hỗ trợ 24/7 qua hotline"
+    },
+    "benefits": {
+      "fast_title": "Nhanh chóng",
+      "fast_subtitle": "Tạo đơn hàng trong vài giây với AI\nnhận diện giọng nói",
+      "secure_title": "Bảo mật",
+      "secure_subtitle": "Dữ liệu được mã hóa và sao lưu tự\nđộng hàng ngày",
+      "support_title": "Hỗ trợ tận tình",
+      "support_subtitle": "Đội ngũ hỗ trợ 24/7 sẵn sàng giúp đỡ bạn"
+    },
+    "faq": {
+      "title": "Câu Hỏi Thường Gặp",
+      "q1": "Tôi có thể hủy bất cứ lúc nào không?",
+      "a1": "Có, bạn có thể hủy đăng ký bất cứ lúc nào. Không có phí hủy.",
+      "q2": "Phương thức thanh toán nào được hỗ trợ?",
+      "a2": "Chúng tôi hỗ trợ chuyển khoản ngân hàng, ví điện tử và thanh toán quốc tế.",
+      "q3": "Tôi có thể nâng cấp hoặc hạ cấp gói không?",
+      "a3": "Có, bạn có thể thay đổi gói bất cứ lúc nào. Phí sẽ được tính theo tỷ lệ."
+    }
+  },
+  "payment": {
+    "appbar_title": "Thanh Toán Gói Premium",
+    "appbar_subtitle": "Chọn phương thức thanh toán",
+    "details_title": "Chi Tiết Thanh Toán",
+    "month": "tháng",
+    "vat": "VAT",
+    "total": "Tổng cộng",
+    "methods_title": "Phương Thức Thanh Toán",
+    "method_qr_title": "Quét mã QR",
+    "method_qr_subtitle": "Thanh toán qua VietQR, Momo, ZaloPay",
+    "method_card_title": "Thẻ tín dụng / Ghi nợ",
+    "method_card_subtitle": "Visa, Mastercard, JCB",
+    "qr_hint": "Quét mã QR để thanh toán",
+    "amount": "Số tiền",
+    "content": "Nội dung",
+    "content_value": "PREMIUM SUB123456",
+    "confirm": "Xác nhận\nthanh toán",
+    "security_note": "Thông tin thanh toán của bạn được mã hóa và\nbảo mật theo tiêu chuẩn PCI DSS"
   }
 }
