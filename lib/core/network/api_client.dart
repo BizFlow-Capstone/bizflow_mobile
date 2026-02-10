@@ -131,7 +131,7 @@ class ApiClient {
       //  NEVER use this in production!
       ..badCertificateCallback = (cert, host, port) {
         // Allow self-signed certificates in development
-        if (kDebugMode && (host == 'localhost' || host == '10.0.2.2' || host == '192.168.1.16')) {
+        if (kDebugMode && (host == 'localhost' || host == '10.0.2.2' || host == '192.168.1.13')) {
           return true;
         }
         return false;

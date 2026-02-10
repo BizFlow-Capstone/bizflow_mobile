@@ -17,7 +17,7 @@ class StockImportPage extends StatefulWidget {
 }
 
 class _StockImportPageState extends State<StockImportPage> {
-  // Current step in the progress indicator (0: Nhập, 1: Đã liên hệ, 2: Đã nhập)
+  // Current step in the progress indicator (0: Nhập, 1: Nhập kho thành công)
   int _currentStep = 0;
 
   // Import type: true = có hóa đơn, false = không hóa đơn
@@ -49,8 +49,6 @@ class _StockImportPageState extends State<StockImportPage> {
       case 0:
         return l10n.translate('stock_import.status_draft');
       case 1:
-        return l10n.translate('stock_import.status_contacted');
-      case 2:
         return l10n.translate('stock_import.status_imported');
       default:
         return l10n.translate('stock_import.status_draft');
@@ -98,7 +96,7 @@ class _StockImportPageState extends State<StockImportPage> {
   void _processImport() {
     // Simulate import process
     setState(() {
-      _currentStep = 2;
+      _currentStep = 1;
     });
 
     // Show success message
@@ -236,18 +234,10 @@ class _StockImportPageState extends State<StockImportPage> {
           _buildStepConnector(isActive: _currentStep > 0),
           _buildStepItem(
             index: 1,
-            label: l10n.translate('stock_import.step_contacted'),
-            icon: Icons.phone_callback_outlined,
-            isActive: _currentStep >= 1,
-            isCompleted: _currentStep > 1,
-          ),
-          _buildStepConnector(isActive: _currentStep > 1),
-          _buildStepItem(
-            index: 2,
             label: l10n.translate('stock_import.step_imported'),
             icon: Icons.inventory_2_outlined,
-            isActive: _currentStep >= 2,
-            isCompleted: _currentStep == 2,
+            isActive: _currentStep >= 1,
+            isCompleted: _currentStep == 1,
           ),
         ],
       ),
@@ -276,7 +266,9 @@ class _StockImportPageState extends State<StockImportPage> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
-          child: Icon(icon, color: iconColor, size: 24),
+          child: isCompleted 
+              ? Icon(Icons.check, color: AppColors.success, size: 24)
+              : Icon(icon, color: iconColor, size: 24),
         ),
         SizedBox(height: AppSpacing.xs),
         Text(

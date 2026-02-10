@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -54,6 +55,7 @@ class _CustomAppBarState extends State<CustomAppBar> {
       elevation: 0,
       backgroundColor: AppColors.white,
       foregroundColor: AppColors.textPrimary,
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
       // Reduce padding - bring title closer to left
       titleSpacing: 0,
       // Remove back button (leading widget)

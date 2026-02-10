@@ -170,6 +170,7 @@ class LocationCard extends StatelessWidget {
                         value: location.isActive,
                         onChanged: onToggleStatus,
                         activeThumbColor: const Color(0xFF23C4C1),
+                        activeTrackColor: AppColors.divider,
                         inactiveThumbColor: AppColors.textDisabled,
                         inactiveTrackColor: AppColors.divider,
                       ),
