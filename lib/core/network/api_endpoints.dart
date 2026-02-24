@@ -25,11 +25,26 @@ class ApiEndpoints {
   static const String workAtLocations = '/api/location/work-at-locations';
   static const String createLocation = '/api/location/create';
   static const String myEmployees = '/api/my-employee/employees';
-  
+
   // Location with ID - use with String interpolation
-  static String updateLocationStatus(String id) => '/api/location/me/owned/$id/status';
+  static String updateLocationStatus(String id) =>
+      '/api/location/me/owned/$id/status';
   static String updateLocation(String id) => '/api/location/me/owned/$id';
-  static String addEmployeesToLocation(String id) => '/api/location/$id/employees';
+  static String addEmployeesToLocation(String id) =>
+      '/api/location/$id/employees';
+  static String getLocationEmployees(String id) =>
+      '/api/location/me/owned/$id/employees';
+
+  // Order/Invoice
+  static const String orders = '/api/order/my-orders';
+  static const String draftOrders = '/api/order/drafts';
+  static const String createOrder = '/api/order/create';
+
+  // Order with ID - use with String interpolation
+  static String getOrder(String id) => '/api/order/$id';
+  static String updateOrder(String id) => '/api/order/$id';
+  static String publishOrder(String id) => '/api/order/$id/publish';
+  static String cancelOrder(String id) => '/api/order/$id/cancel';
 
   // Add more endpoints here...
 }

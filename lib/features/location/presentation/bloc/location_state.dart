@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../employee/domain/entities/employee_entity.dart';
 import '../../domain/entities/location_entity.dart';
 
 /// Location States
@@ -109,4 +110,34 @@ class LocationError extends LocationState {
 
   @override
   List<Object?> get props => [message];
+}
+
+/// Employees loaded for a specific location (employee tab)
+class LocationEmployeesLoaded extends LocationState {
+  final List<EmployeeEntity> locationEmployees;
+  final List<EmployeeEntity> allEmployees;
+
+  const LocationEmployeesLoaded({
+    required this.locationEmployees,
+    required this.allEmployees,
+  });
+
+  /// Employees not yet assigned to this location
+  List<EmployeeEntity> get unassignedEmployees {
+    final assignedIds = locationEmployees.map((e) => e.id).toSet();
+    return allEmployees.where((e) => !assignedIds.contains(e.id)).toList();
+  }
+
+  @override
+  List<Object?> get props => [locationEmployees, allEmployees];
+}
+
+/// Employee successfully added to location from tab
+class AddEmployeeToLocationSuccess extends LocationState {
+  const AddEmployeeToLocationSuccess();
+}
+
+/// Employees successfully saved to server (batch update)
+class SaveLocationEmployeesSuccess extends LocationState {
+  const SaveLocationEmployeesSuccess();
 }

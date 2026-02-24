@@ -24,7 +24,7 @@ class AppConfig {
   //    - Use 10.0.2.2 (Android gateway to host)
   //    - Protocol: HTTP (avoid HTTPS complexity)
   //
-  static const String _hostDeviceIp = '192.168.1.13';    // Physical device IP
+  static const String _hostDeviceIp = '192.168.1.9';    // Physical device IP
   static const String _hostEmulatorIp = '10.0.2.2';      // Emulator gateway
   
   // CHANGE THIS TO SWITCH BETWEEN DEVICE & EMULATOR
@@ -41,7 +41,7 @@ class AppConfig {
       default:
         // Development - HTTP for both physical device & emulator
         // Backend: http://0.0.0.0:7270
-        return 'https://$host:7271';
+        return 'http://$host:7270';
     }
   }
 

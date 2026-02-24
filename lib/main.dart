@@ -15,6 +15,9 @@ import 'features/employee/data/employee_repository.dart';
 import 'features/location/data/location_api_service.dart';
 import 'features/location/data/location_repository.dart';
 import 'features/location/presentation/bloc/location_bloc.dart';
+import 'features/order/data/order_api_service.dart';
+import 'features/order/data/order_repository.dart';
+import 'features/order/presentation/bloc/order_bloc.dart';
 import 'features/product/presentation/bloc/product_bloc.dart';
 
 void main() {
@@ -35,6 +38,8 @@ class _MyAppState extends State<MyApp> {
   late LocationRepository _locationRepository;
   late EmployeeApiService _employeeApiService;
   late EmployeeRepository _employeeRepository;
+  late OrderApiService _orderApiService;
+  late OrderRepository _orderRepository;
 
   @override
   void initState() {
@@ -46,13 +51,15 @@ class _MyAppState extends State<MyApp> {
       baseUrl: AppConfig.baseUrl,
       timeout: AppConfig.apiTimeout,
       requestInterceptors: [
-        // Auth interceptor
-        AuthInterceptor(
-          getToken: () async {
-            final token = await SecureStorage().read(key: 'access_token');
-            return token;
-          },
-        ),
+        // NOTE: Auth interceptor disabled - API backend has no permission yet
+        // Uncomment below when auth is implemented
+        // AuthInterceptor(
+        //   getToken: () async {
+        //     final token = await SecureStorage().read(key: 'access_token');
+        //     return token ?? 'Bearer mock_token_for_testing';
+        //   },
+        // ),
+        
         // Language interceptor - reads from LocalizationProvider
         LanguageInterceptor(
           getCurrentLanguage: () => _localizationProvider.currentLocale.languageCode,
@@ -66,10 +73,12 @@ class _MyAppState extends State<MyApp> {
     // Initialize Services (calls ApiClient)
     _locationApiService = LocationApiService(apiClient: _apiClient);
     _employeeApiService = EmployeeApiService(apiClient: _apiClient);
+    _orderApiService = OrderApiService(apiClient: _apiClient);
 
     // Initialize Repositories (calls Services)
     _locationRepository = LocationRepository(service: _locationApiService);
     _employeeRepository = EmployeeRepository(service: _employeeApiService);
+    _orderRepository = OrderRepository(apiService: _orderApiService);
   }
 
   @override
@@ -89,6 +98,11 @@ class _MyAppState extends State<MyApp> {
           create: (context) => LocationBloc(
             repository: _locationRepository,
             employeeRepository: _employeeRepository,
+          ),
+        ),
+        BlocProvider(
+          create: (context) => OrderBloc(
+            repository: _orderRepository,
           ),
         ),
         BlocProvider(

@@ -38,23 +38,19 @@ class EmployeeResponseDto {
 class EmployeeDto {
   final String userId;
   final String userName;
+  final String phone;
 
-  EmployeeDto({
-    required this.userId,
-    required this.userName,
-  });
+  EmployeeDto({required this.userId, required this.userName, this.phone = ''});
 
   factory EmployeeDto.fromJson(Map<String, dynamic> json) {
     return EmployeeDto(
       userId: json['userId'] as String? ?? '',
       userName: json['userName'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'userId': userId,
-      'userName': userName,
-    };
+    return {'userId': userId, 'userName': userName, 'phone': phone};
   }
 }

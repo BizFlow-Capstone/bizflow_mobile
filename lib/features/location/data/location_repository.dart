@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../employee/domain/entities/employee_entity.dart';
 import '../domain/entities/location_entity.dart';
 import 'location_api_service.dart';
 import 'models/location_dto.dart';
@@ -18,7 +19,8 @@ import 'models/location_mapper.dart';
 class LocationRepository {
   final LocationApiService _service;
 
-  LocationRepository({required LocationApiService service}) : _service = service;
+  LocationRepository({required LocationApiService service})
+    : _service = service;
 
   /// Get business locations owned by current user
   ///
@@ -56,7 +58,9 @@ class LocationRepository {
   }
 
   /// Create new location
-  Future<LocationEntity> createLocation(CreateLocationRequestDto request) async {
+  Future<LocationEntity> createLocation(
+    CreateLocationRequestDto request,
+  ) async {
     try {
       final dto = await _service.createLocation(request);
       return LocationMapper.toEntity(dto);
@@ -113,6 +117,28 @@ class LocationRepository {
       );
     } catch (e) {
       debugPrint('LocationRepository.addEmployeesToLocation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get employees assigned to a location
+  /// Maps DTO → Entity
+  Future<List<EmployeeEntity>> getLocationEmployees({
+    required String locationId,
+  }) async {
+    try {
+      final dtos = await _service.getLocationEmployees(locationId: locationId);
+      return dtos
+          .map(
+            (dto) => EmployeeEntity(
+              id: dto.userId,
+              name: dto.userName,
+              phone: dto.phone,
+            ),
+          )
+          .toList();
+    } catch (e) {
+      debugPrint('LocationRepository.getLocationEmployees error: $e');
       rethrow;
     }
   }

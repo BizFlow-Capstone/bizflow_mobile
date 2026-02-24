@@ -13,16 +13,14 @@ import '../bloc/location_state.dart';
 import '../widgets/location_card.dart';
 import 'add_edit_location_page.dart';
 import '../../../product/presentation/pages/product_management_page.dart';
+import '../../domain/entities/location_entity.dart';
 
 /// Location Management Page
 /// SC-LOC-01: Quản lý địa điểm kinh doanh
 class LocationManagementPage extends StatefulWidget {
   final Function(Locale)? onLocaleChange;
 
-  const LocationManagementPage({
-    super.key,
-    this.onLocaleChange,
-  });
+  const LocationManagementPage({super.key, this.onLocaleChange});
 
   @override
   State<LocationManagementPage> createState() => _LocationManagementPageState();
@@ -35,6 +33,32 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
   void initState() {
     super.initState();
     context.read<LocationBloc>().add(const LoadLocationsRequested());
+  }
+
+  void _handleLocationToggleStatus(String locationId, bool isActive) {
+    if (!mounted) return;
+    context.read<LocationBloc>().add(
+      ToggleLocationStatusRequested(
+        locationId: locationId,
+        isActive: isActive,
+      ),
+    );
+  }
+
+  void _handleLocationEdit(LocationEntity location) {
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditLocationPage(location: location),
+      ),
+    ).then((_) {
+      if (mounted) {
+        context.read<LocationBloc>().add(
+          const RestoreLocationsRequested(),
+        );
+      }
+    });
   }
 
   @override
@@ -62,6 +86,8 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
             _selectedLocation = location;
           });
         },
+        onToggleStatus: _handleLocationToggleStatus,
+        onEdit: _handleLocationEdit,
       ),
     );
   }
@@ -73,11 +99,15 @@ class _LocationPageContent extends StatelessWidget {
   final AppLocalizations l10n;
   final LocationItem? selectedLocation;
   final Function(LocationItem) onLocationSelected;
+  final Function(String, bool) onToggleStatus;
+  final Function(LocationEntity) onEdit;
 
   const _LocationPageContent({
     required this.l10n,
     required this.selectedLocation,
     required this.onLocationSelected,
+    required this.onToggleStatus,
+    required this.onEdit,
   });
 
   @override
@@ -121,6 +151,15 @@ class _LocationPageContent extends StatelessWidget {
       },
       child: SafeArea(
         child: BlocBuilder<LocationBloc, LocationState>(
+          buildWhen: (previous, current) {
+            // Only rebuild for states relevant to the location list page
+            // Ignore employee tab states (LocationEmployeesLoaded, AddEmployeeToLocationSuccess, etc.)
+            return current is LocationsLoaded ||
+                current is LocationLoading ||
+                current is LocationFailure ||
+                current is LocationError ||
+                current is LocationInitial;
+          },
           builder: (context, state) {
             // Loading state
             if (state is LocationLoading) {
@@ -146,19 +185,17 @@ class _LocationPageContent extends StatelessWidget {
               final message = state is LocationFailure
                   ? state.message
                   : (state as LocationError).message;
-              
+
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: AppColors.error,
-                    ),
+                    Icon(Icons.error_outline, size: 64, color: AppColors.error),
                     SizedBox(height: AppSpacing.lg),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xl,
+                      ),
                       child: Text(
                         message,
                         style: AppTextStyles.bodyMedium.copyWith(
@@ -170,7 +207,9 @@ class _LocationPageContent extends StatelessWidget {
                     SizedBox(height: AppSpacing.xl),
                     ElevatedButton.icon(
                       onPressed: () {
-                        context.read<LocationBloc>().add(const LoadLocationsRequested());
+                        context.read<LocationBloc>().add(
+                          const LoadLocationsRequested(),
+                        );
                       },
                       icon: const Icon(Icons.refresh),
                       label: Text(l10n.translate('common.retry')),
@@ -192,11 +231,17 @@ class _LocationPageContent extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.location_city_outlined, size: 64, color: AppColors.textSecondary),
+                      Icon(
+                        Icons.location_city_outlined,
+                        size: 64,
+                        color: AppColors.textSecondary,
+                      ),
                       SizedBox(height: AppSpacing.lg),
                       Text(
                         l10n.translate('location.no_locations'),
-                        style: AppTextStyles.titleSmall.copyWith(color: AppColors.textSecondary),
+                        style: AppTextStyles.titleSmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -213,11 +258,15 @@ class _LocationPageContent extends StatelessWidget {
                         hintText: l10n.translate('location.search_placeholder'),
                         prefixIcon: const Icon(Icons.search),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
                           borderSide: BorderSide(color: AppColors.divider),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
                           borderSide: BorderSide(color: AppColors.divider),
                         ),
                       ),
@@ -248,22 +297,8 @@ class _LocationPageContent extends StatelessWidget {
                                 ),
                               );
                             },
-                            onToggleStatus: (isActive) {
-                              context.read<LocationBloc>().add(
-                                    ToggleLocationStatusRequested(
-                                      locationId: location.id,
-                                      isActive: isActive,
-                                    ),
-                                  );
-                            },
-                            onEdit: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddEditLocationPage(location: location),
-                                ),
-                              );
-                            },
+                            onToggleStatus: (isActive) => onToggleStatus(location.id, isActive),
+                            onEdit: () => onEdit(location),
                             onAddManager: () {
                               AppSnackBar.show(
                                 context,

@@ -33,16 +33,11 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Greeting Section
-              const GreetingSection(),
-              SizedBox(height: AppSpacing.lg),
-
-              // Stats Cards (Today's Orders & Revenue)
-              const StatsCards(),
-              SizedBox(height: AppSpacing.lg),
-
+             
               // Quick Actions
-              const QuickActions(),
+              QuickActions(
+                onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
+              ),
               SizedBox(height: AppSpacing.lg),
 
               // Premium Upgrade Banner

@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../employee/data/models/employee_dto.dart';
 import 'models/location_dto.dart';
 
 /// Location API Service - Handles direct API communication
-/// 
+///
 /// Responsibilities:
 /// 1. Make HTTP requests via ApiClient
 /// 2. Parse raw responses to DTOs
@@ -16,15 +17,13 @@ class LocationApiService {
   LocationApiService({required ApiClient apiClient}) : _apiClient = apiClient;
 
   /// Get business locations owned by current user
-  /// 
+  ///
   /// API: GET /api/location/me/owned
   /// Returns: LocationResponseDto
   /// Throws: Exception with user-friendly message
   Future<LocationResponseDto> getMyOwnedLocations() async {
     try {
-      final response = await _apiClient.get(
-        ApiEndpoints.myOwnedLocations,
-      );
+      final response = await _apiClient.get(ApiEndpoints.myOwnedLocations);
 
       debugPrint('API Response Status: ${response.statusCode}');
       debugPrint('API Response Success: ${response.isSuccess}');
@@ -34,10 +33,12 @@ class LocationApiService {
       if (response.isSuccess && response.data != null) {
         // Check if response.data is Map
         if (response.data is! Map<String, dynamic>) {
-          throw Exception('Response không đúng format\n\n'
-              'Expected: Map<String, dynamic>\n'
-              'Got: ${response.data.runtimeType}\n'
-              'Data: ${response.data}');
+          throw Exception(
+            'Response không đúng format\n\n'
+            'Expected: Map<String, dynamic>\n'
+            'Got: ${response.data.runtimeType}\n'
+            'Data: ${response.data}',
+          );
         }
 
         // Parse raw JSON to DTO
@@ -50,23 +51,29 @@ class LocationApiService {
     } on ApiException catch (e) {
       // Transform ApiException to domain exception with user-friendly messages
       if (e.statusCode == -1) {
-        throw Exception('No network connection\n\n'
-            'Check:\n'
-            '• Is backend running?\n'
-            '• Port: 7270\n'
-            '• URL: https://10.0.2.2:7270');
+        throw Exception(
+          'No network connection\n\n'
+          'Check:\n'
+          '• Is backend running?\n'
+          '• Port: 7270\n'
+          '• URL: https://10.0.2.2:7270',
+        );
       } else if (e.statusCode == -2) {
-        throw Exception('Connection timeout\n\n'
-            'Backend did not respond within 30 seconds');
+        throw Exception(
+          'Connection timeout\n\n'
+          'Backend did not respond within 30 seconds',
+        );
       } else if (e.statusCode == -3) {
         // HttpException or connection error
-        throw Exception('Backend connection error\n\n'
-            '${e.message}\n\n'
-            'Solutions:\n'
-            '1. Check backend is running: dotnet run\n'
-            '2. Ensure port 7270 is not blocked\n'
-            '3. Hot restart app (press R)\n'
-            '4. Check URL: https://10.0.2.2:7270');
+        throw Exception(
+          'Backend connection error\n\n'
+          '${e.message}\n\n'
+          'Solutions:\n'
+          '1. Check backend is running: dotnet run\n'
+          '2. Ensure port 7270 is not blocked\n'
+          '3. Hot restart app (press R)\n'
+          '4. Check URL: https://10.0.2.2:7270',
+        );
       } else if (e.statusCode == 401) {
         throw Exception('Session expired\n\nPlease login again');
       } else if (e.statusCode == 404) {
@@ -79,17 +86,13 @@ class LocationApiService {
     }
   }
 
-
-
   /// Get locations where user works at
-  /// 
+  ///
   /// API: GET /api/location/work-at-locations
   /// Returns: LocationResponseDto
   Future<LocationResponseDto> getWorkAtLocations() async {
     try {
-      final response = await _apiClient.get(
-        ApiEndpoints.workAtLocations,
-      );
+      final response = await _apiClient.get(ApiEndpoints.workAtLocations);
 
       if (response.isSuccess && response.data != null) {
         return LocationResponseDto.fromJson(
@@ -110,7 +113,7 @@ class LocationApiService {
   }
 
   /// Create new location
-  /// 
+  ///
   /// API: POST /api/location/create
   /// Body: CreateLocationRequestDto
   Future<LocationDto> createLocation(CreateLocationRequestDto request) async {
@@ -138,30 +141,48 @@ class LocationApiService {
   }
 
   /// Update location status
-  /// 
+  ///
   /// API: PUT /api/location/me/owned/{id}/status
   /// Body: { "isActive": bool }
-  /// Returns: bool (success or not)
+  /// Returns: { success, message }
   Future<bool> updateLocationStatus({
     required String locationId,
     required bool isActive,
   }) async {
     try {
+      debugPrint('=== UPDATE STATUS REQUEST ===');
+      debugPrint('LocationId: $locationId (Type: ${locationId.runtimeType})');
+      debugPrint('isActive: $isActive');
+      debugPrint('URL: ${ApiEndpoints.updateLocationStatus(locationId)}');
+      
+      final body = UpdateStatusRequestDto(isActive: isActive).toJson();
+      debugPrint('Request Body: $body');
+      
       final response = await _apiClient.put(
         ApiEndpoints.updateLocationStatus(locationId),
-        body: UpdateStatusRequestDto(isActive: isActive).toJson(),
+        body: body,
       );
 
-      debugPrint('Update Status Response: ${response.isSuccess}');
-      debugPrint('Update Status Message: ${response.message}');
+      debugPrint('=== UPDATE STATUS RESPONSE ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('Response Success: ${response.isSuccess}');
+      debugPrint('Response Message: ${response.message}');
+      debugPrint('Response Data: ${response.data}');
 
       if (response.isSuccess) {
-        // Backend only returns {success, message}, no data field
         return true;
       } else {
         throw Exception(response.message ?? 'Failed to update status');
       }
     } on ApiException catch (e) {
+      debugPrint('ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}');
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: You are not the owner');
+      } else if (e.statusCode == 404) {
+        throw Exception('Location not found');
+      } else if (e.statusCode == 307) {
+        throw Exception('Server redirect error (307) - Check backend configuration and URL format');
+      }
       throw Exception('Error updating status: ${e.message}');
     } catch (e) {
       debugPrint('LocationApiService.updateLocationStatus error: $e');
@@ -170,46 +191,59 @@ class LocationApiService {
   }
 
   /// Update location information
-  /// 
+  ///
   /// API: PUT /api/location/me/owned/{id}
   /// Body: UpdateLocationRequestDto
+  /// Response: { success, message } - Backend returns success only, need to refetch for updated data
   Future<LocationDto> updateLocation({
     required String locationId,
     required UpdateLocationRequestDto request,
   }) async {
     try {
+      debugPrint('=== UPDATE LOCATION REQUEST ===');
+      debugPrint('LocationId: $locationId (Type: ${locationId.runtimeType})');
+      debugPrint('URL: ${ApiEndpoints.updateLocation(locationId)}');
+      final body = request.toJson();
+      debugPrint('Request Body: $body');
+      
       final response = await _apiClient.put(
         ApiEndpoints.updateLocation(locationId),
-        body: request.toJson(),
+        body: body,
       );
 
-      debugPrint('Update Location Response: ${response.isSuccess}');
-      debugPrint('Update Location Data: ${response.data}');
+      debugPrint('=== UPDATE LOCATION RESPONSE ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('Response Success: ${response.isSuccess}');
+      debugPrint('Response Message: ${response.message}');
+      debugPrint('Response Data: ${response.data}');
 
       if (response.isSuccess) {
-        // Check if backend returns data field
-        if (response.data != null) {
-          final data = response.data as Map<String, dynamic>;
-          
-          // Check if data has nested 'data' field or is the location itself
-          if (data.containsKey('data')) {
-            return LocationDto.fromJson(data['data'] as Map<String, dynamic>);
-          } else {
-            // Data is the location object directly
-            return LocationDto.fromJson(data);
-          }
-        } else {
-          // Backend only returns success, need to refetch
-          throw Exception('Backend did not return location data. Please reload.');
-        }
+        // Backend returns success/message only, return dummy object for now
+        // The list will be refetched in BLoC after this call
+        return LocationDto(
+          id: int.tryParse(locationId) ?? 0,
+          name: request.name,
+          address: request.address,
+          district: request.district,
+          city: request.city,
+          phone: request.phone,
+          isActive: true,
+          ownerName: '',
+          taxCode: request.taxCode,
+          employeeIds: [],
+        );
       } else {
         throw Exception(response.message ?? 'Failed to update location');
       }
     } on ApiException catch (e) {
       if (e.statusCode == 400) {
-        throw Exception('Invalid data');
+        throw Exception('Invalid data: ${e.message}');
       } else if (e.statusCode == 404) {
         throw Exception('Location not found');
+      } else if (e.statusCode == 403) {
+        throw Exception('Permission denied: You are not the owner');
+      } else if (e.statusCode == 307) {
+        throw Exception('Server redirect error (307) - Check backend configuration');
       }
       throw Exception('Error updating location: ${e.message}');
     } catch (e) {
@@ -219,29 +253,90 @@ class LocationApiService {
   }
 
   /// Add employees to location
-  /// 
+  ///
   /// API: POST /api/location/{locationId}/employees
-  /// Body: List<String> (employee IDs)
+  /// Body: List<String> (employee user IDs)
+  /// The API expects: ["uuid1", "uuid2", ...]
   Future<void> addEmployeesToLocation({
     required String locationId,
     required List<String> employeeIds,
   }) async {
     try {
+      debugPrint('=== ADD EMPLOYEES REQUEST ===');
+      debugPrint('LocationId: $locationId (Type: ${locationId.runtimeType})');
+      debugPrint('URL: ${ApiEndpoints.addEmployeesToLocation(locationId)}');
+      debugPrint('Employee IDs: $employeeIds');
+      debugPrint('Employee IDs Count: ${employeeIds.length}');
+      debugPrint('Request Body Type: ${employeeIds.runtimeType}');
+      
       final response = await _apiClient.post(
         ApiEndpoints.addEmployeesToLocation(locationId),
         body: employeeIds,
       );
 
-      if (!response.isSuccess) {
+      debugPrint('=== ADD EMPLOYEES RESPONSE ===');
+      debugPrint('Status Code: ${response.statusCode}');
+      debugPrint('Response Success: ${response.isSuccess}');
+      debugPrint('Response Message: ${response.message}');
+      debugPrint('Response Data: ${response.data}');
+
+      if (response.isSuccess) {
+        return;
+      } else {
         throw Exception(response.message ?? 'Failed to add employees');
       }
     } on ApiException catch (e) {
-      if (e.statusCode == 404) {
+      debugPrint('ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}');
+      if (e.statusCode == 400) {
+        throw Exception('Invalid request: ${e.message}');
+      } else if (e.statusCode == 404) {
         throw Exception('Location or employees not found');
+      } else if (e.statusCode == 403) {
+        throw Exception('Permission denied: You are not the owner');
+      } else if (e.statusCode == 307) {
+        throw Exception('Server redirect error (307) - Check backend node configuration');
       }
       throw Exception('Error adding employees: ${e.message}');
     } catch (e) {
       debugPrint('LocationApiService.addEmployeesToLocation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get employees assigned to a location
+  ///
+  /// API: GET /api/location/{locationId}/employees
+  /// Returns: List<EmployeeDto>
+  Future<List<EmployeeDto>> getLocationEmployees({
+    required String locationId,
+  }) async {
+    try {
+      final response = await _apiClient.get(
+        ApiEndpoints.getLocationEmployees(locationId),
+      );
+
+      if (response.isSuccess && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        final employeeData = data['data'] as Map<String, dynamic>?;
+        final employeeList = employeeData != null
+            ? (employeeData['employees'] as List<dynamic>? ?? [])
+            : [];
+
+        return employeeList
+            .map((item) => EmployeeDto.fromJson(item as Map<String, dynamic>))
+            .toList();
+      } else {
+        throw Exception(
+          response.message ?? 'Failed to load location employees',
+        );
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        throw Exception('🔒 Session expired');
+      }
+      throw Exception('API Error: ${e.message}');
+    } catch (e) {
+      debugPrint('LocationApiService.getLocationEmployees error: $e');
       rethrow;
     }
   }
