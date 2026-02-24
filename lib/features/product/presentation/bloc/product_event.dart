@@ -13,9 +13,7 @@ abstract class ProductEvent extends Equatable {
 class LoadProductsByLocationRequested extends ProductEvent {
   final String locationId;
 
-  const LoadProductsByLocationRequested({
-    required this.locationId,
-  });
+  const LoadProductsByLocationRequested({required this.locationId});
 
   @override
   List<Object?> get props => [locationId];
@@ -25,9 +23,7 @@ class LoadProductsByLocationRequested extends ProductEvent {
 class RefreshProductsRequested extends ProductEvent {
   final String locationId;
 
-  const RefreshProductsRequested({
-    required this.locationId,
-  });
+  const RefreshProductsRequested({required this.locationId});
 
   @override
   List<Object?> get props => [locationId];
@@ -68,10 +64,7 @@ class SortProductsRequested extends ProductEvent {
   final String locationId;
   final String sortBy; // 'name', 'price', 'stock', 'date'
 
-  const SortProductsRequested({
-    required this.locationId,
-    required this.sortBy,
-  });
+  const SortProductsRequested({required this.locationId, required this.sortBy});
 
   @override
   List<Object?> get props => [locationId, sortBy];
@@ -81,9 +74,7 @@ class SortProductsRequested extends ProductEvent {
 class ClearFiltersRequested extends ProductEvent {
   final String locationId;
 
-  const ClearFiltersRequested({
-    required this.locationId,
-  });
+  const ClearFiltersRequested({required this.locationId});
 
   @override
   List<Object?> get props => [locationId];
@@ -101,6 +92,8 @@ class AddProductRequested extends ProductEvent {
   final String? unit;
   final bool isActive;
   final String? description;
+  final String? imagePath;
+  final List<Map<String, dynamic>>? priceTiers;
 
   const AddProductRequested({
     required this.locationId,
@@ -113,6 +106,8 @@ class AddProductRequested extends ProductEvent {
     this.unit,
     this.isActive = true,
     this.description,
+    this.imagePath,
+    this.priceTiers,
   });
 
   @override
@@ -127,6 +122,8 @@ class AddProductRequested extends ProductEvent {
     unit,
     isActive,
     description,
+    imagePath,
+    priceTiers,
   ];
 }
 
@@ -143,6 +140,9 @@ class UpdateProductRequested extends ProductEvent {
   final String? unit;
   final bool isActive;
   final String? description;
+  final String? imagePath;
+  final List<Map<String, dynamic>>? priceTiers;
+  final bool removeImage;
 
   const UpdateProductRequested({
     required this.locationId,
@@ -156,6 +156,9 @@ class UpdateProductRequested extends ProductEvent {
     this.unit,
     this.isActive = true,
     this.description,
+    this.imagePath,
+    this.priceTiers,
+    this.removeImage = false,
   });
 
   @override
@@ -171,7 +174,20 @@ class UpdateProductRequested extends ProductEvent {
     unit,
     isActive,
     description,
+    imagePath,
+    priceTiers,
+    removeImage,
   ];
+}
+
+/// Load product sale items (price tiers)
+class LoadProductSaleItemsRequested extends ProductEvent {
+  final String productId;
+
+  const LoadProductSaleItemsRequested({required this.productId});
+
+  @override
+  List<Object?> get props => [productId];
 }
 
 /// Delete product
@@ -188,6 +204,22 @@ class DeleteProductRequested extends ProductEvent {
   List<Object?> get props => [locationId, productId];
 }
 
+/// Update product status
+class UpdateProductStatusRequested extends ProductEvent {
+  final String locationId;
+  final String productId;
+  final bool isActive;
+
+  const UpdateProductStatusRequested({
+    required this.locationId,
+    required this.productId,
+    required this.isActive,
+  });
+
+  @override
+  List<Object?> get props => [locationId, productId, isActive];
+}
+
 /// Import inventory
 class ImportInventoryRequested extends ProductEvent {
   final String locationId;
@@ -202,4 +234,14 @@ class ImportInventoryRequested extends ProductEvent {
 
   @override
   List<Object?> get props => [locationId, quantity, productId];
+}
+
+/// Load more products (pagination)
+class LoadMoreProductsRequested extends ProductEvent {
+  final String locationId;
+
+  const LoadMoreProductsRequested({required this.locationId});
+
+  @override
+  List<Object?> get props => [locationId];
 }

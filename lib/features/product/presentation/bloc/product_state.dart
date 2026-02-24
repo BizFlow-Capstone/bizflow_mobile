@@ -1,81 +1,5 @@
 import 'package:equatable/equatable.dart';
-
-/// Mock Product Entity for now (no data layer yet)
-class ProductEntity extends Equatable {
-  final String id;
-  final String name;
-  final String? barcode;
-  final String? category;
-  final double? costPrice;
-  final double? salePrice;
-  final int? quantity;
-  final String? unit;
-  final bool isActive;
-  final String? description;
-  final String? imageUrl;
-  final DateTime? createdAt;
-
-  const ProductEntity({
-    required this.id,
-    required this.name,
-    this.barcode,
-    this.category,
-    this.costPrice,
-    this.salePrice,
-    this.quantity,
-    this.unit,
-    this.isActive = true,
-    this.description,
-    this.imageUrl,
-    this.createdAt,
-  });
-
-  ProductEntity copyWith({
-    String? id,
-    String? name,
-    String? barcode,
-    String? category,
-    double? costPrice,
-    double? salePrice,
-    int? quantity,
-    String? unit,
-    bool? isActive,
-    String? description,
-    String? imageUrl,
-    DateTime? createdAt,
-  }) {
-    return ProductEntity(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      barcode: barcode ?? this.barcode,
-      category: category ?? this.category,
-      costPrice: costPrice ?? this.costPrice,
-      salePrice: salePrice ?? this.salePrice,
-      quantity: quantity ?? this.quantity,
-      unit: unit ?? this.unit,
-      isActive: isActive ?? this.isActive,
-      description: description ?? this.description,
-      imageUrl: imageUrl ?? this.imageUrl,
-      createdAt: createdAt ?? this.createdAt,
-    );
-  }
-
-  @override
-  List<Object?> get props => [
-    id,
-    name,
-    barcode,
-    category,
-    costPrice,
-    salePrice,
-    quantity,
-    unit,
-    isActive,
-    description,
-    imageUrl,
-    createdAt,
-  ];
-}
+import '../../domain/entities/product_entity.dart';
 
 /// Product States
 abstract class ProductState extends Equatable {
@@ -103,6 +27,8 @@ class ProductsLoaded extends ProductState {
   final String? filterStatus;
   final String? filterCategory;
   final String? sortBy;
+  final bool hasReachedMax;
+  final int currentPage;
 
   const ProductsLoaded({
     required this.products,
@@ -111,7 +37,31 @@ class ProductsLoaded extends ProductState {
     this.filterStatus,
     this.filterCategory,
     this.sortBy,
+    this.hasReachedMax = false,
+    this.currentPage = 1,
   });
+
+  ProductsLoaded copyWith({
+    List<ProductEntity>? products,
+    String? locationId,
+    String? searchQuery,
+    String? filterStatus,
+    String? filterCategory,
+    String? sortBy,
+    bool? hasReachedMax,
+    int? currentPage,
+  }) {
+    return ProductsLoaded(
+      products: products ?? this.products,
+      locationId: locationId ?? this.locationId,
+      searchQuery: searchQuery ?? this.searchQuery,
+      filterStatus: filterStatus ?? this.filterStatus,
+      filterCategory: filterCategory ?? this.filterCategory,
+      sortBy: sortBy ?? this.sortBy,
+      hasReachedMax: hasReachedMax ?? this.hasReachedMax,
+      currentPage: currentPage ?? this.currentPage,
+    );
+  }
 
   @override
   List<Object?> get props => [
@@ -121,6 +71,8 @@ class ProductsLoaded extends ProductState {
     filterStatus,
     filterCategory,
     sortBy,
+    hasReachedMax,
+    currentPage,
   ];
 }
 
@@ -186,6 +138,16 @@ class ImportInventorySuccess extends ProductState {
 
   @override
   List<Object?> get props => [productId, quantity];
+}
+
+/// Product sale items loaded
+class ProductSaleItemsLoaded extends ProductState {
+  final List<Map<String, dynamic>> saleItems;
+
+  const ProductSaleItemsLoaded({required this.saleItems});
+
+  @override
+  List<Object?> get props => [saleItems];
 }
 
 /// Failure state

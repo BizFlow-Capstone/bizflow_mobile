@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../bloc/product_state.dart';
+import '../../domain/entities/product_entity.dart';
 import 'edit_product_page.dart';
 
 /// Product Detail Page
@@ -62,6 +63,7 @@ class ProductDetailPage extends StatelessWidget {
   PreferredSizeWidget _buildAppBar(BuildContext context, AppLocalizations? l10n) {
     return AppBar(
       backgroundColor: AppColors.white,
+      systemOverlayStyle: SystemUiOverlayStyle.dark,
       elevation: 0,
       leading: IconButton(
         icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),

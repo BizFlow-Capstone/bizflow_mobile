@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -33,7 +35,13 @@ class _AddProductPageState extends State<AddProductPage> {
   late TextEditingController _unitController;
   late TextEditingController _descriptionController;
 
+  // Image and price tiers
+  String? _selectedImagePath;
+  List<Map<String, dynamic>> _priceTiers = [];
+
   bool _isActive = true;
+
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -61,11 +69,174 @@ class _AddProductPageState extends State<AddProductPage> {
     super.dispose();
   }
 
+  /// Pick image from gallery or camera
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImagePath = pickedFile.path;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n?.translate('common.image_selected') ?? 'Image selected'}: ${pickedFile.name}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${l10n?.translate('common.error') ?? 'Error'}: $e')),
+      );
+    }
+  }
+
+  /// Show dialog to add or edit price tier
+  void _showAddPriceTierDialog({int? editIndex}) {
+    final unitController = TextEditingController();
+    final quantityController = TextEditingController();
+    final priceController = TextEditingController();
+
+    // If editing, populate with existing data
+    if (editIndex != null && editIndex < _priceTiers.length) {
+      final tier = _priceTiers[editIndex];
+      unitController.text = tier['Unit'] ?? '';
+      quantityController.text = tier['Quantity']?.toString() ?? '';
+      priceController.text = tier['Price']?.toString() ?? '';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          editIndex != null
+              ? l10n?.translate('common.edit') ?? 'Sửa quy đổi giá'
+              : l10n?.translate('product.add_price_tier') ?? 'Thêm quy đổi giá',
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: unitController,
+                decoration: InputDecoration(
+                  labelText: l10n?.translate('product.unit') ?? 'Đơn vị',
+                  hintText: 'Lốc, Thùng, ...',
+                ),
+              ),
+              SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: quantityController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: l10n?.translate('product.quantity') ?? 'Số lượng',
+                  hintText: '12',
+                ),
+              ),
+              SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: priceController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: l10n?.translate('product.price') ?? 'Giá',
+                  hintText: '120000',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n?.translate('common.cancel') ?? 'Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (unitController.text.isEmpty || quantityController.text.isEmpty || priceController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n?.translate('common.required_field') ?? 'Vui lòng nhập đủ thông tin')),
+                );
+                return;
+              }
+
+              final quantity = int.tryParse(quantityController.text) ?? 0;
+              final price = int.tryParse(priceController.text) ?? 0;
+
+              if (quantity <= 0 || price < 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n?.translate('product.invalid_value') ?? 'Giá trị không hợp lệ')),
+                );
+                return;
+              }
+
+              setState(() {
+                if (editIndex != null && editIndex < _priceTiers.length) {
+                  // Update existing tier
+                  _priceTiers[editIndex] = {
+                    'Unit': unitController.text,
+                    'Quantity': quantity,
+                    'Price': price,
+                  };
+                } else {
+                  // Add new tier
+                  _priceTiers.add({
+                    'Unit': unitController.text,
+                    'Quantity': quantity,
+                    'Price': price,
+                  });
+                }
+              });
+
+              Navigator.pop(context);
+            },
+            child: Text(editIndex != null ? l10n?.translate('common.save') ?? 'Lưu' : l10n?.translate('common.add') ?? 'Thêm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Format price to VND format
+  String _formatVND(String value) {
+    if (value.isEmpty) return '';
+    try {
+      final number = int.parse(value.replaceAll(',', ''));
+      return number.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (Match m) => '${m[1]},',
+      );
+    } catch (e) {
+      return value;
+    }
+  }
+
+  /// Validate if number is non-negative
+  bool _isValidNumber(String value) {
+    if (value.isEmpty) return true;
+    try {
+      return double.parse(value) >= 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
   void _submitForm() {
     if (_productNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n?.translate('common.required_field') ?? 'Vui lòng nhập tên sản phẩm'),
+        ),
+      );
+      return;
+    }
+
+    if (_unitController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n?.translate('common.required_field') ?? 'Vui lòng chọn đơn vị'),
         ),
       );
       return;
@@ -83,6 +254,8 @@ class _AddProductPageState extends State<AddProductPage> {
             unit: _unitController.text.isNotEmpty ? _unitController.text : null,
             isActive: _isActive,
             description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
+            imagePath: _selectedImagePath,
+            priceTiers: _priceTiers,
           ),
         );
   }
@@ -98,6 +271,7 @@ class _AddProductPageState extends State<AddProductPage> {
         elevation: 0,
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -143,31 +317,38 @@ class _AddProductPageState extends State<AddProductPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Product Image Section
-                Container(
-                  width: double.infinity,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.divider),
-                    borderRadius: BorderRadius.circular(12),
-                    color: const Color.fromARGB(255, 255, 255, 255),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.cloud_upload_outlined,
-                        size: 48,
-                        color: AppColors.textSecondary,
-                      ),
-                      SizedBox(height: AppSpacing.md),
-                      Text(
-                        l10n.translate('product.upload_image'),
-                        style: AppTextStyles.bodyMedium.copyWith(
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    width: double.infinity,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius: BorderRadius.circular(12),
+                      color: const Color.fromARGB(255, 255, 255, 255),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.cloud_upload_outlined,
+                          size: 48,
                           color: AppColors.textSecondary,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+                        SizedBox(height: AppSpacing.md),
+                        Text(
+                          _selectedImagePath != null
+                              ? _selectedImagePath!.split('/').last
+                              : l10n.translate('product.upload_image'),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: _selectedImagePath != null
+                                ? AppColors.secondary
+                                : AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 SizedBox(height: AppSpacing.lg),
@@ -296,69 +477,126 @@ class _AddProductPageState extends State<AddProductPage> {
                 SizedBox(height: AppSpacing.lg),
 
                 // Unit Conversion Section
-                _buildSectionTitle(
-                  l10n.translate('product.unit_conversion'),
-                ),
-                SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: AppColors.divider),
-                      borderRadius: BorderRadius.circular(12),
-                      color: AppColors.background,
-                  ),
+                GestureDetector(
+                  onTap: _showAddPriceTierDialog,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        l10n.translate('product.add_conversion'),
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.secondary,
-                        ),
+                      _buildSectionTitle(
+                        l10n.translate('product.unit_conversion'),
                       ),
-                      SizedBox(height: AppSpacing.sm),
-                      Text(
-                        l10n.translate('product.unit_conversion_example'),
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                      SizedBox(height: AppSpacing.md),
+                      Container(
+                        padding: EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.divider),
+                            borderRadius: BorderRadius.circular(12),
+                            color: AppColors.background,
                         ),
+                        child: _priceTiers.isEmpty
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.translate('product.add_conversion'),
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      color: AppColors.secondary,
+                                    ),
+                                  ),
+                                  SizedBox(height: AppSpacing.sm),
+                                  Text(
+                                    l10n.translate('product.unit_conversion_example'),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: _priceTiers
+                                    .asMap()
+                                    .entries
+                                    .map((e) => Padding(
+                                          padding: EdgeInsets.symmetric(
+                                              vertical: AppSpacing.sm),
+                                          child: GestureDetector(
+                                            onTap: () => _showAddPriceTierDialog(editIndex: e.key),
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    '${e.value['Unit']}: ${e.value['Quantity']} x ${e.value['Price']} đ',
+                                                    style:
+                                                        AppTextStyles.bodySmall,
+                                                  ),
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(Icons.delete,
+                                                      size: 16,
+                                                      color: AppColors.error),
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      _priceTiers
+                                                          .removeAt(e.key);
+                                                    });
+                                                  },
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: BoxConstraints(),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ))
+                                    .toList(),
+                              ),
                       ),
                     ],
                   ),
                 ),
                 SizedBox(height: AppSpacing.lg),
 
-                // Wholesale Price Section
-                _buildSectionTitle(
-                  l10n.translate('product.wholesale_price'),
-                ),
-                SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: EdgeInsets.all(AppSpacing.md),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.divider),
-                    borderRadius: BorderRadius.circular(12),
-                    color: AppColors.background,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        l10n.translate('product.add_wholesale'),
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.secondary,
-                        ),
-                      ),
-                      SizedBox(height: AppSpacing.sm),
-                      Text(
-                        l10n.translate('product.wholesale_price_example'),
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // Wholesale Price Section (For future implementation)
+                // GestureDetector(
+                //   onTap: _showAddWholesalePriceDialog,
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       _buildSectionTitle(
+                //         l10n.translate('product.wholesale_price'),
+                //       ),
+                //       SizedBox(height: AppSpacing.md),
+                //       Container(
+                //         padding: EdgeInsets.all(AppSpacing.md),
+                //         decoration: BoxDecoration(
+                //           border: Border.all(color: AppColors.divider),
+                //           borderRadius: BorderRadius.circular(12),
+                //           color: AppColors.background,
+                //         ),
+                //         child: Column(
+                //           crossAxisAlignment: CrossAxisAlignment.start,
+                //           children: [
+                //             Text(
+                //               l10n.translate('product.add_wholesale'),
+                //               style: AppTextStyles.bodyMedium.copyWith(
+                //                 color: AppColors.secondary,
+                //               ),
+                //             ),
+                //             SizedBox(height: AppSpacing.sm),
+                //             Text(
+                //               l10n.translate('product.wholesale_price_example'),
+                //               style: AppTextStyles.bodySmall.copyWith(
+                //                 color: AppColors.textSecondary,
+                //               ),
+                //             ),
+                //           ],
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
                 SizedBox(height: AppSpacing.lg),
 
                 // Description

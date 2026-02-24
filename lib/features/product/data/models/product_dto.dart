@@ -35,6 +35,8 @@ class ProductDto {
   final double price;
   final int quantity;
   final String? imageUrl;
+  final int? locationId;
+  final String? businessTypeId;
 
   ProductDto({
     required this.id,
@@ -43,16 +45,49 @@ class ProductDto {
     required this.price,
     required this.quantity,
     this.imageUrl,
+    this.locationId,
+    this.businessTypeId,
   });
 
   factory ProductDto.fromJson(Map<String, dynamic> json) {
+    final dynamic idValue =
+        json['id'] ??
+        json['Id'] ??
+        json['ID'] ??
+        json['productId'] ??
+        json['ProductId'];
     return ProductDto(
-      id: json['id']?.toString() ?? '',
-      name: json['name'] as String? ?? '',
-      description: json['description'] as String?,
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      quantity: json['quantity'] as int? ?? 0,
-      imageUrl: json['imageUrl'] as String?,
+      id: idValue?.toString() ?? '',
+      name:
+          (json['name'] ??
+                  json['Name'] ??
+                  json['productName'] ??
+                  json['ProductName'])
+              as String? ??
+          '',
+      description: (json['description'] ?? json['Description']) as String?,
+      price:
+          (json['price'] as num? ??
+                  json['Price'] as num? ??
+                  json['costPrice'] as num? ??
+                  json['CostPrice'] as num?)
+              ?.toDouble() ??
+          0.0,
+      quantity:
+          (json['quantity'] as int? ??
+              json['Quantity'] as int? ??
+              json['stock'] as int? ??
+              json['Stock'] as int?) ??
+          0,
+      imageUrl:
+          (json['imageUrl'] ??
+                  json['ImageUrl'] ??
+                  json['image'] ??
+                  json['Image'])
+              as String?,
+      locationId: json['locationId'] as int? ?? json['LocationId'] as int?,
+      businessTypeId:
+          (json['businessTypeId'] ?? json['BusinessTypeId']) as String?,
     );
   }
 
@@ -64,6 +99,8 @@ class ProductDto {
       'price': price,
       'quantity': quantity,
       if (imageUrl != null) 'imageUrl': imageUrl,
+      if (locationId != null) 'locationId': locationId,
+      if (businessTypeId != null) 'businessTypeId': businessTypeId,
     };
   }
 }

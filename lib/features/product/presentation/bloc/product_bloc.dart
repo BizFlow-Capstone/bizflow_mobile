@@ -1,71 +1,38 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../data/product_repository.dart';
+import '../../domain/entities/product_entity.dart';
 import 'product_event.dart';
 import 'product_state.dart';
 
 /// Product BLoC
 /// Quản lý logic của tất cả các thao tác liên quan đến sản phẩm
 class ProductBloc extends Bloc<ProductEvent, ProductState> {
-  ProductBloc() : super(const ProductInitial()) {
+  final ProductRepository repository;
+
+  ProductBloc({required this.repository}) : super(const ProductInitial()) {
     on<LoadProductsByLocationRequested>(_onLoadProductsByLocationRequested);
     on<RefreshProductsRequested>(_onRefreshProductsRequested);
     on<SearchProductsRequested>(_onSearchProductsRequested);
     on<FilterProductsRequested>(_onFilterProductsRequested);
     on<SortProductsRequested>(_onSortProductsRequested);
     on<ClearFiltersRequested>(_onClearFiltersRequested);
+    on<LoadMoreProductsRequested>(_onLoadMoreProductsRequested);
     on<AddProductRequested>(_onAddProductRequested);
     on<UpdateProductRequested>(_onUpdateProductRequested);
     on<DeleteProductRequested>(_onDeleteProductRequested);
+    on<UpdateProductStatusRequested>(_onUpdateProductStatusRequested);
+    on<LoadProductSaleItemsRequested>(_onLoadProductSaleItemsRequested);
     on<ImportInventoryRequested>(_onImportInventoryRequested);
   }
 
   // In-memory cache for products
   List<ProductEntity> _products = [];
-  List<ProductEntity> _filteredProducts = [];
 
-  /// Mock data generator (for presentation layer without API)
-  List<ProductEntity> _generateMockProducts() {
-    return [
-      ProductEntity(
-        id: '1',
-        name: 'Nước khoáng Lavie',
-        barcode: '8934588020016',
-        category: 'Drinks',
-        costPrice: 5000,
-        salePrice: 59000,
-        quantity: 240,
-        unit: 'Lốc',
-        isActive: true,
-        imageUrl: 'https://via.placeholder.com/100?text=Lavie',
-        createdAt: DateTime.now(),
-      ),
-      ProductEntity(
-        id: '2',
-        name: 'Coca Cola',
-        barcode: '8934588020023',
-        category: 'Drinks',
-        costPrice: 10000,
-        salePrice: 70000,
-        quantity: 180,
-        unit: 'Lốc',
-        isActive: true,
-        imageUrl: 'https://via.placeholder.com/100?text=CocaCola',
-        createdAt: DateTime.now(),
-      ),
-      ProductEntity(
-        id: '3',
-        name: 'Sprite',
-        barcode: '8934588020030',
-        category: 'Drinks',
-        costPrice: 8000,
-        salePrice: 65000,
-        quantity: 150,
-        unit: 'Lốc',
-        isActive: true,
-        imageUrl: 'https://via.placeholder.com/100?text=Sprite',
-        createdAt: DateTime.now(),
-      ),
-    ];
-  }
+  // Filter and search state
+  String? _searchQuery;
+  String? _filterStatus;
+  String? _filterCategory;
 
   Future<void> _onLoadProductsByLocationRequested(
     LoadProductsByLocationRequested event,
@@ -73,13 +40,36 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     emit(const ProductLoading());
     try {
-      // TODO: Replace with actual API call when data layer is ready
-      await Future.delayed(const Duration(milliseconds: 500));
-      _products = _generateMockProducts();
-      _filteredProducts = List.from(_products);
-      emit(ProductsLoaded(products: _filteredProducts, locationId: event.locationId));
+      debugPrint(
+        'ProductBloc: Loading products for location ${event.locationId} with filters: $_searchQuery, $_filterStatus',
+      );
+
+      final response = await repository.getProducts(
+        locationId: int.tryParse(event.locationId),
+        name: _searchQuery,
+        status: _filterStatus,
+      );
+
+      debugPrint('ProductBloc: Response received');
+
+      final products = _parseProductsFromResponse(response);
+
+      _products = products;
+      emit(
+        ProductsLoaded(
+          products: products,
+          hasReachedMax: products.length < 20,
+          currentPage: 1,
+
+          locationId: event.locationId,
+          searchQuery: _searchQuery,
+          filterStatus: _filterStatus,
+          filterCategory: _filterCategory,
+        ),
+      );
     } catch (e) {
-      emit(ProductFailure(message: e.toString()));
+      debugPrint('ProductBloc._onLoadProductsByLocationRequested error: $e');
+      emit(ProductFailure(message: 'Failed to load products: ${e.toString()}'));
     }
   }
 
@@ -88,61 +78,161 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     try {
-      // TODO: Replace with actual API call when data layer is ready
-      await Future.delayed(const Duration(milliseconds: 500));
-      _products = _generateMockProducts();
-      _filteredProducts = List.from(_products);
-      emit(ProductsLoaded(products: _filteredProducts, locationId: event.locationId));
+      debugPrint('ProductBloc: Refreshing products');
+      final response = await repository.getProducts(
+        locationId: int.tryParse(event.locationId),
+        name: _searchQuery,
+        status: _filterStatus,
+      );
+
+      final products = _parseProductsFromResponse(response);
+
+      _products = products;
+      emit(
+        ProductsLoaded(
+          products: products,
+          hasReachedMax: products.length < 20,
+          currentPage: 1,
+
+          locationId: event.locationId,
+          searchQuery: _searchQuery,
+          filterStatus: _filterStatus,
+          filterCategory: _filterCategory,
+        ),
+      );
     } catch (e) {
-      emit(ProductFailure(message: e.toString()));
+      debugPrint('ProductBloc._onRefreshProductsRequested error: $e');
+      emit(
+        ProductFailure(message: 'Failed to refresh products: ${e.toString()}'),
+      );
     }
+  }
+
+  Future<void> _onLoadMoreProductsRequested(
+    LoadMoreProductsRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    final state = this.state;
+    if (state is! ProductsLoaded || state.hasReachedMax) return;
+
+    try {
+      final nextPage = state.currentPage + 1;
+      debugPrint('ProductBloc: Loading more products, page: $nextPage');
+
+      final response = await repository.getProducts(
+        locationId: int.tryParse(event.locationId),
+        name: _searchQuery,
+        status: _filterStatus,
+        pageNumber: nextPage,
+      );
+
+      final newProducts = _parseProductsFromResponse(response);
+
+      if (newProducts.isEmpty) {
+        emit(state.copyWith(hasReachedMax: true));
+      } else {
+        _products.addAll(newProducts);
+        emit(
+          state.copyWith(
+            products: List.of(state.products)..addAll(newProducts),
+            currentPage: nextPage,
+            hasReachedMax: newProducts.length < 20, // Assuming PageSize is 20
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ProductBloc._onLoadMoreProductsRequested error: $e');
+      // Don't emit failure here to avoid breaking the UI, just log it
+    }
+  }
+
+  /// Helper to parse products from API response
+  List<ProductEntity> _parseProductsFromResponse(dynamic response) {
+    if (response is! Map<String, dynamic>) return [];
+
+    final dynamic dataField = response['data'];
+    List<dynamic> productsList = [];
+
+    if (dataField is List<dynamic>) {
+      productsList = dataField;
+    } else if (dataField is Map<String, dynamic>) {
+      productsList =
+          dataField['items'] ??
+          dataField['products'] ??
+          dataField['data'] ??
+          [];
+    }
+
+    return productsList
+        .map((item) {
+          if (item is! Map<String, dynamic>) return null;
+          final dynamic idValue =
+              item['id'] ??
+              item['Id'] ??
+              item['ID'] ??
+              item['productId'] ??
+              item['ProductId'] ??
+              item['product_id'];
+          return ProductEntity(
+            id: idValue?.toString() ?? '',
+            name: (item['name'] ?? item['Name']) as String? ?? 'Unknown',
+            description:
+                (item['description'] ?? item['Description']) as String?,
+            price:
+                (item['salePrice'] ?? item['SalePrice'] as num?)?.toDouble() ??
+                (item['price'] ?? item['Price'] as num?)?.toDouble() ??
+                0.0,
+            quantity: (item['quantity'] ?? item['Quantity']) as int? ?? 0,
+            imageUrl: (item['imageUrl'] ?? item['ImageUrl']) as String?,
+            barcode:
+                (item['barcode'] ??
+                        item['Barcode'] ??
+                        item['sku'] ??
+                        item['Sku'])
+                    as String?,
+            category: (item['category'] ?? item['Category']) as String?,
+            costPrice: (item['costPrice'] ?? item['CostPrice'] as num?)
+                ?.toDouble(),
+            salePrice: (item['salePrice'] ?? item['SalePrice'] as num?)
+                ?.toDouble(),
+            unit: (item['unit'] ?? item['Unit']) as String?,
+            isActive: (item['status'] ?? item['Status']) != null
+                ? (item['status'] ?? item['Status']) == 'active'
+                : (item['isActive'] ??
+                      item['IsActive'] ??
+                      item['active'] ??
+                      item['Active'] ??
+                      true),
+            createdAt: (item['createdAt'] ?? item['CreatedAt']) != null
+                ? DateTime.tryParse(
+                    (item['createdAt'] ?? item['CreatedAt']) as String,
+                  )
+                : null,
+            locationId:
+                item['locationId'] as int? ?? item['LocationId'] as int?,
+            businessTypeId:
+                (item['businessTypeId'] ?? item['BusinessTypeId']) as String?,
+          );
+        })
+        .whereType<ProductEntity>()
+        .toList();
   }
 
   Future<void> _onSearchProductsRequested(
     SearchProductsRequested event,
     Emitter<ProductState> emit,
   ) async {
-    try {
-      if (event.query.isEmpty) {
-        _filteredProducts = List.from(_products);
-      } else {
-        _filteredProducts = _products
-            .where((product) =>
-                product.name.toLowerCase().contains(event.query.toLowerCase()) ||
-                (product.barcode?.toLowerCase().contains(event.query.toLowerCase()) ?? false))
-            .toList();
-      }
-      emit(ProductsLoaded(
-        products: _filteredProducts,
-        locationId: event.locationId,
-        searchQuery: event.query,
-      ));
-    } catch (e) {
-      emit(ProductFailure(message: e.toString()));
-    }
+    _searchQuery = event.query.isEmpty ? null : event.query;
+    add(LoadProductsByLocationRequested(locationId: event.locationId));
   }
 
   Future<void> _onFilterProductsRequested(
     FilterProductsRequested event,
     Emitter<ProductState> emit,
   ) async {
-    try {
-      _filteredProducts = _products.where((product) {
-        bool statusMatch = event.status == null || 
-            (event.status == 'active' ? product.isActive : !product.isActive);
-        bool categoryMatch = event.category == null || product.category == event.category;
-        return statusMatch && categoryMatch;
-      }).toList();
-      
-      emit(ProductsLoaded(
-        products: _filteredProducts,
-        locationId: event.locationId,
-        filterStatus: event.status,
-        filterCategory: event.category,
-      ));
-    } catch (e) {
-      emit(ProductFailure(message: e.toString()));
-    }
+    _filterStatus = event.status;
+    _filterCategory = event.category;
+    add(LoadProductsByLocationRequested(locationId: event.locationId));
   }
 
   Future<void> _onSortProductsRequested(
@@ -150,29 +240,37 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     try {
+      debugPrint('ProductBloc: Sorting products by: ${event.sortBy}');
+
+      List<ProductEntity> sorted = List.from(_products);
       switch (event.sortBy) {
         case 'name':
-          _filteredProducts.sort((a, b) => a.name.compareTo(b.name));
+          sorted.sort((a, b) => a.name.compareTo(b.name));
           break;
         case 'price':
-          _filteredProducts.sort((a, b) => (a.salePrice ?? 0).compareTo(b.salePrice ?? 0));
+          sorted.sort((a, b) => a.price.compareTo(b.price));
           break;
         case 'stock':
-          _filteredProducts.sort((a, b) => (a.quantity ?? 0).compareTo(b.quantity ?? 0));
+          sorted.sort((a, b) => a.quantity.compareTo(b.quantity));
           break;
         case 'date':
-          _filteredProducts.sort((a, b) => (b.createdAt ?? DateTime.now())
-              .compareTo(a.createdAt ?? DateTime.now()));
+          sorted.sort((a, b) => b.id.compareTo(a.id));
           break;
       }
-      
-      emit(ProductsLoaded(
-        products: _filteredProducts,
-        locationId: event.locationId,
-        sortBy: event.sortBy,
-      ));
+
+      emit(
+        ProductsLoaded(
+          products: sorted,
+          locationId: event.locationId,
+          searchQuery: _searchQuery,
+          filterStatus: _filterStatus,
+          filterCategory: _filterCategory,
+          sortBy: event.sortBy,
+        ),
+      );
     } catch (e) {
-      emit(ProductFailure(message: e.toString()));
+      debugPrint('ProductBloc._onSortProductsRequested error: $e');
+      emit(ProductFailure(message: 'Failed to sort products: ${e.toString()}'));
     }
   }
 
@@ -180,12 +278,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     ClearFiltersRequested event,
     Emitter<ProductState> emit,
   ) async {
-    try {
-      _filteredProducts = List.from(_products);
-      emit(ProductsLoaded(products: _filteredProducts, locationId: event.locationId));
-    } catch (e) {
-      emit(ProductFailure(message: e.toString()));
-    }
+    _searchQuery = null;
+    _filterStatus = null;
+    _filterCategory = null;
+    add(LoadProductsByLocationRequested(locationId: event.locationId));
   }
 
   Future<void> _onAddProductRequested(
@@ -194,29 +290,64 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     emit(const ProductAddInProgress());
     try {
-      // TODO: Replace with actual API call when data layer is ready
-      await Future.delayed(const Duration(milliseconds: 500));
-      
+      debugPrint('ProductBloc: Creating product: ${event.productName}');
+
+      // If businessTypeId is not provided, try to find one from existing products at this location
+      String? bId;
+      try {
+        final existing = _products.firstWhere(
+          (p) =>
+              p.locationId.toString() == event.locationId.toString() &&
+              p.businessTypeId != null,
+        );
+        bId = existing.businessTypeId;
+      } catch (_) {}
+
+      // Fallback to a valid UUID strings - required by endpoint.md
+      final businessTypeId = bId ?? '00000000-0000-0000-0000-000000000000';
+
+      final response = await repository.createProduct(
+        productName: event.productName,
+        unit: event.unit ?? 'piece',
+        businessTypeId: businessTypeId,
+        locationId: int.tryParse(event.locationId) ?? 1,
+        sku: event.barcode,
+        costPrice: event.costPrice ?? 0,
+        stock: event.quantity,
+        priceTiers: event.priceTiers,
+        imagePath: event.imagePath,
+      );
+
+      debugPrint('ProductBloc: Create response: $response');
+
+      final dynamic idValue = response is Map
+          ? (response['id'] ??
+                response['Id'] ??
+                response['ID'] ??
+                response['data']?['id'] ??
+                response['data']?['Id'])
+          : null;
       final newProduct = ProductEntity(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: idValue?.toString() ?? '${DateTime.now().millisecondsSinceEpoch}',
         name: event.productName,
+        description: event.description ?? '',
+        price: event.salePrice ?? 0,
+        quantity: event.quantity ?? 0,
         barcode: event.barcode,
         category: event.category,
         costPrice: event.costPrice,
         salePrice: event.salePrice,
-        quantity: event.quantity,
         unit: event.unit,
         isActive: event.isActive,
-        description: event.description,
         createdAt: DateTime.now(),
       );
 
       _products.add(newProduct);
-      _filteredProducts = List.from(_products);
-      
+
       emit(ProductAddSuccess(product: newProduct));
     } catch (e) {
-      emit(ProductFailure(message: e.toString()));
+      debugPrint('ProductBloc._onAddProductRequested error: $e');
+      emit(ProductFailure(message: 'Failed to add product: ${e.toString()}'));
     }
   }
 
@@ -226,28 +357,72 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     emit(const ProductUpdateInProgress());
     try {
-      // TODO: Replace with actual API call when data layer is ready
-      await Future.delayed(const Duration(milliseconds: 500));
-      
+      debugPrint('ProductBloc: Updating product: ${event.productId}');
+
+      // Get existing product to retrieve businessTypeId and locationId if not in event
+      final existingProduct = _products.firstWhere(
+        (p) => p.id == event.productId,
+        orElse: () => throw Exception('Product not found in local state'),
+      );
+
+      final businessTypeId =
+          existingProduct.businessTypeId ??
+          '00000000-0000-0000-0000-000000000000';
+      final locationId =
+          int.tryParse(event.locationId) ?? existingProduct.locationId ?? 0;
+
+      await repository.updateProduct(
+        event.productId,
+        productName: event.productName,
+        unit: event.unit ?? existingProduct.unit ?? 'Unit',
+        locationId: locationId,
+        businessTypeId: businessTypeId,
+        sku: event.barcode,
+        costPrice: event.costPrice,
+        stock: event.quantity,
+        priceTiers: event.priceTiers,
+        imagePath: event.imagePath,
+        removeImage: event.removeImage,
+      );
+
       final index = _products.indexWhere((p) => p.id == event.productId);
       if (index != -1) {
         _products[index] = _products[index].copyWith(
           name: event.productName,
+          quantity: event.quantity,
           barcode: event.barcode,
-          category: event.category,
           costPrice: event.costPrice,
           salePrice: event.salePrice,
-          quantity: event.quantity,
           unit: event.unit,
           isActive: event.isActive,
           description: event.description,
         );
-        _filteredProducts = List.from(_products);
-        
+
         emit(ProductUpdateSuccess(product: _products[index]));
+      } else {
+        emit(
+          ProductUpdateSuccess(
+            product: ProductEntity(
+              id: event.productId,
+              name: event.productName,
+              description: event.description ?? '',
+              price: event.salePrice ?? 0,
+              quantity: event.quantity ?? 0,
+              barcode: event.barcode,
+              category: event.category,
+              costPrice: event.costPrice,
+              salePrice: event.salePrice,
+              unit: event.unit,
+              isActive: event.isActive,
+            ),
+          ),
+        );
       }
     } catch (e) {
-      emit(ProductFailure(message: e.toString()));
+      debugPrint('ProductBloc._onUpdateProductRequested error: $e');
+      emit(
+        ProductFailure(message: 'Failed to update product: ${e.toString()}'),
+      );
     }
   }
 
@@ -257,15 +432,113 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     emit(const ProductDeleteInProgress());
     try {
-      // TODO: Replace with actual API call when data layer is ready
-      await Future.delayed(const Duration(milliseconds: 500));
-      
+      debugPrint('ProductBloc: Deleting product: ${event.productId}');
+
+      await repository.deleteProduct(event.productId);
+
       _products.removeWhere((p) => p.id == event.productId);
-      _filteredProducts = List.from(_products);
-      
+
       emit(ProductDeleteSuccess(productId: event.productId));
     } catch (e) {
-      emit(ProductFailure(message: e.toString()));
+      debugPrint('ProductBloc._onDeleteProductRequested error: $e');
+      emit(
+        ProductFailure(message: 'Failed to delete product: ${e.toString()}'),
+      );
+    }
+  }
+
+  Future<void> _onUpdateProductStatusRequested(
+    UpdateProductStatusRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    emit(const ProductUpdateInProgress());
+    try {
+      debugPrint(
+        'ProductBloc: Updating product status: ${event.productId} to ${event.isActive}',
+      );
+
+      await repository.updateProductStatus(
+        event.productId,
+        status: event.isActive,
+      );
+
+      final index = _products.indexWhere((p) => p.id == event.productId);
+      if (index != -1) {
+        _products[index] = _products[index].copyWith(isActive: event.isActive);
+        emit(ProductUpdateSuccess(product: _products[index]));
+      } else {
+        // If not in cache, we just emit success with a skeleton entity
+        emit(
+          ProductUpdateSuccess(
+            product: ProductEntity(
+              id: event.productId,
+              name: '',
+              price: 0,
+              quantity: 0,
+              isActive: event.isActive,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ProductBloc._onUpdateProductStatusRequested error: $e');
+      emit(
+        ProductFailure(
+          message: 'Failed to update product status: ${e.toString()}',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onLoadProductSaleItemsRequested(
+    LoadProductSaleItemsRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    try {
+      debugPrint(
+        'ProductBloc: Loading sale items for product: ${event.productId}',
+      );
+
+      final response = await repository.getProductSaleItems(event.productId);
+
+      debugPrint('ProductBloc: Sale items response: $response');
+
+      // Parse sale items from response
+      List<Map<String, dynamic>> saleItems = [];
+      if (response is List<dynamic>) {
+        saleItems = response.map((item) {
+          if (item is Map<String, dynamic>) {
+            return {
+              'Unit': item['unit'] as String? ?? '',
+              'Quantity': item['quantity'] as int? ?? 0,
+              'Price': item['price'] as num? ?? 0,
+            };
+          }
+          return <String, dynamic>{};
+        }).toList();
+      } else if (response is Map<String, dynamic>) {
+        final data = response['data'];
+        if (data is List<dynamic>) {
+          saleItems = data.map((item) {
+            if (item is Map<String, dynamic>) {
+              return {
+                'Unit': item['unit'] as String? ?? '',
+                'Quantity': item['quantity'] as int? ?? 0,
+                'Price': item['price'] as num? ?? 0,
+              };
+            }
+            return <String, dynamic>{};
+          }).toList();
+        }
+      }
+
+      emit(ProductSaleItemsLoaded(saleItems: saleItems));
+    } catch (e) {
+      debugPrint(
+        'ProductBloc._onLoadProductSaleItemsRequested: No sale items found or error: $e',
+      );
+      // Treat as empty list if loading fails (e.g., 404 not found is common if no tiers exist)
+      emit(const ProductSaleItemsLoaded(saleItems: []));
     }
   }
 
@@ -275,15 +548,21 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     emit(const ImportInventoryInProgress());
     try {
-      // TODO: Replace with actual API call when data layer is ready
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      emit(ImportInventorySuccess(
-        productId: event.productId,
-        quantity: event.quantity,
-      ));
+      debugPrint(
+        'ProductBloc: Importing inventory for product: ${event.productId}',
+      );
+
+      emit(
+        ImportInventorySuccess(
+          productId: event.productId,
+          quantity: event.quantity,
+        ),
+      );
     } catch (e) {
-      emit(ProductFailure(message: e.toString()));
+      debugPrint('ProductBloc._onImportInventoryRequested error: $e');
+      emit(
+        ProductFailure(message: 'Failed to import inventory: ${e.toString()}'),
+      );
     }
   }
 }

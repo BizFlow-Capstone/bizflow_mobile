@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../bloc/product_state.dart';
+import '../../domain/entities/product_entity.dart';
+import '../bloc/product_bloc.dart';
+import '../bloc/product_event.dart';
 import '../pages/edit_product_page.dart';
 import '../pages/product_detail_page.dart';
 
@@ -229,7 +232,9 @@ class ProductCardWidget extends StatelessWidget {
                           );
                         },
                         icon: const Icon(Icons.edit, size: 18),
-                        label: Text(l10n.translate('product.edit_button_label')),
+                        label: Text(
+                          l10n.translate('product.edit_button_label'),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.secondary,
                         ),
@@ -243,8 +248,14 @@ class ProductCardWidget extends StatelessWidget {
                           showDialog(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: Text(l10n.translate('product.confirm_delete_title')),
-                              content: Text(l10n.translate('product.confirm_delete_message')),
+                              title: Text(
+                                l10n.translate('product.confirm_delete_title'),
+                              ),
+                              content: Text(
+                                l10n.translate(
+                                  'product.confirm_delete_message',
+                                ),
+                              ),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(context),
@@ -253,10 +264,17 @@ class ProductCardWidget extends StatelessWidget {
                                 TextButton(
                                   onPressed: () {
                                     Navigator.pop(context);
-                                    // TODO: Dispatch DeleteProductRequested event
+                                    context.read<ProductBloc>().add(
+                                      DeleteProductRequested(
+                                        locationId: locationId,
+                                        productId: product.id,
+                                      ),
+                                    );
                                   },
                                   child: Text(
-                                    l10n.translate('product.delete_button_label'),
+                                    l10n.translate(
+                                      'product.delete_button_label',
+                                    ),
                                     style: const TextStyle(color: Colors.red),
                                   ),
                                 ),
@@ -265,7 +283,9 @@ class ProductCardWidget extends StatelessWidget {
                           );
                         },
                         icon: const Icon(Icons.delete_outline, size: 18),
-                        label: Text(l10n.translate('product.delete_button_label')),
+                        label: Text(
+                          l10n.translate('product.delete_button_label'),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.error,
                         ),

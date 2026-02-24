@@ -6,6 +6,15 @@ class ProductEntity {
   final double price;
   final int quantity;
   final String? imageUrl;
+  final String? barcode;
+  final String? category;
+  final double? costPrice;
+  final double? salePrice;
+  final String? unit;
+  final bool isActive;
+  final DateTime? createdAt;
+  final int? locationId;
+  final String? businessTypeId;
 
   ProductEntity({
     required this.id,
@@ -14,6 +23,15 @@ class ProductEntity {
     required this.price,
     required this.quantity,
     this.imageUrl,
+    this.barcode,
+    this.category,
+    this.costPrice,
+    this.salePrice,
+    this.unit,
+    this.isActive = true,
+    this.createdAt,
+    this.locationId,
+    this.businessTypeId,
   });
 
   ProductEntity copyWith({
@@ -23,6 +41,15 @@ class ProductEntity {
     double? price,
     int? quantity,
     String? imageUrl,
+    String? barcode,
+    String? category,
+    double? costPrice,
+    double? salePrice,
+    String? unit,
+    bool? isActive,
+    DateTime? createdAt,
+    int? locationId,
+    String? businessTypeId,
   }) {
     return ProductEntity(
       id: id ?? this.id,
@@ -31,6 +58,15 @@ class ProductEntity {
       price: price ?? this.price,
       quantity: quantity ?? this.quantity,
       imageUrl: imageUrl ?? this.imageUrl,
+      barcode: barcode ?? this.barcode,
+      category: category ?? this.category,
+      costPrice: costPrice ?? this.costPrice,
+      salePrice: salePrice ?? this.salePrice,
+      unit: unit ?? this.unit,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      locationId: locationId ?? this.locationId,
+      businessTypeId: businessTypeId ?? this.businessTypeId,
     );
   }
 }

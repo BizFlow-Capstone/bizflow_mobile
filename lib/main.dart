@@ -18,6 +18,8 @@ import 'features/location/presentation/bloc/location_bloc.dart';
 import 'features/order/data/order_api_service.dart';
 import 'features/order/data/order_repository.dart';
 import 'features/order/presentation/bloc/order_bloc.dart';
+import 'features/product/data/product_api_service.dart';
+import 'features/product/data/product_repository.dart';
 import 'features/product/presentation/bloc/product_bloc.dart';
 
 void main() {
@@ -40,6 +42,8 @@ class _MyAppState extends State<MyApp> {
   late EmployeeRepository _employeeRepository;
   late OrderApiService _orderApiService;
   late OrderRepository _orderRepository;
+  late ProductApiService _productApiService;
+  late ProductRepository _productRepository;
 
   @override
   void initState() {
@@ -74,11 +78,13 @@ class _MyAppState extends State<MyApp> {
     _locationApiService = LocationApiService(apiClient: _apiClient);
     _employeeApiService = EmployeeApiService(apiClient: _apiClient);
     _orderApiService = OrderApiService(apiClient: _apiClient);
+    _productApiService = ProductApiService(apiClient: _apiClient);
 
     // Initialize Repositories (calls Services)
     _locationRepository = LocationRepository(service: _locationApiService);
     _employeeRepository = EmployeeRepository(service: _employeeApiService);
     _orderRepository = OrderRepository(apiService: _orderApiService);
+    _productRepository = ProductRepository(service: _productApiService);
   }
 
   @override
@@ -106,7 +112,7 @@ class _MyAppState extends State<MyApp> {
           ),
         ),
         BlocProvider(
-          create: (context) => ProductBloc(),
+          create: (context) => ProductBloc(repository: _productRepository),
         ),
       ],
       child: Consumer<LocalizationProvider>(

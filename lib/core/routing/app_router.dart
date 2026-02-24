@@ -123,6 +123,7 @@ class AppRouter {
             child: ProductManagementPage(
               locationId: args?['locationId'] ?? '',
               locationName: args?['locationName'] ?? 'Location',
+              locationAddress: args?['locationAddress'] ?? 'Address',
             ),
           ),
         );

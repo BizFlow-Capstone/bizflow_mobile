@@ -46,5 +46,21 @@ class ApiEndpoints {
   static String publishOrder(String id) => '/api/order/$id/publish';
   static String cancelOrder(String id) => '/api/order/$id/cancel';
 
+  // Product
+  static const String products = '/api/my-business/products';
+  static const String createProduct = '/api/my-business/product';
+
+  // Product with ID - use with String interpolation
+  static String getProductDetail(String productId) =>
+      '/api/my-business/product/$productId';
+  static String updateProduct(String productId) =>
+      '/api/my-business/product/$productId';
+  static String deleteProduct(String productId) =>
+      '/api/my-business/product/$productId';
+  static String updateProductStatus(String productId) =>
+      '/api/my-business/product/$productId/status';
+  static String getProductSaleItems(String productId) =>
+      '/api/my-business/product/$productId/sale-items';
+
   // Add more endpoints here...
 }

@@ -293,6 +293,7 @@ class _LocationPageContent extends StatelessWidget {
                                   builder: (context) => ProductManagementPage(
                                     locationId: location.id,
                                     locationName: location.name,
+                                    locationAddress: location.address,
                                   ),
                                 ),
                               );

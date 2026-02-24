@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -9,6 +10,8 @@ import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
+import '../widgets/product_filter_dialog.dart';
+import '../widgets/product_sort_dialog.dart';
 import 'add_product_page.dart';
 import 'stock_import_page.dart';
 
@@ -17,11 +20,13 @@ import 'stock_import_page.dart';
 class ProductManagementPage extends StatefulWidget {
   final String locationId;
   final String locationName;
+  final String locationAddress;
 
   const ProductManagementPage({
     super.key,
     required this.locationId,
     required this.locationName,
+    required this.locationAddress,
   });
 
   @override
@@ -30,19 +35,37 @@ class ProductManagementPage extends StatefulWidget {
 
 class _ProductManagementPageState extends State<ProductManagementPage> {
   late TextEditingController _searchController;
+  late ScrollController _scrollController;
   bool _showFabMenu = false;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _scrollController = ScrollController()..addListener(_onScroll);
     _loadProducts();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_isBottom) {
+      context.read<ProductBloc>().add(
+        LoadMoreProductsRequested(locationId: widget.locationId),
+      );
+    }
+  }
+
+  bool get _isBottom {
+    if (!_scrollController.hasClients) return false;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    return currentScroll >= (maxScroll * 0.9);
   }
 
   void _loadProducts() {
@@ -73,6 +96,50 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     });
   }
 
+  void _openFilterDialog(ProductsLoaded state) async {
+    final categories = state.products
+        .map((p) => p.category)
+        .where((c) => c != null && c.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+
+    final result = await showModalBottomSheet<Map<String, String?>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProductFilterDialog(
+        initialStatus: state.filterStatus,
+        initialCategory: state.filterCategory,
+        categories: categories,
+      ),
+    );
+
+    if (result != null && mounted) {
+      context.read<ProductBloc>().add(
+        FilterProductsRequested(
+          locationId: widget.locationId,
+          status: result['status'],
+          category: result['category'],
+        ),
+      );
+    }
+  }
+
+  void _openSortDialog(ProductsLoaded state) async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ProductSortDialog(currentSort: state.sortBy),
+    );
+
+    if (result != null && mounted) {
+      context.read<ProductBloc>().add(
+        SortProductsRequested(locationId: widget.locationId, sortBy: result),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -82,6 +149,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         elevation: 0,
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -98,7 +166,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
               ),
             ),
             Text(
-              l10n.translate('location.address'),
+              widget.locationAddress,
               style: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.textSecondary,
               ),
@@ -156,7 +224,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   child: IconButton(
                     icon: const Icon(Icons.filter_list),
                     onPressed: () {
-                      // TODO: Implement filter dialog
+                      final state = context.read<ProductBloc>().state;
+                      if (state is ProductsLoaded) {
+                        _openFilterDialog(state);
+                      }
                     },
                     color: AppColors.textSecondary,
                   ),
@@ -171,7 +242,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   child: IconButton(
                     icon: const Icon(Icons.tune),
                     onPressed: () {
-                      // TODO: Implement sort dialog
+                      final state = context.read<ProductBloc>().state;
+                      if (state is ProductsLoaded) {
+                        _openSortDialog(state);
+                      }
                     },
                     color: AppColors.textSecondary,
                   ),
@@ -181,9 +255,26 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           ),
           // Products List
           Expanded(
-            child: BlocBuilder<ProductBloc, ProductState>(
+            child: BlocConsumer<ProductBloc, ProductState>(
+              listener: (context, state) {
+                if (state is ProductDeleteSuccess) {
+                  // Reload the product list after a successful deletion
+                  context.read<ProductBloc>().add(
+                    LoadProductsByLocationRequested(
+                      locationId: widget.locationId,
+                    ),
+                  );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.translate('product.delete_success')),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+              },
               builder: (context, state) {
-                if (state is ProductLoading) {
+                if (state is ProductLoading ||
+                    state is ProductDeleteInProgress) {
                   return Center(
                     child: CircularProgressIndicator(
                       color: AppColors.secondary,
@@ -226,12 +317,23 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                       );
                     },
                     child: ListView.builder(
+                      controller: _scrollController,
                       padding: EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
                         vertical: AppSpacing.sm,
                       ),
-                      itemCount: state.products.length,
+                      itemCount: state.hasReachedMax
+                          ? state.products.length
+                          : state.products.length + 1,
                       itemBuilder: (context, index) {
+                        if (index >= state.products.length) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 24.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        }
                         final product = state.products[index];
                         return ProductCardWidget(
                           product: product,

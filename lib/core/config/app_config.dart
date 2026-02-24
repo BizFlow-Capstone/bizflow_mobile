@@ -39,9 +39,9 @@ class AppConfig {
       case 'staging':
         return 'https://staging-api.bizflow.com';
       default:
-        // Development - HTTP for both physical device & emulator
-        // Backend: http://0.0.0.0:7270
-        return 'http://$host:7270';
+        // Development - HTTPS for compatibility with backend redirect
+        // Backend: https://192.168.1.9:7271
+        return 'https://$host:7271';
     }
   }
 
