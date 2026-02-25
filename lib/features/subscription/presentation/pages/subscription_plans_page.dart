@@ -28,11 +28,16 @@ class SubscriptionPlansPage extends StatelessWidget {
         ),
         title: Text(
           l10n.translate('subscription.appbar_title'),
-          style: AppTextStyles.titleSmall.copyWith(color: AppColors.textPrimary),
+          style: AppTextStyles.titleSmall.copyWith(
+            color: AppColors.textPrimary,
+          ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: AppColors.textPrimary),
+            icon: const Icon(
+              Icons.notifications_none,
+              color: AppColors.textPrimary,
+            ),
             onPressed: () {},
           ),
           SizedBox(width: AppSpacing.xs),
@@ -90,6 +95,7 @@ class SubscriptionPlansPage extends StatelessWidget {
 
               _FaqSection(l10n: l10n),
               SizedBox(height: AppSpacing.xl),
+              const SafeArea(top: false, child: SizedBox.shrink()),
             ],
           ),
         ),
@@ -127,13 +133,34 @@ class _PlanCard extends StatelessWidget {
       priceSuffix: l10n.translate('subscription.per_month'),
       borderColor: AppColors.divider,
       features: [
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.free.f1')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.free.f2')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.free.f3')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.free.f4')),
-        _FeatureRowData(enabled: false, text: l10n.translate('subscription.free.f5')),
-        _FeatureRowData(enabled: false, text: l10n.translate('subscription.free.f6')),
-        _FeatureRowData(enabled: false, text: l10n.translate('subscription.free.f7')),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.free.f1'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.free.f2'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.free.f3'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.free.f4'),
+        ),
+        _FeatureRowData(
+          enabled: false,
+          text: l10n.translate('subscription.free.f5'),
+        ),
+        _FeatureRowData(
+          enabled: false,
+          text: l10n.translate('subscription.free.f6'),
+        ),
+        _FeatureRowData(
+          enabled: false,
+          text: l10n.translate('subscription.free.f7'),
+        ),
       ],
       action: AppButton(
         label: l10n.translate('subscription.free.current'),
@@ -156,14 +183,38 @@ class _PlanCard extends StatelessWidget {
       borderColor: AppColors.warning,
       badge: _PopularBadge(text: l10n.translate('subscription.premium.badge')),
       features: [
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f1')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f2')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f3')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f4')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f5')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f6')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f7')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.premium.f8')),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f1'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f2'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f3'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f4'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f5'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f6'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f7'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.premium.f8'),
+        ),
       ],
       action: SizedBox(
         width: double.infinity,
@@ -197,12 +248,30 @@ class _PlanCard extends StatelessWidget {
       priceSuffix: '',
       borderColor: AppColors.divider,
       features: [
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.business.f1')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.business.f2')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.business.f3')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.business.f4')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.business.f5')),
-        _FeatureRowData(enabled: true, text: l10n.translate('subscription.business.f6')),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.business.f1'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.business.f2'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.business.f3'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.business.f4'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.business.f5'),
+        ),
+        _FeatureRowData(
+          enabled: true,
+          text: l10n.translate('subscription.business.f6'),
+        ),
       ],
       action: AppButton(
         label: l10n.translate('subscription.business.cta'),
@@ -227,10 +296,7 @@ class _PlanCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (badge != null) ...[
-            badge!,
-            SizedBox(height: AppSpacing.sm),
-          ],
+          if (badge != null) ...[badge!, SizedBox(height: AppSpacing.sm)],
           Text(
             title,
             style: AppTextStyles.titleMedium.copyWith(
@@ -289,7 +355,10 @@ class _PopularBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs,
+      ),
       decoration: BoxDecoration(
         color: AppColors.warning,
         borderRadius: BorderRadius.circular(999),

@@ -48,6 +48,9 @@ class _ImportHistoryView extends StatefulWidget {
 
 class _ImportHistoryViewState extends State<_ImportHistoryView> {
   final ScrollController _scrollController = ScrollController();
+  bool _needsRefresh = false;
+
+  AppLocalizations get l10n => AppLocalizations.of(context);
 
   @override
   void initState() {
@@ -74,145 +77,166 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
     return currentScroll >= (maxScroll - 200);
   }
 
-  AppLocalizations get l10n => AppLocalizations.of(context);
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.textPrimary,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-          color: Colors.black,
-        ),
-        title: Text(
-          l10n.translate('stock_import.history_title'),
-          style: AppTextStyles.titleLarge.copyWith(
-            color: AppColors.textPrimary,
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop && _needsRefresh) {
+          // Since we already popped, we might need a different way to return the value if not through Navigator.pop
+          // But usually, standard back button doesn't return value easily in older Flutter.
+          // In latest Flutter, we can try to use result if possible or just handle it.
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: AppColors.white,
+          foregroundColor: AppColors.textPrimary,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context, _needsRefresh),
+            color: Colors.black,
           ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: _showFilterBottomSheet,
+          title: Text(
+            l10n.translate('stock_import.history_title'),
+            style: AppTextStyles.titleLarge.copyWith(
+              color: AppColors.textPrimary,
+            ),
           ),
-        ],
-      ),
-      body: BlocBuilder<ImportHistoryBloc, ImportHistoryState>(
-        builder: (context, state) {
-          if (state.status == ImportHistoryStatus.initial ||
-              state.status == ImportHistoryStatus.loading &&
-                  state.items.isEmpty) {
-            return const Center(child: AppLoadingIndicator());
-          }
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: _showFilterBottomSheet,
+            ),
+          ],
+        ),
+        body: BlocBuilder<ImportHistoryBloc, ImportHistoryState>(
+          builder: (context, state) {
+            if (state.status == ImportHistoryStatus.initial ||
+                state.status == ImportHistoryStatus.loading &&
+                    state.items.isEmpty) {
+              return const Center(child: AppLoadingIndicator());
+            }
 
-          if (state.status == ImportHistoryStatus.failure &&
-              state.items.isEmpty) {
-            return Center(
-              child: Text(
-                state.errorMessage ?? l10n.translate('common.error'),
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.error,
-                ),
-              ),
-            );
-          }
-
-          if (state.items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 64, color: AppColors.textDisabled),
-                  SizedBox(height: AppSpacing.md),
-                  Text(
-                    l10n.translate('stock_import.no_history'),
-                    style: AppTextStyles.bodyLarge.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
+            if (state.status == ImportHistoryStatus.failure &&
+                state.items.isEmpty) {
+              return Center(
+                child: Text(
+                  state.errorMessage ?? l10n.translate('common.error'),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.error,
                   ),
-                ],
-              ),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: () async {
-              context.read<ImportHistoryBloc>().add(
-                const RefreshImportHistory(),
-              );
-            },
-            child: ListView.separated(
-              controller: _scrollController,
-              padding: EdgeInsets.all(AppSpacing.md),
-              itemCount: state.hasReachedMax
-                  ? state.items.length
-                  : state.items.length + 1,
-              separatorBuilder: (_, __) => SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) {
-                if (index >= state.items.length) {
-                  return const Center(child: AppLoadingIndicator());
-                }
-
-                final item = state.items[index];
-                return _ImportHistoryCard(
-                  item: item,
-                  onTap: () {
-                    // Navigate to StockImportPage to view or edit
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => StockImportPage(
-                          locationId: item.businessLocationId.toString(),
-                          importId: item
-                              .importId, // We will update StockImportPage to accept this
-                        ),
-                      ),
-                    ).then((_) {
-                      if (context.mounted) {
-                        context.read<ImportHistoryBloc>().add(
-                          const RefreshImportHistory(),
-                        );
-                      }
-                    });
-                  },
-                );
-              },
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        onPressed: () {
-          // Nav to create new import
-          final locState = context.read<LocationBloc>().state;
-          String currentLocId = '0';
-          if (locState is LocationsLoaded && locState.locations.isNotEmpty) {
-            currentLocId = locState.locations.first.id ?? '0';
-          }
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => StockImportPage(locationId: currentLocId),
-            ),
-          ).then((_) {
-            if (context.mounted) {
-              context.read<ImportHistoryBloc>().add(
-                const RefreshImportHistory(),
+                ),
               );
             }
-          });
-        },
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: Text(
-          l10n.translate('stock_import.add_new'),
-          style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
+
+            if (state.items.isEmpty) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.history,
+                      size: 64,
+                      color: AppColors.textDisabled,
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                    Text(
+                      l10n.translate('stock_import.no_history'),
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return RefreshIndicator(
+              onRefresh: () async {
+                context.read<ImportHistoryBloc>().add(
+                  const RefreshImportHistory(),
+                );
+              },
+              child: ListView.separated(
+                controller: _scrollController,
+                padding: EdgeInsets.only(
+                  left: AppSpacing.md,
+                  right: AppSpacing.md,
+                  top: AppSpacing.md,
+                  bottom: 80,
+                ),
+                itemCount: state.hasReachedMax
+                    ? state.items.length
+                    : state.items.length + 1,
+                separatorBuilder: (_, __) => SizedBox(height: AppSpacing.sm),
+                itemBuilder: (context, index) {
+                  if (index >= state.items.length) {
+                    return const Center(child: AppLoadingIndicator());
+                  }
+
+                  final item = state.items[index];
+                  return _ImportHistoryCard(
+                    item: item,
+                    onTap: () {
+                      // Navigate to StockImportPage to view or edit
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => StockImportPage(
+                            locationId: item.businessLocationId.toString(),
+                            importId: item
+                                .importId, // We will update StockImportPage to accept this
+                          ),
+                        ),
+                      ).then((result) {
+                        if (result == true && context.mounted) {
+                          context.read<ImportHistoryBloc>().add(
+                            const RefreshImportHistory(),
+                          );
+                          // Store the fact that something changed to return it to ProductManagementPage
+                          setState(() => _needsRefresh = true);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          backgroundColor: AppColors.primary,
+          onPressed: () {
+            // Nav to create new import
+            final locState = context.read<LocationBloc>().state;
+            String currentLocId = '0';
+            if (locState is LocationsLoaded && locState.locations.isNotEmpty) {
+              currentLocId = locState.locations.first.id ?? '0';
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => StockImportPage(locationId: currentLocId),
+              ),
+            ).then((result) {
+              if (result == true && context.mounted) {
+                context.read<ImportHistoryBloc>().add(
+                  const RefreshImportHistory(),
+                );
+                // Store the fact that something changed
+                setState(() => _needsRefresh = true);
+              }
+            });
+          },
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: Text(
+            l10n.translate('stock_import.add_new'),
+            style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
+          ),
         ),
       ),
     );
@@ -227,25 +251,26 @@ class _ImportHistoryCard extends StatelessWidget {
   final dynamic item; // ImportHistoryItemModel
   final VoidCallback onTap;
 
-  const _ImportHistoryCard({required this.item, required this.onTap});
+  _ImportHistoryCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     Color statusColor;
     String statusText;
 
     switch (item.status) {
       case 'DRAFT':
         statusColor = AppColors.warning;
-        statusText = 'Nháp';
+        statusText = l10n.translate('stock_import.status_draft');
         break;
       case 'CONFIRMED':
         statusColor = AppColors.success;
-        statusText = 'Hoàn thành';
+        statusText = l10n.translate('stock_import.status_imported');
         break;
       case 'CANCELLED':
         statusColor = AppColors.error;
-        statusText = 'Đã hủy';
+        statusText = l10n.translate('order.status_cancelled');
         break;
       default:
         statusColor = AppColors.textSecondary;
@@ -344,7 +369,7 @@ class _ImportHistoryCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Tổng tiền:',
+                    '${l10n.translate('stock_import.receipt_total')}:',
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textPrimary,
                     ),

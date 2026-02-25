@@ -169,10 +169,12 @@ class _StockImportViewState extends State<_StockImportView> {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(_status == 'DRAFT' ? 'Xóa phiếu nháp' : 'Hủy phiếu nhập'),
-        content: const Text(
-          'Hành động này không thể hoàn tác. Bạn có chắc chắn?',
+        title: Text(
+          _status == 'DRAFT'
+              ? l10n.translate('stock_import.delete_draft_title')
+              : l10n.translate('stock_import.cancel_import_title'),
         ),
+        content: Text(l10n.translate('stock_import.confirm_action_message')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -188,7 +190,7 @@ class _StockImportViewState extends State<_StockImportView> {
                 );
               }
             },
-            child: const Text('Đồng ý'),
+            child: Text(l10n.translate('common.confirm')),
           ),
         ],
       ),
@@ -466,7 +468,7 @@ class _StockImportViewState extends State<_StockImportView> {
             title: Text(
               widget.importId == null
                   ? l10n.translate('stock_import.title')
-                  : 'Chi tiết (${state.importDetail?.importCode ?? '...'})',
+                  : '${l10n.translate('common.detail')} (${state.importDetail?.importCode ?? '...'})',
               style: AppTextStyles.titleLarge.copyWith(
                 color: AppColors.textPrimary,
               ),
@@ -515,7 +517,7 @@ class _StockImportViewState extends State<_StockImportView> {
               children: [
                 if (isEditable) ...[
                   Text(
-                    'Loại nhập hàng',
+                    l10n.translate('stock_import.import_type'),
                     style: AppTextStyles.titleSmall.copyWith(
                       color: AppColors.textPrimary,
                     ),
@@ -524,13 +526,13 @@ class _StockImportViewState extends State<_StockImportView> {
                   Row(
                     children: [
                       _buildChip(
-                        'Có hóa đơn',
+                        l10n.translate('stock_import.with_invoice'),
                         _hasInvoice,
                         () => setState(() => _hasInvoice = true),
                       ),
                       SizedBox(width: AppSpacing.md),
                       _buildChip(
-                        'Không hóa đơn',
+                        l10n.translate('stock_import.without_invoice'),
                         !_hasInvoice,
                         () => setState(() => _hasInvoice = false),
                       ),
@@ -542,7 +544,7 @@ class _StockImportViewState extends State<_StockImportView> {
                   controller: _supplierController,
                   enabled: isEditable,
                   decoration: InputDecoration(
-                    labelText: 'Nhà cung cấp',
+                    labelText: l10n.translate('stock_import.receipt_supplier'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -554,7 +556,7 @@ class _StockImportViewState extends State<_StockImportView> {
                   enabled: isEditable,
                   maxLines: 2,
                   decoration: InputDecoration(
-                    labelText: 'Ghi chú',
+                    labelText: l10n.translate('stock_import.note'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -601,7 +603,9 @@ class _StockImportViewState extends State<_StockImportView> {
                 if (_selectedItems.isEmpty)
                   Padding(
                     padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                    child: const Center(child: Text('Chưa có sản phẩm nào')),
+                    child: Center(
+                      child: Text(l10n.translate('stock_import.no_products')),
+                    ),
                   )
                 else
                   ListView.separated(
@@ -736,7 +740,10 @@ class _StockImportViewState extends State<_StockImportView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Trạng thái', style: AppTextStyles.bodyMedium),
+                  Text(
+                    l10n.translate('stock_import.status_label'),
+                    style: AppTextStyles.bodyMedium,
+                  ),
                   Text(
                     _status,
                     style: AppTextStyles.titleSmall.copyWith(
@@ -808,7 +815,7 @@ class _StockImportViewState extends State<_StockImportView> {
                   ),
                 ),
                 child: Text(
-                  'Lưu Nháp',
+                  l10n.translate('stock_import.save_draft'),
                   style: AppTextStyles.labelLarge.copyWith(
                     color: AppColors.primary,
                   ),
@@ -827,7 +834,7 @@ class _StockImportViewState extends State<_StockImportView> {
                   ),
                 ),
                 child: Text(
-                  'Xác nhận',
+                  l10n.translate('common.confirm'),
                   style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
                 ),
               ),
@@ -859,6 +866,8 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
   late List<ImportItemModel> _items;
   String _searchQuery = '';
 
+  AppLocalizations get l10n => AppLocalizations.of(context);
+
   @override
   void initState() {
     super.initState();
@@ -889,6 +898,28 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
             baseUnit: product.unit ?? 'cái',
           ),
         );
+      }
+    });
+  }
+
+  void _removeOrDecrement(ProductEntity product) {
+    final idx = _items.indexWhere(
+      (e) => e.productId == int.tryParse(product.id),
+    );
+    if (idx < 0) return;
+
+    setState(() {
+      if (_items[idx].quantity > 1) {
+        final existing = _items[idx];
+        _items[idx] = ImportItemModel(
+          productId: existing.productId,
+          productName: existing.productName,
+          quantity: existing.quantity - 1,
+          costPrice: existing.costPrice,
+          baseUnit: existing.baseUnit,
+        );
+      } else {
+        _items.removeAt(idx);
       }
     });
   }
@@ -933,7 +964,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Chọn sản phẩm',
+                    l10n.translate('stock_import.select_product'),
                     style: AppTextStyles.titleLarge.copyWith(
                       color: AppColors.textPrimary,
                     ),
@@ -944,7 +975,14 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                       Navigator.pop(context);
                     },
                     child: Text(
-                      'Xong (${_items.fold<int>(0, (sum, e) => sum + e.quantity)})',
+                      l10n.translate(
+                        'stock_import.done_with_count',
+                        params: {
+                          'count': _items
+                              .fold<int>(0, (sum, e) => sum + e.quantity)
+                              .toString(),
+                        },
+                      ),
                       style: AppTextStyles.labelLarge.copyWith(
                         color: AppColors.primary,
                       ),
@@ -970,7 +1008,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                   );
                 },
                 decoration: InputDecoration(
-                  hintText: 'Tìm sản phẩm...',
+                  hintText: l10n.translate('common.search_products'),
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -1009,7 +1047,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                     if (products.isEmpty) {
                       return Center(
                         child: Text(
-                          'Không tìm thấy sản phẩm nào',
+                          l10n.translate('stock_import.no_products_found'),
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -1039,7 +1077,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                             ),
                           ),
                           subtitle: Text(
-                            'Giá vốn: ${fmtPrice.format(product.costPrice ?? 0)}  •  Tồn: ${product.quantity} ${product.unit ?? ''}',
+                            '${l10n.translate('stock_import.cost_price_label')}${fmtPrice.format(product.costPrice ?? 0)}${l10n.translate('stock_import.stock_label')}${product.quantity} ${product.unit ?? ''}',
                             style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -1048,6 +1086,15 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                               ? Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      onPressed: () =>
+                                          _removeOrDecrement(product),
+                                    ),
+                                    const SizedBox(width: 4),
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
@@ -1071,7 +1118,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                                             ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 4),
                                     IconButton(
                                       icon: const Icon(
                                         Icons.add_circle,
@@ -1100,7 +1147,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                         const AppLoadingIndicator(),
                         SizedBox(height: AppSpacing.md),
                         Text(
-                          'Đang tải sản phẩm...',
+                          l10n.translate('stock_import.loading_products'),
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.textSecondary,
                           ),
@@ -1111,6 +1158,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                 },
               ),
             ),
+            SafeArea(top: false, child: const SizedBox.shrink()),
           ],
         );
       },

@@ -163,7 +163,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               _refreshOrders();
             },
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.only(top: 8, bottom: 80),
               itemCount: orders.length,
               itemBuilder: (context, index) {
                 final order = orders[index];

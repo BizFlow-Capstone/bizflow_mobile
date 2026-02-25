@@ -38,10 +38,7 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
   void _handleLocationToggleStatus(String locationId, bool isActive) {
     if (!mounted) return;
     context.read<LocationBloc>().add(
-      ToggleLocationStatusRequested(
-        locationId: locationId,
-        isActive: isActive,
-      ),
+      ToggleLocationStatusRequested(locationId: locationId, isActive: isActive),
     );
   }
 
@@ -54,9 +51,7 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
       ),
     ).then((_) {
       if (mounted) {
-        context.read<LocationBloc>().add(
-          const RestoreLocationsRequested(),
-        );
+        context.read<LocationBloc>().add(const RestoreLocationsRequested());
       }
     });
   }
@@ -275,9 +270,11 @@ class _LocationPageContent extends StatelessWidget {
                   // Location List
                   Expanded(
                     child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
+                      padding: const EdgeInsets.only(
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        top: AppSpacing.sm,
+                        bottom: 80.0,
                       ),
                       itemCount: locations.length,
                       itemBuilder: (context, index) {
@@ -298,7 +295,8 @@ class _LocationPageContent extends StatelessWidget {
                                 ),
                               );
                             },
-                            onToggleStatus: (isActive) => onToggleStatus(location.id, isActive),
+                            onToggleStatus: (isActive) =>
+                                onToggleStatus(location.id, isActive),
                             onEdit: () => onEdit(location),
                             onAddManager: () {
                               AppSnackBar.show(

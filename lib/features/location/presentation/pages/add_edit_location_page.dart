@@ -363,6 +363,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                 );
               },
             ),
+            const SafeArea(top: false, child: SizedBox(height: AppSpacing.md)),
           ],
         ),
       ),
@@ -614,6 +615,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                 },
               ),
             ),
+            const SafeArea(top: false, child: SizedBox(height: AppSpacing.md)),
           ],
         ),
       ),

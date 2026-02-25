@@ -94,10 +94,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
 
     // Call BLoC to handle OTP verification
     context.read<AuthBloc>().add(
-      VerifyOtpRequested(
-        phone: widget.phoneNumber,
-        otpCode: otpCode,
-      ),
+      VerifyOtpRequested(phone: widget.phoneNumber, otpCode: otpCode),
     );
   }
 
@@ -105,9 +102,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
     if (!_canResend) return;
 
     // Call BLoC to handle resend OTP
-    context.read<AuthBloc>().add(
-      ResendOtpRequested(phone: widget.phoneNumber),
-    );
+    context.read<AuthBloc>().add(ResendOtpRequested(phone: widget.phoneNumber));
 
     setState(() {
       _canResend = false;
@@ -123,10 +118,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
     );
   }
 
@@ -259,10 +251,7 @@ class _VerifyOtpPageContent extends StatelessWidget {
               // OTP Input Boxes
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  6,
-                  (index) => _buildOtpBox(index),
-                ),
+                children: List.generate(6, (index) => _buildOtpBox(index)),
               ),
               SizedBox(height: AppSpacing.xl),
 
@@ -273,7 +262,9 @@ class _VerifyOtpPageContent extends StatelessWidget {
                     label: l10n.translate('auth.verify_button'),
                     isFullWidth: true,
                     isLoading: state is OtpVerificationInProgress,
-                    onPressed: state is OtpVerificationInProgress ? null : onVerify,
+                    onPressed: state is OtpVerificationInProgress
+                        ? null
+                        : onVerify,
                     type: AppButtonType.primary,
                     size: AppButtonSize.large,
                   );
@@ -299,10 +290,7 @@ class _VerifyOtpPageContent extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Text(
-                        ' • ',
-                        style: AppTextStyles.bodyMedium,
-                      ),
+                      Text(' • ', style: AppTextStyles.bodyMedium),
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: Text(
@@ -333,6 +321,10 @@ class _VerifyOtpPageContent extends StatelessWidget {
                     ),
                   ],
                 ),
+              const SafeArea(
+                top: false,
+                child: SizedBox(height: AppSpacing.md),
+              ),
             ],
           ),
         ),
@@ -346,10 +338,7 @@ class _VerifyOtpPageContent extends StatelessWidget {
       height: 60,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: AppColors.divider,
-          width: 2,
-        ),
+        border: Border.all(color: AppColors.divider, width: 2),
         borderRadius: AppSpacing.borderRadiusMd,
       ),
       child: TextField(
@@ -374,19 +363,13 @@ class _VerifyOtpPageContent extends StatelessWidget {
 
   void _showError(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
     );
   }
 
   void _showSuccess(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.success),
     );
   }
 

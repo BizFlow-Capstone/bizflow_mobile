@@ -33,7 +33,6 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-             
               // Quick Actions
               QuickActions(
                 onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
@@ -48,11 +47,11 @@ class _HomePageState extends State<HomePage> {
 
               // Management Cards (Locations & Employees)
               ManagementCards(
-                onLocationsTab: () => AppRouter.navigateTo(
-                  AppRoutes.locationManagement,
-                ),
+                onLocationsTab: () =>
+                    AppRouter.navigateTo(AppRoutes.locationManagement),
               ),
               SizedBox(height: AppSpacing.xl),
+              const SafeArea(top: false, child: SizedBox.shrink()),
             ],
           ),
         ),

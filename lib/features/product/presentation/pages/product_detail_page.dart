@@ -22,7 +22,7 @@ class ProductDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(context, l10n),
@@ -34,33 +34,36 @@ class ProductDetailPage extends StatelessWidget {
             // Product Details Section
             _buildProductDetailsSection(context, l10n),
             SizedBox(height: AppSpacing.lg),
-            
+
             // Supplier Section (if available)
             _buildSupplierSection(context, l10n),
             SizedBox(height: AppSpacing.lg),
-            
+
             // Stock Location Section
             _buildStockLocationSection(context, l10n),
             SizedBox(height: AppSpacing.lg),
-            
+
             // Unit Conversion Section
             _buildUnitConversionSection(context, l10n),
             SizedBox(height: AppSpacing.lg),
-            
+
             // Barcode Section
             _buildBarcodeSection(context, l10n),
             SizedBox(height: AppSpacing.lg),
-            
+
             // Price Section
             _buildPriceSection(context, l10n),
-            SizedBox(height: AppSpacing.xl),
+            const SafeArea(top: false, child: SizedBox(height: AppSpacing.xl)),
           ],
         ),
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context, AppLocalizations? l10n) {
+  PreferredSizeWidget _buildAppBar(
+    BuildContext context,
+    AppLocalizations? l10n,
+  ) {
     return AppBar(
       backgroundColor: AppColors.white,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -112,7 +115,10 @@ class ProductDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildProductDetailsSection(BuildContext context, AppLocalizations? l10n) {
+  Widget _buildProductDetailsSection(
+    BuildContext context,
+    AppLocalizations? l10n,
+  ) {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -125,33 +131,36 @@ class ProductDetailPage extends StatelessWidget {
         children: [
           // Section Title
           Text(
-            l10n?.translate('product.detail.product_info') ?? 'Chi tiết sản phẩm',
+            l10n?.translate('product.detail.product_info') ??
+                'Chi tiết sản phẩm',
             style: AppTextStyles.titleMedium.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Product Name
           _buildDetailRow(
             label: l10n?.translate('product.name') ?? 'Tên sản phẩm',
             value: product.name,
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // SKU/Barcode
           if (product.barcode != null)
             Column(
               children: [
                 _buildDetailRow(
-                  label: l10n?.translate('product.detail.sku') ?? 'Mã vạch / SKU ID',
+                  label:
+                      l10n?.translate('product.detail.sku') ??
+                      'Mã vạch / SKU ID',
                   value: product.barcode!,
                 ),
                 SizedBox(height: AppSpacing.sm),
               ],
             ),
-          
+
           // Unit
           if (product.unit != null)
             Column(
@@ -163,23 +172,26 @@ class ProductDetailPage extends StatelessWidget {
                 SizedBox(height: AppSpacing.sm),
               ],
             ),
-          
+
           // Expiry Date (if available in data)
           _buildDetailRow(
-            label: l10n?.translate('product.detail.expiry_date') ?? 'Ngày hết hạn',
-            value: product.createdAt != null 
-                ? _formatDate(product.createdAt!) 
+            label:
+                l10n?.translate('product.detail.expiry_date') ?? 'Ngày hết hạn',
+            value: product.createdAt != null
+                ? _formatDate(product.createdAt!)
                 : l10n?.translate('common.no_data') ?? 'Không có',
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // Min Stock
           _buildDetailRow(
-            label: l10n?.translate('product.detail.min_stock') ?? 'Định mức tồn kho tối thiểu',
+            label:
+                l10n?.translate('product.detail.min_stock') ??
+                'Định mức tồn kho tối thiểu',
             value: '${product.quantity ?? 0}',
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // Status
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -201,8 +213,12 @@ class ProductDetailPage extends StatelessWidget {
                 ),
                 child: Text(
                   product.isActive
-                      ? (l10n?.translate('product.detail.status_in_stock') ?? 'Đủ dùng')
-                      : (l10n?.translate('product.detail.status_out_of_stock') ?? 'Hết hàng'),
+                      ? (l10n?.translate('product.detail.status_in_stock') ??
+                            'Đủ dùng')
+                      : (l10n?.translate(
+                              'product.detail.status_out_of_stock',
+                            ) ??
+                            'Hết hàng'),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,
@@ -236,28 +252,34 @@ class ProductDetailPage extends StatelessWidget {
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Supplier Name
           _buildDetailRow(
-            label: l10n?.translate('product.detail.supplier_name') ?? 'Tên nhà sản xuất',
+            label:
+                l10n?.translate('product.detail.supplier_name') ??
+                'Tên nhà sản xuất',
             value: l10n?.translate('common.no_data') ?? 'Không có',
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // Contact
           _buildDetailRow(
-            label: l10n?.translate('product.detail.supplier_contact') ?? 'Số liên lạc',
+            label:
+                l10n?.translate('product.detail.supplier_contact') ??
+                'Số liên lạc',
             value: l10n?.translate('common.no_data') ?? 'Không có',
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // Contact Person
           _buildDetailRow(
-            label: l10n?.translate('product.detail.contact_person') ?? 'Người liên hệ',
+            label:
+                l10n?.translate('product.detail.contact_person') ??
+                'Người liên hệ',
             value: l10n?.translate('common.no_data') ?? 'Không có',
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // Address
           _buildDetailRow(
             label: l10n?.translate('product.detail.address') ?? 'Địa chỉ',
@@ -268,7 +290,10 @@ class ProductDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStockLocationSection(BuildContext context, AppLocalizations? l10n) {
+  Widget _buildStockLocationSection(
+    BuildContext context,
+    AppLocalizations? l10n,
+  ) {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -281,14 +306,15 @@ class ProductDetailPage extends StatelessWidget {
         children: [
           // Section Title
           Text(
-            l10n?.translate('product.detail.stock_location') ?? 'Vị trí tồn kho',
+            l10n?.translate('product.detail.stock_location') ??
+                'Vị trí tồn kho',
             style: AppTextStyles.titleMedium.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Table Header
           Row(
             children: [
@@ -316,13 +342,14 @@ class ProductDetailPage extends StatelessWidget {
             ],
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Table Row (Sample)
           Row(
             children: [
               Expanded(
                 child: Text(
-                  l10n?.translate('product.detail.default_warehouse') ?? 'Kho Quận 1',
+                  l10n?.translate('product.detail.default_warehouse') ??
+                      'Kho Quận 1',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -347,7 +374,10 @@ class ProductDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildUnitConversionSection(BuildContext context, AppLocalizations? l10n) {
+  Widget _buildUnitConversionSection(
+    BuildContext context,
+    AppLocalizations? l10n,
+  ) {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -360,20 +390,22 @@ class ProductDetailPage extends StatelessWidget {
         children: [
           // Section Title
           Text(
-            l10n?.translate('product.detail.unit_conversion') ?? 'Quy đổi đơn vị',
+            l10n?.translate('product.detail.unit_conversion') ??
+                'Quy đổi đơn vị',
             style: AppTextStyles.titleMedium.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Table Header
           Row(
             children: [
               Expanded(
                 child: Text(
-                  l10n?.translate('product.detail.conversion_unit') ?? 'Tên kho bán đầu',
+                  l10n?.translate('product.detail.conversion_unit') ??
+                      'Tên kho bán đầu',
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -395,7 +427,7 @@ class ProductDetailPage extends StatelessWidget {
             ],
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Sample Row
           Row(
             children: [
@@ -421,7 +453,7 @@ class ProductDetailPage extends StatelessWidget {
             ],
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Sample Row 2
           Row(
             children: [
@@ -453,7 +485,7 @@ class ProductDetailPage extends StatelessWidget {
 
   Widget _buildBarcodeSection(BuildContext context, AppLocalizations? l10n) {
     if (product.barcode == null) return SizedBox.shrink();
-    
+
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -473,7 +505,7 @@ class ProductDetailPage extends StatelessWidget {
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Barcode Display (placeholder for actual barcode image)
           Center(
             child: Container(
@@ -520,7 +552,7 @@ class ProductDetailPage extends StatelessWidget {
 
   Widget _buildPriceSection(BuildContext context, AppLocalizations? l10n) {
     final profit = (product.salePrice ?? 0) - (product.costPrice ?? 0);
-    
+
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -540,14 +572,14 @@ class ProductDetailPage extends StatelessWidget {
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          
+
           // Cost Price
           _buildPriceRow(
             label: l10n?.translate('product.cost_price') ?? 'Giá vốn',
             value: _formatPrice(product.costPrice ?? 0),
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // Sale Price
           _buildPriceRow(
             label: l10n?.translate('product.sale_price') ?? 'Giá bán',
@@ -555,7 +587,7 @@ class ProductDetailPage extends StatelessWidget {
             valueColor: AppColors.primary,
           ),
           SizedBox(height: AppSpacing.sm),
-          
+
           // Profit
           _buildPriceRow(
             label: l10n?.translate('product.detail.profit') ?? 'Lợi nhuận',
@@ -566,10 +598,7 @@ class ProductDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow({
-    required String label,
-    required String value,
-  }) {
+  Widget _buildDetailRow({required String label, required String value}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [

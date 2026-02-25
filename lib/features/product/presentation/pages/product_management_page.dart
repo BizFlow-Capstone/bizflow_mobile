@@ -185,7 +185,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                 MaterialPageRoute(
                   builder: (context) => const ImportHistoryPage(),
                 ),
-              );
+              ).then((result) {
+                if (result == true && mounted) {
+                  _loadProducts();
+                }
+              });
             },
           ),
         ],
@@ -347,9 +351,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     },
                     child: ListView.builder(
                       controller: _scrollController,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
+                      padding: EdgeInsets.only(
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        top: AppSpacing.sm,
+                        bottom: 80,
                       ),
                       itemCount: state.hasReachedMax
                           ? state.products.length
@@ -416,7 +422,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
-          );
+          ).then((result) {
+            if (result == true && mounted) {
+              _loadProducts();
+            }
+          });
         },
       ),
     );

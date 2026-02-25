@@ -15,10 +15,7 @@ import '../bloc/product_state.dart';
 class AddProductPage extends StatefulWidget {
   final String locationId;
 
-  const AddProductPage({
-    super.key,
-    required this.locationId,
-  });
+  const AddProductPage({super.key, required this.locationId});
 
   @override
   State<AddProductPage> createState() => _AddProductPageState();
@@ -82,12 +79,18 @@ class _AddProductPageState extends State<AddProductPage> {
           _selectedImagePath = pickedFile.path;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${l10n?.translate('common.image_selected') ?? 'Image selected'}: ${pickedFile.name}')),
+          SnackBar(
+            content: Text(
+              '${l10n?.translate('common.image_selected') ?? 'Image selected'}: ${pickedFile.name}',
+            ),
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n?.translate('common.error') ?? 'Error'}: $e')),
+        SnackBar(
+          content: Text('${l10n?.translate('common.error') ?? 'Error'}: $e'),
+        ),
       );
     }
   }
@@ -155,9 +158,16 @@ class _AddProductPageState extends State<AddProductPage> {
           ),
           TextButton(
             onPressed: () {
-              if (unitController.text.isEmpty || quantityController.text.isEmpty || priceController.text.isEmpty) {
+              if (unitController.text.isEmpty ||
+                  quantityController.text.isEmpty ||
+                  priceController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n?.translate('common.required_field') ?? 'Vui lòng nhập đủ thông tin')),
+                  SnackBar(
+                    content: Text(
+                      l10n?.translate('common.required_field') ??
+                          'Vui lòng nhập đủ thông tin',
+                    ),
+                  ),
                 );
                 return;
               }
@@ -167,7 +177,12 @@ class _AddProductPageState extends State<AddProductPage> {
 
               if (quantity <= 0 || price < 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n?.translate('product.invalid_value') ?? 'Giá trị không hợp lệ')),
+                  SnackBar(
+                    content: Text(
+                      l10n?.translate('product.invalid_value') ??
+                          'Giá trị không hợp lệ',
+                    ),
+                  ),
                 );
                 return;
               }
@@ -192,7 +207,11 @@ class _AddProductPageState extends State<AddProductPage> {
 
               Navigator.pop(context);
             },
-            child: Text(editIndex != null ? l10n?.translate('common.save') ?? 'Lưu' : l10n?.translate('common.add') ?? 'Thêm'),
+            child: Text(
+              editIndex != null
+                  ? l10n?.translate('common.save') ?? 'Lưu'
+                  : l10n?.translate('common.add') ?? 'Thêm',
+            ),
           ),
         ],
       ),
@@ -227,7 +246,10 @@ class _AddProductPageState extends State<AddProductPage> {
     if (_productNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n?.translate('common.required_field') ?? 'Vui lòng nhập tên sản phẩm'),
+          content: Text(
+            l10n?.translate('common.required_field') ??
+                'Vui lòng nhập tên sản phẩm',
+          ),
         ),
       );
       return;
@@ -236,28 +258,30 @@ class _AddProductPageState extends State<AddProductPage> {
     if (_unitController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n?.translate('common.required_field') ?? 'Vui lòng chọn đơn vị'),
+          content: Text(
+            l10n?.translate('common.required_field') ?? 'Vui lòng chọn đơn vị',
+          ),
         ),
       );
       return;
     }
 
     context.read<ProductBloc>().add(
-          AddProductRequested(
-            locationId: widget.locationId,
-            productName: _productNameController.text,
+      AddProductRequested(
+        locationId: widget.locationId,
+        productName: _productNameController.text,
             barcode: _barcodeController.text.isNotEmpty ? _barcodeController.text : null,
             category: _categoryController.text.isNotEmpty ? _categoryController.text : null,
             costPrice: _costPriceController.text.isNotEmpty ? double.tryParse(_costPriceController.text) : null,
             salePrice: _salePriceController.text.isNotEmpty ? double.tryParse(_salePriceController.text) : null,
             quantity: _quantityController.text.isNotEmpty ? int.tryParse(_quantityController.text) : null,
-            unit: _unitController.text.isNotEmpty ? _unitController.text : null,
-            isActive: _isActive,
+        unit: _unitController.text.isNotEmpty ? _unitController.text : null,
+        isActive: _isActive,
             description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
-            imagePath: _selectedImagePath,
-            priceTiers: _priceTiers,
-          ),
-        );
+        imagePath: _selectedImagePath,
+        priceTiers: _priceTiers,
+      ),
+    );
   }
 
   AppLocalizations? get l10n => AppLocalizations.of(context);
@@ -290,24 +314,20 @@ class _AddProductPageState extends State<AddProductPage> {
           if (state is ProductAddSuccess) {
             // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.translate('product.add_success')),
-              ),
+              SnackBar(content: Text(l10n.translate('product.add_success'))),
             );
             // Reload product list
             context.read<ProductBloc>().add(
-                  LoadProductsByLocationRequested(locationId: widget.locationId),
-                );
+              LoadProductsByLocationRequested(locationId: widget.locationId),
+            );
             // Navigate back
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) Navigator.pop(context);
             });
           } else if (state is ProductFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-              ),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.message)));
           }
         },
         child: SingleChildScrollView(
@@ -489,9 +509,9 @@ class _AddProductPageState extends State<AddProductPage> {
                       Container(
                         padding: EdgeInsets.all(AppSpacing.md),
                         decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.divider),
-                            borderRadius: BorderRadius.circular(12),
-                            color: AppColors.background,
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(12),
+                          color: AppColors.background,
                         ),
                         child: _priceTiers.isEmpty
                             ? Column(
@@ -505,7 +525,9 @@ class _AddProductPageState extends State<AddProductPage> {
                                   ),
                                   SizedBox(height: AppSpacing.sm),
                                   Text(
-                                    l10n.translate('product.unit_conversion_example'),
+                                    l10n.translate(
+                                      'product.unit_conversion_example',
+                                    ),
                                     style: AppTextStyles.bodySmall.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -517,39 +539,45 @@ class _AddProductPageState extends State<AddProductPage> {
                                 children: _priceTiers
                                     .asMap()
                                     .entries
-                                    .map((e) => Padding(
-                                          padding: EdgeInsets.symmetric(
-                                              vertical: AppSpacing.sm),
-                                          child: GestureDetector(
-                                            onTap: () => _showAddPriceTierDialog(editIndex: e.key),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.spaceBetween,
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    '${e.value['Unit']}: ${e.value['Quantity']} x ${e.value['Price']} đ',
-                                                    style:
-                                                        AppTextStyles.bodySmall,
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: Icon(Icons.delete,
-                                                      size: 16,
-                                                      color: AppColors.error),
-                                                  onPressed: () {
-                                                    setState(() {
-                                                      _priceTiers
-                                                          .removeAt(e.key);
-                                                    });
-                                                  },
-                                                  padding: EdgeInsets.zero,
-                                                  constraints: BoxConstraints(),
-                                                ),
-                                              ],
-                                            ),
+                                    .map(
+                                      (e) => Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: AppSpacing.sm,
+                                        ),
+                                        child: GestureDetector(
+                                          onTap: () => _showAddPriceTierDialog(
+                                            editIndex: e.key,
                                           ),
-                                        ))
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '${e.value['Unit']}: ${e.value['Quantity']} x ${e.value['Price']} đ',
+                                                  style:
+                                                      AppTextStyles.bodySmall,
+                                                ),
+                                              ),
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.delete,
+                                                  size: 16,
+                                                  color: AppColors.error,
+                                                ),
+                                                onPressed: () {
+                                                  setState(() {
+                                                    _priceTiers.removeAt(e.key);
+                                                  });
+                                                },
+                                                padding: EdgeInsets.zero,
+                                                constraints: BoxConstraints(),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    )
                                     .toList(),
                               ),
                       ),
@@ -607,51 +635,66 @@ class _AddProductPageState extends State<AddProductPage> {
                   maxLines: 3,
                 ),
                 SizedBox(height: AppSpacing.xl),
-
-                // Action Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text(
-                          l10n.translate('common.cancel'),
-                          style: AppTextStyles.labelLarge.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: BlocBuilder<ProductBloc, ProductState>(
-                        builder: (context, state) {
-                          return ElevatedButton(
-                            onPressed: state is ProductAddInProgress ? null : _submitForm,
-                            child: state is ProductAddInProgress
-                                ? SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.white,
-                                    ),
-                                  )
-                                : Text(
-                                    l10n.translate('product.add_button'),
-                                    style: AppTextStyles.labelLarge.copyWith(
-                                      color: AppColors.white,
-                                    ),
-                                  ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: AppSpacing.lg),
               ],
             ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    l10n.translate('common.cancel'),
+                    style: AppTextStyles.labelLarge.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: BlocBuilder<ProductBloc, ProductState>(
+                  builder: (context, state) {
+                    return ElevatedButton(
+                      onPressed: state is ProductAddInProgress
+                          ? null
+                          : _submitForm,
+                      child: state is ProductAddInProgress
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.white,
+                              ),
+                            )
+                          : Text(
+                              l10n.translate('product.add_button'),
+                              style: AppTextStyles.labelLarge.copyWith(
+                                color: AppColors.white,
+                              ),
+                            ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -756,14 +799,16 @@ class _AddProductPageState extends State<AddProductPage> {
                         color: AppColors.textDisabled,
                       ),
                     ),
-                    value: controller.text.isNotEmpty && categoryItems.contains(controller.text) 
-                        ? controller.text 
+                    value:
+                        controller.text.isNotEmpty &&
+                            categoryItems.contains(controller.text)
+                        ? controller.text
                         : null,
                     items: categoryItems
-                        .map((item) => DropdownMenuItem(
-                              value: item,
-                              child: Text(item),
-                            ))
+                        .map(
+                          (item) =>
+                              DropdownMenuItem(value: item, child: Text(item)),
+                        )
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -775,10 +820,7 @@ class _AddProductPageState extends State<AddProductPage> {
               ),
               Padding(
                 padding: EdgeInsets.only(right: AppSpacing.md),
-                child: Icon(
-                  Icons.expand_more,
-                  color: AppColors.textSecondary,
-                ),
+                child: Icon(Icons.expand_more, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -800,9 +842,7 @@ class _AddProductPageState extends State<AddProductPage> {
         SizedBox(width: AppSpacing.sm),
         Text(
           '+ ${l10n.translate('common.add')}',
-          style: AppTextStyles.bodySmall.copyWith(
-            color: AppColors.secondary,
-          ),
+          style: AppTextStyles.bodySmall.copyWith(color: AppColors.secondary),
         ),
       ],
     );

@@ -344,6 +344,10 @@ class _RegisterPageContent extends StatelessWidget {
                   ),
                 ],
               ),
+              const SafeArea(
+                top: false,
+                child: SizedBox(height: AppSpacing.md),
+              ),
             ],
           ),
         ),

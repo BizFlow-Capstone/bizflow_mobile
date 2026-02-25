@@ -120,7 +120,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
         _refreshOrders();
       },
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.only(top: 8, bottom: 80),
         itemCount: draftOrders.length,
         itemBuilder: (context, index) {
           final order = draftOrders[index];
@@ -168,7 +168,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
         _refreshOrders();
       },
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.only(top: 8, bottom: 80),
         itemCount: pendingOrders.length,
         itemBuilder: (context, index) {
           final order = pendingOrders[index];

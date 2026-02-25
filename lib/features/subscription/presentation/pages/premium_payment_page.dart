@@ -53,12 +53,16 @@ class _PremiumPaymentPageState extends State<PremiumPaymentPage> {
           children: [
             Text(
               l10n.translate('payment.appbar_title'),
-              style: AppTextStyles.titleSmall.copyWith(color: AppColors.textPrimary),
+              style: AppTextStyles.titleSmall.copyWith(
+                color: AppColors.textPrimary,
+              ),
             ),
             SizedBox(height: 2),
             Text(
               l10n.translate('payment.appbar_subtitle'),
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -73,12 +77,14 @@ class _PremiumPaymentPageState extends State<PremiumPaymentPage> {
                 child: Column(
                   children: [
                     _RowLine(
-                      label: '${widget.planName} (1 ${l10n.translate('payment.month')})',
+                      label:
+                          '${widget.planName} (1 ${l10n.translate('payment.month')})',
                       value: _formatCurrency(widget.price),
                     ),
                     SizedBox(height: AppSpacing.sm),
                     _RowLine(
-                      label: '${l10n.translate('payment.vat')} (${widget.vatPercent}%)',
+                      label:
+                          '${l10n.translate('payment.vat')} (${widget.vatPercent}%)',
                       value: _formatCurrency(_vatAmount),
                     ),
                     SizedBox(height: AppSpacing.md),
@@ -104,14 +110,16 @@ class _PremiumPaymentPageState extends State<PremiumPaymentPage> {
                       selected: _method == _PaymentMethod.vietQr,
                       title: l10n.translate('payment.method_qr_title'),
                       subtitle: l10n.translate('payment.method_qr_subtitle'),
-                      onTap: () => setState(() => _method = _PaymentMethod.vietQr),
+                      onTap: () =>
+                          setState(() => _method = _PaymentMethod.vietQr),
                     ),
                     SizedBox(height: AppSpacing.md),
                     _MethodTile(
                       selected: _method == _PaymentMethod.card,
                       title: l10n.translate('payment.method_card_title'),
                       subtitle: l10n.translate('payment.method_card_subtitle'),
-                      onTap: () => setState(() => _method = _PaymentMethod.card),
+                      onTap: () =>
+                          setState(() => _method = _PaymentMethod.card),
                     ),
                   ],
                 ),
@@ -142,6 +150,10 @@ class _PremiumPaymentPageState extends State<PremiumPaymentPage> {
               ),
               SizedBox(height: AppSpacing.md),
               _SecurityNote(l10n: l10n),
+              const SafeArea(
+                top: false,
+                child: SizedBox(height: AppSpacing.md),
+              ),
             ],
           ),
         ),
@@ -204,11 +216,7 @@ class _RowLine extends StatelessWidget {
   final String value;
   final TextStyle? valueStyle;
 
-  const _RowLine({
-    required this.label,
-    required this.value,
-    this.valueStyle,
-  });
+  const _RowLine({required this.label, required this.value, this.valueStyle});
 
   @override
   Widget build(BuildContext context) {
@@ -217,12 +225,15 @@ class _RowLine extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
         Text(
           value,
-          style: valueStyle ??
+          style:
+              valueStyle ??
               AppTextStyles.bodyMedium.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
@@ -277,7 +288,9 @@ class _MethodTile extends StatelessWidget {
                   SizedBox(height: AppSpacing.xs),
                   Text(
                     subtitle,
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -327,7 +340,11 @@ class _QrCard extends StatelessWidget {
                   border: Border.all(color: AppColors.divider),
                 ),
                 child: const Center(
-                  child: Icon(Icons.qr_code_2, size: 64, color: AppColors.textSecondary),
+                  child: Icon(
+                    Icons.qr_code_2,
+                    size: 64,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ),
@@ -335,12 +352,20 @@ class _QrCard extends StatelessWidget {
           SizedBox(height: AppSpacing.md),
           Text(
             l10n.translate('payment.qr_hint'),
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
           SizedBox(height: AppSpacing.md),
-          _InfoLine(label: l10n.translate('payment.amount'), value: _formatCurrency(amount)),
+          _InfoLine(
+            label: l10n.translate('payment.amount'),
+            value: _formatCurrency(amount),
+          ),
           SizedBox(height: AppSpacing.xs),
-          _InfoLine(label: l10n.translate('payment.content'), value: l10n.translate('payment.content_value')),
+          _InfoLine(
+            label: l10n.translate('payment.content'),
+            value: l10n.translate('payment.content_value'),
+          ),
         ],
       ),
     );
@@ -373,7 +398,9 @@ class _InfoLine extends StatelessWidget {
         Expanded(
           child: Text(
             '${label}:',
-            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
         Text(

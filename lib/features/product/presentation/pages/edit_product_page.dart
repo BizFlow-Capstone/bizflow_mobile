@@ -857,6 +857,7 @@ class _EditProductPageState extends State<EditProductPage> {
                   ],
                 ),
                 SizedBox(height: AppSpacing.lg),
+                const SafeArea(top: false, child: SizedBox.shrink()),
               ],
             ),
           ),
