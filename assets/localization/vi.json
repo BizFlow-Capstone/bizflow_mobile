@@ -310,7 +310,18 @@
     "add_product_required": "Vui lòng thêm ít nhất một sản phẩm",
     "confirm_title": "Xác nhận nhập kho",
     "confirm_message": "Bạn có chắc chắn muốn nhập {count} sản phẩm vào kho?",
-    "success": "Nhập kho thành công!"
+    "success": "Nhập kho thành công!",
+    "history_title": "Lịch sử nhập kho",
+    "no_history": "Chưa có phiếu nhập kho nào",
+    "add_new": "Nhập kho",
+    "receipt_title": "Phiếu nhập kho",
+    "receipt_subtitle": "Xác nhận nhập kho thành công",
+    "receipt_code": "Mã phiếu",
+    "receipt_date": "Ngày nhập",
+    "receipt_location": "Kho hàng",
+    "receipt_supplier": "Nhà cung cấp",
+    "receipt_total": "Tổng tiền",
+    "receipt_done": "Hoàn tất"
   },
   "home": {
     "title": "Trang chủ",

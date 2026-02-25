@@ -10,6 +10,7 @@ import '../../../../core/providers/localization_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
+import '../../../../shared/widgets/google_icon.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -280,9 +281,7 @@ class _LoginPageContent extends StatelessWidget {
                 suffixIcon: GestureDetector(
                   onTap: () => onPasswordVisibilityChanged(!isPasswordVisible),
                   child: Icon(
-                    isPasswordVisible
-                        ? Icons.visibility
-                        : Icons.visibility_off,
+                    isPasswordVisible ? Icons.visibility : Icons.visibility_off,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -353,10 +352,7 @@ class _LoginPageContent extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Divider(
-                      color: AppColors.divider,
-                      thickness: 1,
-                    ),
+                    child: Divider(color: AppColors.divider, thickness: 1),
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -370,10 +366,7 @@ class _LoginPageContent extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: Divider(
-                      color: AppColors.divider,
-                      thickness: 1,
-                    ),
+                    child: Divider(color: AppColors.divider, thickness: 1),
                   ),
                 ],
               ),
@@ -437,36 +430,8 @@ class _LoginPageContent extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Google Icon - using local asset with fallback
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Image.asset(
-                    'assets/icons/google.png',
-                    width: 24,
-                    height: 24,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'G',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                // Google Icon - inline branded widget
+                const GoogleIcon(),
                 SizedBox(width: AppSpacing.md),
                 Text(
                   l10n.translate('auth.or_login_google'),

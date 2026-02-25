@@ -8,6 +8,7 @@ import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
 import '../../features/product/presentation/pages/product_management_page.dart';
+import '../../features/product/presentation/pages/import_history_page.dart';
 import '../../features/order/presentation/pages/order_list_screen.dart';
 import '../../features/order/presentation/pages/order_status_screen.dart';
 import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
@@ -40,6 +41,7 @@ class AppRoutes {
   static const String premiumPayment = '/premium-payment';
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String importHistory = '/import-history';
 }
 
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
@@ -71,7 +73,8 @@ class GlobalAppBarState extends ChangeNotifier {
 class AppRouter {
   AppRouter._();
 
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
   static final GlobalAppBarState globalAppBarState = GlobalAppBarState();
 
   /// Lấy context hiện tại
@@ -89,10 +92,16 @@ class AppRouter {
         return _buildRoute(settings, const RegisterPage());
 
       case AppRoutes.verifyOtp:
-        return _buildRoute(settings, const VerifyOtpPage(phoneNumber: '095555555',));
+        return _buildRoute(
+          settings,
+          const VerifyOtpPage(phoneNumber: '095555555'),
+        );
 
       case AppRoutes.forgotPassword:
-        return _buildRoute(settings, const _PlaceholderPage(title: 'Forgot Password'));
+        return _buildRoute(
+          settings,
+          const _PlaceholderPage(title: 'Forgot Password'),
+        );
 
       // Main Routes - With Global AppBar
       case AppRoutes.home:
@@ -168,6 +177,9 @@ class AppRouter {
           _GlobalAppBarShell(child: const _PlaceholderPage(title: 'Settings')),
         );
 
+      case AppRoutes.importHistory:
+        return _buildRoute(settings, const ImportHistoryPage());
+
       default:
         return _buildRoute(settings, const _NotFoundPage());
     }
@@ -178,10 +190,7 @@ class AppRouter {
     RouteSettings settings,
     Widget page,
   ) {
-    return MaterialPageRoute<T>(
-      settings: settings,
-      builder: (_) => page,
-    );
+    return MaterialPageRoute<T>(settings: settings, builder: (_) => page);
   }
 
   /// Navigate to route
@@ -201,7 +210,10 @@ class AppRouter {
   }
 
   /// Clear stack and navigate
-  static Future<T?> navigateAndClearStack<T>(String routeName, {Object? arguments}) {
+  static Future<T?> navigateAndClearStack<T>(
+    String routeName, {
+    Object? arguments,
+  }) {
     return navigatorKey.currentState!.pushNamedAndRemoveUntil<T>(
       routeName,
       (route) => false,
@@ -259,9 +271,9 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
               AppRouter.globalAppBarState.setLocale(locale);
             },
             onNotificationTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Notifications')));
             },
             onSettingsTap: () {
               AppRouter.navigateTo(AppRoutes.settings);
@@ -275,11 +287,13 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
               List<LocationItem> locations = [];
               if (state is LocationsLoaded) {
                 locations = state.locations
-                    .map((loc) => LocationItem(
-                          id: loc.id,
-                          name: loc.name,
-                          isActive: loc.isActive,
-                        ))
+                    .map(
+                      (loc) => LocationItem(
+                        id: loc.id,
+                        name: loc.name,
+                        isActive: loc.isActive,
+                      ),
+                    )
                     .toList();
               }
 

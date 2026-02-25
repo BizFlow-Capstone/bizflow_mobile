@@ -29,6 +29,7 @@ class ProductsLoaded extends ProductState {
   final String? sortBy;
   final bool hasReachedMax;
   final int currentPage;
+  final String? apiMessage; // server feedback message
 
   const ProductsLoaded({
     required this.products,
@@ -39,6 +40,7 @@ class ProductsLoaded extends ProductState {
     this.sortBy,
     this.hasReachedMax = false,
     this.currentPage = 1,
+    this.apiMessage,
   });
 
   ProductsLoaded copyWith({
@@ -50,6 +52,7 @@ class ProductsLoaded extends ProductState {
     String? sortBy,
     bool? hasReachedMax,
     int? currentPage,
+    String? apiMessage,
   }) {
     return ProductsLoaded(
       products: products ?? this.products,
@@ -60,6 +63,7 @@ class ProductsLoaded extends ProductState {
       sortBy: sortBy ?? this.sortBy,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       currentPage: currentPage ?? this.currentPage,
+      apiMessage: apiMessage, // always overwrite (null clears it)
     );
   }
 
@@ -73,6 +77,7 @@ class ProductsLoaded extends ProductState {
     sortBy,
     hasReachedMax,
     currentPage,
+    apiMessage,
   ];
 }
 

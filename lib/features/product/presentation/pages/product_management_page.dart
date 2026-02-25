@@ -13,7 +13,7 @@ import '../widgets/product_fab_menu_widget.dart';
 import '../widgets/product_filter_dialog.dart';
 import '../widgets/product_sort_dialog.dart';
 import 'add_product_page.dart';
-import 'stock_import_page.dart';
+import 'import_history_page.dart';
 
 /// Product Management by Location Page
 /// SC-INV-03.1: Quản lý sản phẩm theo địa điểm kinh doanh
@@ -174,6 +174,21 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           ],
         ),
         centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Lịch sử nhập kho',
+            color: AppColors.textPrimary,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ImportHistoryPage(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -268,6 +283,20 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     SnackBar(
                       content: Text(l10n.translate('product.delete_success')),
                       backgroundColor: AppColors.success,
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } else if (state is ProductsLoaded &&
+                    state.apiMessage != null &&
+                    state.apiMessage!.isNotEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(state.apiMessage!),
+                      backgroundColor: AppColors.primary,
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
                     ),
                   );
                 }
@@ -386,10 +415,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           _toggleFabMenu();
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  StockImportPage(locationId: widget.locationId),
-            ),
+            MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
           );
         },
       ),

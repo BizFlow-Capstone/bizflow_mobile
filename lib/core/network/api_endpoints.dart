@@ -63,4 +63,19 @@ class ApiEndpoints {
       '/api/my-business/product/$productId/sale-items';
 
   // Add more endpoints here...
+  // Import
+  static const String imports = '/api/my-business/accounting/imports';
+  static const String createImport = '/api/my-business/accounting/import';
+  static const String importTemplate =
+      '/api/my-business/accounting/import-template';
+
+  // Import with ID - use with String interpolation
+  static String getImportDetail(String id) =>
+      '/api/my-business/accounting/import/$id';
+  static String updateImport(String id) =>
+      '/api/my-business/accounting/import/$id';
+  static String confirmImport(String id) =>
+      '/api/my-business/accounting/import/$id';
+  static String deleteImport(String id) =>
+      '/api/my-business/accounting/import/$id';
 }

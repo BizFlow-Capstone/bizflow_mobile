@@ -10,6 +10,7 @@ import '../../../../core/providers/localization_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
+import '../../../../shared/widgets/google_icon.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -102,10 +103,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
     );
   }
 
@@ -113,7 +111,6 @@ class _RegisterPageState extends State<RegisterPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final localizationProvider = Provider.of<LocalizationProvider>(context);
-
 
     return Scaffold(
       backgroundColor: AppColors.white,
@@ -184,7 +181,6 @@ class _RegisterPageContent extends StatelessWidget {
     required this.onPasswordVisibilityChanged,
     required this.onRegister,
     required this.onGoogleRegister,
-
   });
 
   @override
@@ -198,9 +194,8 @@ class _RegisterPageContent extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => VerifyOtpPage(
-                phoneNumber: phoneController.text.trim(),
-              ),
+              builder: (_) =>
+                  VerifyOtpPage(phoneNumber: phoneController.text.trim()),
             ),
           );
         } else if (state is SignupFailure) {
@@ -219,11 +214,7 @@ class _RegisterPageContent extends StatelessWidget {
             children: [
               if (!isKeyboardOpen) ...[
                 SizedBox(height: AppSpacing.lg),
-                const Icon(
-                  Icons.business,
-                  size: 60,
-                  color: Color(0xFF23C4C1),
-                ),
+                const Icon(Icons.business, size: 60, color: Color(0xFF23C4C1)),
                 SizedBox(height: AppSpacing.md),
               ],
               Text(
@@ -311,7 +302,9 @@ class _RegisterPageContent extends StatelessWidget {
                     child: Divider(color: AppColors.divider, thickness: 1),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
                     child: Text(
                       l10n.translate('auth.or_divider'),
                       style: AppTextStyles.bodyMedium.copyWith(
@@ -338,9 +331,7 @@ class _RegisterPageContent extends StatelessWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => LoginPage(),
-                        ),
+                        MaterialPageRoute(builder: (context) => LoginPage()),
                       );
                     },
                     child: Text(
@@ -380,35 +371,7 @@ class _RegisterPageContent extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Image.asset(
-                    'assets/icons/google.png',
-                    width: 24,
-                    height: 24,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'G',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                const GoogleIcon(),
                 SizedBox(width: AppSpacing.md),
                 Text(
                   l10n.translate('auth.sign_up_google'),
@@ -427,19 +390,13 @@ class _RegisterPageContent extends StatelessWidget {
 
   void _showError(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
     );
   }
 
   void _showSuccess(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppColors.success),
     );
   }
 

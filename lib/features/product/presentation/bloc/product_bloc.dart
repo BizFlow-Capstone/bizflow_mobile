@@ -60,11 +60,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           products: products,
           hasReachedMax: products.length < 20,
           currentPage: 1,
-
           locationId: event.locationId,
           searchQuery: _searchQuery,
           filterStatus: _filterStatus,
           filterCategory: _filterCategory,
+          apiMessage: response is Map ? response['message'] as String? : null,
         ),
       );
     } catch (e) {
@@ -93,11 +93,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           products: products,
           hasReachedMax: products.length < 20,
           currentPage: 1,
-
           locationId: event.locationId,
           searchQuery: _searchQuery,
           filterStatus: _filterStatus,
           filterCategory: _filterCategory,
+          apiMessage: response is Map ? response['message'] as String? : null,
         ),
       );
     } catch (e) {
@@ -173,16 +173,34 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['productId'] ??
               item['ProductId'] ??
               item['product_id'];
+
+          // API may return 'price' as the selling price and 'stock' as inventory
+          final dynamic rawSalePrice =
+              item['salePrice'] ??
+              item['SalePrice'] ??
+              item['price'] ??
+              item['Price'];
+          final double resolvedSalePrice =
+              (rawSalePrice as num?)?.toDouble() ?? 0.0;
+
+          final dynamic rawCostPrice = item['costPrice'] ?? item['CostPrice'];
+          final double? resolvedCostPrice = (rawCostPrice as num?)?.toDouble();
+
+          // 'stock' is the inventory field from the list API
+          final dynamic rawQty =
+              item['stock'] ??
+              item['Stock'] ??
+              item['quantity'] ??
+              item['Quantity'];
+          final int resolvedQty = (rawQty as num?)?.toInt() ?? 0;
+
           return ProductEntity(
             id: idValue?.toString() ?? '',
             name: (item['name'] ?? item['Name']) as String? ?? 'Unknown',
             description:
                 (item['description'] ?? item['Description']) as String?,
-            price:
-                (item['salePrice'] ?? item['SalePrice'] as num?)?.toDouble() ??
-                (item['price'] ?? item['Price'] as num?)?.toDouble() ??
-                0.0,
-            quantity: (item['quantity'] ?? item['Quantity']) as int? ?? 0,
+            price: resolvedSalePrice,
+            quantity: resolvedQty,
             imageUrl: (item['imageUrl'] ?? item['ImageUrl']) as String?,
             barcode:
                 (item['barcode'] ??
@@ -191,18 +209,17 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
                         item['Sku'])
                     as String?,
             category: (item['category'] ?? item['Category']) as String?,
-            costPrice: (item['costPrice'] ?? item['CostPrice'] as num?)
-                ?.toDouble(),
-            salePrice: (item['salePrice'] ?? item['SalePrice'] as num?)
-                ?.toDouble(),
+            costPrice: resolvedCostPrice,
+            salePrice: resolvedSalePrice,
             unit: (item['unit'] ?? item['Unit']) as String?,
             isActive: (item['status'] ?? item['Status']) != null
-                ? (item['status'] ?? item['Status']) == 'active'
+                ? ((item['status'] ?? item['Status']) == 'active')
                 : (item['isActive'] ??
-                      item['IsActive'] ??
-                      item['active'] ??
-                      item['Active'] ??
-                      true),
+                          item['IsActive'] ??
+                          item['active'] ??
+                          item['Active'] ??
+                          true)
+                      as bool,
             createdAt: (item['createdAt'] ?? item['CreatedAt']) != null
                 ? DateTime.tryParse(
                     (item['createdAt'] ?? item['CreatedAt']) as String,

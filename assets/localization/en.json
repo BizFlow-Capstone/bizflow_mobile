@@ -306,7 +306,18 @@
     "add_product_required": "Please add at least one product",
     "confirm_title": "Confirm Stock Import",
     "confirm_message": "Are you sure you want to import {count} products to inventory?",
-    "success": "Stock imported successfully!"
+    "success": "Stock imported successfully!",
+    "history_title": "Import History",
+    "no_history": "No import receipts yet",
+    "add_new": "New Import",
+    "receipt_title": "Import Receipt",
+    "receipt_subtitle": "Stock import confirmed successfully",
+    "receipt_code": "Receipt Code",
+    "receipt_date": "Import Date",
+    "receipt_location": "Warehouse",
+    "receipt_supplier": "Supplier",
+    "receipt_total": "Total Amount",
+    "receipt_done": "Done"
   },
   "home": {
     "title": "Home",

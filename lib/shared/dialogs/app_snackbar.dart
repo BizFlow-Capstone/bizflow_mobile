@@ -39,9 +39,8 @@ class AppSnackBar {
         ),
         backgroundColor: _getBackgroundColor(type),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppSpacing.borderRadiusSm,
-        ),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
         duration: duration,
         action: actionLabel != null
             ? SnackBarAction(
