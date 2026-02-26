@@ -65,10 +65,7 @@ class AppTextField extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (label != null) ...[
-          Text(
-            label!,
-            style: AppTextStyles.labelMedium,
-          ),
+          Text(label!, style: AppTextStyles.labelMedium),
           SizedBox(height: AppSpacing.xs),
         ],
         TextFormField(
@@ -98,7 +95,8 @@ class AppTextField extends StatelessWidget {
             helperText: helperText,
             prefixIcon: prefixIcon,
             suffixIcon: suffixIcon,
-            contentPadding: contentPadding ??
+            contentPadding:
+                contentPadding ??
                 EdgeInsets.symmetric(
                   horizontal: AppSpacing.md,
                   vertical: AppSpacing.sm,

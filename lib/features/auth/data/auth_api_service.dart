@@ -10,19 +10,21 @@ class AuthApiService {
   static const String _googleLoginEndpoint = '$_baseUrl/auth/google-login';
   static const String _verifyOtpEndpoint = '$_baseUrl/auth/verify-otp';
   static const String _resendOtpEndpoint = '$_baseUrl/auth/resend-otp';
-  static const String _googleRegisterEndpoint = '$_baseUrl/auth/google-register';
+  static const String _googleRegisterEndpoint =
+      '$_baseUrl/auth/google-register';
 
   AuthApiService({Dio? dio})
-      : _dio = dio ??
-            Dio(
-              BaseOptions(
-                baseUrl: _baseUrl,
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 10),
-                sendTimeout: const Duration(seconds: 10),
-                contentType: 'application/json',
-              ),
-            );
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: _baseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 10),
+              sendTimeout: const Duration(seconds: 10),
+              contentType: 'application/json',
+            ),
+          );
 
   /// Register new user
   /// Returns phone number for OTP verification
@@ -62,10 +64,7 @@ class AuthApiService {
     try {
       final response = await _dio.post(
         _verifyOtpEndpoint,
-        data: {
-          'phone': phone,
-          'otpCode': otpCode,
-        },
+        data: {'phone': phone, 'otpCode': otpCode},
       );
 
       if (response.statusCode == 200) {
@@ -79,15 +78,11 @@ class AuthApiService {
   }
 
   /// Resend OTP code
-  Future<Map<String, dynamic>> resendOtp({
-    required String phone,
-  }) async {
+  Future<Map<String, dynamic>> resendOtp({required String phone}) async {
     try {
       final response = await _dio.post(
         _resendOtpEndpoint,
-        data: {
-          'phone': phone,
-        },
+        data: {'phone': phone},
       );
 
       if (response.statusCode == 200) {
@@ -109,11 +104,7 @@ class AuthApiService {
     try {
       final response = await _dio.post(
         _googleRegisterEndpoint,
-        data: {
-          'idToken': idToken,
-          'email': email,
-          'name': name,
-        },
+        data: {'idToken': idToken, 'email': email, 'name': name},
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -140,9 +131,7 @@ class AuthApiService {
         throw Exception('Email hoặc số điện thoại là bắt buộc');
       }
 
-      final requestData = {
-        'password': password,
-      };
+      final requestData = {'password': password};
 
       // Thêm email hoặc phone vào request
       if (email.isNotEmpty) {
@@ -151,10 +140,7 @@ class AuthApiService {
         requestData['phone'] = phone;
       }
 
-      final response = await _dio.post(
-        _loginEndpoint,
-        data: requestData,
-      );
+      final response = await _dio.post(_loginEndpoint, data: requestData);
 
       if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;
@@ -168,15 +154,11 @@ class AuthApiService {
 
   /// Login with Google account
   /// Returns token and user data on success
-  Future<Map<String, dynamic>> googleLogin({
-    String? idToken,
-  }) async {
+  Future<Map<String, dynamic>> googleLogin({String? idToken}) async {
     try {
       final response = await _dio.post(
         _googleLoginEndpoint,
-        data: {
-          if (idToken != null) 'idToken': idToken,
-        },
+        data: {if (idToken != null) 'idToken': idToken},
       );
 
       if (response.statusCode == 200) {

@@ -11,6 +11,7 @@ import '../../features/product/presentation/pages/product_management_page.dart';
 import '../../features/product/presentation/pages/import_history_page.dart';
 import '../../features/order/presentation/pages/order_list_screen.dart';
 import '../../features/order/presentation/pages/order_status_screen.dart';
+import '../../features/order/presentation/pages/order_creation_selection_screen.dart';
 import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
 import '../../features/subscription/presentation/pages/premium_payment_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
@@ -37,6 +38,7 @@ class AppRoutes {
   static const String productManagement = '/product-management';
   static const String orderList = '/order-list';
   static const String orderStatus = '/order-status';
+  static const String orderCreateSelection = '/order-create-selection';
   static const String subscriptionPlans = '/subscription-plans';
   static const String premiumPayment = '/premium-payment';
   static const String profile = '/profile';
@@ -141,6 +143,12 @@ class AppRouter {
         return _buildRoute(
           settings,
           _GlobalAppBarShell(child: const OrderListScreen()),
+        );
+
+      case AppRoutes.orderCreateSelection:
+        return _buildRoute(
+          settings,
+          _GlobalAppBarShell(child: const OrderCreationSelectionScreen()),
         );
 
       case AppRoutes.orderStatus:

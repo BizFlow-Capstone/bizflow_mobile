@@ -6,13 +6,7 @@ class VerifyOtpUseCase {
 
   VerifyOtpUseCase(this._repository);
 
-  Future<AuthResponse> call({
-    required String phone,
-    required String otpCode,
-  }) {
-    return _repository.verifyOtp(
-      phone: phone,
-      otpCode: otpCode,
-    );
+  Future<AuthResponse> call({required String phone, required String otpCode}) {
+    return _repository.verifyOtp(phone: phone, otpCode: otpCode);
   }
 }

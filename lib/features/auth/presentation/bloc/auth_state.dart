@@ -41,10 +41,7 @@ class OtpVerificationSuccess extends AuthState {
   final String token;
   final Map<String, dynamic> user;
 
-  const OtpVerificationSuccess({
-    required this.token,
-    required this.user,
-  });
+  const OtpVerificationSuccess({required this.token, required this.user});
 }
 
 class OtpVerificationFailure extends AuthState {
@@ -62,10 +59,7 @@ class LoginSuccess extends AuthState {
   final String token;
   final Map<String, dynamic> user;
 
-  const LoginSuccess({
-    required this.token,
-    required this.user,
-  });
+  const LoginSuccess({required this.token, required this.user});
 }
 
 class LoginFailure extends AuthState {
@@ -79,10 +73,7 @@ class AuthAuthenticated extends AuthState {
   final String token;
   final Map<String, dynamic> user;
 
-  const AuthAuthenticated({
-    required this.token,
-    required this.user,
-  });
+  const AuthAuthenticated({required this.token, required this.user});
 }
 
 // Unauthenticated State

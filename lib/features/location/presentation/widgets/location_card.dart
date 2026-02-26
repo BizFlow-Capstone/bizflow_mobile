@@ -28,10 +28,7 @@ class LocationCard extends StatelessWidget {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-          side: BorderSide(
-            color: AppColors.divider,
-            width: 1,
-          ),
+          side: BorderSide(color: AppColors.divider, width: 1),
         ),
         child: Container(
           decoration: BoxDecoration(
@@ -51,8 +48,8 @@ class LocationCard extends StatelessWidget {
                       location.name,
                       style: AppTextStyles.titleSmall.copyWith(
                         color: location.isActive
-                          ? AppColors.textPrimary
-                          : AppColors.textDisabled,
+                            ? AppColors.textPrimary
+                            : AppColors.textDisabled,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -66,8 +63,8 @@ class LocationCard extends StatelessWidget {
                           Icons.location_on_outlined,
                           size: 16,
                           color: location.isActive
-                            ? AppColors.textSecondary
-                            : AppColors.textDisabled,
+                              ? AppColors.textSecondary
+                              : AppColors.textDisabled,
                         ),
                         SizedBox(width: AppSpacing.xs),
                         Expanded(
@@ -75,8 +72,8 @@ class LocationCard extends StatelessWidget {
                             location.fullAddress,
                             style: AppTextStyles.bodySmall.copyWith(
                               color: location.isActive
-                                ? AppColors.textSecondary
-                                : AppColors.textDisabled,
+                                  ? AppColors.textSecondary
+                                  : AppColors.textDisabled,
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -93,16 +90,16 @@ class LocationCard extends StatelessWidget {
                           Icons.phone_outlined,
                           size: 16,
                           color: location.isActive
-                            ? AppColors.textSecondary
-                            : AppColors.textDisabled,
+                              ? AppColors.textSecondary
+                              : AppColors.textDisabled,
                         ),
                         SizedBox(width: AppSpacing.xs),
                         Text(
                           location.phone,
                           style: AppTextStyles.bodySmall.copyWith(
                             color: location.isActive
-                              ? AppColors.textSecondary
-                              : AppColors.textDisabled,
+                                ? AppColors.textSecondary
+                                : AppColors.textDisabled,
                           ),
                         ),
                       ],
@@ -116,8 +113,8 @@ class LocationCard extends StatelessWidget {
                           Icons.person_outline,
                           size: 16,
                           color: location.isActive
-                            ? AppColors.textSecondary
-                            : AppColors.textDisabled,
+                              ? AppColors.textSecondary
+                              : AppColors.textDisabled,
                         ),
                         SizedBox(width: AppSpacing.xs),
                         Expanded(
@@ -125,8 +122,8 @@ class LocationCard extends StatelessWidget {
                             '${location.ownerName}',
                             style: AppTextStyles.bodySmall.copyWith(
                               color: location.isActive
-                                ? AppColors.textSecondary
-                                : AppColors.textDisabled,
+                                  ? AppColors.textSecondary
+                                  : AppColors.textDisabled,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -152,7 +149,9 @@ class LocationCard extends StatelessWidget {
                         padding: const EdgeInsets.all(AppSpacing.xs),
                         decoration: BoxDecoration(
                           color: AppColors.background,
-                          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
                         ),
                         child: Icon(
                           Icons.edit_outlined,
@@ -194,7 +193,9 @@ class LocationCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF23C4C1).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

@@ -35,18 +35,13 @@ class VerifyOtpRequested extends AuthEvent {
   final String phone;
   final String otpCode;
 
-  const VerifyOtpRequested({
-    required this.phone,
-    required this.otpCode,
-  });
+  const VerifyOtpRequested({required this.phone, required this.otpCode});
 }
 
 class ResendOtpRequested extends AuthEvent {
   final String phone;
 
-  const ResendOtpRequested({
-    required this.phone,
-  });
+  const ResendOtpRequested({required this.phone});
 }
 
 // Login Events
@@ -65,9 +60,7 @@ class LoginRequested extends AuthEvent {
 class GoogleLoginRequested extends AuthEvent {
   final String? idToken;
 
-  const GoogleLoginRequested({
-    this.idToken,
-  });
+  const GoogleLoginRequested({this.idToken});
 }
 
 // General Auth Events

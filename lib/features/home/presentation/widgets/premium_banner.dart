@@ -7,10 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 class PremiumBanner extends StatelessWidget {
   final VoidCallback? onTap;
 
-  const PremiumBanner({
-    super.key,
-    this.onTap,
-  });
+  const PremiumBanner({super.key, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -20,10 +17,7 @@ class PremiumBanner extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: const [
-              Color(0xFFFFA500),
-              Color(0xFFFF8C00),
-            ],
+            colors: const [Color(0xFFFFA500), Color(0xFFFF8C00)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -40,11 +34,7 @@ class PremiumBanner extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Center(
-                child: Icon(
-                  Icons.auto_awesome,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: Icon(Icons.auto_awesome, color: Colors.white, size: 28),
               ),
             ),
             SizedBox(width: AppSpacing.md),
@@ -77,11 +67,7 @@ class PremiumBanner extends StatelessWidget {
               ),
             ),
             // Arrow Icon
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.white,
-              size: 20,
-            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.white, size: 20),
           ],
         ),
       ),

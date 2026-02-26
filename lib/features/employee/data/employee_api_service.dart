@@ -4,7 +4,7 @@ import '../../../core/network/api_endpoints.dart';
 import 'models/employee_dto.dart';
 
 /// Employee API Service - Handles employee-related API calls
-/// 
+///
 /// Architecture: BLoC → Repository → Service → ApiClient → Backend
 class EmployeeApiService {
   final ApiClient _apiClient;
@@ -12,14 +12,12 @@ class EmployeeApiService {
   EmployeeApiService({required ApiClient apiClient}) : _apiClient = apiClient;
 
   /// Get employees available for assignment
-  /// 
+  ///
   /// API: GET /api/my-employee/employees
   /// Returns: List<EmployeeDto>
   Future<List<EmployeeDto>> getMyEmployees() async {
     try {
-      final response = await _apiClient.get(
-        ApiEndpoints.myEmployees,
-      );
+      final response = await _apiClient.get(ApiEndpoints.myEmployees);
 
       if (response.isSuccess && response.data != null) {
         final dto = EmployeeResponseDto.fromJson(

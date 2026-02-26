@@ -46,36 +46,42 @@ class OrderApiService {
       if (response.isSuccess && response.data != null) {
         // Check if response.data is Map
         if (response.data is! Map<String, dynamic>) {
-          throw Exception('Response không đúng format\n\n'
-              'Expected: Map<String, dynamic>\n'
-              'Got: ${response.data.runtimeType}\n');
+          throw Exception(
+            'Response không đúng format\n\n'
+            'Expected: Map<String, dynamic>\n'
+            'Got: ${response.data.runtimeType}\n',
+          );
         }
 
         // Parse raw JSON to DTO
-        return OrderResponseDto.fromJson(
-          response.data as Map<String, dynamic>,
-        );
+        return OrderResponseDto.fromJson(response.data as Map<String, dynamic>);
       } else {
         throw Exception(response.message ?? 'Failed to load orders');
       }
     } on ApiException catch (e) {
       // Transform ApiException to domain exception with user-friendly messages
       if (e.statusCode == -1) {
-        throw Exception('No network connection\n\n'
-            'Check:\n'
-            '• Is backend running?\n'
-            '• Port: 7270\n'
-            '• URL: http://192.168.1.9:7270');
+        throw Exception(
+          'No network connection\n\n'
+          'Check:\n'
+          '• Is backend running?\n'
+          '• Port: 7270\n'
+          '• URL: http://192.168.1.9:7270',
+        );
       } else if (e.statusCode == -2) {
-        throw Exception('Connection timeout\n\n'
-            'Backend did not respond within 30 seconds');
+        throw Exception(
+          'Connection timeout\n\n'
+          'Backend did not respond within 30 seconds',
+        );
       } else if (e.statusCode == -3) {
-        throw Exception('Backend connection error\n\n'
-            '${e.message}\n\n'
-            'Solutions:\n'
-            '1. Check backend is running: dotnet run\n'
-            '2. Ensure port 7270 is not blocked\n'
-            '3. Hot restart app (press R)');
+        throw Exception(
+          'Backend connection error\n\n'
+          '${e.message}\n\n'
+          'Solutions:\n'
+          '1. Check backend is running: dotnet run\n'
+          '2. Ensure port 7270 is not blocked\n'
+          '3. Hot restart app (press R)',
+        );
       } else if (e.statusCode == 401) {
         throw Exception('Session expired\n\nPlease login again');
       } else if (e.statusCode == 404) {
@@ -97,10 +103,7 @@ class OrderApiService {
     int pageSize = 20,
   }) async {
     try {
-      final queryParams = {
-        'pageNumber': pageNumber,
-        'pageSize': pageSize,
-      };
+      final queryParams = {'pageNumber': pageNumber, 'pageSize': pageSize};
 
       final response = await _apiClient.get(
         ApiEndpoints.draftOrders,
@@ -112,9 +115,7 @@ class OrderApiService {
           throw Exception('Invalid response format');
         }
 
-        return OrderResponseDto.fromJson(
-          response.data as Map<String, dynamic>,
-        );
+        return OrderResponseDto.fromJson(response.data as Map<String, dynamic>);
       } else {
         throw Exception(response.message ?? 'Failed to load draft orders');
       }
@@ -130,9 +131,7 @@ class OrderApiService {
   /// Returns: OrderDto
   Future<OrderDto> getOrder(String orderId) async {
     try {
-      final response = await _apiClient.get(
-        ApiEndpoints.getOrder(orderId),
-      );
+      final response = await _apiClient.get(ApiEndpoints.getOrder(orderId));
 
       if (response.isSuccess && response.data != null) {
         if (response.data is! Map<String, dynamic>) {
@@ -160,11 +159,7 @@ class OrderApiService {
     String? note,
   }) async {
     try {
-      final body = {
-        'locationId': locationId,
-        'items': items,
-        'note': note,
-      };
+      final body = {'locationId': locationId, 'items': items, 'note': note};
 
       final response = await _apiClient.post(
         ApiEndpoints.createOrder,
@@ -255,9 +250,7 @@ class OrderApiService {
   /// Returns: bool (success/failure)
   Future<bool> cancelOrder(String orderId) async {
     try {
-      final response = await _apiClient.post(
-        ApiEndpoints.cancelOrder(orderId),
-      );
+      final response = await _apiClient.post(ApiEndpoints.cancelOrder(orderId));
 
       if (response.isSuccess) {
         return true;

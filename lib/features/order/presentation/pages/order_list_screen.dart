@@ -6,6 +6,7 @@ import '../bloc/order_event.dart';
 import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
 import '../widgets/order_filter.dart';
+import 'order_creation_selection_screen.dart';
 
 /// Order List Screen (SC-ORD-02) - Displays list of draft invoices/orders
 class OrderListScreen extends StatefulWidget {
@@ -149,7 +150,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () {
-                      // TODO: Navigate to create order screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OrderCreationSelectionScreen(),
+                        ),
+                      );
                     },
                     child: Text(l10n.translate('order.action_add')),
                   ),
@@ -191,7 +197,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: Navigate to create order screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const OrderCreationSelectionScreen(),
+            ),
+          );
         },
         child: const Icon(Icons.add),
       ),

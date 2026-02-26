@@ -28,10 +28,7 @@ class AppAvatar extends StatelessWidget {
         color: backgroundColor ?? AppColors.primary,
         shape: BoxShape.circle,
         image: imageUrl != null
-            ? DecorationImage(
-                image: NetworkImage(imageUrl!),
-                fit: BoxFit.cover,
-              )
+            ? DecorationImage(image: NetworkImage(imageUrl!), fit: BoxFit.cover)
             : null,
       ),
       child: imageUrl == null
@@ -49,10 +46,7 @@ class AppAvatar extends StatelessWidget {
     );
 
     if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: avatar,
-      );
+      return GestureDetector(onTap: onTap, child: avatar);
     }
 
     return avatar;
@@ -152,10 +146,10 @@ class AppChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = backgroundColor ??
-        (isSelected ? AppColors.primary : AppColors.divider);
-    final fgColor = textColor ??
-        (isSelected ? AppColors.white : AppColors.textPrimary);
+    final bgColor =
+        backgroundColor ?? (isSelected ? AppColors.primary : AppColors.divider);
+    final fgColor =
+        textColor ?? (isSelected ? AppColors.white : AppColors.textPrimary);
 
     return GestureDetector(
       onTap: onTap,

@@ -70,12 +70,12 @@ class OrderItemDto extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        productId,
-        productName,
-        price,
-        quantity,
-        discount,
-        note,
-      ];
+    id,
+    productId,
+    productName,
+    price,
+    quantity,
+    discount,
+    note,
+  ];
 }

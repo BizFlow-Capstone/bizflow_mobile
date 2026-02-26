@@ -98,11 +98,7 @@ class AppEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: AppColors.textHint,
-            ),
+            Icon(icon, size: 64, color: AppColors.textHint),
             SizedBox(height: AppSpacing.md),
             Text(
               title,
@@ -119,10 +115,7 @@ class AppEmptyState extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ],
-            if (action != null) ...[
-              SizedBox(height: AppSpacing.lg),
-              action!,
-            ],
+            if (action != null) ...[SizedBox(height: AppSpacing.lg), action!],
           ],
         ),
       ),
@@ -151,11 +144,7 @@ class AppErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: AppColors.error,
-            ),
+            Icon(Icons.error_outline, size: 64, color: AppColors.error),
             SizedBox(height: AppSpacing.md),
             Text(
               title,

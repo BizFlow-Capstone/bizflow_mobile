@@ -77,11 +77,7 @@ class _QuickActionButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Center(
-              child: Icon(
-                icon,
-                size: 28,
-                color: AppColors.primary,
-              ),
+              child: Icon(icon, size: 28, color: AppColors.primary),
             ),
           ),
           SizedBox(height: AppSpacing.sm),

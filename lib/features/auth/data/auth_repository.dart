@@ -14,9 +14,7 @@ abstract class AuthRepository {
     required String otpCode,
   });
 
-  Future<AuthResponse> resendOtp({
-    required String phone,
-  });
+  Future<AuthResponse> resendOtp({required String phone});
 
   Future<AuthResponse> googleRegister({
     required String idToken,
@@ -73,9 +71,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<AuthResponse> resendOtp({
-    required String phone,
-  }) async {
+  Future<AuthResponse> resendOtp({required String phone}) async {
     try {
       final response = await _apiService.resendOtp(phone: phone);
       return AuthResponse.fromJson(response);

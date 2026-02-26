@@ -60,7 +60,9 @@ class NotificationService {
     String? payload,
   }) async {
     // TODO: Implement schedule notification
-    debugPrint('NotificationService: Schedule notification at $scheduledTime - $title: $body');
+    debugPrint(
+      'NotificationService: Schedule notification at $scheduledTime - $title: $body',
+    );
   }
 
   /// Cancel notification

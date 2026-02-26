@@ -113,10 +113,7 @@ class AppBottomSheet extends StatelessWidget {
                 children: [
                   if (title != null)
                     Expanded(
-                      child: Text(
-                        title!,
-                        style: AppTextStyles.titleMedium,
-                      ),
+                      child: Text(title!, style: AppTextStyles.titleMedium),
                     )
                   else
                     const Spacer(),

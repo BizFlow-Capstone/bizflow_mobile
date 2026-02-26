@@ -49,12 +49,14 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       _currentStatusFilter = event.status;
       _currentLocationFilter = event.locationId;
 
-      emit(OrdersLoaded(
-        orders: orders,
-        total: orders.length,
-        pageNumber: event.pageNumber,
-        pageSize: event.pageSize,
-      ));
+      emit(
+        OrdersLoaded(
+          orders: orders,
+          total: orders.length,
+          pageNumber: event.pageNumber,
+          pageSize: event.pageSize,
+        ),
+      );
     } catch (e) {
       emit(OrderError(message: e.toString()));
     }
@@ -191,11 +193,13 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       _currentStatusFilter = event.status;
       _currentLocationFilter = event.locationId;
 
-      emit(OrdersFiltered(
-        orders: orders,
-        statusFilter: event.status,
-        locationFilter: event.locationId,
-      ));
+      emit(
+        OrdersFiltered(
+          orders: orders,
+          statusFilter: event.status,
+          locationFilter: event.locationId,
+        ),
+      );
     } catch (e) {
       emit(OrderError(message: e.toString()));
     }
@@ -217,12 +221,14 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
 
       _orders = orders;
 
-      emit(OrdersLoaded(
-        orders: orders,
-        total: orders.length,
-        pageNumber: 1,
-        pageSize: 20,
-      ));
+      emit(
+        OrdersLoaded(
+          orders: orders,
+          total: orders.length,
+          pageNumber: 1,
+          pageSize: 20,
+        ),
+      );
     } catch (e) {
       emit(OrderError(message: e.toString()));
     }

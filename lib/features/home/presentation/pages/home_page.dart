@@ -35,6 +35,8 @@ class _HomePageState extends State<HomePage> {
             children: [
               // Quick Actions
               QuickActions(
+                onCreateOrder: () =>
+                    AppRouter.navigateTo(AppRoutes.orderCreateSelection),
                 onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
               ),
               SizedBox(height: AppSpacing.lg),

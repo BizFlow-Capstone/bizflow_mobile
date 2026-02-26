@@ -1,26 +1,99 @@
-import 'package:flutter/foundation.dart';
 import '../domain/entities/order_entity.dart';
 import '../domain/entities/order_item_entity.dart';
-import 'models/order_dto.dart';
-import 'models/order_item_dto.dart';
 import 'order_api_service.dart';
 
-/// Order Repository - Orchestrates data sources and business logic
+/// Mock Order Repository - Returns mock data since API is not ready
 ///
 /// Responsibilities:
-/// 1. Coordinate between API service and domain logic
-/// 2. Transform DTOs to Entities
-/// 3. Cache data in memory
-/// 4. Handle data transformations and business rules
+/// 1. Provide mock data for order UI creation
+/// 2. Handle data transformations and business rules locally
 class OrderRepository {
-  final OrderApiService _apiService;
+  // ignore: unused_field
+  final OrderApiService _apiService; // Kept for DI compatibility
 
   OrderRepository({required OrderApiService apiService})
-    : _apiService = apiService;
+    : _apiService = apiService {
+    _initMockData();
+  }
 
   // Cache
   List<OrderEntity> _ordersCache = [];
-  Map<String, OrderEntity> _orderDetailsCache = {};
+  final Map<String, OrderEntity> _orderDetailsCache = {};
+
+  void _initMockData() {
+    final now = DateTime.now();
+    _ordersCache = [
+      OrderEntity(
+        id: '1',
+        locationId: '1',
+        locationName: 'Shinkiri Tech Store - HCM',
+        status: 'DRAFT',
+        items: const [
+          OrderItemEntity(
+            id: 'item1',
+            productId: 'prod1',
+            productName: 'iPhone 15 Pro Max',
+            price: 30000000,
+            quantity: 1,
+            discount: 0,
+          ),
+        ],
+        subtotal: 30000000,
+        discountAmount: 0,
+        taxAmount: 3000000,
+        totalAmount: 33000000,
+        note: 'Khách yêu cầu lấy màu đen',
+        createdAt: now.subtract(const Duration(hours: 2)),
+        updatedAt: now.subtract(const Duration(hours: 1)),
+      ),
+      OrderEntity(
+        id: '2',
+        locationId: '4',
+        locationName: 'Ngan Beauty Salon',
+        status: 'PENDING',
+        items: const [
+          OrderItemEntity(
+            id: 'item2',
+            productId: 'prod2',
+            productName: 'Mặt nạ dưỡng da',
+            price: 500000,
+            quantity: 2,
+            discount: 10,
+          ),
+        ],
+        subtotal: 1000000,
+        discountAmount: 100000,
+        taxAmount: 90000,
+        totalAmount: 990000,
+        createdAt: now.subtract(const Duration(days: 1)),
+        updatedAt: now.subtract(const Duration(days: 1)),
+      ),
+      OrderEntity(
+        id: '3',
+        locationId: '1',
+        locationName: 'Shinkiri Tech Store - HCM',
+        status: 'PUBLISHED',
+        items: const [
+          OrderItemEntity(
+            id: 'item3',
+            productId: 'prod3',
+            productName: 'MacBook Pro M3',
+            price: 45000000,
+            quantity: 1,
+            discount: 0,
+          ),
+        ],
+        subtotal: 45000000,
+        discountAmount: 0,
+        taxAmount: 4500000,
+        totalAmount: 49500000,
+        createdAt: now.subtract(const Duration(days: 2)),
+        updatedAt: now.subtract(const Duration(days: 2)),
+        invoiceNumber: 'INV-2026-001',
+        invoicedAt: now.subtract(const Duration(days: 2)),
+      ),
+    ];
+  }
 
   /// Get all orders with optional filters
   Future<List<OrderEntity>> getOrders({
@@ -29,23 +102,30 @@ class OrderRepository {
     String? status,
     String? locationId,
   }) async {
-    try {
-      final responseDto = await _apiService.getOrders(
-        pageNumber: pageNumber,
-        pageSize: pageSize,
-        status: status,
-        locationId: locationId,
-      );
+    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network
 
-      _ordersCache = responseDto.orders
-          .map((dto) => _dtoToEntity(dto))
-          .toList();
+    var filtered = List<OrderEntity>.from(_ordersCache);
 
-      return _ordersCache;
-    } catch (e) {
-      debugPrint('OrderRepository.getOrders error: $e');
-      rethrow;
+    if (status != null && status.isNotEmpty) {
+      filtered = filtered.where((o) => o.status == status).toList();
     }
+
+    if (locationId != null && locationId.isNotEmpty) {
+      filtered = filtered.where((o) => o.locationId == locationId).toList();
+    }
+
+    // Sort descending by updated date
+    filtered.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+    // Simple pagination mock
+    final startIndex = (pageNumber - 1) * pageSize;
+    if (startIndex >= filtered.length) return [];
+
+    final endIndex = (startIndex + pageSize < filtered.length)
+        ? startIndex + pageSize
+        : filtered.length;
+
+    return filtered.sublist(startIndex, endIndex);
   }
 
   /// Get draft orders
@@ -53,72 +133,70 @@ class OrderRepository {
     int pageNumber = 1,
     int pageSize = 20,
   }) async {
-    try {
-      final responseDto = await _apiService.getDraftOrders(
-        pageNumber: pageNumber,
-        pageSize: pageSize,
-      );
-
-      return responseDto.orders.map((dto) => _dtoToEntity(dto)).toList();
-    } catch (e) {
-      debugPrint('OrderRepository.getDraftOrders error: $e');
-      rethrow;
-    }
+    return getOrders(
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      status: 'DRAFT',
+    );
   }
 
   /// Get single order by ID
   Future<OrderEntity> getOrder(String orderId) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
     try {
-      // Check cache first
       if (_orderDetailsCache.containsKey(orderId)) {
         return _orderDetailsCache[orderId]!;
       }
 
-      final dto = await _apiService.getOrder(orderId);
-      final entity = _dtoToEntity(dto);
-      _orderDetailsCache[orderId] = entity;
-
-      return entity;
+      final order = _ordersCache.firstWhere((o) => o.id == orderId);
+      _orderDetailsCache[orderId] = order;
+      return order;
     } catch (e) {
-      debugPrint('OrderRepository.getOrder error: $e');
-      rethrow;
+      throw Exception('Order not found');
     }
   }
 
-  /// Create a new order
+  /// Create a new order (saves as DRAFT locally)
   Future<OrderEntity> createOrder({
     required String locationId,
     required List<OrderItemEntity> items,
     String? note,
   }) async {
-    try {
-      final itemsJson = items
-          .map(
-            (item) => <String, dynamic>{
-              'productId': item.productId,
-              'productName': item.productName,
-              'price': item.price,
-              'quantity': item.quantity,
-              'discount': item.discount,
-              'note': item.note,
-            },
-          )
-          .toList();
+    await Future.delayed(const Duration(milliseconds: 800));
 
-      final dto = await _apiService.createOrder(
-        locationId: locationId,
-        items: itemsJson,
-        note: note,
-      );
+    double subtotal = 0;
+    double discountAmount = 0;
 
-      final entity = _dtoToEntity(dto);
-      _ordersCache.add(entity);
-
-      return entity;
-    } catch (e) {
-      debugPrint('OrderRepository.createOrder error: $e');
-      rethrow;
+    for (var item in items) {
+      subtotal += item.price * item.quantity;
+      discountAmount += (item.price * item.quantity) * (item.discount / 100);
     }
+
+    final taxAmount = (subtotal - discountAmount) * 0.1; // 10% tax mock
+    final totalAmount = subtotal - discountAmount + taxAmount;
+
+    final now = DateTime.now();
+
+    final newOrder = OrderEntity(
+      id: 'mock_${now.millisecondsSinceEpoch}',
+      locationId: locationId,
+      locationName: 'Mock Location',
+      status: 'DRAFT',
+      items: items,
+      subtotal: subtotal,
+      discountAmount: discountAmount,
+      taxAmount: taxAmount,
+      totalAmount: totalAmount,
+      note: note,
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    _ordersCache.insert(0, newOrder);
+    _orderDetailsCache[newOrder.id] = newOrder;
+
+    return newOrder;
   }
 
   /// Update an existing order
@@ -127,115 +205,107 @@ class OrderRepository {
     String? note,
     List<OrderItemEntity>? items,
   }) async {
-    try {
-      final itemsJson = items
-          ?.map(
-            (item) => <String, dynamic>{
-              'productId': item.productId,
-              'productName': item.productName,
-              'price': item.price,
-              'quantity': item.quantity,
-              'discount': item.discount,
-              'note': item.note,
-            },
-          )
-          .toList();
+    await Future.delayed(const Duration(milliseconds: 800));
 
-      final dto = await _apiService.updateOrder(
-        orderId: orderId,
-        note: note,
-        items: itemsJson,
+    try {
+      final index = _ordersCache.indexWhere((o) => o.id == orderId);
+      if (index == -1) throw Exception('Order not found');
+
+      final existingOrder = _ordersCache[index];
+
+      double subtotal = existingOrder.subtotal;
+      double discountAmount = existingOrder.discountAmount;
+      double taxAmount = existingOrder.taxAmount;
+      double totalAmount = existingOrder.totalAmount;
+
+      // Re-calculate if items changed
+      if (items != null) {
+        subtotal = 0;
+        discountAmount = 0;
+        for (var item in items) {
+          subtotal += item.price * item.quantity;
+          discountAmount +=
+              (item.price * item.quantity) * (item.discount / 100);
+        }
+        taxAmount = (subtotal - discountAmount) * 0.1;
+        totalAmount = subtotal - discountAmount + taxAmount;
+      }
+
+      final updatedOrder = existingOrder.copyWith(
+        note: note ?? existingOrder.note,
+        items: items ?? existingOrder.items,
+        subtotal: subtotal,
+        discountAmount: discountAmount,
+        taxAmount: taxAmount,
+        totalAmount: totalAmount,
+        updatedAt: DateTime.now(),
       );
 
-      final entity = _dtoToEntity(dto);
+      _ordersCache[index] = updatedOrder;
+      _orderDetailsCache[orderId] = updatedOrder;
 
-      // Update cache
-      final index = _ordersCache.indexWhere((order) => order.id == orderId);
-      if (index != -1) {
-        _ordersCache[index] = entity;
-      }
-      _orderDetailsCache[orderId] = entity;
-
-      return entity;
+      return updatedOrder;
     } catch (e) {
-      debugPrint('OrderRepository.updateOrder error: $e');
       rethrow;
     }
   }
 
   /// Publish an order (convert draft to invoice)
   Future<OrderEntity> publishOrder(String orderId) async {
+    await Future.delayed(const Duration(milliseconds: 800));
+
     try {
-      final dto = await _apiService.publishOrder(orderId);
-      final entity = _dtoToEntity(dto);
+      final index = _ordersCache.indexWhere((o) => o.id == orderId);
+      if (index == -1) throw Exception('Order not found');
 
-      // Update cache
-      final index = _ordersCache.indexWhere((order) => order.id == orderId);
-      if (index != -1) {
-        _ordersCache[index] = entity;
-      }
-      _orderDetailsCache[orderId] = entity;
+      final existingOrder = _ordersCache[index];
+      final now = DateTime.now();
 
-      return entity;
+      final updatedOrder = existingOrder.copyWith(
+        status: 'PUBLISHED',
+        updatedAt: now,
+        invoiceNumber:
+            'INV-${now.year}-${now.millisecondsSinceEpoch.toString().substring(8)}',
+        invoicedAt: now,
+      );
+
+      _ordersCache[index] = updatedOrder;
+      _orderDetailsCache[orderId] = updatedOrder;
+
+      return updatedOrder;
     } catch (e) {
-      debugPrint('OrderRepository.publishOrder error: $e');
       rethrow;
     }
   }
 
   /// Cancel an order
   Future<bool> cancelOrder(String orderId) async {
-    try {
-      final success = await _apiService.cancelOrder(orderId);
+    await Future.delayed(const Duration(milliseconds: 500));
 
-      if (success) {
-        // Remove from cache
-        _ordersCache.removeWhere((order) => order.id == orderId);
-        _orderDetailsCache.remove(orderId);
-      }
+    final index = _ordersCache.indexWhere((o) => o.id == orderId);
+    if (index == -1) return false;
 
-      return success;
-    } catch (e) {
-      debugPrint('OrderRepository.cancelOrder error: $e');
-      rethrow;
+    final order = _ordersCache[index];
+    if (order.status == 'DRAFT') {
+      // Hard delete draft
+      _ordersCache.removeAt(index);
+      _orderDetailsCache.remove(orderId);
+    } else {
+      // Soft cancel
+      final updatedOrder = order.copyWith(
+        status: 'CANCELLED',
+        updatedAt: DateTime.now(),
+      );
+      _ordersCache[index] = updatedOrder;
+      _orderDetailsCache[orderId] = updatedOrder;
     }
+
+    return true;
   }
 
-  /// Convert DTO to Entity
-  OrderEntity _dtoToEntity(OrderDto dto) {
-    return OrderEntity(
-      id: dto.id,
-      locationId: dto.locationId,
-      locationName: dto.locationName,
-      status: dto.status,
-      items: dto.items
-          .map(
-            (itemDto) => OrderItemEntity(
-              id: itemDto.id,
-              productId: itemDto.productId,
-              productName: itemDto.productName,
-              price: itemDto.price,
-              quantity: itemDto.quantity,
-              discount: itemDto.discount,
-              note: itemDto.note,
-            ),
-          )
-          .toList(),
-      subtotal: dto.subtotal,
-      discountAmount: dto.discountAmount,
-      taxAmount: dto.taxAmount,
-      totalAmount: dto.totalAmount,
-      note: dto.note,
-      createdAt: dto.createdAt,
-      updatedAt: dto.updatedAt,
-      invoiceNumber: dto.invoiceNumber,
-      invoicedAt: dto.invoicedAt,
-    );
-  }
-
-  /// Clear all caches
+  /// Clear all caches (keeping mock memory structure intact)
   void clearCache() {
-    _ordersCache = [];
-    _orderDetailsCache = {};
+    // For mock setup, we don't nullify _ordersCache
+    _orderDetailsCache.clear();
   }
 }

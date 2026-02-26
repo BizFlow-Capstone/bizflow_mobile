@@ -79,10 +79,7 @@ class _AppOtpInputState extends State<AppOtpInput> {
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        widget.length,
-        (index) => _buildOtpBox(index),
-      ),
+      children: List.generate(widget.length, (index) => _buildOtpBox(index)),
     );
   }
 
@@ -92,10 +89,7 @@ class _AppOtpInputState extends State<AppOtpInput> {
       height: 60,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        border: Border.all(
-          color: AppColors.divider,
-          width: 2,
-        ),
+        border: Border.all(color: AppColors.divider, width: 2),
         borderRadius: AppSpacing.borderRadiusMd,
       ),
       child: TextField(

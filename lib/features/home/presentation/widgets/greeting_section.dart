@@ -9,11 +9,7 @@ class GreetingSection extends StatelessWidget {
   final String? userName;
   final String? greeting;
 
-  const GreetingSection({
-    super.key,
-    this.userName,
-    this.greeting,
-  });
+  const GreetingSection({super.key, this.userName, this.greeting});
 
   @override
   Widget build(BuildContext context) {

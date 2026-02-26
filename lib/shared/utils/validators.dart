@@ -61,7 +61,9 @@ class Validators {
 
   static String? validateRequired(String? value, [String? fieldName]) {
     if (!isNotEmpty(value)) {
-      return fieldName != null ? '$fieldName is required' : 'This field is required';
+      return fieldName != null
+          ? '$fieldName is required'
+          : 'This field is required';
     }
     return null;
   }
@@ -106,9 +108,15 @@ class Validators {
     return null;
   }
 
-  static String? validateMinLength(String? value, int minLength, [String? fieldName]) {
+  static String? validateMinLength(
+    String? value,
+    int minLength, [
+    String? fieldName,
+  ]) {
     if (!isNotEmpty(value)) {
-      return fieldName != null ? '$fieldName is required' : 'This field is required';
+      return fieldName != null
+          ? '$fieldName is required'
+          : 'This field is required';
     }
     if (!hasMinLength(value!, minLength)) {
       return fieldName != null

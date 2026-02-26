@@ -196,9 +196,7 @@ class AppButton extends StatelessWidget {
       foregroundColor: AppColors.white,
       disabledBackgroundColor: AppColors.disabled,
       disabledForegroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -209,9 +207,7 @@ class AppButton extends StatelessWidget {
       foregroundColor: AppColors.white,
       disabledBackgroundColor: AppColors.disabled,
       disabledForegroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -222,9 +218,7 @@ class AppButton extends StatelessWidget {
       side: BorderSide(
         color: isDisabled ? AppColors.disabled : AppColors.primary,
       ),
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -232,9 +226,7 @@ class AppButton extends StatelessWidget {
   ButtonStyle _textStyle() {
     return TextButton.styleFrom(
       foregroundColor: AppColors.primary,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -245,9 +237,7 @@ class AppButton extends StatelessWidget {
       foregroundColor: AppColors.white,
       disabledBackgroundColor: AppColors.disabled,
       disabledForegroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }

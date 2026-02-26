@@ -115,8 +115,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                                 ),
                                 padding: const EdgeInsets.all(AppSpacing.sm),
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     // Location Logo
                                     Container(
@@ -142,8 +141,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                                     // Location Name
                                     Text(
                                       location.name,
-                                      style: AppTextStyles.labelSmall
-                                          .copyWith(
+                                      style: AppTextStyles.labelSmall.copyWith(
                                         color: isSelected
                                             ? AppColors.secondary
                                             : AppColors.textPrimary,
@@ -171,9 +169,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                         child: ElevatedButton.icon(
                           onPressed: widget.onAddLocation,
                           icon: const Icon(Icons.add),
-                          label: Text(
-                            l10n.translate('sidebar.add_location'),
-                          ),
+                          label: Text(l10n.translate('sidebar.add_location')),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.secondary,
                             foregroundColor: AppColors.white,
@@ -208,10 +204,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                         color: AppColors.secondary.withValues(alpha: 0.1),
                       ),
                       child: widget.userLogo != null
-                          ? Image.asset(
-                              widget.userLogo!,
-                              fit: BoxFit.cover,
-                            )
+                          ? Image.asset(widget.userLogo!, fit: BoxFit.cover)
                           : Image.asset(
                               'assets/images/logos/Bizflow.png',
                               fit: BoxFit.contain,
@@ -271,9 +264,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                           widget.onLogout();
                         },
                         icon: const Icon(Icons.logout),
-                        label: Text(
-                          l10n.translate('sidebar.logout'),
-                        ),
+                        label: Text(l10n.translate('sidebar.logout')),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.danger,
                           foregroundColor: AppColors.white,
@@ -304,10 +295,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
     return Material(
       color: Colors.transparent,
       child: ListTile(
-        leading: Icon(
-          icon,
-          color: AppColors.secondary,
-        ),
+        leading: Icon(icon, color: AppColors.secondary),
         title: Text(
           label,
           style: AppTextStyles.labelSmall.copyWith(

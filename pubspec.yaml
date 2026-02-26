@@ -53,6 +53,13 @@ dependencies:
 
   # Image & File Handling
   image_picker: ^1.0.7
+  file_picker: ^8.1.0
+
+  # Audio & Voice
+  record: ^6.2.0
+  audioplayers: ^6.5.1
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:

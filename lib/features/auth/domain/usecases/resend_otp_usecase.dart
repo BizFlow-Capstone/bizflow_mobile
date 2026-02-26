@@ -6,9 +6,7 @@ class ResendOtpUseCase {
 
   ResendOtpUseCase(this._repository);
 
-  Future<AuthResponse> call({
-    required String phone,
-  }) {
+  Future<AuthResponse> call({required String phone}) {
     return _repository.resendOtp(phone: phone);
   }
 }

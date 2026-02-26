@@ -32,8 +32,7 @@ class Throttler {
 
   void run(VoidCallback action) {
     final now = DateTime.now();
-    if (_lastExecution == null ||
-        now.difference(_lastExecution!) > delay) {
+    if (_lastExecution == null || now.difference(_lastExecution!) > delay) {
       _lastExecution = now;
       action();
     }
@@ -74,7 +73,12 @@ class AppLogger {
     }
   }
 
-  static void error(String message, {String? tag, Object? error, StackTrace? stackTrace}) {
+  static void error(
+    String message, {
+    String? tag,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     if (_enabled && kDebugMode) {
       final prefix = tag != null ? '[$tag] ' : '';
       debugPrint('🔴 ERROR: $prefix$message');
@@ -119,12 +123,20 @@ class StringUtils {
   /// Get initials from name
   static String getInitials(String name, {int count = 2}) {
     final words = name.trim().split(RegExp(r'\s+'));
-    final initials = words.take(count).map((word) => word[0].toUpperCase()).join();
+    final initials = words
+        .take(count)
+        .map((word) => word[0].toUpperCase())
+        .join();
     return initials;
   }
 
   /// Mask string (e.g., email, phone)
-  static String mask(String text, {int visibleStart = 3, int visibleEnd = 3, String maskChar = '*'}) {
+  static String mask(
+    String text, {
+    int visibleStart = 3,
+    int visibleEnd = 3,
+    String maskChar = '*',
+  }) {
     if (text.length <= visibleStart + visibleEnd) return text;
     final start = text.substring(0, visibleStart);
     final end = text.substring(text.length - visibleEnd);

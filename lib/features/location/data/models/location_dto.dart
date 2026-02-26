@@ -59,21 +59,25 @@ class LocationDto {
   factory LocationDto.fromJson(Map<String, dynamic> json) {
     // Handle id as either int or String from API
     final dynamic idValue = json['id'];
-    final int parsedId = idValue is int 
-        ? idValue 
+    final int parsedId = idValue is int
+        ? idValue
         : (idValue is String ? int.tryParse(idValue) ?? 0 : 0);
-    
+
     // Parse employeeIds from array (API might return employee objects or IDs)
     final List<String> employeeIds = [];
     final employees = json['employees'] as List<dynamic>?;
     if (employees != null) {
       employeeIds.addAll(
         employees
-            .map((e) => e is Map ? (e['userId'] ?? e['id'] ?? '').toString() : e.toString())
+            .map(
+              (e) => e is Map
+                  ? (e['userId'] ?? e['id'] ?? '').toString()
+                  : e.toString(),
+            )
             .where((id) => id.isNotEmpty),
       );
     }
-    
+
     return LocationDto(
       id: parsedId,
       name: json['name'] as String? ?? '',

@@ -35,15 +35,13 @@ extension ContextExtension on BuildContext {
   void pop<T>([T? result]) => Navigator.of(this).pop(result);
 
   Future<T?> push<T>(Widget page) {
-    return Navigator.of(this).push<T>(
-      MaterialPageRoute(builder: (_) => page),
-    );
+    return Navigator.of(this).push<T>(MaterialPageRoute(builder: (_) => page));
   }
 
   Future<T?> pushReplacement<T>(Widget page) {
-    return Navigator.of(this).pushReplacement<T, dynamic>(
-      MaterialPageRoute(builder: (_) => page),
-    );
+    return Navigator.of(
+      this,
+    ).pushReplacement<T, dynamic>(MaterialPageRoute(builder: (_) => page));
   }
 
   Future<T?> pushNamed<T>(String routeName, {Object? arguments}) {
@@ -51,10 +49,9 @@ extension ContextExtension on BuildContext {
   }
 
   Future<T?> pushReplacementNamed<T>(String routeName, {Object? arguments}) {
-    return Navigator.of(this).pushReplacementNamed<T, dynamic>(
-      routeName,
-      arguments: arguments,
-    );
+    return Navigator.of(
+      this,
+    ).pushReplacementNamed<T, dynamic>(routeName, arguments: arguments);
   }
 
   Future<T?> pushNamedAndRemoveUntil<T>(

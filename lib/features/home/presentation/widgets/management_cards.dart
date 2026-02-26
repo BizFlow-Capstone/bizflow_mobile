@@ -75,10 +75,7 @@ class _ManagementCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: AppColors.divider,
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.divider, width: 1),
         ),
         child: Row(
           children: [
@@ -90,13 +87,7 @@ class _ManagementCard extends StatelessWidget {
                 color: iconColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Center(
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 28,
-                ),
-              ),
+              child: Center(child: Icon(icon, color: iconColor, size: 28)),
             ),
             SizedBox(width: AppSpacing.md),
             // Content

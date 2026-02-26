@@ -115,27 +115,18 @@ class AppDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusMd,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusMd),
       title: Row(
         children: [
           _buildIcon(),
           SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              title,
-              style: AppTextStyles.titleMedium,
-            ),
-          ),
+          Expanded(child: Text(title, style: AppTextStyles.titleMedium)),
         ],
       ),
-      content: content ??
+      content:
+          content ??
           (message != null
-              ? Text(
-                  message!,
-                  style: AppTextStyles.bodyMedium,
-                )
+              ? Text(message!, style: AppTextStyles.bodyMedium)
               : null),
       actions: _buildActions(context),
     );

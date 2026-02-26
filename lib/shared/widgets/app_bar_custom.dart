@@ -80,11 +80,7 @@ class _CustomAppBarState extends State<CustomAppBar> {
                 color: AppColors.secondary.withValues(alpha: 0.1),
               ),
               child: Center(
-                child: Icon(
-                  Icons.person,
-                  color: AppColors.secondary,
-                  size: 20,
-                ),
+                child: Icon(Icons.person, color: AppColors.secondary, size: 20),
               ),
             ),
             SizedBox(width: AppSpacing.sm),

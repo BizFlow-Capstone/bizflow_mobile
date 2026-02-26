@@ -56,7 +56,8 @@ class OrderDto extends Equatable {
   });
 
   bool get isDraft => status == 'DRAFT' || status == OrderStatus.draft.code;
-  bool get isPending => status == 'PENDING' || status == OrderStatus.pending.code;
+  bool get isPending =>
+      status == 'PENDING' || status == OrderStatus.pending.code;
   bool get isPublished =>
       status == 'PUBLISHED' || status == OrderStatus.published.code;
   bool get isCancelled =>
@@ -68,8 +69,11 @@ class OrderDto extends Equatable {
       locationId: json['locationId'] as String? ?? '',
       locationName: json['locationName'] as String? ?? '',
       status: json['status'] as String? ?? 'DRAFT',
-      items: (json['items'] as List<dynamic>?)
-              ?.map((item) => OrderItemDto.fromJson(item as Map<String, dynamic>))
+      items:
+          (json['items'] as List<dynamic>?)
+              ?.map(
+                (item) => OrderItemDto.fromJson(item as Map<String, dynamic>),
+              )
               .toList() ??
           [],
       subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
@@ -145,21 +149,21 @@ class OrderDto extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        locationId,
-        locationName,
-        status,
-        items,
-        subtotal,
-        discountAmount,
-        taxAmount,
-        totalAmount,
-        note,
-        createdAt,
-        updatedAt,
-        invoiceNumber,
-        invoicedAt,
-      ];
+    id,
+    locationId,
+    locationName,
+    status,
+    items,
+    subtotal,
+    discountAmount,
+    taxAmount,
+    totalAmount,
+    note,
+    createdAt,
+    updatedAt,
+    invoiceNumber,
+    invoicedAt,
+  ];
 }
 
 /// Order Response DTO - API response wrapper
@@ -178,7 +182,8 @@ class OrderResponseDto extends Equatable {
 
   factory OrderResponseDto.fromJson(Map<String, dynamic> json) {
     return OrderResponseDto(
-      orders: (json['data'] as List<dynamic>?)
+      orders:
+          (json['data'] as List<dynamic>?)
               ?.map((order) => OrderDto.fromJson(order as Map<String, dynamic>))
               .toList() ??
           [],

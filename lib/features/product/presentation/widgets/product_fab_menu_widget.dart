@@ -32,12 +32,10 @@ class ProductFabMenuWidget extends StatelessWidget {
           Positioned.fill(
             child: GestureDetector(
               onTap: onToggle,
-              child: Container(
-                color: Colors.transparent,
-              ),
+              child: Container(color: Colors.transparent),
             ),
           ),
-        
+
         // Menu items container
         if (isOpen)
           Positioned(
@@ -91,18 +89,22 @@ class ProductFabMenuWidget extends StatelessWidget {
                                   ),
                                   SizedBox(width: AppSpacing.lg),
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         l10n.translate('product.add_product'),
-                                        style: AppTextStyles.bodyMedium.copyWith(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                       ),
                                       SizedBox(height: AppSpacing.xs),
                                       Text(
-                                        l10n.translate('product.create_product_option'),
+                                        l10n.translate(
+                                          'product.create_product_option',
+                                        ),
                                         style: AppTextStyles.bodySmall.copyWith(
                                           color: AppColors.textSecondary,
                                         ),
@@ -115,7 +117,7 @@ class ProductFabMenuWidget extends StatelessWidget {
                             ),
                           ),
                         ),
-                        
+
                         // Divider
                         Divider(
                           color: AppColors.divider,
@@ -123,7 +125,7 @@ class ProductFabMenuWidget extends StatelessWidget {
                           indent: AppSpacing.lg,
                           endIndent: AppSpacing.lg,
                         ),
-                        
+
                         // Import Inventory Option
                         Material(
                           color: Colors.transparent,
@@ -150,14 +152,18 @@ class ProductFabMenuWidget extends StatelessWidget {
                                   ),
                                   SizedBox(width: AppSpacing.lg),
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        l10n.translate('product.import_inventory'),
-                                        style: AppTextStyles.bodyMedium.copyWith(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w500,
+                                        l10n.translate(
+                                          'product.import_inventory',
                                         ),
+                                        style: AppTextStyles.bodyMedium
+                                            .copyWith(
+                                              color: AppColors.textPrimary,
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                       ),
                                       SizedBox(height: AppSpacing.xs),
                                       Text(
@@ -181,7 +187,7 @@ class ProductFabMenuWidget extends StatelessWidget {
               },
             ),
           ),
-        
+
         // Main FAB Button
         Positioned(
           bottom: 16,

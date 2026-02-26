@@ -26,15 +26,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     // Handle Signup Events
     on<SignupRequested>(_onSignupRequested);
     on<GoogleSignupRequested>(_onGoogleSignupRequested);
-    
+
     // Handle Login Events
     on<LoginRequested>(_onLoginRequested);
     on<GoogleLoginRequested>(_onGoogleLoginRequested);
-    
+
     // Handle OTP Events
     on<VerifyOtpRequested>(_onVerifyOtpRequested);
     on<ResendOtpRequested>(_onResendOtpRequested);
-    
+
     // Handle General Events
     on<LogoutRequested>(_onLogoutRequested);
     on<ClearAuthError>(_onClearAuthError);
@@ -54,7 +54,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   email: event.email,
       //   password: event.password,
       // );
-      
+
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       emit(SignupSuccess(phoneNumber: event.phone));
@@ -77,7 +77,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   email: event.email,
       //   name: event.name,
       // );
-      
+
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       emit(SignupSuccess(phoneNumber: '+84123456789'));
@@ -99,13 +99,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   phone: event.phone.isNotEmpty ? event.phone : null,
       //   password: event.password,
       // );
-      
+
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
-      emit(LoginSuccess(
-        token: 'mock_token_123',
-        user: {'id': '1', 'email': event.email, 'phone': event.phone},
-      ));
+      emit(
+        LoginSuccess(
+          token: 'mock_token_123',
+          user: {'id': '1', 'email': event.email, 'phone': event.phone},
+        ),
+      );
     } catch (e) {
       emit(const LoginFailure(errorCode: AuthErrorCode.loginFailed));
     }
@@ -122,13 +124,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // final result = await _authRepository.googleLogin(
       //   idToken: event.idToken,
       // );
-      
+
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
-      emit(LoginSuccess(
-        token: 'mock_google_token_123',
-        user: {'id': '1', 'email': 'user@google.com'},
-      ));
+      emit(
+        LoginSuccess(
+          token: 'mock_google_token_123',
+          user: {'id': '1', 'email': 'user@google.com'},
+        ),
+      );
     } catch (e) {
       emit(const LoginFailure(errorCode: AuthErrorCode.loginFailed));
     }
@@ -146,16 +150,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       //   phone: event.phone,
       //   otpCode: event.otpCode,
       // );
-      
+
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
       if (event.otpCode == '000000') {
         emit(const OtpVerificationFailure(errorCode: AuthErrorCode.invalidOtp));
       } else {
-        emit(OtpVerificationSuccess(
-          token: 'mock_token_after_otp',
-          user: {'id': '1', 'phone': event.phone, 'verified': true},
-        ));
+        emit(
+          OtpVerificationSuccess(
+            token: 'mock_token_after_otp',
+            user: {'id': '1', 'phone': event.phone, 'verified': true},
+          ),
+        );
       }
     } catch (e) {
       emit(const OtpVerificationFailure(errorCode: AuthErrorCode.otpFailed));
@@ -172,7 +178,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // final result = await _authRepository.resendOtp(
       //   phone: event.phone,
       // );
-      
+
       // Mock success - just show success message in UI
       await Future.delayed(const Duration(seconds: 1));
     } catch (e) {
@@ -188,7 +194,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       // TODO: Call repository to logout
       // await _authRepository.logout();
-      
+
       // Mock success
       emit(AuthUnauthenticated());
     } catch (e) {
@@ -197,10 +203,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   /// Handle Clear Error
-  void _onClearAuthError(
-    ClearAuthError event,
-    Emitter<AuthState> emit,
-  ) {
+  void _onClearAuthError(ClearAuthError event, Emitter<AuthState> emit) {
     emit(AuthInitial());
   }
 }

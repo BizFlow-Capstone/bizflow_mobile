@@ -52,4 +52,3 @@ class GlobalAppBarNotifier extends ChangeNotifier {
     notifyListeners();
   }
 }
-

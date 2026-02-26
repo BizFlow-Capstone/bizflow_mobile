@@ -282,8 +282,7 @@ class ApiClient {
       if ((response.statusCode == 307 || response.statusCode == 308) &&
           response.headers['location'] != null) {
         final redirectUrl = response.headers['location']!.first;
-        debugPrint(
-            'Redirect detected: ${response.statusCode} -> $redirectUrl');
+        debugPrint('Redirect detected: ${response.statusCode} -> $redirectUrl');
 
         // Create a new request to the redirect location
         final redirectUri = Uri.parse(redirectUrl);
@@ -306,9 +305,10 @@ class ApiClient {
         }
 
         // Send redirect request
-        final redirectResponse =
-            await redirectRequest.close().timeout(timeout);
-        final redirectBody = await redirectResponse.transform(utf8.decoder).join();
+        final redirectResponse = await redirectRequest.close().timeout(timeout);
+        final redirectBody = await redirectResponse
+            .transform(utf8.decoder)
+            .join();
 
         // Parse redirect response
         dynamic jsonRedirectResponse;
@@ -320,7 +320,10 @@ class ApiClient {
 
         // Apply response interceptors to redirect response
         for (final interceptor in responseInterceptors) {
-          await interceptor.onResponse(redirectResponse.statusCode, jsonRedirectResponse);
+          await interceptor.onResponse(
+            redirectResponse.statusCode,
+            jsonRedirectResponse,
+          );
         }
 
         // Check redirect response status
@@ -329,12 +332,17 @@ class ApiClient {
           final data = parser != null
               ? parser(jsonRedirectResponse)
               : jsonRedirectResponse as T?;
-          return ApiResponse.success(data as T,
-              statusCode: redirectResponse.statusCode);
+          return ApiResponse.success(
+            data as T,
+            statusCode: redirectResponse.statusCode,
+          );
         } else {
           final error = ApiException(
             statusCode: redirectResponse.statusCode,
-            message: _getErrorMessage(redirectResponse.statusCode, jsonRedirectResponse),
+            message: _getErrorMessage(
+              redirectResponse.statusCode,
+              jsonRedirectResponse,
+            ),
             data: jsonRedirectResponse,
           );
 

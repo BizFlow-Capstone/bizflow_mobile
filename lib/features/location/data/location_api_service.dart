@@ -154,10 +154,10 @@ class LocationApiService {
       debugPrint('LocationId: $locationId (Type: ${locationId.runtimeType})');
       debugPrint('isActive: $isActive');
       debugPrint('URL: ${ApiEndpoints.updateLocationStatus(locationId)}');
-      
+
       final body = UpdateStatusRequestDto(isActive: isActive).toJson();
       debugPrint('Request Body: $body');
-      
+
       final response = await _apiClient.put(
         ApiEndpoints.updateLocationStatus(locationId),
         body: body,
@@ -175,13 +175,17 @@ class LocationApiService {
         throw Exception(response.message ?? 'Failed to update status');
       }
     } on ApiException catch (e) {
-      debugPrint('ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}');
+      debugPrint(
+        'ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}',
+      );
       if (e.statusCode == 403) {
         throw Exception('Permission denied: You are not the owner');
       } else if (e.statusCode == 404) {
         throw Exception('Location not found');
       } else if (e.statusCode == 307) {
-        throw Exception('Server redirect error (307) - Check backend configuration and URL format');
+        throw Exception(
+          'Server redirect error (307) - Check backend configuration and URL format',
+        );
       }
       throw Exception('Error updating status: ${e.message}');
     } catch (e) {
@@ -205,7 +209,7 @@ class LocationApiService {
       debugPrint('URL: ${ApiEndpoints.updateLocation(locationId)}');
       final body = request.toJson();
       debugPrint('Request Body: $body');
-      
+
       final response = await _apiClient.put(
         ApiEndpoints.updateLocation(locationId),
         body: body,
@@ -243,7 +247,9 @@ class LocationApiService {
       } else if (e.statusCode == 403) {
         throw Exception('Permission denied: You are not the owner');
       } else if (e.statusCode == 307) {
-        throw Exception('Server redirect error (307) - Check backend configuration');
+        throw Exception(
+          'Server redirect error (307) - Check backend configuration',
+        );
       }
       throw Exception('Error updating location: ${e.message}');
     } catch (e) {
@@ -268,7 +274,7 @@ class LocationApiService {
       debugPrint('Employee IDs: $employeeIds');
       debugPrint('Employee IDs Count: ${employeeIds.length}');
       debugPrint('Request Body Type: ${employeeIds.runtimeType}');
-      
+
       final response = await _apiClient.post(
         ApiEndpoints.addEmployeesToLocation(locationId),
         body: employeeIds,
@@ -286,7 +292,9 @@ class LocationApiService {
         throw Exception(response.message ?? 'Failed to add employees');
       }
     } on ApiException catch (e) {
-      debugPrint('ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}');
+      debugPrint(
+        'ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}',
+      );
       if (e.statusCode == 400) {
         throw Exception('Invalid request: ${e.message}');
       } else if (e.statusCode == 404) {
@@ -294,7 +302,9 @@ class LocationApiService {
       } else if (e.statusCode == 403) {
         throw Exception('Permission denied: You are not the owner');
       } else if (e.statusCode == 307) {
-        throw Exception('Server redirect error (307) - Check backend node configuration');
+        throw Exception(
+          'Server redirect error (307) - Check backend node configuration',
+        );
       }
       throw Exception('Error adding employees: ${e.message}');
     } catch (e) {

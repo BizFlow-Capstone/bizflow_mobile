@@ -15,7 +15,6 @@ class AppColors {
   static const Color secondaryLight = Color(0xFF64D8CB);
   static const Color secondaryDark = Color(0xFF00766C);
 
-
   // Semantic
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFF9800);

@@ -270,14 +270,26 @@ class _AddProductPageState extends State<AddProductPage> {
       AddProductRequested(
         locationId: widget.locationId,
         productName: _productNameController.text,
-            barcode: _barcodeController.text.isNotEmpty ? _barcodeController.text : null,
-            category: _categoryController.text.isNotEmpty ? _categoryController.text : null,
-            costPrice: _costPriceController.text.isNotEmpty ? double.tryParse(_costPriceController.text) : null,
-            salePrice: _salePriceController.text.isNotEmpty ? double.tryParse(_salePriceController.text) : null,
-            quantity: _quantityController.text.isNotEmpty ? int.tryParse(_quantityController.text) : null,
+        barcode: _barcodeController.text.isNotEmpty
+            ? _barcodeController.text
+            : null,
+        category: _categoryController.text.isNotEmpty
+            ? _categoryController.text
+            : null,
+        costPrice: _costPriceController.text.isNotEmpty
+            ? double.tryParse(_costPriceController.text)
+            : null,
+        salePrice: _salePriceController.text.isNotEmpty
+            ? double.tryParse(_salePriceController.text)
+            : null,
+        quantity: _quantityController.text.isNotEmpty
+            ? int.tryParse(_quantityController.text)
+            : null,
         unit: _unitController.text.isNotEmpty ? _unitController.text : null,
         isActive: _isActive,
-            description: _descriptionController.text.isNotEmpty ? _descriptionController.text : null,
+        description: _descriptionController.text.isNotEmpty
+            ? _descriptionController.text
+            : null,
         imagePath: _selectedImagePath,
         priceTiers: _priceTiers,
       ),

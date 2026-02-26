@@ -1,11 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 /// FCM Message type
-enum FcmMessageType {
-  notification,
-  data,
-  both,
-}
+enum FcmMessageType { notification, data, both }
 
 /// FCM Message model
 class FcmMessage {
@@ -14,12 +10,7 @@ class FcmMessage {
   final Map<String, dynamic>? data;
   final FcmMessageType type;
 
-  FcmMessage({
-    this.title,
-    this.body,
-    this.data,
-    required this.type,
-  });
+  FcmMessage({this.title, this.body, this.data, required this.type});
 
   factory FcmMessage.fromMap(Map<String, dynamic> map) {
     final notification = map['notification'] as Map<String, dynamic>?;
