@@ -7,9 +7,11 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/formatters.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
+import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 
 /// Edit Product Page
 /// SC-PRO-02: Chỉnh sửa sản phẩm
@@ -162,8 +164,11 @@ class _EditProductPageState extends State<EditProductPage> {
           tier['unit']?.toString() ?? tier['Unit']?.toString() ?? '';
       quantityController.text =
           tier['quantity']?.toString() ?? tier['Quantity']?.toString() ?? '';
-      priceController.text =
-          tier['price']?.toString() ?? tier['Price']?.toString() ?? '';
+
+      final dynamic rawPrice = tier['price'] ?? tier['Price'];
+      priceController.text = rawPrice != null
+          ? CurrencyFormatter.formatNumber(rawPrice)
+          : '';
     }
 
     showDialog(
@@ -199,10 +204,10 @@ class _EditProductPageState extends State<EditProductPage> {
               TextField(
                 controller: priceController,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [CurrencyInputFormatter()],
                 decoration: InputDecoration(
                   labelText: l10n.translate('product.price'),
-                  hintText: '120000',
+                  hintText: '120,000',
                 ),
               ),
             ],
@@ -240,7 +245,11 @@ class _EditProductPageState extends State<EditProductPage> {
               }
 
               final quantity = int.tryParse(quantityController.text) ?? 0;
-              final price = int.tryParse(priceController.text) ?? 0;
+              final price =
+                  int.tryParse(
+                    priceController.text.replaceAll(RegExp(r'[,.]'), ''),
+                  ) ??
+                  0;
 
               if (quantity <= 0 || price < 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -629,7 +638,7 @@ class _EditProductPageState extends State<EditProductPage> {
                 SizedBox(height: AppSpacing.lg),
 
                 // Barcode
-                _buildTextFieldWithLabel(
+                _buildBarcodeFieldWithScanner(
                   label: l10n.translate('product.barcode'),
                   controller: _barcodeController,
                   hint: l10n.translate('product.barcode_hint'),
@@ -665,6 +674,7 @@ class _EditProductPageState extends State<EditProductPage> {
                         controller: _costPriceController,
                         hint: '0',
                         keyboardType: TextInputType.number,
+                        inputFormatters: [CurrencyInputFormatter()],
                       ),
                     ),
                     SizedBox(width: AppSpacing.md),
@@ -674,6 +684,7 @@ class _EditProductPageState extends State<EditProductPage> {
                         controller: _salePriceController,
                         hint: '0',
                         keyboardType: TextInputType.number,
+                        inputFormatters: [CurrencyInputFormatter()],
                       ),
                     ),
                   ],
@@ -754,7 +765,7 @@ class _EditProductPageState extends State<EditProductPage> {
                                           ),
                                           SizedBox(height: AppSpacing.xs),
                                           Text(
-                                            'Giá: ${tier['price'] ?? tier['Price']}đ',
+                                            'Giá: ${CurrencyFormatter.formatVND(((tier['price'] ?? tier['Price']) as num).toDouble())}',
                                             style: AppTextStyles.bodySmall
                                                 .copyWith(
                                                   color: AppColors.secondary,
@@ -904,6 +915,7 @@ class _EditProductPageState extends State<EditProductPage> {
     bool isRequired = false,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -930,6 +942,7 @@ class _EditProductPageState extends State<EditProductPage> {
           controller: controller,
           keyboardType: keyboardType,
           maxLines: maxLines,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             hintText: hint,
             border: OutlineInputBorder(
@@ -947,6 +960,63 @@ class _EditProductPageState extends State<EditProductPage> {
             contentPadding: EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
               vertical: AppSpacing.md,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBarcodeFieldWithScanner({
+    required String label,
+    required TextEditingController controller,
+    required String hint,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+          ),
+        ),
+        SizedBox(height: AppSpacing.sm),
+        TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: hint,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.divider),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.divider),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.secondary),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.md,
+            ),
+            suffixIcon: IconButton(
+              icon: Icon(Icons.qr_code_scanner, color: AppColors.secondary),
+              onPressed: () async {
+                var res = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SimpleBarcodeScannerPage(),
+                  ),
+                );
+                if (res is String && res != '-1' && res.isNotEmpty) {
+                  setState(() {
+                    controller.text = res;
+                  });
+                }
+              },
             ),
           ),
         ),

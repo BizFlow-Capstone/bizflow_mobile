@@ -70,6 +70,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       final response = await repository.getProducts(
         locationId: int.tryParse(event.locationId),
         name: _searchQuery,
+        sku: _searchQuery,
         status: _filterStatus,
       );
 
@@ -105,6 +106,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       final response = await repository.getProducts(
         locationId: int.tryParse(event.locationId),
         name: _searchQuery,
+        sku: _searchQuery,
         status: _filterStatus,
       );
 
@@ -145,6 +147,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       final response = await repository.getProducts(
         locationId: int.tryParse(event.locationId),
         name: _searchQuery,
+        sku: _searchQuery,
         status: _filterStatus,
         pageNumber: nextPage,
       );

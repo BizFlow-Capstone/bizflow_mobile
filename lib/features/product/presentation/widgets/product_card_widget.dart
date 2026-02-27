@@ -4,6 +4,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/formatters.dart';
 import '../../domain/entities/product_entity.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
@@ -150,7 +151,7 @@ class ProductCardWidget extends StatelessWidget {
                     SizedBox(height: AppSpacing.xs),
                     Text(
                       product.salePrice != null
-                          ? '${product.salePrice?.toStringAsFixed(0)}đ'
+                          ? CurrencyFormatter.formatVND(product.salePrice)
                           : 'N/A',
                       style: AppTextStyles.titleSmall.copyWith(
                         color: AppColors.textPrimary,

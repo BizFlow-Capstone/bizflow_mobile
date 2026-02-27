@@ -78,10 +78,11 @@ class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
                 ),
                 TextButton(
                   onPressed: () {
-                    setState(() {
-                      _selectedStatus = null;
-                      _selectedCategory = null;
-                      _selectedSort = null;
+                    // Instantly clear and apply
+                    Navigator.pop(context, {
+                      'status': null,
+                      'category': null,
+                      'sort': null,
                     });
                   },
                   child: Text(l10n.translate('product.reset_filters')),

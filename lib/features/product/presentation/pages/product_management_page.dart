@@ -232,6 +232,17 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         vertical: AppSpacing.md,
                         horizontal: AppSpacing.md,
                       ),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                });
+                                _searchProducts('');
+                              },
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -284,6 +295,61 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                 ),
               ],
             ),
+          ),
+          // Active Filters Indicator
+          BlocBuilder<ProductBloc, ProductState>(
+            builder: (context, state) {
+              if (state is ProductsLoaded &&
+                  (state.filterStatus != null ||
+                      state.filterCategory != null ||
+                      state.sortBy != null)) {
+                return Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.filter_alt,
+                        size: 16,
+                        color: AppColors.secondary,
+                      ),
+                      SizedBox(width: AppSpacing.xs),
+                      Text(
+                        l10n.translate('product.active_filters'),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          context.read<ProductBloc>().add(
+                            ClearFiltersRequested(
+                              locationId: widget.locationId,
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          l10n.translate('product.clear_filters'),
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
           ),
           // Products List
           Expanded(

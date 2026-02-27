@@ -1,15 +1,12 @@
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 /// Currency Formatter - Format currency values
 class CurrencyFormatter {
   CurrencyFormatter._();
 
-  // Vietnam Dong
-  static final _vndFormat = NumberFormat.currency(
-    locale: 'vi_VN',
-    symbol: '₫',
-    decimalDigits: 0,
-  );
+  // Custom VN Format (using en_US to get commas as thousand separators)
+  static final _customVndFormat = NumberFormat('#,###', 'en_US');
 
   // US Dollar
   static final _usdFormat = NumberFormat.currency(
@@ -18,13 +15,13 @@ class CurrencyFormatter {
     decimalDigits: 2,
   );
 
-  // Number format (no currency symbol)
-  static final _numberFormat = NumberFormat('#,###', 'vi_VN');
+  // Number format (with commas)
+  static final _numberFormat = NumberFormat('#,###', 'en_US');
 
-  /// Format to VND
+  /// Format to VND (e.g. 65,000đ)
   static String formatVND(num? amount) {
-    if (amount == null) return '0 ₫';
-    return _vndFormat.format(amount);
+    if (amount == null) return '0đ';
+    return '${_customVndFormat.format(amount)}đ';
   }
 
   /// Format to USD
@@ -80,5 +77,36 @@ class NumberUtils {
   /// Check if value is between range
   static bool isBetween(num value, num min, num max) {
     return value >= min && value <= max;
+  }
+}
+
+/// Currency Input Formatter for TextFields
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    // Remove any non-digit characters
+    final cleanedText = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+    if (cleanedText.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+
+    final number = int.tryParse(cleanedText) ?? 0;
+
+    // Format the number with commas
+    final newText = NumberFormat('#,###', 'en_US').format(number);
+
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(
+        offset: newText.length,
+      ), // Always put cursor at the end
+    );
   }
 }
