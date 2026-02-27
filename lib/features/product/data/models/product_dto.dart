@@ -37,6 +37,8 @@ class ProductDto {
   final String? imageUrl;
   final int? locationId;
   final String? businessTypeId;
+  final String? manufacturer;
+  final List<Map<String, dynamic>> saleItems;
 
   ProductDto({
     required this.id,
@@ -47,6 +49,8 @@ class ProductDto {
     this.imageUrl,
     this.locationId,
     this.businessTypeId,
+    this.manufacturer,
+    this.saleItems = const [],
   });
 
   factory ProductDto.fromJson(Map<String, dynamic> json) {
@@ -88,6 +92,12 @@ class ProductDto {
       locationId: json['locationId'] as int? ?? json['LocationId'] as int?,
       businessTypeId:
           (json['businessTypeId'] ?? json['BusinessTypeId']) as String?,
+      manufacturer: (json['manufacturer'] ?? json['Manufacturer']) as String?,
+      saleItems:
+          (json['saleItems'] as List<dynamic>?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          const [],
     );
   }
 

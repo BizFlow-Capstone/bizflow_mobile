@@ -169,6 +169,7 @@ class CreateImportRequest {
   final String note;
   final DateTime? receivedAt;
   final bool saveAsDraft;
+  final String? imagePath;
   final List<ImportItemModel> items;
 
   CreateImportRequest({
@@ -178,6 +179,7 @@ class CreateImportRequest {
     required this.note,
     this.receivedAt,
     required this.saveAsDraft,
+    this.imagePath,
     required this.items,
   });
 
@@ -189,6 +191,7 @@ class CreateImportRequest {
       'note': note,
       if (receivedAt != null) 'receivedAt': receivedAt!.toIso8601String(),
       'saveAsDraft': saveAsDraft,
+      if (imagePath != null) 'imagePath': imagePath,
       'items': items.map((e) => e.toJson()).toList(),
     };
   }

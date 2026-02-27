@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/localization/app_localizations.dart';
@@ -63,6 +64,9 @@ class _StockImportViewState extends State<_StockImportView> {
   // Selected products for import
   List<ImportItemModel> _selectedItems = [];
 
+  String? _selectedImagePath;
+  final ImagePicker _imagePicker = ImagePicker();
+
   late TextEditingController _noteController;
   late TextEditingController _supplierController;
   late TextEditingController _searchController;
@@ -83,6 +87,32 @@ class _StockImportViewState extends State<_StockImportView> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImagePath = pickedFile.path;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${l10n.translate('common.image_selected')}: ${pickedFile.name}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${l10n.translate('common.error')}: $e')),
+      );
+    }
+  }
+
   AppLocalizations get l10n => AppLocalizations.of(context);
 
   void _onSaveDraft() {
@@ -99,6 +129,7 @@ class _StockImportViewState extends State<_StockImportView> {
         note: _noteController.text,
         receivedAt: null,
         saveAsDraft: true,
+        imagePath: _selectedImagePath,
         items: _selectedItems,
       );
       context.read<ImportActionBloc>().add(CreateImportEvent(req));
@@ -148,6 +179,7 @@ class _StockImportViewState extends State<_StockImportView> {
                   note: _noteController.text,
                   receivedAt: DateTime.now(),
                   saveAsDraft: false,
+                  imagePath: _selectedImagePath,
                   items: _selectedItems,
                 );
                 context.read<ImportActionBloc>().add(CreateImportEvent(req));
@@ -539,6 +571,52 @@ class _StockImportViewState extends State<_StockImportView> {
                     ],
                   ),
                   SizedBox(height: AppSpacing.md),
+                  if (_hasInvoice) ...[
+                    Text(
+                      l10n.translate('stock_import.invoice_image'),
+                      style: AppTextStyles.titleSmall.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.sm),
+                    GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        width: double.infinity,
+                        height: 120,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(8),
+                          color: AppColors.background,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.camera_alt_outlined,
+                              size: 32,
+                              color: AppColors.textSecondary,
+                            ),
+                            SizedBox(height: AppSpacing.xs),
+                            Text(
+                              _selectedImagePath != null
+                                  ? _selectedImagePath!.split('/').last
+                                  : l10n.translate(
+                                      'stock_import.upload_invoice',
+                                    ),
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: _selectedImagePath != null
+                                    ? AppColors.secondary
+                                    : AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                  ],
                 ],
                 TextField(
                   controller: _supplierController,

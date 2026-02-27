@@ -25,44 +25,47 @@ class _AddProductPageState extends State<AddProductPage> {
   // Form controllers
   late TextEditingController _productNameController;
   late TextEditingController _barcodeController;
-  late TextEditingController _categoryController;
   late TextEditingController _costPriceController;
   late TextEditingController _salePriceController;
   late TextEditingController _quantityController;
   late TextEditingController _unitController;
   late TextEditingController _descriptionController;
+  late TextEditingController _manufacturerController;
 
   // Image and price tiers
   String? _selectedImagePath;
   List<Map<String, dynamic>> _priceTiers = [];
 
   bool _isActive = true;
+  String? _selectedBusinessTypeId;
 
   final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
+    // Load business types when page opens
+    context.read<ProductBloc>().add(const LoadBusinessTypesRequested());
     _productNameController = TextEditingController();
     _barcodeController = TextEditingController();
-    _categoryController = TextEditingController();
     _costPriceController = TextEditingController();
     _salePriceController = TextEditingController();
     _quantityController = TextEditingController();
     _unitController = TextEditingController();
     _descriptionController = TextEditingController();
+    _manufacturerController = TextEditingController();
   }
 
   @override
   void dispose() {
     _productNameController.dispose();
     _barcodeController.dispose();
-    _categoryController.dispose();
     _costPriceController.dispose();
     _salePriceController.dispose();
     _quantityController.dispose();
     _unitController.dispose();
     _descriptionController.dispose();
+    _manufacturerController.dispose();
     super.dispose();
   }
 
@@ -266,6 +269,18 @@ class _AddProductPageState extends State<AddProductPage> {
       return;
     }
 
+    if (_selectedBusinessTypeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n?.translate('common.required_field') ??
+                'Vui lòng chọn loại hình kinh doanh',
+          ),
+        ),
+      );
+      return;
+    }
+
     context.read<ProductBloc>().add(
       AddProductRequested(
         locationId: widget.locationId,
@@ -273,25 +288,30 @@ class _AddProductPageState extends State<AddProductPage> {
         barcode: _barcodeController.text.isNotEmpty
             ? _barcodeController.text
             : null,
-        category: _categoryController.text.isNotEmpty
-            ? _categoryController.text
-            : null,
         costPrice: _costPriceController.text.isNotEmpty
-            ? double.tryParse(_costPriceController.text)
+            ? double.tryParse(
+                _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
+              )
             : null,
         salePrice: _salePriceController.text.isNotEmpty
-            ? double.tryParse(_salePriceController.text)
+            ? double.tryParse(
+                _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
+              )
             : null,
         quantity: _quantityController.text.isNotEmpty
             ? int.tryParse(_quantityController.text)
             : null,
         unit: _unitController.text.isNotEmpty ? _unitController.text : null,
         isActive: _isActive,
+        manufacturer: _manufacturerController.text.isNotEmpty
+            ? _manufacturerController.text
+            : null,
         description: _descriptionController.text.isNotEmpty
             ? _descriptionController.text
             : null,
         imagePath: _selectedImagePath,
         priceTiers: _priceTiers,
+        businessTypeId: _selectedBusinessTypeId,
       ),
     );
   }
@@ -328,13 +348,9 @@ class _AddProductPageState extends State<AddProductPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.translate('product.add_success'))),
             );
-            // Reload product list
-            context.read<ProductBloc>().add(
-              LoadProductsByLocationRequested(locationId: widget.locationId),
-            );
-            // Navigate back
+            // Navigate back and return true to trigger reload
             Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) Navigator.pop(context);
+              if (mounted) Navigator.pop(context, true);
             });
           } else if (state is ProductFailure) {
             ScaffoldMessenger.of(
@@ -446,12 +462,16 @@ class _AddProductPageState extends State<AddProductPage> {
                 ),
                 SizedBox(height: AppSpacing.lg),
 
-                // Category
-                _buildDropdownWithLabel(
-                  label: l10n.translate('product.category'),
-                  controller: _categoryController,
-                  hint: l10n.translate('product.category_hint'),
+                // Manufacturer
+                _buildTextFieldWithLabel(
+                  label: l10n.translate('product.manufacturer'),
+                  controller: _manufacturerController,
+                  hint: l10n.translate('product.manufacturer_hint'),
                 ),
+                SizedBox(height: AppSpacing.lg),
+
+                // Business Type Dropdown
+                _buildBusinessTypeDropdown(),
                 SizedBox(height: AppSpacing.lg),
 
                 // Price & Inventory Section
@@ -770,74 +790,71 @@ class _AddProductPageState extends State<AddProductPage> {
     );
   }
 
-  Widget _buildDropdownWithLabel({
-    required String label,
-    required TextEditingController controller,
-    required String hint,
-  }) {
+  Widget _buildBusinessTypeDropdown() {
     final l10n = AppLocalizations.of(context);
-    final categoryItems = [
-      l10n.translate('product.category_drinks'),
-      l10n.translate('product.category_food'),
-      l10n.translate('product.category_other'),
-    ];
+    return BlocBuilder<ProductBloc, ProductState>(
+      builder: (context, state) {
+        List<DropdownMenuItem<String>> typeItems = [];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(height: AppSpacing.sm),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.divider),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        if (state is BusinessTypesLoaded) {
+          typeItems = state.businessTypes.map((type) {
+            return DropdownMenuItem<String>(
+              value: type.businessTypeId,
+              child: Text(type.name),
+            );
+          }).toList();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  l10n.translate('product.business_type'),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  '*',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: AppSpacing.sm),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.divider),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     isExpanded: true,
-                    underline: const SizedBox.shrink(),
                     hint: Text(
-                      hint,
+                      l10n.translate('product.select_business_type'),
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textDisabled,
                       ),
                     ),
-                    value:
-                        controller.text.isNotEmpty &&
-                            categoryItems.contains(controller.text)
-                        ? controller.text
-                        : null,
-                    items: categoryItems
-                        .map(
-                          (item) =>
-                              DropdownMenuItem(value: item, child: Text(item)),
-                        )
-                        .toList(),
+                    value: _selectedBusinessTypeId,
+                    items: typeItems,
                     onChanged: (value) {
                       setState(() {
-                        controller.text = value ?? '';
+                        _selectedBusinessTypeId = value;
                       });
                     },
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(right: AppSpacing.md),
-                child: Icon(Icons.expand_more, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -81,8 +81,8 @@ class ProductDetailPage extends StatelessWidget {
           padding: EdgeInsets.only(right: AppSpacing.md),
           child: Center(
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
+              onTap: () async {
+                final result = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
                     builder: (context) => EditProductPage(
@@ -97,9 +97,15 @@ class ProductDetailPage extends StatelessWidget {
                       unit: product.unit,
                       description: product.description,
                       isActive: product.isActive,
+                      businessTypeId: product.businessTypeId,
+                      manufacturer: product.manufacturer,
                     ),
                   ),
                 );
+                if (result == true && context.mounted) {
+                  // Pop back to product management screen to reload the list
+                  Navigator.pop(context, true);
+                }
               },
               child: Text(
                 l10n?.translate('common.edit') ?? 'Chỉnh sửa',

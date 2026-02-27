@@ -25,6 +25,8 @@ class EditProductPage extends StatefulWidget {
   final String? unit;
   final String? description;
   final bool isActive;
+  final String? businessTypeId;
+  final String? manufacturer;
 
   const EditProductPage({
     super.key,
@@ -39,6 +41,8 @@ class EditProductPage extends StatefulWidget {
     this.unit,
     this.description,
     this.isActive = true,
+    this.businessTypeId,
+    this.manufacturer,
   });
 
   @override
@@ -49,12 +53,12 @@ class _EditProductPageState extends State<EditProductPage> {
   // Form controllers
   late TextEditingController _productNameController;
   late TextEditingController _barcodeController;
-  late TextEditingController _categoryController;
   late TextEditingController _costPriceController;
   late TextEditingController _salePriceController;
   late TextEditingController _quantityController;
   late TextEditingController _unitController;
   late TextEditingController _descriptionController;
+  late TextEditingController _manufacturerController;
 
   // Image and price tiers
   String? _selectedImagePath;
@@ -62,6 +66,7 @@ class _EditProductPageState extends State<EditProductPage> {
   bool _removeImage = false;
 
   late bool _isActive;
+  String? _selectedBusinessTypeId;
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -72,7 +77,6 @@ class _EditProductPageState extends State<EditProductPage> {
     super.initState();
     _productNameController = TextEditingController(text: widget.productName);
     _barcodeController = TextEditingController(text: widget.barcode ?? '');
-    _categoryController = TextEditingController(text: widget.category ?? '');
     _costPriceController = TextEditingController(
       text: widget.costPrice != null ? widget.costPrice.toString() : '',
     );
@@ -86,7 +90,14 @@ class _EditProductPageState extends State<EditProductPage> {
     _descriptionController = TextEditingController(
       text: widget.description ?? '',
     );
+    _manufacturerController = TextEditingController(
+      text: widget.manufacturer ?? '',
+    );
     _isActive = widget.isActive;
+    _selectedBusinessTypeId = widget.businessTypeId;
+
+    // Load business types
+    context.read<ProductBloc>().add(const LoadBusinessTypesRequested());
 
     // Load sale items (price tiers) from API
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -100,12 +111,12 @@ class _EditProductPageState extends State<EditProductPage> {
   void dispose() {
     _productNameController.dispose();
     _barcodeController.dispose();
-    _categoryController.dispose();
     _costPriceController.dispose();
     _salePriceController.dispose();
     _quantityController.dispose();
     _unitController.dispose();
     _descriptionController.dispose();
+    _manufacturerController.dispose();
     super.dispose();
   }
 
@@ -147,9 +158,12 @@ class _EditProductPageState extends State<EditProductPage> {
     // If editing, populate with existing data
     if (editIndex != null && editIndex < _priceTiers.length) {
       final tier = _priceTiers[editIndex];
-      unitController.text = tier['Unit'] ?? '';
-      quantityController.text = tier['Quantity']?.toString() ?? '';
-      priceController.text = tier['Price']?.toString() ?? '';
+      unitController.text =
+          tier['unit']?.toString() ?? tier['Unit']?.toString() ?? '';
+      quantityController.text =
+          tier['quantity']?.toString() ?? tier['Quantity']?.toString() ?? '';
+      priceController.text =
+          tier['price']?.toString() ?? tier['Price']?.toString() ?? '';
     }
 
     showDialog(
@@ -354,6 +368,12 @@ class _EditProductPageState extends State<EditProductPage> {
       );
       return;
     }
+    if (_selectedBusinessTypeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.translate('common.required_field'))),
+      );
+      return;
+    }
 
     debugPrint(
       'EditProductPage: Updating product with ID: ${widget.productId}',
@@ -367,26 +387,31 @@ class _EditProductPageState extends State<EditProductPage> {
         barcode: _barcodeController.text.isNotEmpty
             ? _barcodeController.text
             : null,
-        category: _categoryController.text.isNotEmpty
-            ? _categoryController.text
-            : null,
         costPrice: _costPriceController.text.isNotEmpty
-            ? double.tryParse(_costPriceController.text)
+            ? double.tryParse(
+                _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
+              )
             : null,
         salePrice: _salePriceController.text.isNotEmpty
-            ? double.tryParse(_salePriceController.text)
+            ? double.tryParse(
+                _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
+              )
             : null,
         quantity: _quantityController.text.isNotEmpty
             ? int.tryParse(_quantityController.text)
             : null,
         unit: _unitController.text.isNotEmpty ? _unitController.text : null,
         isActive: _isActive,
+        manufacturer: _manufacturerController.text.isNotEmpty
+            ? _manufacturerController.text
+            : null,
         description: _descriptionController.text.isNotEmpty
             ? _descriptionController.text
             : null,
         imagePath: _selectedImagePath,
         priceTiers: _priceTiers.isNotEmpty ? _priceTiers : null,
         removeImage: _removeImage,
+        businessTypeId: _selectedBusinessTypeId,
       ),
     );
   }
@@ -419,13 +444,9 @@ class _EditProductPageState extends State<EditProductPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.translate('product.edit_success'))),
             );
-            // Reload product list
-            context.read<ProductBloc>().add(
-              LoadProductsByLocationRequested(locationId: widget.locationId),
-            );
-            // Navigate back
+            // Navigate back and return true to indicate success
             Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) Navigator.pop(context);
+              if (mounted) Navigator.pop(context, true);
             });
           } else if (state is ProductDeleteSuccess) {
             // Show delete success message
@@ -435,17 +456,25 @@ class _EditProductPageState extends State<EditProductPage> {
                 backgroundColor: AppColors.success,
               ),
             );
-            // Reload product list
-            context.read<ProductBloc>().add(
-              LoadProductsByLocationRequested(locationId: widget.locationId),
-            );
-            // Navigate back
+            // Navigate back and return true to indicate success
             Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) Navigator.pop(context);
+              if (mounted) Navigator.pop(context, true);
             });
           } else if (state is ProductSaleItemsLoaded) {
             setState(() {
-              _priceTiers = List<Map<String, dynamic>>.from(state.saleItems);
+              final items = List<Map<String, dynamic>>.from(state.saleItems);
+              if (items.isNotEmpty) {
+                // First element is the base unit
+                final baseItem = items.first;
+                _unitController.text =
+                    baseItem['unit']?.toString() ??
+                    baseItem['Unit']?.toString() ??
+                    '';
+                // The rest are price tiers
+                _priceTiers = items.skip(1).toList();
+              } else {
+                _priceTiers = [];
+              }
             });
           } else if (state is ProductFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -493,8 +522,7 @@ class _EditProductPageState extends State<EditProductPage> {
                                     ),
                                     SizedBox(height: AppSpacing.md),
                                     Text(
-                                      l10n.translate('product.change_image') ??
-                                          'Thay đổi ảnh',
+                                      l10n.translate('product.change_image'),
                                       style: AppTextStyles.bodyMedium.copyWith(
                                         color: AppColors.white,
                                       ),
@@ -525,8 +553,7 @@ class _EditProductPageState extends State<EditProductPage> {
                                 Padding(
                                   padding: EdgeInsets.only(top: AppSpacing.md),
                                   child: Text(
-                                    l10n.translate('common.tap_to_select') ??
-                                        'Nhấn để chọn ảnh',
+                                    l10n.translate('common.tap_to_select'),
                                     style: AppTextStyles.bodySmall.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -609,12 +636,16 @@ class _EditProductPageState extends State<EditProductPage> {
                 ),
                 SizedBox(height: AppSpacing.lg),
 
-                // Category
-                _buildDropdownWithLabel(
-                  label: l10n.translate('product.category'),
-                  controller: _categoryController,
-                  hint: l10n.translate('product.category_hint'),
+                // Manufacturer
+                _buildTextFieldWithLabel(
+                  label: l10n.translate('product.manufacturer'),
+                  controller: _manufacturerController,
+                  hint: l10n.translate('product.manufacturer_hint'),
                 ),
+                SizedBox(height: AppSpacing.lg),
+
+                // Business Type Dropdown
+                _buildBusinessTypeDropdown(),
                 SizedBox(height: AppSpacing.lg),
 
                 // Price & Inventory Section
@@ -715,7 +746,7 @@ class _EditProductPageState extends State<EditProductPage> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            '${tier['Unit']} - SL: ${tier['Quantity']}',
+                                            '${tier['unit'] ?? tier['Unit']} - SL: ${tier['quantity'] ?? tier['Quantity']}',
                                             style: AppTextStyles.bodyMedium
                                                 .copyWith(
                                                   color: AppColors.textPrimary,
@@ -723,7 +754,7 @@ class _EditProductPageState extends State<EditProductPage> {
                                           ),
                                           SizedBox(height: AppSpacing.xs),
                                           Text(
-                                            'Giá: ${tier['Price']}đ',
+                                            'Giá: ${tier['price'] ?? tier['Price']}đ',
                                             style: AppTextStyles.bodySmall
                                                 .copyWith(
                                                   color: AppColors.secondary,
@@ -748,7 +779,7 @@ class _EditProductPageState extends State<EditProductPage> {
                       GestureDetector(
                         onTap: () => _showAddPriceTierDialog(),
                         child: Text(
-                          '+ ${l10n.translate('product.add_price_tier') ?? 'Thêm quy đổi giá'}',
+                          '+ ${l10n.translate('product.add_price_tier')}',
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.secondary,
                           ),
@@ -923,74 +954,70 @@ class _EditProductPageState extends State<EditProductPage> {
     );
   }
 
-  Widget _buildDropdownWithLabel({
-    required String label,
-    required TextEditingController controller,
-    required String hint,
-  }) {
-    final l10n = AppLocalizations.of(context);
-    final categoryItems = [
-      l10n.translate('product.category_drinks'),
-      l10n.translate('product.category_food'),
-      l10n.translate('product.category_other'),
-    ];
+  Widget _buildBusinessTypeDropdown() {
+    return BlocBuilder<ProductBloc, ProductState>(
+      builder: (context, state) {
+        List<DropdownMenuItem<String>> typeItems = [];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: AppColors.textPrimary,
-          ),
-        ),
-        SizedBox(height: AppSpacing.sm),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.divider),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        if (state is BusinessTypesLoaded) {
+          typeItems = state.businessTypes.map((type) {
+            return DropdownMenuItem<String>(
+              value: type.businessTypeId,
+              child: Text(type.name),
+            );
+          }).toList();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  l10n.translate('product.business_type'),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  '*',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.error,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: AppSpacing.sm),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.divider),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     isExpanded: true,
-                    underline: const SizedBox.shrink(),
                     hint: Text(
-                      hint,
+                      l10n.translate('product.select_business_type'),
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: AppColors.textDisabled,
                       ),
                     ),
-                    value:
-                        controller.text.isNotEmpty &&
-                            categoryItems.contains(controller.text)
-                        ? controller.text
-                        : null,
-                    items: categoryItems
-                        .map(
-                          (item) =>
-                              DropdownMenuItem(value: item, child: Text(item)),
-                        )
-                        .toList(),
+                    value: _selectedBusinessTypeId,
+                    items: typeItems,
                     onChanged: (value) {
                       setState(() {
-                        controller.text = value ?? '';
+                        _selectedBusinessTypeId = value;
                       });
                     },
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(right: AppSpacing.md),
-                child: Icon(Icons.expand_more, color: AppColors.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 

@@ -80,6 +80,11 @@ class ClearFiltersRequested extends ProductEvent {
   List<Object?> get props => [locationId];
 }
 
+/// Load business types
+class LoadBusinessTypesRequested extends ProductEvent {
+  const LoadBusinessTypesRequested();
+}
+
 /// Add new product
 class AddProductRequested extends ProductEvent {
   final String locationId;
@@ -94,6 +99,8 @@ class AddProductRequested extends ProductEvent {
   final String? description;
   final String? imagePath;
   final List<Map<String, dynamic>>? priceTiers;
+  final String? businessTypeId;
+  final String? manufacturer;
 
   const AddProductRequested({
     required this.locationId,
@@ -108,6 +115,8 @@ class AddProductRequested extends ProductEvent {
     this.description,
     this.imagePath,
     this.priceTiers,
+    this.businessTypeId,
+    this.manufacturer,
   });
 
   @override
@@ -124,6 +133,8 @@ class AddProductRequested extends ProductEvent {
     description,
     imagePath,
     priceTiers,
+    businessTypeId,
+    manufacturer,
   ];
 }
 
@@ -143,6 +154,8 @@ class UpdateProductRequested extends ProductEvent {
   final String? imagePath;
   final List<Map<String, dynamic>>? priceTiers;
   final bool removeImage;
+  final String? businessTypeId;
+  final String? manufacturer;
 
   const UpdateProductRequested({
     required this.locationId,
@@ -159,6 +172,8 @@ class UpdateProductRequested extends ProductEvent {
     this.imagePath,
     this.priceTiers,
     this.removeImage = false,
+    this.businessTypeId,
+    this.manufacturer,
   });
 
   @override
@@ -177,6 +192,8 @@ class UpdateProductRequested extends ProductEvent {
     imagePath,
     priceTiers,
     removeImage,
+    businessTypeId,
+    manufacturer,
   ];
 }
 

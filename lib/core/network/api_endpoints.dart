@@ -62,6 +62,9 @@ class ApiEndpoints {
   static String getProductSaleItems(String productId) =>
       '/api/my-business/product/$productId/sale-items';
 
+  // Business Types
+  static const String businessTypes = '/api/business-types';
+
   // Add more endpoints here...
   // Import
   static const String imports = '/api/my-business/accounting/imports';

@@ -187,8 +187,8 @@ class ProductCardWidget extends StatelessWidget {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
+                    onPressed: () async {
+                      final result = await Navigator.push<bool>(
                         context,
                         MaterialPageRoute(
                           builder: (context) => ProductDetailPage(
@@ -197,6 +197,13 @@ class ProductCardWidget extends StatelessWidget {
                           ),
                         ),
                       );
+                      if (result == true && context.mounted) {
+                        context.read<ProductBloc>().add(
+                          LoadProductsByLocationRequested(
+                            locationId: locationId,
+                          ),
+                        );
+                      }
                     },
                     icon: const Icon(Icons.info_outline, size: 18),
                     label: Text(l10n.translate('product.detail_title')),
@@ -211,8 +218,8 @@ class ProductCardWidget extends StatelessWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          final result = await Navigator.push<bool>(
                             context,
                             MaterialPageRoute(
                               builder: (context) => EditProductPage(
@@ -227,9 +234,18 @@ class ProductCardWidget extends StatelessWidget {
                                 unit: product.unit,
                                 description: product.description,
                                 isActive: product.isActive,
+                                businessTypeId: product.businessTypeId,
+                                manufacturer: product.manufacturer,
                               ),
                             ),
                           );
+                          if (result == true && context.mounted) {
+                            context.read<ProductBloc>().add(
+                              LoadProductsByLocationRequested(
+                                locationId: locationId,
+                              ),
+                            );
+                          }
                         },
                         icon: const Icon(Icons.edit, size: 18),
                         label: Text(

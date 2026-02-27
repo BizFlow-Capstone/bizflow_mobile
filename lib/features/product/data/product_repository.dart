@@ -23,6 +23,9 @@ class ProductRepository {
               price: dto.price,
               quantity: dto.quantity,
               imageUrl: dto.imageUrl,
+              businessTypeId: dto.businessTypeId,
+              manufacturer: dto.manufacturer,
+              saleItems: dto.saleItems,
             ),
           )
           .toList();
@@ -177,6 +180,16 @@ class ProductRepository {
       return await _service.deleteProduct(productId);
     } catch (e) {
       debugPrint('ProductRepository.deleteProduct error: $e');
+      rethrow;
+    }
+  }
+
+  /// Get business types
+  Future<dynamic> getBusinessTypes() async {
+    try {
+      return await _service.getBusinessTypes();
+    } catch (e) {
+      debugPrint('ProductRepository.getBusinessTypes error: $e');
       rethrow;
     }
   }

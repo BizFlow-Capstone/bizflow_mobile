@@ -11,7 +11,7 @@ import '../bloc/product_state.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
 import '../widgets/product_filter_dialog.dart';
-import '../widgets/product_sort_dialog.dart';
+import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 import 'add_product_page.dart';
 import 'import_history_page.dart';
 
@@ -82,12 +82,16 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 
   void _openAddProductPage() {
     _toggleFabMenu();
-    Navigator.push(
+    Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => AddProductPage(locationId: widget.locationId),
       ),
-    );
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadProducts();
+      }
+    });
   }
 
   void _toggleFabMenu() {
@@ -108,35 +112,33 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => ProductFilterDialog(
+      builder: (context) => ProductFilterSortDialog(
         initialStatus: state.filterStatus,
         initialCategory: state.filterCategory,
+        initialSort: state.sortBy,
         categories: categories,
       ),
     );
 
     if (result != null && mounted) {
-      context.read<ProductBloc>().add(
-        FilterProductsRequested(
-          locationId: widget.locationId,
-          status: result['status'],
-          category: result['category'],
-        ),
-      );
-    }
-  }
-
-  void _openSortDialog(ProductsLoaded state) async {
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => ProductSortDialog(currentSort: state.sortBy),
-    );
-
-    if (result != null && mounted) {
-      context.read<ProductBloc>().add(
-        SortProductsRequested(locationId: widget.locationId, sortBy: result),
-      );
+      if (result['status'] != state.filterStatus ||
+          result['category'] != state.filterCategory) {
+        context.read<ProductBloc>().add(
+          FilterProductsRequested(
+            locationId: widget.locationId,
+            status: result['status'],
+            category: result['category'],
+          ),
+        );
+      }
+      if (result['sort'] != state.sortBy) {
+        context.read<ProductBloc>().add(
+          SortProductsRequested(
+            locationId: widget.locationId,
+            sortBy: result['sort'] ?? '',
+          ),
+        );
+      }
     }
   }
 
@@ -251,19 +253,30 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                SizedBox(width: AppSpacing.sm),
-                // Sort Button
+                // Barcode Scanner Button
                 Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.divider),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.tune),
-                    onPressed: () {
-                      final state = context.read<ProductBloc>().state;
-                      if (state is ProductsLoaded) {
-                        _openSortDialog(state);
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () async {
+                      var res = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const SimpleBarcodeScannerPage(),
+                        ),
+                      );
+                      if (res is String &&
+                          res != '-1' &&
+                          res.isNotEmpty &&
+                          mounted) {
+                        setState(() {
+                          _searchController.text = res;
+                        });
+                        _searchProducts(res);
                       }
                     },
                     color: AppColors.textSecondary,
@@ -403,6 +416,39 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                           textAlign: TextAlign.center,
                         ),
                       ],
+                    ),
+                  );
+                }
+
+                final currentProducts = context
+                    .read<ProductBloc>()
+                    .currentProducts;
+
+                if (currentProducts.isNotEmpty &&
+                    state is! ProductLoading &&
+                    state is! ProductDeleteInProgress) {
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<ProductBloc>().add(
+                        RefreshProductsRequested(locationId: widget.locationId),
+                      );
+                    },
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: EdgeInsets.only(
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        top: AppSpacing.sm,
+                        bottom: 80,
+                      ),
+                      itemCount: currentProducts
+                          .length, // Don't show loading indicator at bottom for fallback
+                      itemBuilder: (context, index) {
+                        return ProductCardWidget(
+                          product: currentProducts[index],
+                          locationId: widget.locationId,
+                        );
+                      },
                     ),
                   );
                 }

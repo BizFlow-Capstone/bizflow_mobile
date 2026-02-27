@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../data/models/business_type_model.dart';
 
 /// Product States
 abstract class ProductState extends Equatable {
@@ -163,4 +164,14 @@ class ProductFailure extends ProductState {
 
   @override
   List<Object?> get props => [message];
+}
+
+/// Business types loaded
+class BusinessTypesLoaded extends ProductState {
+  final List<BusinessTypeDto> businessTypes;
+
+  const BusinessTypesLoaded({required this.businessTypes});
+
+  @override
+  List<Object?> get props => [businessTypes];
 }

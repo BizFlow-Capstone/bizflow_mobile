@@ -15,6 +15,8 @@ class ProductEntity {
   final DateTime? createdAt;
   final int? locationId;
   final String? businessTypeId;
+  final String? manufacturer;
+  final List<Map<String, dynamic>> saleItems;
 
   ProductEntity({
     required this.id,
@@ -32,6 +34,8 @@ class ProductEntity {
     this.createdAt,
     this.locationId,
     this.businessTypeId,
+    this.manufacturer,
+    this.saleItems = const [],
   });
 
   ProductEntity copyWith({
@@ -50,6 +54,8 @@ class ProductEntity {
     DateTime? createdAt,
     int? locationId,
     String? businessTypeId,
+    String? manufacturer,
+    List<Map<String, dynamic>>? saleItems,
   }) {
     return ProductEntity(
       id: id ?? this.id,
@@ -67,6 +73,8 @@ class ProductEntity {
       createdAt: createdAt ?? this.createdAt,
       locationId: locationId ?? this.locationId,
       businessTypeId: businessTypeId ?? this.businessTypeId,
+      manufacturer: manufacturer ?? this.manufacturer,
+      saleItems: saleItems ?? this.saleItems,
     );
   }
 }

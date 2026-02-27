@@ -6,6 +6,7 @@ import 'package:dio/io.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import 'models/product_dto.dart';
+import 'models/business_type_model.dart';
 
 /// Product API Service - Handles product-related API calls
 ///
@@ -531,6 +532,28 @@ class ProductApiService {
       throw Exception('Error deleting product: ${e.message}');
     } catch (e) {
       debugPrint('ProductApiService.deleteProduct error: $e');
+      return;
+    }
+  }
+
+  /// Get Business Types
+  Future<List<BusinessTypeDto>> getBusinessTypes() async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiEndpoints.businessTypes,
+      );
+
+      final data = response.data;
+      if (data != null && data['data'] != null) {
+        final List<dynamic> list = data['data'];
+        return list
+            .map((e) => BusinessTypeDto.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+
+      return [];
+    } catch (e) {
+      debugPrint('ProductApiService.getBusinessTypes error: $e');
       rethrow;
     }
   }

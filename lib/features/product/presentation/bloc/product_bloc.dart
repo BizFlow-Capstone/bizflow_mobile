@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../data/models/business_type_model.dart';
 import 'product_event.dart';
 import 'product_state.dart';
 
@@ -11,6 +12,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   final ProductRepository repository;
 
   ProductBloc({required this.repository}) : super(const ProductInitial()) {
+    on<LoadBusinessTypesRequested>(_onLoadBusinessTypesRequested);
     on<LoadProductsByLocationRequested>(_onLoadProductsByLocationRequested);
     on<RefreshProductsRequested>(_onRefreshProductsRequested);
     on<SearchProductsRequested>(_onSearchProductsRequested);
@@ -29,10 +31,31 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   // In-memory cache for products
   List<ProductEntity> _products = [];
 
+  /// Get current products list from cache
+  List<ProductEntity> get currentProducts => _products;
+
   // Filter and search state
   String? _searchQuery;
   String? _filterStatus;
   String? _filterCategory;
+
+  Future<void> _onLoadBusinessTypesRequested(
+    LoadBusinessTypesRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    try {
+      final businessTypes = await repository.getBusinessTypes();
+      if (businessTypes is List && businessTypes.isNotEmpty) {
+        emit(
+          BusinessTypesLoaded(
+            businessTypes: List<BusinessTypeDto>.from(businessTypes),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ProductBloc._onLoadBusinessTypesRequested error: $e');
+    }
+  }
 
   Future<void> _onLoadProductsByLocationRequested(
     LoadProductsByLocationRequested event,
@@ -321,7 +344,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       } catch (_) {}
 
       // Fallback to a valid UUID strings - required by endpoint.md
-      final businessTypeId = bId ?? '00000000-0000-0000-0000-000000000000';
+      final businessTypeId =
+          event.businessTypeId ?? bId ?? '00000000-0000-0000-0000-000000000000';
 
       final response = await repository.createProduct(
         productName: event.productName,
@@ -333,6 +357,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         stock: event.quantity,
         priceTiers: event.priceTiers,
         imagePath: event.imagePath,
+        manufacturer: event.manufacturer,
       );
 
       debugPrint('ProductBloc: Create response: $response');
@@ -357,11 +382,25 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         unit: event.unit,
         isActive: event.isActive,
         createdAt: DateTime.now(),
+        businessTypeId: event.businessTypeId,
+        manufacturer: event.manufacturer,
       );
 
       _products.add(newProduct);
 
       emit(ProductAddSuccess(product: newProduct));
+      emit(
+        ProductsLoaded(
+          products: _products,
+          hasReachedMax: this.state is ProductsLoaded
+              ? (this.state as ProductsLoaded).hasReachedMax
+              : false,
+          currentPage: this.state is ProductsLoaded
+              ? (this.state as ProductsLoaded).currentPage
+              : 1,
+          locationId: event.locationId,
+        ),
+      );
     } catch (e) {
       debugPrint('ProductBloc._onAddProductRequested error: $e');
       emit(ProductFailure(message: 'Failed to add product: ${e.toString()}'));
@@ -383,6 +422,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       );
 
       final businessTypeId =
+          event.businessTypeId ??
           existingProduct.businessTypeId ??
           '00000000-0000-0000-0000-000000000000';
       final locationId =
@@ -400,6 +440,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         priceTiers: event.priceTiers,
         imagePath: event.imagePath,
         removeImage: event.removeImage,
+        manufacturer: event.manufacturer,
       );
 
       final index = _products.indexWhere((p) => p.id == event.productId);
@@ -416,6 +457,18 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         );
 
         emit(ProductUpdateSuccess(product: _products[index]));
+        emit(
+          ProductsLoaded(
+            products: _products,
+            hasReachedMax: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).hasReachedMax
+                : false,
+            currentPage: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).currentPage
+                : 1,
+            locationId: locationId.toString(),
+          ),
+        );
       } else {
         emit(
           ProductUpdateSuccess(
@@ -431,7 +484,22 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               salePrice: event.salePrice,
               unit: event.unit,
               isActive: event.isActive,
+              businessTypeId:
+                  event.businessTypeId ?? existingProduct.businessTypeId,
+              manufacturer: event.manufacturer ?? existingProduct.manufacturer,
             ),
+          ),
+        );
+        emit(
+          ProductsLoaded(
+            products: _products,
+            hasReachedMax: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).hasReachedMax
+                : false,
+            currentPage: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).currentPage
+                : 1,
+            locationId: locationId.toString(),
           ),
         );
       }
@@ -456,6 +524,18 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       _products.removeWhere((p) => p.id == event.productId);
 
       emit(ProductDeleteSuccess(productId: event.productId));
+      emit(
+        ProductsLoaded(
+          products: _products,
+          hasReachedMax: this.state is ProductsLoaded
+              ? (this.state as ProductsLoaded).hasReachedMax
+              : false,
+          currentPage: this.state is ProductsLoaded
+              ? (this.state as ProductsLoaded).currentPage
+              : 1,
+          locationId: event.locationId,
+        ),
+      );
     } catch (e) {
       debugPrint('ProductBloc._onDeleteProductRequested error: $e');
       emit(
@@ -483,6 +563,18 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       if (index != -1) {
         _products[index] = _products[index].copyWith(isActive: event.isActive);
         emit(ProductUpdateSuccess(product: _products[index]));
+        emit(
+          ProductsLoaded(
+            products: _products,
+            hasReachedMax: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).hasReachedMax
+                : false,
+            currentPage: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).currentPage
+                : 1,
+            locationId: _products[index].locationId?.toString() ?? '1',
+          ),
+        );
       } else {
         // If not in cache, we just emit success with a skeleton entity
         emit(
@@ -494,6 +586,18 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               quantity: 0,
               isActive: event.isActive,
             ),
+          ),
+        );
+        emit(
+          ProductsLoaded(
+            products: _products,
+            hasReachedMax: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).hasReachedMax
+                : false,
+            currentPage: this.state is ProductsLoaded
+                ? (this.state as ProductsLoaded).currentPage
+                : 1,
+            locationId: '1',
           ),
         );
       }
@@ -535,8 +639,17 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         }).toList();
       } else if (response is Map<String, dynamic>) {
         final data = response['data'];
+        List<dynamic> itemsList = [];
+
         if (data is List<dynamic>) {
-          saleItems = data.map((item) {
+          itemsList = data;
+        } else if (data is Map<String, dynamic> &&
+            data['saleItems'] is List<dynamic>) {
+          itemsList = data['saleItems'] as List<dynamic>;
+        }
+
+        if (itemsList.isNotEmpty) {
+          saleItems = itemsList.map((item) {
             if (item is Map<String, dynamic>) {
               return {
                 'Unit': item['unit'] as String? ?? '',
