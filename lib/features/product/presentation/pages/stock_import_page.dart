@@ -972,7 +972,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
             productId: int.tryParse(product.id) ?? 0,
             productName: product.name,
             quantity: 1,
-            costPrice: product.costPrice ?? product.price,
+            costPrice: product.costPrice ?? product.salePrice ?? product.price,
             baseUnit: product.unit ?? 'cái',
           ),
         );

@@ -197,6 +197,7 @@ class ProductApiService {
     String? sku,
     bool trackInventory = true,
     double? costPrice,
+    double? price,
     int? stock,
     String? manufacturer,
     List<Map<String, dynamic>>? priceTiers,
@@ -219,6 +220,7 @@ class ProductApiService {
         sku: sku,
         trackInventory: trackInventory,
         costPrice: costPrice,
+        price: price,
         stock: stock,
         manufacturer: manufacturer,
         priceTiers: convertedPriceTiers,
@@ -244,6 +246,7 @@ class ProductApiService {
     String? sku,
     bool trackInventory = true,
     double? costPrice,
+    double? price,
     int? stock,
     String? manufacturer,
     List<Map<String, dynamic>>? priceTiers,
@@ -251,6 +254,27 @@ class ProductApiService {
   }) async {
     try {
       debugPrint('=== CREATE PRODUCT MULTIPART ===');
+
+      // Filter out base unit from PriceTiers to avoid duplicate unit error
+      final List<Map<String, dynamic>> finalPriceTiers = [];
+      if (priceTiers != null) {
+        for (var tier in priceTiers) {
+          final tierUnit = tier['Unit'] ?? tier['unit'];
+          final tierQty = tier['Quantity'] ?? tier['quantity'];
+
+          // Skip if it's the base unit with quantity 1
+          if ((tierUnit == unit) && (tierQty == 1 || tierQty == 1.0)) {
+            continue;
+          }
+
+          // Ensure PascalCase keys for the JSON string as per description
+          finalPriceTiers.add({
+            'Unit': tierUnit,
+            'Quantity': tierQty,
+            'Price': tier['Price'] ?? tier['price'],
+          });
+        }
+      }
 
       final Map<String, dynamic> dataMap = {
         'ProductName': productName,
@@ -260,12 +284,15 @@ class ProductApiService {
         'TrackInventory': trackInventory,
         if (sku != null) 'Sku': sku,
         if (costPrice != null) 'CostPrice': costPrice,
+        // Send selling price as 'Price' (PascalCase) - likely undocumented top-level field
+        if (price != null) 'Price': price,
         if (stock != null) 'Stock': stock,
         if (manufacturer != null) 'Manufacturer': manufacturer,
-        // PriceTiers as JSON string per description
-        if (priceTiers != null && priceTiers.isNotEmpty)
-          'PriceTiers': jsonEncode(priceTiers),
+        if (finalPriceTiers.isNotEmpty)
+          'PriceTiers': jsonEncode(finalPriceTiers),
       };
+
+      debugPrint('DataMap: $dataMap');
 
       if (imagePath != null && imagePath.isNotEmpty) {
         final imageFile = File(imagePath);
@@ -325,6 +352,7 @@ class ProductApiService {
     String? sku,
     bool? trackInventory,
     double? costPrice,
+    double? price,
     int? stock,
     String? manufacturer,
     List<Map<String, dynamic>>? priceTiers,
@@ -348,6 +376,7 @@ class ProductApiService {
         sku: sku,
         trackInventory: trackInventory,
         costPrice: costPrice,
+        price: price,
         stock: stock,
         manufacturer: manufacturer,
         priceTiers: convertedPriceTiers,
@@ -373,6 +402,7 @@ class ProductApiService {
     String? sku,
     bool? trackInventory,
     double? costPrice,
+    double? price,
     int? stock,
     String? manufacturer,
     List<Map<String, dynamic>>? priceTiers,
@@ -381,6 +411,25 @@ class ProductApiService {
   }) async {
     try {
       debugPrint('=== UPDATE PRODUCT MULTIPART ===');
+
+      // Filter out base unit from PriceTiers to avoid duplicate unit error
+      final List<Map<String, dynamic>> finalPriceTiers = [];
+      if (priceTiers != null) {
+        for (var tier in priceTiers) {
+          final tierUnit = tier['Unit'] ?? tier['unit'];
+          final tierQty = tier['Quantity'] ?? tier['quantity'];
+
+          if ((tierUnit == unit) && (tierQty == 1 || tierQty == 1.0)) {
+            continue;
+          }
+
+          finalPriceTiers.add({
+            'Unit': tierUnit,
+            'Quantity': tierQty,
+            'Price': tier['Price'] ?? tier['price'],
+          });
+        }
+      }
 
       final Map<String, dynamic> dataMap = {
         'ProductName': productName,
@@ -391,11 +440,15 @@ class ProductApiService {
         if (sku != null) 'Sku': sku,
         if (trackInventory != null) 'TrackInventory': trackInventory,
         if (costPrice != null) 'CostPrice': costPrice,
+        // Send selling price as 'Price' (PascalCase)
+        if (price != null) 'Price': price,
         if (stock != null) 'Stock': stock,
         if (manufacturer != null) 'Manufacturer': manufacturer,
-        if (priceTiers != null && priceTiers.isNotEmpty)
-          'PriceTiers': jsonEncode(priceTiers),
+        if (finalPriceTiers.isNotEmpty)
+          'PriceTiers': jsonEncode(finalPriceTiers),
       };
+
+      debugPrint('DataMap: $dataMap');
 
       if (imagePath != null && imagePath.isNotEmpty) {
         final imageFile = File(imagePath);
@@ -424,6 +477,9 @@ class ProductApiService {
         '$baseUrl${ApiEndpoints.updateProduct(productId)}',
         data: formData,
       );
+
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response data: ${response.data}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return response.data;

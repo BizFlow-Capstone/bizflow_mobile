@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:dio/dio.dart';
 import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
 import '../../data/models/business_type_model.dart';
@@ -334,6 +335,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     emit(const ProductAddInProgress());
     try {
       debugPrint('ProductBloc: Creating product: ${event.productName}');
+      debugPrint(
+        'Event CostPrice: ${event.costPrice}, SalePrice: ${event.salePrice}',
+      );
 
       // If businessTypeId is not provided, try to find one from existing products at this location
       String? bId;
@@ -357,6 +361,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         locationId: int.tryParse(event.locationId) ?? 1,
         sku: event.barcode,
         costPrice: event.costPrice ?? 0,
+        price: event.salePrice,
         stock: event.quantity,
         priceTiers: event.priceTiers,
         imagePath: event.imagePath,
@@ -404,6 +409,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           locationId: event.locationId,
         ),
       );
+    } on DioException catch (e) {
+      final message = e.response?.data?['message'] ?? e.message ?? e.toString();
+      debugPrint('ProductBloc._onAddProductRequested DioError: $message');
+      emit(ProductFailure(message: message.toString()));
     } catch (e) {
       debugPrint('ProductBloc._onAddProductRequested error: $e');
       emit(ProductFailure(message: 'Failed to add product: ${e.toString()}'));
@@ -439,6 +448,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         businessTypeId: businessTypeId,
         sku: event.barcode,
         costPrice: event.costPrice,
+        price: event.salePrice,
         stock: event.quantity,
         priceTiers: event.priceTiers,
         imagePath: event.imagePath,
@@ -506,6 +516,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           ),
         );
       }
+    } on DioException catch (e) {
+      final message = e.response?.data?['message'] ?? e.message ?? e.toString();
+      debugPrint('ProductBloc._onUpdateProductRequested DioError: $message');
+      emit(ProductFailure(message: message.toString()));
     } catch (e) {
       debugPrint('ProductBloc._onUpdateProductRequested error: $e');
       emit(
@@ -539,6 +553,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           locationId: event.locationId,
         ),
       );
+    } on DioException catch (e) {
+      final message = e.response?.data?['message'] ?? e.message ?? e.toString();
+      debugPrint('ProductBloc._onDeleteProductRequested DioError: $message');
+      emit(ProductFailure(message: message.toString()));
     } catch (e) {
       debugPrint('ProductBloc._onDeleteProductRequested error: $e');
       emit(

@@ -11,6 +11,7 @@ import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
 import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
+import '../../data/models/business_type_model.dart';
 
 /// Add New Product Page
 /// SC-PRO-01: Thêm sản phẩm mới
@@ -40,6 +41,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
   bool _isActive = true;
   String? _selectedBusinessTypeId;
+  List<BusinessTypeDto> _businessTypes = [];
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -230,28 +232,28 @@ class _AddProductPageState extends State<AddProductPage> {
   }
 
   /// Format price to VND format
-  String _formatVND(String value) {
-    if (value.isEmpty) return '';
-    try {
-      final number = int.parse(value.replaceAll(',', ''));
-      return number.toString().replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-        (Match m) => '${m[1]},',
-      );
-    } catch (e) {
-      return value;
-    }
-  }
+  // String _formatVND(String value) {
+  //   if (value.isEmpty) return '';
+  //   try {
+  //     final number = int.parse(value.replaceAll(',', ''));
+  //     return number.toString().replaceAllMapped(
+  //       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+  //       (Match m) => '${m[1]},',
+  //     );
+  //   } catch (e) {
+  //     return value;
+  //   }
+  // }
 
   /// Validate if number is non-negative
-  bool _isValidNumber(String value) {
-    if (value.isEmpty) return true;
-    try {
-      return double.parse(value) >= 0;
-    } catch (e) {
-      return false;
-    }
-  }
+  // bool _isValidNumber(String value) {
+  //   if (value.isEmpty) return true;
+  //   try {
+  //     return double.parse(value) >= 0;
+  //   } catch (e) {
+  //     return false;
+  //   }
+  // }
 
   void _submitForm() {
     if (_productNameController.text.isEmpty) {
@@ -359,6 +361,10 @@ class _AddProductPageState extends State<AddProductPage> {
             // Navigate back and return true to trigger reload
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) Navigator.pop(context, true);
+            });
+          } else if (state is BusinessTypesLoaded) {
+            setState(() {
+              _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
             ScaffoldMessenger.of(
@@ -863,16 +869,12 @@ class _AddProductPageState extends State<AddProductPage> {
     final l10n = AppLocalizations.of(context);
     return BlocBuilder<ProductBloc, ProductState>(
       builder: (context, state) {
-        List<DropdownMenuItem<String>> typeItems = [];
-
-        if (state is BusinessTypesLoaded) {
-          typeItems = state.businessTypes.map((type) {
-            return DropdownMenuItem<String>(
-              value: type.businessTypeId,
-              child: Text(type.name),
-            );
-          }).toList();
-        }
+        final typeItems = _businessTypes.map((type) {
+          return DropdownMenuItem<String>(
+            value: type.businessTypeId,
+            child: Text(type.name),
+          );
+        }).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -26,7 +26,7 @@ class ImportHistoryPage extends StatelessWidget {
     final locationState = context.read<LocationBloc>().state;
     if (locationState is LocationsLoaded &&
         locationState.locations.isNotEmpty) {
-      locationId = int.tryParse(locationState.locations.first.id ?? '');
+      locationId = int.tryParse(locationState.locations.first.id);
     }
 
     final importRepo = context.read<ImportRepository>();
@@ -215,7 +215,7 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
             final locState = context.read<LocationBloc>().state;
             String currentLocId = '0';
             if (locState is LocationsLoaded && locState.locations.isNotEmpty) {
-              currentLocId = locState.locations.first.id ?? '0';
+              currentLocId = locState.locations.first.id;
             }
             Navigator.push(
               context,

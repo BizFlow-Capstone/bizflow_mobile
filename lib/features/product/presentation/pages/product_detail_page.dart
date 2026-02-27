@@ -195,7 +195,7 @@ class ProductDetailPage extends StatelessWidget {
             label:
                 l10n?.translate('product.detail.min_stock') ??
                 'Định mức tồn kho tối thiểu',
-            value: '${product.quantity ?? 0}',
+            value: '${product.quantity}',
           ),
           SizedBox(height: AppSpacing.sm),
 
@@ -366,7 +366,7 @@ class ProductDetailPage extends StatelessWidget {
               SizedBox(
                 width: 60,
                 child: Text(
-                  '${product.quantity ?? 0}',
+                  '${product.quantity}',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
@@ -450,7 +450,7 @@ class ProductDetailPage extends StatelessWidget {
               SizedBox(
                 width: 60,
                 child: Text(
-                  '${(product.quantity ?? 0) ~/ 10}',
+                  '${(product.quantity) ~/ 10}',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -476,7 +476,7 @@ class ProductDetailPage extends StatelessWidget {
               SizedBox(
                 width: 60,
                 child: Text(
-                  '${product.quantity ?? 0}',
+                  '${product.quantity}',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                   ),

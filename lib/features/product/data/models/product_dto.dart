@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Product DTO - Data Transfer Object
 
 /// Product Response from API
@@ -32,7 +34,9 @@ class ProductDto {
   final String id;
   final String name;
   final String? description;
-  final double price;
+  final double price; // Legacy field, kept for compatibility
+  final double? costPrice;
+  final double? salePrice;
   final int quantity;
   final String? imageUrl;
   final int? locationId;
@@ -45,6 +49,8 @@ class ProductDto {
     required this.name,
     this.description,
     required this.price,
+    this.costPrice,
+    this.salePrice,
     required this.quantity,
     this.imageUrl,
     this.locationId,
@@ -54,12 +60,24 @@ class ProductDto {
   });
 
   factory ProductDto.fromJson(Map<String, dynamic> json) {
+    debugPrint('ProductDto.fromJson raw data: $json');
     final dynamic idValue =
         json['id'] ??
         json['Id'] ??
         json['ID'] ??
         json['productId'] ??
         json['ProductId'];
+
+    final fetchedSalePrice =
+        (json['price'] as num? ??
+                json['Price'] as num? ??
+                json['salePrice'] as num? ??
+                json['SalePrice'] as num?)
+            ?.toDouble();
+
+    final fetchedCostPrice =
+        (json['costPrice'] as num? ?? json['CostPrice'] as num?)?.toDouble();
+
     return ProductDto(
       id: idValue?.toString() ?? '',
       name:
@@ -70,13 +88,9 @@ class ProductDto {
               as String? ??
           '',
       description: (json['description'] ?? json['Description']) as String?,
-      price:
-          (json['price'] as num? ??
-                  json['Price'] as num? ??
-                  json['costPrice'] as num? ??
-                  json['CostPrice'] as num?)
-              ?.toDouble() ??
-          0.0,
+      price: fetchedSalePrice ?? 0.0,
+      salePrice: fetchedSalePrice,
+      costPrice: fetchedCostPrice,
       quantity:
           (json['quantity'] as int? ??
               json['Quantity'] as int? ??

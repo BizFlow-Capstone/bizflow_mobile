@@ -170,7 +170,7 @@ class ProductCardWidget extends StatelessWidget {
                     ),
                     SizedBox(height: AppSpacing.xs),
                     Text(
-                      '${product.quantity ?? 0} ${product.unit ?? 'cái'}',
+                      '${product.quantity} ${product.unit ?? 'cái'}',
                       style: AppTextStyles.titleSmall.copyWith(
                         color: AppColors.textPrimary,
                       ),

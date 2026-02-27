@@ -12,6 +12,7 @@ import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
 import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
+import '../../data/models/business_type_model.dart';
 
 /// Edit Product Page
 /// SC-PRO-02: Chỉnh sửa sản phẩm
@@ -69,6 +70,7 @@ class _EditProductPageState extends State<EditProductPage> {
 
   late bool _isActive;
   String? _selectedBusinessTypeId;
+  List<BusinessTypeDto> _businessTypes = [];
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -80,10 +82,14 @@ class _EditProductPageState extends State<EditProductPage> {
     _productNameController = TextEditingController(text: widget.productName);
     _barcodeController = TextEditingController(text: widget.barcode ?? '');
     _costPriceController = TextEditingController(
-      text: widget.costPrice != null ? widget.costPrice.toString() : '',
+      text: widget.costPrice != null
+          ? CurrencyFormatter.formatNumber(widget.costPrice!)
+          : '',
     );
     _salePriceController = TextEditingController(
-      text: widget.salePrice != null ? widget.salePrice.toString() : '',
+      text: widget.salePrice != null
+          ? CurrencyFormatter.formatNumber(widget.salePrice!)
+          : '',
     );
     _quantityController = TextEditingController(
       text: widget.quantity != null ? widget.quantity.toString() : '',
@@ -484,6 +490,10 @@ class _EditProductPageState extends State<EditProductPage> {
               } else {
                 _priceTiers = [];
               }
+            });
+          } else if (state is BusinessTypesLoaded) {
+            setState(() {
+              _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1027,16 +1037,12 @@ class _EditProductPageState extends State<EditProductPage> {
   Widget _buildBusinessTypeDropdown() {
     return BlocBuilder<ProductBloc, ProductState>(
       builder: (context, state) {
-        List<DropdownMenuItem<String>> typeItems = [];
-
-        if (state is BusinessTypesLoaded) {
-          typeItems = state.businessTypes.map((type) {
-            return DropdownMenuItem<String>(
-              value: type.businessTypeId,
-              child: Text(type.name),
-            );
-          }).toList();
-        }
+        final typeItems = _businessTypes.map((type) {
+          return DropdownMenuItem<String>(
+            value: type.businessTypeId,
+            child: Text(type.name),
+          );
+        }).toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
