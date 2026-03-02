@@ -1,0 +1,142 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/localization/app_localizations.dart';
+import 'order_audio_upload_screen.dart';
+import 'order_voice_record_screen.dart';
+import 'order_manual_input_screen.dart';
+
+/// Screen SC-ORD-01: User selects method to create an order
+class OrderCreationSelectionScreen extends StatelessWidget {
+  const OrderCreationSelectionScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.translate('order_create.select_method_title')),
+        elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 16),
+              _buildSelectionCard(
+                context: context,
+                icon: Icons.mic,
+                title: l10n.translate('order_create.method_voice'),
+                subtitle: l10n.translate('order_create.method_voice_subtitle'),
+                color: Colors.blue.shade50,
+                iconColor: Colors.blue,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrderVoiceRecordScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildSelectionCard(
+                context: context,
+                icon: Icons.upload_file,
+                title: l10n.translate('order_create.method_audio'),
+                subtitle: null,
+                color: Colors.green.shade50,
+                iconColor: Colors.green,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrderAudioUploadScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              _buildSelectionCard(
+                context: context,
+                icon: Icons.edit_document,
+                title: l10n.translate('order_create.method_manual'),
+                subtitle: null,
+                color: Colors.orange.shade50,
+                iconColor: Colors.orange,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrderManualInputScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectionCard({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required Color color,
+    required Color iconColor,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                child: Icon(icon, color: iconColor, size: 32),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

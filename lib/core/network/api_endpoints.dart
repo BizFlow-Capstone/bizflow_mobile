@@ -20,5 +20,65 @@ class ApiEndpoints {
   static const String dashboard = '/dashboard';
   static const String notifications = '/notifications';
 
+  // Location
+  static const String myOwnedLocations = '/api/location/me/owned';
+  static const String workAtLocations = '/api/location/work-at-locations';
+  static const String createLocation = '/api/location/create';
+  static const String myEmployees = '/api/my-employee/employees';
+
+  // Location with ID - use with String interpolation
+  static String updateLocationStatus(String id) =>
+      '/api/location/me/owned/$id/status';
+  static String updateLocation(String id) => '/api/location/me/owned/$id';
+  static String addEmployeesToLocation(String id) =>
+      '/api/location/$id/employees';
+  static String getLocationEmployees(String id) =>
+      '/api/location/me/owned/$id/employees';
+
+  // Order/Invoice
+  static const String orders = '/api/order/my-orders';
+  static const String draftOrders = '/api/order/drafts';
+  static const String createOrder = '/api/order/create';
+
+  // Order with ID - use with String interpolation
+  static String getOrder(String id) => '/api/order/$id';
+  static String updateOrder(String id) => '/api/order/$id';
+  static String publishOrder(String id) => '/api/order/$id/publish';
+  static String cancelOrder(String id) => '/api/order/$id/cancel';
+
+  // Product
+  static const String products = '/api/my-business/products';
+  static const String createProduct = '/api/my-business/product';
+
+  // Product with ID - use with String interpolation
+  static String getProductDetail(String productId) =>
+      '/api/my-business/product/$productId';
+  static String updateProduct(String productId) =>
+      '/api/my-business/product/$productId';
+  static String deleteProduct(String productId) =>
+      '/api/my-business/product/$productId';
+  static String updateProductStatus(String productId) =>
+      '/api/my-business/product/$productId/status';
+  static String getProductSaleItems(String productId) =>
+      '/api/my-business/product/$productId/sale-items';
+
+  // Business Types
+  static const String businessTypes = '/api/business-types';
+
   // Add more endpoints here...
+  // Import
+  static const String imports = '/api/my-business/accounting/imports';
+  static const String createImport = '/api/my-business/accounting/import';
+  static const String importTemplate =
+      '/api/my-business/accounting/import-template';
+
+  // Import with ID - use with String interpolation
+  static String getImportDetail(String id) =>
+      '/api/my-business/accounting/import/$id';
+  static String updateImport(String id) =>
+      '/api/my-business/accounting/import/$id';
+  static String confirmImport(String id) =>
+      '/api/my-business/accounting/import/$id';
+  static String deleteImport(String id) =>
+      '/api/my-business/accounting/import/$id';
 }

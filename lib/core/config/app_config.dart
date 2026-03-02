@@ -12,15 +12,37 @@ class AppConfig {
   static bool get isStaging => environment == 'staging';
   static bool get isProduction => environment == 'production';
 
-  // API
+  // API Configuration
+  // Choose based on what you're testing on:
+  //
+  //  PHYSICAL DEVICE (RFCTB0VPSSR):
+  //    - Use your host machine IP from: ipconfig
+  //    - Example: 192.168.1.16
+  //    - Protocol: HTTP (simpler for development)
+  //
+  //  ANDROID EMULATOR:
+  //    - Use 10.0.2.2 (Android gateway to host)
+  //    - Protocol: HTTP (avoid HTTPS complexity)
+  //
+  static const String _hostDeviceIp = '192.168.1.11'; // Physical device IP
+  static const String _hostEmulatorIp = '10.0.2.2'; // Emulator gateway
+
+  // CHANGE THIS TO SWITCH BETWEEN DEVICE & EMULATOR
+  static const bool _runningOnPhysicalDevice =
+      true; // Set to false for emulator
+
   static String get baseUrl {
+    final host = _runningOnPhysicalDevice ? _hostDeviceIp : _hostEmulatorIp;
+
     switch (environment) {
       case 'production':
-        return 'https://api.bizflow.com/v1';
+        return 'https://api.bizflow.com';
       case 'staging':
-        return 'https://staging-api.bizflow.com/v1';
+        return 'https://staging-api.bizflow.com';
       default:
-        return 'https://dev-api.bizflow.com/v1';
+        // Development - HTTPS for compatibility with backend redirect
+        // Backend: https://192.168.1.9:7271
+        return 'https://$host:7271';
     }
   }
 

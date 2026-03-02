@@ -1,0 +1,18 @@
+# Backgrounds Folder
+
+Store background images here.
+
+## Files Example
+- `bg_register.png` - Background for register page
+- `bg_login.png` - Background for login page
+- `bg_home.png` - Background for home page
+- `bg_pattern.png` - Repeating pattern background
+
+## Usage
+
+```dart
+Image.asset(
+  'assets/images/backgrounds/bg_register.png',
+  fit: BoxFit.cover,
+)
+```

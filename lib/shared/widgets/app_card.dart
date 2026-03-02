@@ -43,10 +43,7 @@ class AppCard extends StatelessWidget {
               ]
             : null,
       ),
-      child: Padding(
-        padding: padding ?? AppSpacing.paddingMd,
-        child: child,
-      ),
+      child: Padding(padding: padding ?? AppSpacing.paddingMd, child: child),
     );
 
     if (onTap != null) {
@@ -91,7 +88,9 @@ class AppListTile extends StatelessWidget {
           leading: leading,
           title: Text(title),
           subtitle: subtitle != null ? Text(subtitle!) : null,
-          trailing: trailing ?? (onTap != null ? const Icon(Icons.chevron_right) : null),
+          trailing:
+              trailing ??
+              (onTap != null ? const Icon(Icons.chevron_right) : null),
           onTap: onTap,
           contentPadding: contentPadding,
         ),

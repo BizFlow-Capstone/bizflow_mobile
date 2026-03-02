@@ -44,11 +44,7 @@ class ApiException implements Exception {
   final String message;
   final dynamic data;
 
-  ApiException({
-    required this.statusCode,
-    required this.message,
-    this.data,
-  });
+  ApiException({required this.statusCode, required this.message, this.data});
 
   @override
   String toString() => 'ApiException: [$statusCode] $message';
@@ -76,6 +72,22 @@ class AuthInterceptor implements RequestInterceptor {
     final token = await getToken();
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
+    }
+    return headers;
+  }
+}
+
+/// Language Interceptor - Tự động thêm Accept-Language header
+class LanguageInterceptor implements RequestInterceptor {
+  final String Function() getCurrentLanguage;
+
+  LanguageInterceptor({required this.getCurrentLanguage});
+
+  @override
+  Future<Map<String, String>> onRequest(Map<String, String> headers) async {
+    final language = getCurrentLanguage();
+    if (language.isNotEmpty) {
+      headers['Accept-Language'] = language;
     }
     return headers;
   }
@@ -109,7 +121,21 @@ class ApiClient {
     this.requestInterceptors = const [],
     this.responseInterceptors = const [],
   }) {
-    _client = HttpClient()..connectionTimeout = timeout;
+    _client = HttpClient()
+      ..connectionTimeout = timeout
+      //  DEVELOPMENT ONLY: Bypass SSL certificate validation
+      //  NEVER use this in production!
+      ..badCertificateCallback = (cert, host, port) {
+        // Allow self-signed certificates in development
+        if (kDebugMode &&
+            (host == 'localhost' ||
+                host == '10.0.2.2' ||
+                host == '192.168.1.9' ||
+                host == '192.168.1.11')) {
+          return true;
+        }
+        return false;
+      };
   }
 
   /// GET request
@@ -211,9 +237,11 @@ class ApiClient {
       // Build URL
       var uri = Uri.parse('$baseUrl$path');
       if (queryParams != null && queryParams.isNotEmpty) {
-        uri = uri.replace(queryParameters: queryParams.map(
-          (key, value) => MapEntry(key, value.toString()),
-        ));
+        uri = uri.replace(
+          queryParameters: queryParams.map(
+            (key, value) => MapEntry(key, value.toString()),
+          ),
+        );
       }
 
       // Create request
@@ -235,15 +263,96 @@ class ApiClient {
         request.headers.set(key, value);
       });
 
-      // Set body
+      // Set body (set encoding to utf8 to support non-ASCII characters like Vietnamese)
       if (body != null) {
         final jsonBody = json.encode(body);
+        request.headers.contentType = ContentType(
+          'application',
+          'json',
+          charset: 'utf-8',
+        );
         request.write(jsonBody);
       }
 
       // Send request
       final response = await request.close().timeout(timeout);
       final responseBody = await response.transform(utf8.decoder).join();
+
+      // Handle redirects (307, 308, etc.)
+      if ((response.statusCode == 307 || response.statusCode == 308) &&
+          response.headers['location'] != null) {
+        final redirectUrl = response.headers['location']!.first;
+        debugPrint('Redirect detected: ${response.statusCode} -> $redirectUrl');
+
+        // Create a new request to the redirect location
+        final redirectUri = Uri.parse(redirectUrl);
+        final redirectRequest = await _createRequest(method, redirectUri);
+
+        // Reapply all headers to the redirect request
+        requestHeaders.forEach((key, value) {
+          redirectRequest.headers.set(key, value);
+        });
+
+        // Reapply body if needed (for PUT/POST redirects)
+        if (body != null) {
+          final jsonBody = json.encode(body);
+          redirectRequest.headers.contentType = ContentType(
+            'application',
+            'json',
+            charset: 'utf-8',
+          );
+          redirectRequest.write(jsonBody);
+        }
+
+        // Send redirect request
+        final redirectResponse = await redirectRequest.close().timeout(timeout);
+        final redirectBody = await redirectResponse
+            .transform(utf8.decoder)
+            .join();
+
+        // Parse redirect response
+        dynamic jsonRedirectResponse;
+        try {
+          jsonRedirectResponse = json.decode(redirectBody);
+        } catch (_) {
+          jsonRedirectResponse = redirectBody;
+        }
+
+        // Apply response interceptors to redirect response
+        for (final interceptor in responseInterceptors) {
+          await interceptor.onResponse(
+            redirectResponse.statusCode,
+            jsonRedirectResponse,
+          );
+        }
+
+        // Check redirect response status
+        if (redirectResponse.statusCode >= 200 &&
+            redirectResponse.statusCode < 300) {
+          final data = parser != null
+              ? parser(jsonRedirectResponse)
+              : jsonRedirectResponse as T?;
+          return ApiResponse.success(
+            data as T,
+            statusCode: redirectResponse.statusCode,
+          );
+        } else {
+          final error = ApiException(
+            statusCode: redirectResponse.statusCode,
+            message: _getErrorMessage(
+              redirectResponse.statusCode,
+              jsonRedirectResponse,
+            ),
+            data: jsonRedirectResponse,
+          );
+
+          for (final interceptor in responseInterceptors) {
+            await interceptor.onError(error);
+          }
+
+          throw error;
+        }
+      }
 
       // Parse response
       dynamic jsonResponse;
@@ -261,10 +370,7 @@ class ApiClient {
       // Check status code
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = parser != null ? parser(jsonResponse) : jsonResponse as T?;
-        return ApiResponse.success(
-          data as T,
-          statusCode: response.statusCode,
-        );
+        return ApiResponse.success(data as T, statusCode: response.statusCode);
       } else {
         final error = ApiException(
           statusCode: response.statusCode,
@@ -279,22 +385,13 @@ class ApiClient {
         throw error;
       }
     } on SocketException {
-      throw ApiException(
-        statusCode: -1,
-        message: 'No internet connection',
-      );
+      throw ApiException(statusCode: -1, message: 'No internet connection');
     } on TimeoutException {
-      throw ApiException(
-        statusCode: -2,
-        message: 'Request timeout',
-      );
+      throw ApiException(statusCode: -2, message: 'Request timeout');
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(
-        statusCode: -3,
-        message: e.toString(),
-      );
+      throw ApiException(statusCode: -3, message: e.toString());
     }
   }
 

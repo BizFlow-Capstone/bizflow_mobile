@@ -101,6 +101,7 @@ class AppButton extends StatelessWidget {
 
     final textStyle = _getTextStyle();
     final iconSize = _getIconSize();
+    final textColor = _getTextColor();
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -110,7 +111,7 @@ class AppButton extends StatelessWidget {
           Icon(prefixIcon, size: iconSize),
           SizedBox(width: AppSpacing.sm),
         ],
-        Text(label, style: textStyle),
+        Text(label, style: textStyle.copyWith(color: textColor)),
         if (suffixIcon != null) ...[
           SizedBox(width: AppSpacing.sm),
           Icon(suffixIcon, size: iconSize),
@@ -165,6 +166,18 @@ class AppButton extends StatelessWidget {
     }
   }
 
+  Color _getTextColor() {
+    switch (type) {
+      case AppButtonType.primary:
+      case AppButtonType.secondary:
+      case AppButtonType.danger:
+        return AppColors.white;
+      case AppButtonType.outlined:
+      case AppButtonType.text:
+        return AppColors.primary;
+    }
+  }
+
   Color _getLoadingColor() {
     switch (type) {
       case AppButtonType.primary:
@@ -183,9 +196,7 @@ class AppButton extends StatelessWidget {
       foregroundColor: AppColors.white,
       disabledBackgroundColor: AppColors.disabled,
       disabledForegroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -196,9 +207,7 @@ class AppButton extends StatelessWidget {
       foregroundColor: AppColors.white,
       disabledBackgroundColor: AppColors.disabled,
       disabledForegroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -209,9 +218,7 @@ class AppButton extends StatelessWidget {
       side: BorderSide(
         color: isDisabled ? AppColors.disabled : AppColors.primary,
       ),
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -219,9 +226,7 @@ class AppButton extends StatelessWidget {
   ButtonStyle _textStyle() {
     return TextButton.styleFrom(
       foregroundColor: AppColors.primary,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
@@ -232,9 +237,7 @@ class AppButton extends StatelessWidget {
       foregroundColor: AppColors.white,
       disabledBackgroundColor: AppColors.disabled,
       disabledForegroundColor: AppColors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-      ),
+      shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
     );
   }
