@@ -846,13 +846,8 @@ class _AddProductPageState extends State<AddProductPage> {
             suffixIcon: IconButton(
               icon: Icon(Icons.qr_code_scanner, color: AppColors.secondary),
               onPressed: () async {
-                var res = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AppBarcodeScanner(),
-                  ),
-                );
-                if (res is String && res != '-1' && res.isNotEmpty) {
+                final res = await AppBarcodeScanner.scan(context);
+                if (res != null) {
                   setState(() {
                     controller.text = res;
                   });

@@ -273,16 +273,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   child: IconButton(
                     icon: const Icon(Icons.qr_code_scanner),
                     onPressed: () async {
-                      var res = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AppBarcodeScanner(),
-                        ),
-                      );
-                      if (res is String &&
-                          res != '-1' &&
-                          res.isNotEmpty &&
-                          mounted) {
+                      final res = await AppBarcodeScanner.scan(context);
+                      if (res != null && mounted) {
                         setState(() {
                           _searchController.text = res;
                         });
