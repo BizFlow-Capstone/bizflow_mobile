@@ -114,6 +114,10 @@ class StorageKeys {
   static const String isFirstLaunch = 'is_first_launch';
   static const String notificationEnabled = 'notification_enabled';
 
+  // Business Context
+  static const String currentBusinessId = 'current_business_id';
+  static const String currentBusinessName = 'current_business_name';
+
   // Cache
   static const String lastSyncTime = 'last_sync_time';
 

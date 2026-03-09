@@ -55,4 +55,34 @@ class LocationEntity {
       employeeIds: employeeIds ?? this.employeeIds,
     );
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'district': district,
+      'city': city,
+      'phone': phone,
+      'isActive': isActive,
+      'ownerName': ownerName,
+      'taxCode': taxCode,
+      'employeeIds': employeeIds,
+    };
+  }
+
+  factory LocationEntity.fromMap(Map<String, dynamic> map) {
+    return LocationEntity(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      address: map['address'] ?? '',
+      district: map['district'] ?? '',
+      city: map['city'] ?? '',
+      phone: map['phone'] ?? '',
+      isActive: map['isActive'] ?? false,
+      ownerName: map['ownerName'] ?? '',
+      taxCode: map['taxCode'],
+      employeeIds: List<String>.from(map['employeeIds'] ?? []),
+    );
+  }
 }

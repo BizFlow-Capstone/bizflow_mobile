@@ -24,7 +24,13 @@ import 'features/product/presentation/bloc/product_bloc.dart';
 import 'features/product/data/import_api_service.dart';
 import 'features/product/data/import_repository.dart';
 
-void main() {
+import 'shared/context/business_context.dart';
+import 'shared/cache/cache_manager.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await CacheManager().init();
+  await BusinessContext().init();
   runApp(const MyApp());
 }
 
@@ -97,7 +103,11 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: _localizationProvider),
-        BlocProvider(create: (context) => AuthBloc()),
+        ChangeNotifierProvider.value(value: BusinessContext()),
+        BlocProvider(
+          create: (context) =>
+              AuthBloc(locationRepository: _locationRepository),
+        ),
         BlocProvider(
           create: (context) => LocationBloc(
             repository: _locationRepository,

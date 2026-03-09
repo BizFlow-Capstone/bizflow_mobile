@@ -7,6 +7,7 @@ import '../../data/models/location_dto.dart';
 import '../../domain/entities/location_entity.dart';
 import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
+import '../../../../shared/cache/cache_manager.dart';
 
 /// Location BLoC
 /// Quản lý logic của tất cả các thao tác liên quan đến địa điểm kinh doanh
@@ -48,14 +49,30 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     LoadLocationsRequested event,
     Emitter<LocationState> emit,
   ) async {
+    // Only emit loading initially so UI can show some loading indicator
+    // if there is absolutely no cache.
     emit(const LocationLoading());
-    try {
-      // Call API to get locations
-      final locations = await _refreshLocations();
-      emit(LocationsLoaded(locations: locations));
-    } catch (e) {
-      emit(LocationFailure(message: e.toString()));
-    }
+
+    await CacheManager().fetchWithSWR<List<LocationEntity>>(
+      key: 'my_owned_locations',
+      fetcher: _refreshLocations,
+      fromJson: (json) {
+        final list = json['data'] as List;
+        return list
+            .map((e) => LocationEntity.fromMap(e as Map<String, dynamic>))
+            .toList();
+      },
+      toJson: (data) {
+        return {'data': data.map((e) => e.toMap()).toList()};
+      },
+      onData: (data, isFromCache) {
+        _locations = data;
+        emit(LocationsLoaded(locations: data));
+      },
+      onError: (error) {
+        emit(LocationFailure(message: error.toString()));
+      },
+    );
   }
 
   /// Restore cached locations (instant, no API call)
@@ -92,6 +109,11 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
             isActive: event.isActive,
           );
 
+          // Update underlying storage cache
+          await CacheManager().set('my_owned_locations', {
+            'data': _locations.map((e) => e.toMap()).toList(),
+          });
+
           // Emit success event
           emit(LocationToggleSuccess(updatedLocation: _locations[index]));
 
@@ -127,6 +149,11 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         (loc) => loc.id == newLocation.id,
         orElse: () => newLocation,
       );
+
+      // Save to disk
+      await CacheManager().set('my_owned_locations', {
+        'data': refreshed.map((e) => e.toMap()).toList(),
+      });
 
       emit(LocationAddSuccess(newLocation: createdLocation));
       emit(LocationsLoaded(locations: List.from(refreshed)));
@@ -199,11 +226,16 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         employeeIds: originalLocation.employeeIds + newEmployeeIds,
       );
 
-      // Update cache
+      // Update local memory cache
       final index = _locations.indexWhere((loc) => loc.id == event.locationId);
       if (index != -1) {
         _locations[index] = updatedLocation;
       }
+
+      // Update persistent CacheManager
+      await CacheManager().set('my_owned_locations', {
+        'data': _locations.map((e) => e.toMap()).toList(),
+      });
 
       emit(LocationEditSuccess(updatedLocation: updatedLocation));
       emit(LocationsLoaded(locations: List.from(_locations)));
@@ -223,6 +255,11 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       await Future.delayed(const Duration(milliseconds: 500));
 
       _locations.removeWhere((loc) => loc.id == event.locationId);
+
+      await CacheManager().set('my_owned_locations', {
+        'data': _locations.map((e) => e.toMap()).toList(),
+      });
+
       emit(LocationDeleteSuccess(locationId: event.locationId));
       emit(LocationsLoaded(locations: _locations));
     } catch (e) {

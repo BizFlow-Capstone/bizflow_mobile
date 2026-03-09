@@ -166,7 +166,11 @@
     "employee_all_assigned": "All employees have been assigned",
     "employee_update_button": "Update employees",
     "employee_update_success": "Employees updated successfully",
-    "employee_no_results": "No employees assigned yet"
+    "employee_no_results": "No employees assigned yet",
+    "welcome_bizflow": "Welcome to Bizflow",
+    "no_locations_yet": "You don't have any business locations yet",
+    "create_or_invite_msg": "Please create a business location or accept an invitation from others to start using Bizflow.",
+    "accept_invite": "Accept Invitation"
   },
   "appbar": {
     "greeting": "Hello,"
@@ -348,10 +352,14 @@
     "reports": "Reports",
     "upgrade_premium": "Upgrade Premium",
     "unlock_all_features": "Unlock all features",
+    "manage_products": "Manage Products",
+    "products_active": "Manage current inventory",
     "manage_locations": "Manage Locations",
     "locations_active": "{count} locations active",
     "manage_employees": "Manage Employees",
-    "employees_count": "{count} employees"
+    "employees_count": "{count} employees",
+    "managing": "Managing",
+    "please_select_location": "Please select or create a business location first"
   },
   "subscription": {
     "appbar_title": "Subscription",

@@ -8,6 +8,7 @@ import '../../../../core/theme/app_text_styles.dart';
 class ManagementCards extends StatelessWidget {
   final int locationsCount;
   final int employeesCount;
+  final VoidCallback? onProductsTab;
   final VoidCallback? onLocationsTab;
   final VoidCallback? onEmployeesTab;
 
@@ -15,6 +16,7 @@ class ManagementCards extends StatelessWidget {
     super.key,
     this.locationsCount = 5,
     this.employeesCount = 12,
+    this.onProductsTab,
     this.onLocationsTab,
     this.onEmployeesTab,
   });
@@ -24,6 +26,14 @@ class ManagementCards extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return Column(
       children: [
+        _ManagementCard(
+          icon: Icons.inventory_2_outlined,
+          iconColor: const Color(0xFF4CAF50),
+          title: l10n.translate('home.manage_products'),
+          subtitle: l10n.translate('home.products_active'),
+          onTap: onProductsTab,
+        ),
+        SizedBox(height: AppSpacing.md),
         _ManagementCard(
           icon: Icons.location_on_outlined,
           iconColor: const Color(0xFF00BCD4),

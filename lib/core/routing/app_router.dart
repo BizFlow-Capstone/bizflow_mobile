@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:bizflow_mobile/core/localization/app_localizations.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
@@ -7,6 +8,7 @@ import '../../features/auth/presentation/pages/verify_otp_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
+import '../../features/location/presentation/pages/no_location_page.dart';
 import '../../features/product/presentation/pages/product_management_page.dart';
 import '../../features/product/presentation/pages/import_history_page.dart';
 import '../../features/order/presentation/pages/order_list_screen.dart';
@@ -19,6 +21,7 @@ import '../../features/location/presentation/bloc/location_state.dart';
 import '../../shared/widgets/app_bar_custom.dart';
 import '../../shared/widgets/sidebar_widget.dart';
 import '../../shared/dialogs/app_snackbar.dart';
+import '../../shared/context/business_context.dart';
 
 /// Route names - Tập trung khai báo tất cả route
 class AppRoutes {
@@ -35,6 +38,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String locationManagement = '/location-management';
   static const String addEditLocation = '/add-edit-location';
+  static const String noLocation = '/no-location';
   static const String productManagement = '/product-management';
   static const String orderList = '/order-list';
   static const String orderStatus = '/order-status';
@@ -125,6 +129,9 @@ class AppRouter {
           settings,
           _GlobalAppBarShell(child: const AddEditLocationPage()),
         );
+
+      case AppRoutes.noLocation:
+        return _buildRoute(settings, const NoLocationPage());
 
       case AppRoutes.productManagement:
         final args = settings.arguments as Map<String, dynamic>?;
@@ -261,7 +268,6 @@ class _GlobalAppBarShell extends StatefulWidget {
 }
 
 class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
-  LocationItem? _selectedLocation;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
@@ -288,60 +294,82 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
             },
           ),
           // Drawer
-          drawer: BlocBuilder<LocationBloc, LocationState>(
-            builder: (context, state) {
-              // Get locations for sidebar
-              final l10n = AppLocalizations.of(context);
-              List<LocationItem> locations = [];
-              if (state is LocationsLoaded) {
-                locations = state.locations
-                    .map(
-                      (loc) => LocationItem(
-                        id: loc.id,
-                        name: loc.name,
-                        isActive: loc.isActive,
-                      ),
-                    )
-                    .toList();
-              }
+          drawer: Consumer<BusinessContext>(
+            builder: (context, businessContext, _) {
+              return BlocBuilder<LocationBloc, LocationState>(
+                builder: (context, state) {
+                  // Get locations for sidebar
+                  final l10n = AppLocalizations.of(context);
+                  List<LocationItem> locations = [];
+                  LocationItem? selectedLocation;
 
-              return SidebarWidget(
-                locations: locations,
-                selectedLocation: _selectedLocation,
-                onAddLocation: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddEditLocationPage(),
-                    ),
+                  if (state is LocationsLoaded) {
+                    locations = state.locations
+                        .map(
+                          (loc) => LocationItem(
+                            id: loc.id,
+                            name: loc.name,
+                            isActive: loc.isActive,
+                          ),
+                        )
+                        .toList();
+
+                    // Resolve selectedLocation from businessContext
+                    if (businessContext.currentBusinessId != null) {
+                      try {
+                        selectedLocation = locations.firstWhere(
+                          (loc) => loc.id == businessContext.currentBusinessId,
+                        );
+                      } catch (_) {
+                        // Safe fallback
+                      }
+                    } else if (locations.isNotEmpty) {
+                      // Fallback if no context selected
+                      selectedLocation = locations.first;
+                    }
+                  }
+
+                  return SidebarWidget(
+                    locations: locations,
+                    selectedLocation: selectedLocation,
+                    onAddLocation: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddEditLocationPage(),
+                        ),
+                      );
+                    },
+                    onLogout: () {
+                      businessContext.clear();
+                      AppSnackBar.show(
+                        context,
+                        message: l10n.translate('sidebar.logout'),
+                        type: AppSnackBarType.info,
+                      );
+                    },
+                    onGuide: () {
+                      AppSnackBar.show(
+                        context,
+                        message: l10n.translate('sidebar.guide'),
+                        type: AppSnackBarType.info,
+                      );
+                    },
+                    onAccountSettings: () {
+                      AppSnackBar.show(
+                        context,
+                        message: l10n.translate('sidebar.account_settings'),
+                        type: AppSnackBarType.info,
+                      );
+                    },
+                    onLocationSelected: (location) {
+                      businessContext.switchBusinessLocation(
+                        location.id,
+                        location.name,
+                      );
+                    },
                   );
-                },
-                onLogout: () {
-                  AppSnackBar.show(
-                    context,
-                    message: l10n.translate('sidebar.logout'),
-                    type: AppSnackBarType.info,
-                  );
-                },
-                onGuide: () {
-                  AppSnackBar.show(
-                    context,
-                    message: l10n.translate('sidebar.guide'),
-                    type: AppSnackBarType.info,
-                  );
-                },
-                onAccountSettings: () {
-                  AppSnackBar.show(
-                    context,
-                    message: l10n.translate('sidebar.account_settings'),
-                    type: AppSnackBarType.info,
-                  );
-                },
-                onLocationSelected: (location) {
-                  setState(() {
-                    _selectedLocation = location;
-                  });
                 },
               );
             },

@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
+import '../../../../shared/cache/cache_manager.dart';
+import '../../../location/data/location_repository.dart';
 
 /// Error codes for auth operations
 /// These codes are mapped to localization keys in UI layer
@@ -22,7 +25,9 @@ enum AuthErrorCode {
 /// Xử lý tất cả auth events: signup, login, verify OTP, logout
 /// NOTE: Bloc không biết về localization - chỉ return error code
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
-  AuthBloc() : super(AuthInitial()) {
+  final LocationRepository locationRepository;
+
+  AuthBloc({required this.locationRepository}) : super(AuthInitial()) {
     // Handle Signup Events
     on<SignupRequested>(_onSignupRequested);
     on<GoogleSignupRequested>(_onGoogleSignupRequested);
@@ -38,6 +43,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     // Handle General Events
     on<LogoutRequested>(_onLogoutRequested);
     on<ClearAuthError>(_onClearAuthError);
+  }
+
+  Future<void> _prefetchLocations() async {
+    try {
+      final locations = await locationRepository.getMyOwnedLocations();
+      await CacheManager().set('my_owned_locations', {
+        'data': locations.map((e) => e.toMap()).toList(),
+      });
+    } catch (e) {
+      debugPrint('Prefetch locations error: $e');
+    }
   }
 
   /// Handle Signup
@@ -102,6 +118,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
+      await _prefetchLocations();
       emit(
         LoginSuccess(
           token: 'mock_token_123',
@@ -127,6 +144,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       // Mock success
       await Future.delayed(const Duration(seconds: 2));
+      await _prefetchLocations();
       emit(
         LoginSuccess(
           token: 'mock_google_token_123',
@@ -156,6 +174,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (event.otpCode == '000000') {
         emit(const OtpVerificationFailure(errorCode: AuthErrorCode.invalidOtp));
       } else {
+        await _prefetchLocations();
         emit(
           OtpVerificationSuccess(
             token: 'mock_token_after_otp',

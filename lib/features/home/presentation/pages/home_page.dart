@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../location/presentation/bloc/location_bloc.dart';
+import '../../../location/presentation/bloc/location_state.dart';
 import '../widgets/greeting_section.dart';
 import '../widgets/stats_cards.dart';
 import '../widgets/quick_actions.dart';
@@ -25,36 +33,132 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Quick Actions
-              QuickActions(
-                onCreateOrder: () =>
-                    AppRouter.navigateTo(AppRoutes.orderCreateSelection),
-                onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
-              ),
-              SizedBox(height: AppSpacing.lg),
+    final l10n = AppLocalizations.of(context);
 
-              // Premium Upgrade Banner
-              PremiumBanner(
-                onTap: () => AppRouter.navigateTo(AppRoutes.subscriptionPlans),
-              ),
-              SizedBox(height: AppSpacing.lg),
+    return BlocListener<LocationBloc, LocationState>(
+      listener: (context, state) {
+        if (state is LocationsLoaded && state.locations.isEmpty) {
+          // If the user has 0 locations, send them to the no locations screen
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            AppRouter.navigateAndClearStack(AppRoutes.noLocation);
+          });
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Business Context Section
+                Consumer<BusinessContext>(
+                  builder: (context, businessContext, _) {
+                    final isContextReady =
+                        businessContext.currentBusinessId != null;
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusMd,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.translate('home.managing'),
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.storefront,
+                                color: AppColors.secondary,
+                                size: 24,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  isContextReady
+                                      ? (businessContext.currentBusinessName ??
+                                            l10n.translate('common.loading'))
+                                      : l10n.translate('common.loading'),
+                                  style: AppTextStyles.titleLarge.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
 
-              // Management Cards (Locations & Employees)
-              ManagementCards(
-                onLocationsTab: () =>
-                    AppRouter.navigateTo(AppRoutes.locationManagement),
-              ),
-              SizedBox(height: AppSpacing.xl),
-              const SafeArea(top: false, child: SizedBox.shrink()),
-            ],
+                // Quick Actions
+                QuickActions(
+                  onCreateOrder: () =>
+                      AppRouter.navigateTo(AppRoutes.orderCreateSelection),
+                  onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
+                ),
+                SizedBox(height: AppSpacing.lg),
+
+                // Premium Upgrade Banner
+                PremiumBanner(
+                  onTap: () =>
+                      AppRouter.navigateTo(AppRoutes.subscriptionPlans),
+                ),
+                SizedBox(height: AppSpacing.lg),
+
+                // Management Cards (Locations & Employees)
+                ManagementCards(
+                  onProductsTab: () {
+                    final contextData = Provider.of<BusinessContext>(
+                      context,
+                      listen: false,
+                    );
+                    if (contextData.currentBusinessId != null) {
+                      AppRouter.navigateTo(
+                        AppRoutes.productManagement,
+                        arguments: {
+                          'locationId': contextData.currentBusinessId,
+                          'locationName': contextData.currentBusinessName,
+                        },
+                      );
+                    } else {
+                      AppSnackBar.show(
+                        context,
+                        message: l10n.translate('home.please_select_location'),
+                        type: AppSnackBarType.warning,
+                      );
+                    }
+                  },
+                  onLocationsTab: () =>
+                      AppRouter.navigateTo(AppRoutes.locationManagement),
+                ),
+                SizedBox(height: AppSpacing.xl),
+                const SafeArea(top: false, child: SizedBox.shrink()),
+              ],
+            ),
           ),
         ),
       ),

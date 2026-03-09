@@ -170,7 +170,11 @@
     "employee_all_assigned": "Tất cả nhân viên đã được phân công",
     "employee_update_button": "Cập nhật nhân viên",
     "employee_update_success": "Cập nhật nhân viên thành công",
-    "employee_no_results": "Chưa có nhân viên nào"
+    "employee_no_results": "Chưa có nhân viên nào",
+    "welcome_bizflow": "Chào mừng đến với Bizflow",
+    "no_locations_yet": "Bạn chưa có địa điểm kinh doanh nào cả",
+    "create_or_invite_msg": "Hãy tạo địa điểm kinh doanh hoặc nhận lời mời từ người khác để bắt đầu sử dụng Bizflow.",
+    "accept_invite": "Nhận lời mời"
   },
   "appbar": {
     "greeting": "Xin chào,"
@@ -352,10 +356,14 @@
     "reports": "Báo cáo",
     "upgrade_premium": "Nâng cấp Premium",
     "unlock_all_features": "Mở khóa tất cả tính năng",
+    "manage_products": "Quản lý Sản phẩm",
+    "products_active": "Quản lý tồn kho hiện tại",
     "manage_locations": "Quản lý Địa điểm",
     "locations_active": "{count} địa điểm đang hoạt động",
     "manage_employees": "Quản lý Nhân viên",
-    "employees_count": "{count} nhân viên"
+    "employees_count": "{count} nhân viên",
+    "managing": "Đang quản lý",
+    "please_select_location": "Vui lòng chọn hoặc tạo địa điểm kinh doanh trước"
   },
   "subscription": {
     "appbar_title": "Gói Đăng Ký",
