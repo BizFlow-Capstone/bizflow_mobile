@@ -10,8 +10,8 @@ import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
+import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../widgets/product_filter_dialog.dart';
-import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 import 'add_product_page.dart';
 import 'import_history_page.dart';
 
@@ -276,8 +276,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                       var res = await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) =>
-                              const SimpleBarcodeScannerPage(),
+                          builder: (context) => const AppBarcodeScanner(),
                         ),
                       );
                       if (res is String &&

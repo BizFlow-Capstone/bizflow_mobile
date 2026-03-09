@@ -358,7 +358,7 @@
     "locations_active": "{count} locations active",
     "manage_employees": "Manage Employees",
     "employees_count": "{count} employees",
-    "managing": "Managing",
+    "managing": "Current business location",
     "please_select_location": "Please select or create a business location first"
   },
   "subscription": {

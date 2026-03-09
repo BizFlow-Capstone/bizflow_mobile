@@ -10,7 +10,7 @@ import '../../../../shared/utils/formatters.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
-import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
+import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../../data/models/business_type_model.dart';
 
 /// Add New Product Page
@@ -849,7 +849,7 @@ class _AddProductPageState extends State<AddProductPage> {
                 var res = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const SimpleBarcodeScannerPage(),
+                    builder: (context) => const AppBarcodeScanner(),
                   ),
                 );
                 if (res is String && res != '-1' && res.isNotEmpty) {

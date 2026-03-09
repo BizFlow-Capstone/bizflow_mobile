@@ -89,7 +89,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           searchQuery: _searchQuery,
           filterStatus: _filterStatus,
           filterCategory: _filterCategory,
-          apiMessage: response is Map ? response['message'] as String? : null,
+          apiMessage: null, // do not show API success message for GET
         ),
       );
     } catch (e) {
@@ -123,7 +123,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           searchQuery: _searchQuery,
           filterStatus: _filterStatus,
           filterCategory: _filterCategory,
-          apiMessage: response is Map ? response['message'] as String? : null,
+          apiMessage: null, // do not show API success message for GET
         ),
       );
     } catch (e) {

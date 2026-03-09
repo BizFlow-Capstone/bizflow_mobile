@@ -94,8 +94,8 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                             ),
                             child: GestureDetector(
                               onTap: () {
-                                widget.onLocationSelected?.call(location);
                                 Navigator.pop(context);
+                                widget.onLocationSelected?.call(location);
                               },
                               child: Container(
                                 decoration: BoxDecoration(
@@ -164,21 +164,17 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                     // Add Location Button
                     Padding(
                       padding: const EdgeInsets.all(AppSpacing.md),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: widget.onAddLocation,
-                          icon: const Icon(Icons.add),
-                          label: Text(l10n.translate('sidebar.add_location')),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondary,
-                            foregroundColor: AppColors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppSpacing.radiusXs,
-                              ),
-                            ),
+                      child: InkWell(
+                        onTap: widget.onAddLocation,
+                        borderRadius: BorderRadius.circular(30),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            shape: BoxShape.circle,
                           ),
+                          child: Icon(Icons.add, color: AppColors.white),
                         ),
                       ),
                     ),

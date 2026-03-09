@@ -137,12 +137,10 @@ class AppRouter {
         final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(
-            child: ProductManagementPage(
-              locationId: args?['locationId'] ?? '',
-              locationName: args?['locationName'] ?? 'Location',
-              locationAddress: args?['locationAddress'] ?? 'Address',
-            ),
+          ProductManagementPage(
+            locationId: args?['locationId'] ?? '',
+            locationName: args?['locationName'] ?? 'Location',
+            locationAddress: args?['locationAddress'] ?? 'Address',
           ),
         );
 
@@ -368,6 +366,8 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                         location.id,
                         location.name,
                       );
+                      // Go back to Home
+                      AppRouter.navigateAndClearStack(AppRoutes.home);
                     },
                   );
                 },

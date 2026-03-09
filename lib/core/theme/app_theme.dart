@@ -34,6 +34,8 @@ class AppTheme {
       centerTitle: true,
       backgroundColor: AppColors.primary,
       foregroundColor: AppColors.white,
+      surfaceTintColor:
+          Colors.transparent, // Prevents Material 3 scroll color change
       systemOverlayStyle: SystemUiOverlayStyle.light,
       titleTextStyle: AppTextStyles.titleLarge,
       iconTheme: IconThemeData(color: AppColors.white),
@@ -248,6 +250,8 @@ class AppTheme {
       centerTitle: true,
       backgroundColor: const Color(0xFF1E1E1E),
       foregroundColor: AppColors.white,
+      surfaceTintColor:
+          Colors.transparent, // Prevents Material 3 scroll color change
       systemOverlayStyle: SystemUiOverlayStyle.dark,
       titleTextStyle: AppTextStyles.titleLarge.copyWith(color: AppColors.white),
       iconTheme: const IconThemeData(color: AppColors.white),

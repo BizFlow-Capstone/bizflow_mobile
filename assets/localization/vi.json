@@ -362,7 +362,7 @@
     "locations_active": "{count} địa điểm đang hoạt động",
     "manage_employees": "Quản lý Nhân viên",
     "employees_count": "{count} nhân viên",
-    "managing": "Đang quản lý",
+    "managing": "Địa điểm kinh doanh hiện tại",
     "please_select_location": "Vui lòng chọn hoặc tạo địa điểm kinh doanh trước"
   },
   "subscription": {

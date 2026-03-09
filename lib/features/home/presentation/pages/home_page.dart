@@ -9,8 +9,8 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
+import '../../../location/presentation/bloc/location_event.dart';
 import '../../../location/presentation/bloc/location_state.dart';
-import '../widgets/greeting_section.dart';
 import '../widgets/stats_cards.dart';
 import '../widgets/quick_actions.dart';
 import '../widgets/premium_banner.dart';
@@ -31,6 +31,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Đảm bảo danh sách địa điểm được tải khi ở HomePage để hiển thị trên Sidebar
+    final locationBloc = context.read<LocationBloc>();
+    if (locationBloc.state is LocationInitial) {
+      locationBloc.add(const LoadLocationsRequested());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
