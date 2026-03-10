@@ -16,6 +16,10 @@ import '../../features/order/presentation/pages/order_status_screen.dart';
 import '../../features/order/presentation/pages/order_creation_selection_screen.dart';
 import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
 import '../../features/subscription/presentation/pages/premium_payment_page.dart';
+import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/notification/presentation/pages/notification_list_page.dart';
+import '../../features/notification/presentation/pages/notification_detail_page.dart';
+import '../../features/debt/presentation/pages/debt_list_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
 import '../../shared/widgets/app_bar_custom.dart';
@@ -48,6 +52,9 @@ class AppRoutes {
   static const String profile = '/profile';
   static const String settings = '/settings';
   static const String importHistory = '/import-history';
+  static const String notifications = '/notifications';
+  static const String notificationDetail = '/notification-detail';
+  static const String debtList = '/debt-list';
 }
 
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
@@ -185,9 +192,28 @@ class AppRouter {
         );
 
       case AppRoutes.settings:
+        return _buildRoute(settings, const SettingsPage());
+
+      case AppRoutes.notifications:
+        return _buildRoute(settings, const NotificationListPage());
+
+      case AppRoutes.notificationDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const _PlaceholderPage(title: 'Settings')),
+          NotificationDetailPage(
+            title: args?['title'] ?? '',
+            body: args?['body'] ?? '',
+            time: args?['time'] ?? '',
+            icon: args?['icon'] ?? Icons.notifications,
+            iconColor: args?['iconColor'] ?? Colors.blue,
+          ),
+        );
+
+      case AppRoutes.debtList:
+        return _buildRoute(
+          settings,
+           const DebtListPage(),
         );
 
       case AppRoutes.importHistory:
@@ -279,13 +305,12 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           appBar: CustomAppBar(
             userName: AppRouter.globalAppBarState.userName,
             scaffoldKey: _scaffoldKey,
+            notificationCount: 2, // Mock: 2 unread notifications
             onLocaleChange: (locale) {
               AppRouter.globalAppBarState.setLocale(locale);
             },
             onNotificationTap: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Notifications')));
+              AppRouter.navigateTo(AppRoutes.notifications);
             },
             onSettingsTap: () {
               AppRouter.navigateTo(AppRoutes.settings);

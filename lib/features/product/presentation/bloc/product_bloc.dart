@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
 import '../../data/models/business_type_model.dart';
+import '../../../../shared/cache/cache_manager.dart';
 import 'product_event.dart';
 import 'product_state.dart';
 
@@ -63,39 +64,55 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     emit(const ProductLoading());
-    try {
-      debugPrint(
-        'ProductBloc: Loading products for location ${event.locationId} with filters: $_searchQuery, $_filterStatus',
-      );
 
-      final response = await repository.getProducts(
-        locationId: int.tryParse(event.locationId),
-        name: _searchQuery,
-        sku: _searchQuery,
-        status: _filterStatus,
-      );
+    final cacheKey = 'cache_products_${event.locationId}';
 
-      debugPrint('ProductBloc: Response received');
-
-      final products = _parseProductsFromResponse(response);
-
-      _products = products;
-      emit(
-        ProductsLoaded(
-          products: products,
-          hasReachedMax: products.length < 20,
-          currentPage: 1,
-          locationId: event.locationId,
-          searchQuery: _searchQuery,
-          filterStatus: _filterStatus,
-          filterCategory: _filterCategory,
-          apiMessage: null, // do not show API success message for GET
-        ),
-      );
-    } catch (e) {
-      debugPrint('ProductBloc._onLoadProductsByLocationRequested error: $e');
-      emit(ProductFailure(message: 'Failed to load products: ${e.toString()}'));
-    }
+    await CacheManager().fetchWithSWR<List<ProductEntity>>(
+      key: cacheKey,
+      fetcher: () async {
+        debugPrint(
+          'ProductBloc: Loading products for location ${event.locationId} with filters: $_searchQuery, $_filterStatus',
+        );
+        final response = await repository.getProducts(
+          locationId: int.tryParse(event.locationId),
+          name: _searchQuery,
+          sku: _searchQuery,
+          status: _filterStatus,
+        );
+        debugPrint('ProductBloc: Response received');
+        return _parseProductsFromResponse(response);
+      },
+      fromJson: (json) {
+        final list = json['data'] as List;
+        return list
+            .map((e) => ProductEntity.fromMap(e as Map<String, dynamic>))
+            .toList();
+      },
+      toJson: (data) {
+        return {'data': data.map((e) => e.toMap()).toList()};
+      },
+      onData: (products, isFromCache) {
+        _products = products;
+        emit(
+          ProductsLoaded(
+            products: products,
+            hasReachedMax: products.length < 20,
+            currentPage: 1,
+            locationId: event.locationId,
+            searchQuery: _searchQuery,
+            filterStatus: _filterStatus,
+            filterCategory: _filterCategory,
+            apiMessage: null,
+          ),
+        );
+      },
+      onError: (e) {
+        debugPrint('ProductBloc._onLoadProductsByLocationRequested error: $e');
+        emit(
+          ProductFailure(message: 'Failed to load products: ${e.toString()}'),
+        );
+      },
+    );
   }
 
   Future<void> _onRefreshProductsRequested(
@@ -396,6 +413,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
       _products.add(newProduct);
 
+      // Update cache
+      await _updateProductCache(event.locationId);
+
       emit(ProductAddSuccess(product: newProduct));
       emit(
         ProductsLoaded(
@@ -469,6 +489,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           description: event.description,
         );
 
+        // Update cache
+        await _updateProductCache(locationId.toString());
+
         emit(ProductUpdateSuccess(product: _products[index]));
         emit(
           ProductsLoaded(
@@ -539,6 +562,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       await repository.deleteProduct(event.productId);
 
       _products.removeWhere((p) => p.id == event.productId);
+
+      // Update cache
+      await _updateProductCache(event.locationId);
 
       emit(ProductDeleteSuccess(productId: event.productId));
       emit(
@@ -715,5 +741,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         ProductFailure(message: 'Failed to import inventory: ${e.toString()}'),
       );
     }
+  }
+
+  /// Helper to update product cache after mutations
+  Future<void> _updateProductCache(String locationId) async {
+    final cacheKey = 'cache_products_$locationId';
+    await CacheManager().set(cacheKey, {
+      'data': _products.map((e) => e.toMap()).toList(),
+    });
   }
 }

@@ -77,4 +77,56 @@ class ProductEntity {
       saleItems: saleItems ?? this.saleItems,
     );
   }
+
+  /// Serialize to Map for CacheManager storage
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'price': price,
+      'quantity': quantity,
+      'imageUrl': imageUrl,
+      'barcode': barcode,
+      'category': category,
+      'costPrice': costPrice,
+      'salePrice': salePrice,
+      'unit': unit,
+      'isActive': isActive,
+      'createdAt': createdAt?.toIso8601String(),
+      'locationId': locationId,
+      'businessTypeId': businessTypeId,
+      'manufacturer': manufacturer,
+      'saleItems': saleItems,
+    };
+  }
+
+  /// Deserialize from Map (CacheManager)
+  factory ProductEntity.fromMap(Map<String, dynamic> map) {
+    return ProductEntity(
+      id: map['id']?.toString() ?? '',
+      name: map['name'] as String? ?? 'Unknown',
+      description: map['description'] as String?,
+      price: (map['price'] as num?)?.toDouble() ?? 0,
+      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      imageUrl: map['imageUrl'] as String?,
+      barcode: map['barcode'] as String?,
+      category: map['category'] as String?,
+      costPrice: (map['costPrice'] as num?)?.toDouble(),
+      salePrice: (map['salePrice'] as num?)?.toDouble(),
+      unit: map['unit'] as String?,
+      isActive: map['isActive'] as bool? ?? true,
+      createdAt: map['createdAt'] != null
+          ? DateTime.tryParse(map['createdAt'] as String)
+          : null,
+      locationId: map['locationId'] as int?,
+      businessTypeId: map['businessTypeId'] as String?,
+      manufacturer: map['manufacturer'] as String?,
+      saleItems:
+          (map['saleItems'] as List<dynamic>?)
+              ?.map((e) => e as Map<String, dynamic>)
+              .toList() ??
+          const [],
+    );
+  }
 }

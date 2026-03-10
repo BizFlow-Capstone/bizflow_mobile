@@ -23,6 +23,7 @@ class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   final VoidCallback? onGuide;
   final VoidCallback? onAccountSettings;
   final GlobalKey<ScaffoldState>? scaffoldKey;
+  final int notificationCount;
 
   const CustomAppBar({
     super.key,
@@ -36,6 +37,7 @@ class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
     this.onGuide,
     this.onAccountSettings,
     this.scaffoldKey,
+    this.notificationCount = 0,
   });
 
   @override
@@ -117,11 +119,50 @@ class _CustomAppBarState extends State<CustomAppBar> {
             localizationProvider.setLocale(locale);
           },
         ),
-        // Notification
-        IconButton(
-          onPressed: widget.onNotificationTap,
-          icon: const Icon(Icons.notifications_none),
-          color: AppColors.textPrimary,
+        // Notification with badge
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              onPressed: widget.onNotificationTap,
+              icon: const Icon(Icons.notifications_none),
+              color: AppColors.textPrimary,
+            ),
+            if (widget.notificationCount > 0)
+              Positioned(
+                right: 6,
+                top: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Center(
+                    child: Text(
+                      widget.notificationCount > 9
+                          ? '9+'
+                          : '${widget.notificationCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        height: 1,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         // Settings
         IconButton(

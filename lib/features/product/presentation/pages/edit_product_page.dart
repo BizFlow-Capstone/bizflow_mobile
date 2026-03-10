@@ -74,7 +74,7 @@ class _EditProductPageState extends State<EditProductPage> {
 
   final ImagePicker _imagePicker = ImagePicker();
 
-  AppLocalizations get l10n => AppLocalizations.of(context)!;
+  AppLocalizations get l10n => AppLocalizations.of(context);
 
   @override
   void initState() {
