@@ -142,30 +142,51 @@ class _HomePageState extends State<HomePage> {
                 SizedBox(height: AppSpacing.lg),
 
                 // Management Cards (Locations & Employees)
-                ManagementCards(
-                  onProductsTab: () {
-                    final contextData = Provider.of<BusinessContext>(
-                      context,
-                      listen: false,
+                BlocBuilder<LocationBloc, LocationState>(
+                  builder: (context, locationState) {
+                    final locationsCount = locationState is LocationsLoaded
+                        ? locationState.locations.length
+                        : 0;
+                    return ManagementCards(
+                      locationsCount: locationsCount,
+                      onProductsTab: () {
+                        final contextData = Provider.of<BusinessContext>(
+                          context,
+                          listen: false,
+                        );
+                        if (contextData.currentBusinessId != null) {
+                          String address = '';
+                          if (locationState is LocationsLoaded) {
+                            try {
+                              final currentLoc = locationState.locations.firstWhere(
+                                (loc) => loc.id == contextData.currentBusinessId,
+                              );
+                              address = currentLoc.address;
+                            } catch (_) {}
+                          }
+
+                          AppRouter.navigateTo(
+                            AppRoutes.productManagement,
+                            arguments: {
+                              'locationId': contextData.currentBusinessId,
+                              'locationName': contextData.currentBusinessName,
+                              'locationAddress': address,
+                            },
+                          );
+                        } else {
+                          AppSnackBar.show(
+                            context,
+                            message: l10n.translate(
+                              'home.please_select_location',
+                            ),
+                            type: AppSnackBarType.warning,
+                          );
+                        }
+                      },
+                      onLocationsTab: () =>
+                          AppRouter.navigateTo(AppRoutes.locationManagement),
                     );
-                    if (contextData.currentBusinessId != null) {
-                      AppRouter.navigateTo(
-                        AppRoutes.productManagement,
-                        arguments: {
-                          'locationId': contextData.currentBusinessId,
-                          'locationName': contextData.currentBusinessName,
-                        },
-                      );
-                    } else {
-                      AppSnackBar.show(
-                        context,
-                        message: l10n.translate('home.please_select_location'),
-                        type: AppSnackBarType.warning,
-                      );
-                    }
                   },
-                  onLocationsTab: () =>
-                      AppRouter.navigateTo(AppRoutes.locationManagement),
                 ),
                 SizedBox(height: AppSpacing.xl),
                 const SafeArea(top: false, child: SizedBox.shrink()),

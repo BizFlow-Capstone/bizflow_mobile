@@ -240,6 +240,8 @@ class ProductDetailPage extends StatelessWidget {
   }
 
   Widget _buildSupplierSection(BuildContext context, AppLocalizations? l10n) {
+    final noData = l10n?.translate('common.no_data') ?? 'Không có';
+
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -260,37 +262,16 @@ class ProductDetailPage extends StatelessWidget {
           ),
           SizedBox(height: AppSpacing.md),
 
-          // Supplier Name
+          // Manufacturer Name
           _buildDetailRow(
             label:
                 l10n?.translate('product.detail.supplier_name') ??
                 'Tên nhà sản xuất',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
-          ),
-          SizedBox(height: AppSpacing.sm),
-
-          // Contact
-          _buildDetailRow(
-            label:
-                l10n?.translate('product.detail.supplier_contact') ??
-                'Số liên lạc',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
-          ),
-          SizedBox(height: AppSpacing.sm),
-
-          // Contact Person
-          _buildDetailRow(
-            label:
-                l10n?.translate('product.detail.contact_person') ??
-                'Người liên hệ',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
-          ),
-          SizedBox(height: AppSpacing.sm),
-
-          // Address
-          _buildDetailRow(
-            label: l10n?.translate('product.detail.address') ?? 'Địa chỉ',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
+            value:
+                (product.manufacturer != null &&
+                    product.manufacturer!.isNotEmpty)
+                ? product.manufacturer!
+                : noData,
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -80,7 +81,7 @@ class SettingsPage extends StatelessWidget {
                 iconBgColor: const Color(0xFFE8EAF6),
                 title: l10n.translate('settings_page.invoice_template'),
                 subtitle: l10n.translate('settings_page.invoice_template_sub'),
-                onTap: () {},
+                onTap: () => AppRouter.navigateTo(AppRoutes.invoiceTemplate),
               ),
               const SizedBox(height: AppSpacing.sm),
               _buildSettingsTile(
@@ -90,7 +91,8 @@ class SettingsPage extends StatelessWidget {
                 iconBgColor: const Color(0xFFFCE4EC),
                 title: l10n.translate('settings_page.advanced_invoice'),
                 subtitle: l10n.translate('settings_page.advanced_invoice_sub'),
-                onTap: () {},
+                onTap: () =>
+                    AppRouter.navigateTo(AppRoutes.advancedInvoiceTemplate),
               ),
               const SizedBox(height: AppSpacing.sm),
               _buildSettingsTile(
@@ -186,23 +188,31 @@ class SettingsPage extends StatelessWidget {
 
               // Version Footer
               Center(
-                child: Column(
-                  children: [
-                    Text(
-                      l10n.translate('settings_page.version'),
-                      style: AppTextStyles.labelMedium.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.translate('settings_page.copyright'),
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textHint,
-                      ),
-                    ),
-                  ],
+                child: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) {
+                    final version = snapshot.hasData
+                        ? '${snapshot.data!.version}+${snapshot.data!.buildNumber}'
+                        : '1.0.0';
+                    return Column(
+                      children: [
+                        Text(
+                          'BizFlow v$version',
+                          style: AppTextStyles.labelMedium.copyWith(
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          l10n.translate('settings_page.copyright'),
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 40),

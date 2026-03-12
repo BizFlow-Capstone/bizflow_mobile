@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/import_repository.dart';
 import '../../../data/models/import_model.dart';
+import '../../../../../shared/cache/cache_manager.dart';
 import 'import_history_event.dart';
 import 'import_history_state.dart';
 
@@ -18,42 +20,100 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
     on<UpdateFilters>(_onUpdateFilters);
   }
 
+  /// Kiểm tra có filter nào đang active không
+  bool get _hasActiveFilters =>
+      state.statusFilter != null ||
+      state.typeFilter != null ||
+      state.businessLocationId != null ||
+      state.fromDate != null ||
+      state.toDate != null;
+
   Future<void> _onLoadImportHistory(
     LoadImportHistory event,
     Emitter<ImportHistoryState> emit,
   ) async {
     emit(state.copyWith(status: ImportHistoryStatus.loading));
-    try {
-      final response = await _repository.getImports(
-        status: state.statusFilter,
-        importType: state.typeFilter,
-        businessLocationId: state.businessLocationId,
-        fromDate: state.fromDate,
-        toDate: state.toDate,
-        pageNumber: 1,
-        pageSize: _pageSize,
-      );
 
-      final itemsRaw = response['data']['items'] as List;
-      final items = itemsRaw
-          .map((e) => ImportHistoryItemModel.fromJson(e))
-          .toList();
+    // Chỉ dùng SWR cache cho trang đầu tiên khi không có filter
+    if (!_hasActiveFilters) {
+      await CacheManager().fetchWithSWR<List<ImportHistoryItemModel>>(
+        key: 'cache_import_history',
+        fetcher: () async {
+          final response = await _repository.getImports(
+            pageNumber: 1,
+            pageSize: _pageSize,
+          );
+          final itemsRaw = response['data']['items'] as List;
+          return itemsRaw
+              .map((e) => ImportHistoryItemModel.fromJson(e))
+              .toList();
+        },
+        fromJson: (json) {
+          final list = json['data'] as List;
+          return list
+              .map(
+                (e) =>
+                    ImportHistoryItemModel.fromJson(e as Map<String, dynamic>),
+              )
+              .toList();
+        },
+        toJson: (data) {
+          return {'data': data.map((e) => e.toJson()).toList()};
+        },
+        onData: (items, isFromCache) {
+          emit(
+            state.copyWith(
+              status: ImportHistoryStatus.success,
+              items: items,
+              hasReachedMax: items.length < _pageSize,
+              currentPage: 1,
+            ),
+          );
+        },
+        onError: (e) {
+          debugPrint('ImportHistoryBloc SWR error: $e');
+          emit(
+            state.copyWith(
+              status: ImportHistoryStatus.failure,
+              errorMessage: e.toString(),
+            ),
+          );
+        },
+      );
+    } else {
+      // Có filter → gọi API trực tiếp, không cache
+      try {
+        final response = await _repository.getImports(
+          status: state.statusFilter,
+          importType: state.typeFilter,
+          businessLocationId: state.businessLocationId,
+          fromDate: state.fromDate,
+          toDate: state.toDate,
+          pageNumber: 1,
+          pageSize: _pageSize,
+        );
 
-      emit(
-        state.copyWith(
-          status: ImportHistoryStatus.success,
-          items: items,
-          hasReachedMax: response['data']['hasNextPage'] == false,
-          currentPage: 1,
-        ),
-      );
-    } catch (e) {
-      emit(
-        state.copyWith(
-          status: ImportHistoryStatus.failure,
-          errorMessage: e.toString(),
-        ),
-      );
+        final itemsRaw = response['data']['items'] as List;
+        final items = itemsRaw
+            .map((e) => ImportHistoryItemModel.fromJson(e))
+            .toList();
+
+        emit(
+          state.copyWith(
+            status: ImportHistoryStatus.success,
+            items: items,
+            hasReachedMax: response['data']['hasNextPage'] == false,
+            currentPage: 1,
+          ),
+        );
+      } catch (e) {
+        emit(
+          state.copyWith(
+            status: ImportHistoryStatus.failure,
+            errorMessage: e.toString(),
+          ),
+        );
+      }
     }
   }
 

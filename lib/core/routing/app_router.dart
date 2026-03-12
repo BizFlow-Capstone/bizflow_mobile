@@ -20,6 +20,8 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notification/presentation/pages/notification_list_page.dart';
 import '../../features/notification/presentation/pages/notification_detail_page.dart';
 import '../../features/debt/presentation/pages/debt_list_page.dart';
+import '../../features/invoice_template/presentation/pages/invoice_template_page.dart';
+import '../../features/invoice_template/presentation/pages/advanced_invoice_template_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
 import '../../shared/widgets/app_bar_custom.dart';
@@ -55,6 +57,8 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String notificationDetail = '/notification-detail';
   static const String debtList = '/debt-list';
+  static const String invoiceTemplate = '/invoice-template';
+  static const String advancedInvoiceTemplate = '/advanced-invoice-template';
 }
 
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
@@ -218,6 +222,18 @@ class AppRouter {
 
       case AppRoutes.importHistory:
         return _buildRoute(settings, const ImportHistoryPage());
+
+      case AppRoutes.invoiceTemplate:
+        return _buildRoute(
+          settings,
+          const InvoiceTemplatePage(),
+        );
+
+      case AppRoutes.advancedInvoiceTemplate:
+        return _buildRoute(
+          settings,
+          const AdvancedInvoiceTemplatePage(),
+        );
 
       default:
         return _buildRoute(settings, const _NotFoundPage());

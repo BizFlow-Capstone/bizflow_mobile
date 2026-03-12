@@ -366,7 +366,7 @@ class _StockImportViewState extends State<_StockImportView> {
                   Text(
                     formatCurrency.format(detail.totalAmount ?? 0),
                     style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.primary,
+                      color: AppColors.secondary,
                     ),
                   ),
                 ],
@@ -376,7 +376,7 @@ class _StockImportViewState extends State<_StockImportView> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: AppColors.secondary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
@@ -887,7 +887,7 @@ class _StockImportViewState extends State<_StockImportView> {
                 onPressed: _onSaveDraft,
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                  side: BorderSide(color: AppColors.primary),
+                  side: BorderSide(color: AppColors.secondary),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -895,7 +895,7 @@ class _StockImportViewState extends State<_StockImportView> {
                 child: Text(
                   l10n.translate('stock_import.save_draft'),
                   style: AppTextStyles.labelLarge.copyWith(
-                    color: AppColors.primary,
+                    color: AppColors.secondary,
                   ),
                 ),
               ),
@@ -1062,7 +1062,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                         },
                       ),
                       style: AppTextStyles.labelLarge.copyWith(
-                        color: AppColors.primary,
+                        color: AppColors.secondary,
                       ),
                     ),
                   ),

@@ -69,46 +69,49 @@ class _CustomAppBarState extends State<CustomAppBar> {
             widget.scaffoldKey!.currentState?.openDrawer();
           }
         },
-        child: Row(
-          mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            // Avatar hoặc Icon
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.secondary.withValues(alpha: 0.1),
-              ),
-              child: Center(
-                child: Icon(Icons.person, color: AppColors.secondary, size: 20),
-              ),
-            ),
-            SizedBox(width: AppSpacing.sm),
-            // Greeting + Name (Fixed width to prevent expansion)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  l10n.translate('appbar.greeting'),
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.only(left: AppSpacing.sm),
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              // Avatar hoặc Icon
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.secondary.withValues(alpha: 0.1),
                 ),
-                Text(
-                  widget.userName ?? 'User',
-                  style: AppTextStyles.titleSmall.copyWith(
-                    color: AppColors.secondary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Center(
+                  child: Icon(Icons.person, color: AppColors.secondary, size: 20),
                 ),
-              ],
-            ),
-          ],
+              ),
+              SizedBox(width: AppSpacing.sm),
+              // Greeting + Name (Fixed width to prevent expansion)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    l10n.translate('appbar.greeting'),
+                    style: AppTextStyles.labelSmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    widget.userName ?? 'User',
+                    style: AppTextStyles.titleSmall.copyWith(
+                      color: AppColors.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

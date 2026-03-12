@@ -209,7 +209,7 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
           },
         ),
         floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.primary,
+          backgroundColor: AppColors.secondary,
           onPressed: () {
             // Nav to create new import
             final locState = context.read<LocationBloc>().state;
@@ -378,7 +378,7 @@ class _ImportHistoryCard extends StatelessWidget {
                     formatCurrency.format(item.totalAmount),
                     style: AppTextStyles.titleMedium.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
+                      color: AppColors.secondary,
                     ),
                   ),
                 ],

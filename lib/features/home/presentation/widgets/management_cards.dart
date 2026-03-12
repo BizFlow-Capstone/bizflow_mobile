@@ -14,8 +14,8 @@ class ManagementCards extends StatelessWidget {
 
   const ManagementCards({
     super.key,
-    this.locationsCount = 5,
-    this.employeesCount = 12,
+    this.locationsCount = 0,
+    this.employeesCount = 0,
     this.onProductsTab,
     this.onLocationsTab,
     this.onEmployeesTab,

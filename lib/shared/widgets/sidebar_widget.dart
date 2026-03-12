@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -249,9 +250,35 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                     ),
                   ),
 
+                  // App Version
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: Center(
+                      child: FutureBuilder<PackageInfo>(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, snapshot) {
+                          final version = snapshot.hasData
+                              ? '${snapshot.data!.version}+${snapshot.data!.buildNumber}'
+                              : '1.0.0';
+                          return Text(
+                            'BizFlow v$version',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textHint,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+
                   // Logout Button
                   Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: const EdgeInsets.only(
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
+                      top: AppSpacing.xs,
+                      bottom: AppSpacing.md,
+                    ),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(

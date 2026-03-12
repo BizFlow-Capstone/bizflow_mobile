@@ -45,18 +45,33 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     LoadBusinessTypesRequested event,
     Emitter<ProductState> emit,
   ) async {
-    try {
-      final businessTypes = await repository.getBusinessTypes();
-      if (businessTypes is List && businessTypes.isNotEmpty) {
-        emit(
-          BusinessTypesLoaded(
-            businessTypes: List<BusinessTypeDto>.from(businessTypes),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('ProductBloc._onLoadBusinessTypesRequested error: $e');
-    }
+    await CacheManager().fetchWithSWR<List<BusinessTypeDto>>(
+      key: 'cache_business_types',
+      fetcher: () async {
+        final result = await repository.getBusinessTypes();
+        if (result is List) {
+          return List<BusinessTypeDto>.from(result);
+        }
+        return <BusinessTypeDto>[];
+      },
+      fromJson: (json) {
+        final list = json['data'] as List;
+        return list
+            .map((e) => BusinessTypeDto.fromJson(e as Map<String, dynamic>))
+            .toList();
+      },
+      toJson: (data) {
+        return {'data': data.map((e) => e.toJson()).toList()};
+      },
+      onData: (businessTypes, isFromCache) {
+        if (businessTypes.isNotEmpty) {
+          emit(BusinessTypesLoaded(businessTypes: businessTypes));
+        }
+      },
+      onError: (e) {
+        debugPrint('ProductBloc._onLoadBusinessTypesRequested error: $e');
+      },
+    );
   }
 
   Future<void> _onLoadProductsByLocationRequested(
