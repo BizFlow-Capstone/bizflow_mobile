@@ -32,77 +32,79 @@ class _OrderFilterBottomSheetState extends State<OrderFilterBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                l10n.translate('order.filter_title'),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  l10n.translate('order.filter_title'),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-          // Status Filter
-          Text(
-            l10n.translate('order.filter_status'),
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              _buildStatusChip(context, 'DRAFT', 'order.status_draft'),
-              _buildStatusChip(context, 'PENDING', 'order.status_pending'),
-              _buildStatusChip(context, 'PUBLISHED', 'order.status_published'),
-              _buildStatusChip(context, 'CANCELLED', 'order.status_cancelled'),
-            ],
-          ),
-          const SizedBox(height: 24),
+            // Status Filter
+            Text(
+              l10n.translate('order.filter_status'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                _buildStatusChip(context, 'DRAFT', 'order.status_draft'),
+                _buildStatusChip(context, 'PENDING', 'order.status_pending'),
+                _buildStatusChip(context, 'PUBLISHED', 'order.status_published'),
+                _buildStatusChip(context, 'CANCELLED', 'order.status_cancelled'),
+              ],
+            ),
+            const SizedBox(height: 24),
 
-          // Action buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    selectedStatus = null;
-                    selectedLocation = null;
-                  });
-                },
-                child: Text(l10n.translate('order.filter_clear')),
-              ),
-              SizedBox(
-                width: 120,
-                child: ElevatedButton(
+            // Action buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
                   onPressed: () {
-                    widget.onApply({
-                      'status': selectedStatus,
-                      'locationId': selectedLocation,
+                    setState(() {
+                      selectedStatus = null;
+                      selectedLocation = null;
                     });
-                    Navigator.pop(context);
                   },
-                  child: Text(l10n.translate('order.filter_apply')),
+                  child: Text(l10n.translate('order.filter_clear')),
                 ),
-              ),
-            ],
-          ),
-        ],
+                SizedBox(
+                  width: 120,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      widget.onApply({
+                        'status': selectedStatus,
+                        'locationId': selectedLocation,
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: Text(l10n.translate('order.filter_apply')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

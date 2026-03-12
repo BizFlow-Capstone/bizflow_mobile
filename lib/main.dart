@@ -12,6 +12,8 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/employee/data/employee_api_service.dart';
 import 'features/employee/data/employee_repository.dart';
+import 'features/employee/data/employee_management_repository.dart';
+import 'features/employee/presentation/bloc/employee_bloc.dart';
 import 'features/location/data/location_api_service.dart';
 import 'features/invoice_template/data/invoice_template_repository.dart';
 import 'features/invoice_template/presentation/bloc/invoice_template_bloc.dart';
@@ -58,6 +60,7 @@ class _MyAppState extends State<MyApp> {
   late ImportApiService _importApiService;
   late ImportRepository _importRepository;
   late InvoiceTemplateRepository _invoiceTemplateRepository;
+  late EmployeeManagementRepository _employeeManagementRepository;
 
   @override
   void initState() {
@@ -94,6 +97,7 @@ class _MyAppState extends State<MyApp> {
     _productRepository = ProductRepository(service: _productApiService);
     _importRepository = ImportRepository(_importApiService);
     _invoiceTemplateRepository = InvoiceTemplateRepositoryMock();
+    _employeeManagementRepository = EmployeeManagementRepositoryMock();
   }
 
   @override
@@ -129,6 +133,9 @@ class _MyAppState extends State<MyApp> {
           create: (context) => InvoiceTemplateBloc(
             repository: _invoiceTemplateRepository,
           )..add(const LoadInvoiceTemplateRequested()),
+        ),
+        BlocProvider(
+          create: (context) => EmployeeBloc(repository: _employeeManagementRepository),
         ),
         Provider<ImportRepository>.value(value: _importRepository),
       ],

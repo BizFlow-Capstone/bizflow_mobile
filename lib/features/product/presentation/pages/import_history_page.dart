@@ -167,7 +167,7 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
                   left: AppSpacing.md,
                   right: AppSpacing.md,
                   top: AppSpacing.md,
-                  bottom: 80,
+                  bottom: 120, // Increased bottom padding for FAB
                 ),
                 itemCount: state.hasReachedMax
                     ? state.items.length

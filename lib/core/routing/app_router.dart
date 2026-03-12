@@ -22,6 +22,9 @@ import '../../features/notification/presentation/pages/notification_detail_page.
 import '../../features/debt/presentation/pages/debt_list_page.dart';
 import '../../features/invoice_template/presentation/pages/invoice_template_page.dart';
 import '../../features/invoice_template/presentation/pages/advanced_invoice_template_page.dart';
+import '../../features/employee/presentation/pages/employee_list_page.dart';
+import '../../features/employee/presentation/pages/add_employee_page.dart';
+import '../../features/employee/presentation/pages/edit_employee_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
 import '../../shared/widgets/app_bar_custom.dart';
@@ -59,6 +62,9 @@ class AppRoutes {
   static const String debtList = '/debt-list';
   static const String invoiceTemplate = '/invoice-template';
   static const String advancedInvoiceTemplate = '/advanced-invoice-template';
+  static const String employeeList = '/employee-list';
+  static const String addEmployee = '/add-employee';
+  static const String editEmployee = '/edit-employee';
 }
 
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
@@ -158,19 +164,19 @@ class AppRouter {
       case AppRoutes.orderList:
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const OrderListScreen()),
+          const OrderListScreen(),
         );
 
       case AppRoutes.orderCreateSelection:
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const OrderCreationSelectionScreen()),
+          const OrderCreationSelectionScreen(),
         );
 
       case AppRoutes.orderStatus:
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const OrderStatusScreen()),
+          const OrderStatusScreen(),
         );
 
       case AppRoutes.subscriptionPlans:
@@ -233,6 +239,25 @@ class AppRouter {
         return _buildRoute(
           settings,
           const AdvancedInvoiceTemplatePage(),
+        );
+
+      case AppRoutes.employeeList:
+        return _buildRoute(
+          settings,
+          const EmployeeListPage(),
+        );
+
+      case AppRoutes.addEmployee:
+        return _buildRoute(
+          settings,
+          const AddEmployeePage(),
+        );
+
+      case AppRoutes.editEmployee:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(employeeId: args?['employeeId'] ?? ''),
         );
 
       default:

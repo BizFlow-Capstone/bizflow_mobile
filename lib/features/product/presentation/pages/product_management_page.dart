@@ -264,6 +264,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     color: AppColors.textSecondary,
                   ),
                 ),
+                SizedBox(width: AppSpacing.sm),
                 // Barcode Scanner Button
                 Container(
                   decoration: BoxDecoration(
@@ -425,7 +426,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         left: AppSpacing.md,
                         right: AppSpacing.md,
                         top: AppSpacing.sm,
-                        bottom: 80,
+                        bottom: 120, // Increased bottom padding for FAB
                       ),
                       itemCount: state.hasReachedMax
                           ? state.products.length
@@ -496,7 +497,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         left: AppSpacing.md,
                         right: AppSpacing.md,
                         top: AppSpacing.sm,
-                        bottom: 80,
+                        bottom: 120, // Increased bottom padding for FAB
                       ),
                       itemCount: currentProducts
                           .length, // Don't show loading indicator at bottom for fallback

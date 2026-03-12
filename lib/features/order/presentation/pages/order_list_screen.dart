@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../bloc/order_bloc.dart';
@@ -63,6 +64,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
       appBar: AppBar(
         title: Text(l10n.translate('order.list_title')),
         elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+            color: Colors.black,
+          ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -75,11 +84,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 onApply: _applyFilter,
               );
             },
+            color: Colors.black,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: l10n.translate('order.action_refresh'),
             onPressed: _refreshOrders,
+            color: Colors.black,
           ),
         ],
       ),
@@ -169,7 +180,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
               _refreshOrders();
             },
             child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 80),
+              padding: const EdgeInsets.only(top: 8, bottom: 120), // Increased bottom padding for FAB
               itemCount: orders.length,
               itemBuilder: (context, index) {
                 final order = orders[index];

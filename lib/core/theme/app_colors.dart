@@ -24,9 +24,9 @@ class AppColors {
   // Neutral
   static const Color white = Color(0xFFFFFFFF);
   static const Color black = Color(0xFF000000);
-  static const Color background = Color(0xFFF5F5F5);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color divider = Color(0xFFE0E0E0);
+  static const Color background = Color(0xFFFFFFFF); // Pure white background
+  static const Color surface = Color(0xFFF9FAFB); // Light distinct surface color for contrast
+  static const Color divider = Color(0xFFEAEEF2); // Softer divider
 
   // Text
   static const Color textPrimary = Color(0xFF212121);

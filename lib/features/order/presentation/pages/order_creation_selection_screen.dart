@@ -18,6 +18,11 @@ class OrderCreationSelectionScreen extends StatelessWidget {
         title: Text(l10n.translate('order_create.select_method_title')),
         elevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+            color: Colors.black,
+          ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
       ),

@@ -104,33 +104,35 @@ class AppTheme {
     // Input Decoration
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surface,
+      fillColor: AppColors.white,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+        vertical: 16, // Better vertical padding for premium feel
       ),
       border: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
+        borderRadius: AppSpacing.borderRadiusMd,
         borderSide: const BorderSide(color: AppColors.divider),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
+        borderRadius: AppSpacing.borderRadiusMd,
         borderSide: const BorderSide(color: AppColors.divider),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        borderRadius: AppSpacing.borderRadiusMd,
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
+        borderRadius: AppSpacing.borderRadiusMd,
         borderSide: const BorderSide(color: AppColors.error),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-        borderSide: const BorderSide(color: AppColors.error, width: 2),
+        borderRadius: AppSpacing.borderRadiusMd,
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
       hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
-      labelStyle: AppTextStyles.bodyMedium,
+      labelStyle: AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textSecondary,
+      ),
       errorStyle: AppTextStyles.error,
     ),
 

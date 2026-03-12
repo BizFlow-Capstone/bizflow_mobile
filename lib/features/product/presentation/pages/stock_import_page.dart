@@ -1022,7 +1022,8 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
       minChildSize: 0.5,
       expand: false,
       builder: (_, scrollController) {
-        return Column(
+        return SafeArea(
+          child: Column(
           children: [
             // Handle
             Padding(
@@ -1238,6 +1239,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
             ),
             SafeArea(top: false, child: const SizedBox.shrink()),
           ],
+        ),
         );
       },
     );

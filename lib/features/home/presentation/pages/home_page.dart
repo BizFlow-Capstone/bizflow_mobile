@@ -11,7 +11,6 @@ import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_event.dart';
 import '../../../location/presentation/bloc/location_state.dart';
-import '../widgets/stats_cards.dart';
 import '../widgets/quick_actions.dart';
 import '../widgets/premium_banner.dart';
 import '../widgets/management_cards.dart';
@@ -48,11 +47,23 @@ class _HomePageState extends State<HomePage> {
 
     return BlocListener<LocationBloc, LocationState>(
       listener: (context, state) {
-        if (state is LocationsLoaded && state.locations.isEmpty) {
-          // If the user has 0 locations, send them to the no locations screen
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            AppRouter.navigateAndClearStack(AppRoutes.noLocation);
-          });
+        if (state is LocationsLoaded) {
+          if (state.locations.isEmpty) {
+            // If the user has 0 locations, send them to the no locations screen
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              AppRouter.navigateAndClearStack(AppRoutes.noLocation);
+            });
+          } else {
+            // Auto-select first location if context is empty
+            final businessContext = Provider.of<BusinessContext>(context, listen: false);
+            if (businessContext.currentBusinessId == null) {
+              final firstLocation = state.locations.first;
+              businessContext.switchBusinessLocation(
+                firstLocation.id,
+                firstLocation.name,
+              );
+            }
+          }
         }
       },
       child: Scaffold(
@@ -185,6 +196,23 @@ class _HomePageState extends State<HomePage> {
                       },
                       onLocationsTab: () =>
                           AppRouter.navigateTo(AppRoutes.locationManagement),
+                      onEmployeesTab: () {
+                        final contextData = Provider.of<BusinessContext>(
+                          context,
+                          listen: false,
+                        );
+                        if (contextData.currentBusinessId != null) {
+                          AppRouter.navigateTo(AppRoutes.employeeList);
+                        } else {
+                          AppSnackBar.show(
+                            context,
+                            message: l10n.translate(
+                              'home.please_select_location',
+                            ),
+                            type: AppSnackBarType.warning,
+                          );
+                        }
+                      },
                     );
                   },
                 ),
