@@ -32,12 +32,14 @@ import 'features/product/data/import_api_service.dart';
 import 'features/product/data/import_repository.dart';
 
 import 'shared/context/business_context.dart';
+import 'shared/context/user_profile_context.dart';
 import 'shared/cache/cache_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await CacheManager().init();
   await BusinessContext().init();
+  await UserProfileContext().init();
   runApp(const MyApp());
 }
 
@@ -114,6 +116,12 @@ class _MyAppState extends State<MyApp> {
     _importRepository = ImportRepository(_importApiService);
     _invoiceTemplateRepository = InvoiceTemplateRepositoryMock();
     _employeeManagementRepository = EmployeeManagementRepositoryMock();
+
+    final userProfile = UserProfileContext();
+    AppRouter.globalAppBarState.updateProfile(
+      name: userProfile.fullName,
+      avatarUrl: userProfile.avatarUrl,
+    );
   }
 
   @override

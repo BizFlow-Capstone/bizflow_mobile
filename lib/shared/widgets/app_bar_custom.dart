@@ -14,6 +14,7 @@ import 'sidebar_widget.dart';
 /// Chứa: Xin chào + tên, Đa ngôn ngữ, Thông báo, Cài đặt
 class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   final String? userName;
+  final String? avatarUrl;
   final VoidCallback? onNotificationTap;
   final VoidCallback? onSettingsTap;
   final Function(Locale)? onLocaleChange;
@@ -28,6 +29,7 @@ class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   const CustomAppBar({
     super.key,
     this.userName,
+    this.avatarUrl,
     this.onNotificationTap,
     this.onSettingsTap,
     this.onLocaleChange,
@@ -83,8 +85,31 @@ class _CustomAppBarState extends State<CustomAppBar> {
                   shape: BoxShape.circle,
                   color: AppColors.secondary.withValues(alpha: 0.1),
                 ),
-                child: Center(
-                  child: Icon(Icons.person, color: AppColors.secondary, size: 20),
+                child: ClipOval(
+                  child: (widget.avatarUrl != null &&
+                          widget.avatarUrl!.trim().isNotEmpty)
+                      ? Image.network(
+                          widget.avatarUrl!,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) {
+                            return Center(
+                              child: Icon(
+                                Icons.person,
+                                color: AppColors.secondary,
+                                size: 20,
+                              ),
+                            );
+                          },
+                        )
+                      : Center(
+                          child: Icon(
+                            Icons.person,
+                            color: AppColors.secondary,
+                            size: 20,
+                          ),
+                        ),
                 ),
               ),
               SizedBox(width: AppSpacing.sm),

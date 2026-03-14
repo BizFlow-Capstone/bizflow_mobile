@@ -75,13 +75,30 @@ class AppRoutes {
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
 class GlobalAppBarState extends ChangeNotifier {
   String _userName = 'User';
+  String? _avatarUrl;
   Locale _currentLocale = const Locale('vi');
 
   String get userName => _userName;
+  String? get avatarUrl => _avatarUrl;
   Locale get currentLocale => _currentLocale;
 
   void updateUserName(String name) {
     _userName = name;
+    notifyListeners();
+  }
+
+  void updateAvatarUrl(String? url) {
+    _avatarUrl = (url == null || url.trim().isEmpty) ? null : url.trim();
+    notifyListeners();
+  }
+
+  void updateProfile({String? name, String? avatarUrl}) {
+    if (name != null && name.trim().isNotEmpty) {
+      _userName = name.trim();
+    }
+    _avatarUrl = (avatarUrl == null || avatarUrl.trim().isEmpty)
+        ? null
+        : avatarUrl.trim();
     notifyListeners();
   }
 
@@ -92,6 +109,7 @@ class GlobalAppBarState extends ChangeNotifier {
 
   void reset() {
     _userName = 'User';
+    _avatarUrl = null;
     _currentLocale = const Locale('vi');
     notifyListeners();
   }
@@ -151,7 +169,7 @@ class AppRouter {
       case AppRoutes.addEditLocation:
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const AddEditLocationPage()),
+          const AddEditLocationPage(),
         );
 
       case AppRoutes.noLocation:
@@ -352,6 +370,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           // Global AppBar
           appBar: CustomAppBar(
             userName: AppRouter.globalAppBarState.userName,
+            avatarUrl: AppRouter.globalAppBarState.avatarUrl,
             scaffoldKey: _scaffoldKey,
             notificationCount: 2, // Mock: 2 unread notifications
             onLocaleChange: (locale) {

@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/context/business_context.dart';
 
 import '../../domain/domain.dart';
 import '../bloc/location_bloc.dart';
@@ -171,7 +173,19 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
       ),
       body: BlocListener<LocationBloc, LocationState>(
         listener: (context, state) {
-          if (state is LocationAddSuccess || state is LocationEditSuccess) {
+          if (state is LocationAddSuccess) {
+            BusinessContext()
+                .switchBusinessLocation(
+                  state.newLocation.id,
+                  state.newLocation.name,
+                )
+                .then((_) {
+                  if (!mounted) {
+                    return;
+                  }
+                  AppRouter.navigateAndClearStack(AppRoutes.home);
+                });
+          } else if (state is LocationEditSuccess) {
             Navigator.pop(context);
           } else if (state is AddEmployeeToLocationSuccess) {
             AppSnackBar.show(

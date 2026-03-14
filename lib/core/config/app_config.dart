@@ -24,14 +24,30 @@ class AppConfig {
   //    - Use 10.0.2.2 (Android gateway to host)
   //    - Protocol: HTTP (avoid HTTPS complexity)
   //
-  static const String _hostDeviceIp = '192.168.1.197'; // Physical device IP
-  static const String _hostEmulatorIp = '10.0.2.2'; // Emulator gateway
+  static const String _hostDeviceIp = String.fromEnvironment(
+    'API_HOST_DEVICE',
+    defaultValue: '192.168.1.197',
+  );
+  static const String _hostEmulatorIp = String.fromEnvironment(
+    'API_HOST_EMULATOR',
+    defaultValue: '10.0.2.2',
+  );
+  static const String _apiBaseUrlOverride = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
 
   // CHANGE THIS TO SWITCH BETWEEN DEVICE & EMULATOR
-  static const bool _runningOnPhysicalDevice =
-      true; // Set to false for emulator
+  static const bool _runningOnPhysicalDevice = bool.fromEnvironment(
+    'RUN_ON_PHYSICAL_DEVICE',
+    defaultValue: true,
+  );
 
   static String get baseUrl {
+    if (_apiBaseUrlOverride.isNotEmpty) {
+      return _apiBaseUrlOverride;
+    }
+
     final host = _runningOnPhysicalDevice ? _hostDeviceIp : _hostEmulatorIp;
 
     switch (environment) {

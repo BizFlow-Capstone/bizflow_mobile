@@ -7,6 +7,8 @@ class AuthResponse {
   final String? accessToken;
   final String? refreshToken;
   final bool? isNewAccount;
+  final String? fullName;
+  final String? avatarUrl;
 
   AuthResponse({
     required this.success,
@@ -16,10 +18,13 @@ class AuthResponse {
     this.accessToken,
     this.refreshToken,
     this.isNewAccount,
+    this.fullName,
+    this.avatarUrl,
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? json;
+    final account = data['account'] as Map<String, dynamic>?;
     return AuthResponse(
       success: json['success'] as bool? ?? false,
       message: json['message'] as String? ?? '',
@@ -29,6 +34,8 @@ class AuthResponse {
       accessToken: data['token'] as String? ?? data['accessToken'] as String?,
       refreshToken: data['refreshToken'] as String?,
       isNewAccount: data['isNewAccount'] as bool?,
+      fullName: account?['fullName'] as String?,
+      avatarUrl: account?['avatarUrl'] as String?,
     );
   }
 
@@ -41,6 +48,8 @@ class AuthResponse {
       if (accessToken != null) 'token': accessToken,
       if (refreshToken != null) 'refreshToken': refreshToken,
       if (isNewAccount != null) 'isNewAccount': isNewAccount,
+      if (fullName != null) 'fullName': fullName,
+      if (avatarUrl != null) 'avatarUrl': avatarUrl,
     };
   }
 }

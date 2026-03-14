@@ -14,6 +14,7 @@ import '../../../../shared/widgets/google_icon.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../navigation/post_auth_navigation.dart';
 import 'register_page.dart';
 import '../../../../core/routing/app_router.dart';
 
@@ -219,7 +220,7 @@ class _LoginPageContent extends StatelessWidget {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
-          AppRouter.navigateAndClearStack(AppRoutes.home);
+          PostAuthNavigation.route(context);
         } else if (state is GoogleLoginSetPasswordRequired) {
           AppRouter.navigateAndClearStack(AppRoutes.setPassword);
         } else if (state is LoginFailure) {

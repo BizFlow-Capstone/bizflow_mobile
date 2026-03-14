@@ -406,6 +406,10 @@ class ApiClient {
         );
       }
 
+      if (kDebugMode) {
+        debugPrint('API Request: ${method.name.toUpperCase()} $uri');
+      }
+
       // Create request
       final request = await _createRequest(method, uri);
 
@@ -439,6 +443,10 @@ class ApiClient {
       // Send request
       final response = await request.close().timeout(timeout);
       final responseBody = await response.transform(utf8.decoder).join();
+
+      if (kDebugMode) {
+        debugPrint('API Raw Response: [${response.statusCode}] $uri');
+      }
 
       // Handle redirects (307, 308, etc.)
       if ((response.statusCode == 307 || response.statusCode == 308) &&

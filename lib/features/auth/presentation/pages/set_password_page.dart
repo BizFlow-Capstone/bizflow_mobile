@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -10,6 +9,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../navigation/post_auth_navigation.dart';
 
 /// Set Password page — shown for new Google accounts (isNewAccount=true)
 class SetPasswordPage extends StatefulWidget {
@@ -66,7 +66,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is SetPasswordSuccess) {
-          AppRouter.navigateAndClearStack(AppRoutes.home);
+          PostAuthNavigation.route(context);
         } else if (state is SetPasswordFailure) {
           _showError(state.message);
         }

@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../navigation/post_auth_navigation.dart';
 
 /// Splash / Auth-check page
 /// Dispatches AppStarted, then routes to home or login
@@ -27,7 +28,7 @@ class _SplashPageState extends State<SplashPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthAuthenticated) {
-          AppRouter.navigateAndClearStack(AppRoutes.home);
+          PostAuthNavigation.route(context);
         } else if (state is AuthUnauthenticated) {
           AppRouter.navigateAndClearStack(AppRoutes.login);
         }

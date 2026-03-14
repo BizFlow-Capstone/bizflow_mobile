@@ -1,11 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'dart:convert';
 import 'auth_event.dart';
 import 'auth_state.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/context/user_profile_context.dart';
 import '../../../../core/storage/secure_storage.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../location/data/location_repository.dart';
 import '../../data/auth_repository.dart';
 import '../../data/models/auth_response.dart';
@@ -119,10 +123,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken ?? '',
       );
+      await UserProfileContext().saveProfile(
+        fullName: result.fullName,
+        avatarUrl: result.avatarUrl,
+      );
+      AppRouter.globalAppBarState.updateProfile(
+        name: result.fullName,
+        avatarUrl: result.avatarUrl,
+      );
       await _prefetchLocations();
       emit(LoginSuccess(
         accessToken: result.accessToken!,
-        user: const {},
+        user: {
+          if (result.fullName != null) 'fullName': result.fullName,
+          if (result.avatarUrl != null) 'avatarUrl': result.avatarUrl,
+        },
       ));
     } catch (e) {
       emit(LoginFailure(
@@ -153,6 +168,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
 
+      if (kDebugMode) {
+        debugPrint('Google login API baseUrl: ${AppConfig.baseUrl}');
+        debugPrint('Google token metadata: ${_extractTokenMetadata(idToken)}');
+      }
+
       final result = await authRepository.loginWithGoogleToken(idToken);
       if (!result.success || result.accessToken == null) {
         emit(LoginFailure(
@@ -165,6 +185,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await secureStorage.saveAuthTokens(
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken ?? '',
+      );
+
+      await UserProfileContext().saveProfile(
+        fullName: result.fullName,
+        avatarUrl: result.avatarUrl,
+      );
+      AppRouter.globalAppBarState.updateProfile(
+        name: result.fullName,
+        avatarUrl: result.avatarUrl,
       );
 
       if (result.isNewAccount == true) {
@@ -254,12 +283,41 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       debugPrint('Logout error (ignored): $e');
     }
     await BusinessContext().clear();
+    await UserProfileContext().clear();
     await CacheManager().clearAll();
+    AppRouter.globalAppBarState.reset();
     emit(LogoutSuccess());
   }
 
   /// Handle Clear Error
   void _onClearAuthError(ClearAuthError event, Emitter<AuthState> emit) {
     emit(AuthInitial());
+  }
+
+  String _extractTokenMetadata(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) {
+        return 'invalid_format';
+      }
+
+      var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      final padding = payload.length % 4;
+      if (padding > 0) {
+        payload = payload.padRight(payload.length + (4 - padding), '=');
+      }
+
+      final payloadJson = utf8.decode(base64.decode(payload));
+      final payloadMap = jsonDecode(payloadJson) as Map<String, dynamic>;
+
+      return jsonEncode({
+        'aud': payloadMap['aud'],
+        'azp': payloadMap['azp'],
+        'iss': payloadMap['iss'],
+        'sub': payloadMap['sub'],
+      });
+    } catch (_) {
+      return 'unparsable';
+    }
   }
 }

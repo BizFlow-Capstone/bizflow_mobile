@@ -131,7 +131,22 @@ class LocationApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 400) {
-        throw Exception('Invalid data');
+        String detail = e.message;
+        final data = e.data;
+        if (data is Map<String, dynamic>) {
+          final errors = data['errors'];
+          if (errors is Map<String, dynamic>) {
+            final errorMessage = errors['message']?.toString();
+            final errorException = errors['exception']?.toString();
+            if (errorMessage != null && errorMessage.isNotEmpty) {
+              detail = '$detail | $errorMessage';
+            }
+            if (errorException != null && errorException.isNotEmpty) {
+              detail = '$detail ($errorException)';
+            }
+          }
+        }
+        throw Exception('Invalid data: $detail');
       }
       throw Exception('Error creating location: ${e.message}');
     } catch (e) {
