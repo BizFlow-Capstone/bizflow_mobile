@@ -45,6 +45,9 @@ dependencies:
   # Storage
   shared_preferences: ^2.2.2
 
+  # Google Sign-In
+  google_sign_in: ^6.2.2
+
   # HTTP & API
   dio: ^5.3.1
 
@@ -54,6 +57,7 @@ dependencies:
   # Image & File Handling
   image_picker: ^1.0.7
   file_picker: ^8.1.0
+  cached_network_image: ^3.3.1
 
   # Audio & Voice
   record: ^6.2.0

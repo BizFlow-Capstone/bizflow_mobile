@@ -106,6 +106,122 @@ class LoggingInterceptor implements ResponseInterceptor {
   }
 }
 
+/// Token Refresh Interceptor
+/// Watches for 401 responses, tries to refresh the access token,
+/// then retries the original request automatically.
+/// On refresh failure, calls [onRefreshFailed] (e.g., to force logout).
+class TokenRefreshInterceptor implements ResponseInterceptor {
+  final Future<String?> Function() getRefreshToken;
+  final Future<void> Function({
+    required String accessToken,
+    required String refreshToken,
+  }) onTokenRefreshed;
+  final Future<void> Function() onRefreshFailed;
+  final String baseUrl;
+  final String refreshEndpoint;
+  final Duration timeout;
+  final List<RequestInterceptor> requestInterceptors;
+
+  bool _isRefreshing = false;
+
+  TokenRefreshInterceptor({
+    required this.getRefreshToken,
+    required this.onTokenRefreshed,
+    required this.onRefreshFailed,
+    required this.baseUrl,
+    required this.refreshEndpoint,
+    required this.timeout,
+    required this.requestInterceptors,
+  });
+
+  @override
+  Future<void> onResponse(int statusCode, dynamic body) async {
+    // nothing to do on success
+  }
+
+  @override
+  Future<void> onError(ApiException error) async {
+    // handled externally via shouldRefresh
+  }
+
+  /// Returns true if a 401 should trigger a refresh attempt
+  bool shouldRefresh(int statusCode) => statusCode == 401 && !_isRefreshing;
+
+  /// Attempt to refresh tokens. Returns the new access token on success, null on failure.
+  Future<String?> attemptRefresh() async {
+    if (_isRefreshing) return null;
+    _isRefreshing = true;
+    try {
+      final storedRefreshToken = await getRefreshToken();
+      if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
+        await onRefreshFailed();
+        return null;
+      }
+
+      final client = HttpClient()
+        ..connectionTimeout = timeout
+        ..badCertificateCallback = (cert, host, port) {
+          if (kDebugMode &&
+              (host == 'localhost' ||
+                  host == '10.0.2.2' ||
+                  host.startsWith('192.168.'))) {
+            return true;
+          }
+          return false;
+        };
+
+      try {
+        final uri = Uri.parse('$baseUrl$refreshEndpoint');
+        final request = await client.postUrl(uri);
+
+        var headers = <String, String>{
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        };
+        for (final interceptor in requestInterceptors) {
+          headers = await interceptor.onRequest(headers);
+        }
+        headers.forEach((key, value) => request.headers.set(key, value));
+
+        final body = json.encode({'refreshToken': storedRefreshToken});
+        request.headers.contentType =
+            ContentType('application', 'json', charset: 'utf-8');
+        request.write(body);
+
+        final response = await request.close().timeout(timeout);
+        final responseBody = await response.transform(utf8.decoder).join();
+        final jsonResponse = json.decode(responseBody) as Map<String, dynamic>;
+
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          final data = jsonResponse['data'] as Map<String, dynamic>? ??
+              jsonResponse;
+          final newAccessToken =
+              data['token'] as String? ?? data['accessToken'] as String?;
+          final newRefreshToken = data['refreshToken'] as String?;
+
+          if (newAccessToken != null && newRefreshToken != null) {
+            await onTokenRefreshed(
+              accessToken: newAccessToken,
+              refreshToken: newRefreshToken,
+            );
+            return newAccessToken;
+          }
+        }
+
+        await onRefreshFailed();
+        return null;
+      } finally {
+        client.close();
+      }
+    } catch (_) {
+      await onRefreshFailed();
+      return null;
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+}
+
 /// HTTP Client
 class ApiClient {
   final String baseUrl;
@@ -226,6 +342,52 @@ class ApiClient {
 
   /// Internal request method
   Future<ApiResponse<T>> _request<T>(
+    HttpMethod method,
+    String path, {
+    dynamic body,
+    Map<String, dynamic>? queryParams,
+    Map<String, String>? headers,
+    T Function(dynamic)? parser,
+  }) async {
+    ApiResponse<T>? result;
+    try {
+      result = await _doRequest<T>(
+        method,
+        path,
+        body: body,
+        queryParams: queryParams,
+        headers: headers,
+        parser: parser,
+      );
+    } on ApiException catch (e) {
+      // Check for 401 — attempt token refresh
+      final refreshInterceptor = responseInterceptors
+          .whereType<TokenRefreshInterceptor>()
+          .firstOrNull;
+      if (e.statusCode == 401 &&
+          refreshInterceptor != null &&
+          refreshInterceptor.shouldRefresh(e.statusCode)) {
+        final newToken = await refreshInterceptor.attemptRefresh();
+        if (newToken != null) {
+          // Retry original request with new token
+          return _doRequest<T>(
+            method,
+            path,
+            body: body,
+            queryParams: queryParams,
+            headers: headers,
+            parser: parser,
+          );
+        }
+      }
+      // No refresh possible — propagate
+      rethrow;
+    }
+    return result;
+  }
+
+  /// Performs the actual HTTP request (no retry logic)
+  Future<ApiResponse<T>> _doRequest<T>(
     HttpMethod method,
     String path, {
     dynamic body,

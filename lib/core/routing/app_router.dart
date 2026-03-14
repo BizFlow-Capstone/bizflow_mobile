@@ -5,6 +5,9 @@ import 'package:bizflow_mobile/core/localization/app_localizations.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/verify_otp_page.dart';
+import '../../features/auth/presentation/pages/splash_page.dart';
+import '../../features/auth/presentation/pages/set_password_page.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
@@ -35,6 +38,8 @@ import '../../shared/context/business_context.dart';
 /// Route names - Tập trung khai báo tất cả route
 class AppRoutes {
   AppRoutes._();
+
+  static const String setPassword = '/set-password';
 
   // Auth
   static const String splash = '/';
@@ -108,6 +113,8 @@ class AppRouter {
     switch (settings.name) {
       // Auth Routes - No AppBar
       case AppRoutes.splash:
+        return _buildRoute(settings, const SplashPage());
+
       case AppRoutes.login:
         return _buildRoute(settings, const LoginPage());
 
@@ -120,11 +127,11 @@ class AppRouter {
           const VerifyOtpPage(phoneNumber: '095555555'),
         );
 
+      case AppRoutes.setPassword:
+        return _buildRoute(settings, const SetPasswordPage());
+
       case AppRoutes.forgotPassword:
-        return _buildRoute(
-          settings,
-          const _PlaceholderPage(title: 'Forgot Password'),
-        );
+        return _buildRoute(settings, const ForgotPasswordPage());
 
       // Main Routes - With Global AppBar
       case AppRoutes.home:

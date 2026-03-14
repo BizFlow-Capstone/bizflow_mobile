@@ -3,6 +3,11 @@ abstract class AuthEvent {
   const AuthEvent();
 }
 
+/// Called on app startup to check if user is still authenticated
+class AppStarted extends AuthEvent {
+  const AppStarted();
+}
+
 // Signup Events
 class SignupRequested extends AuthEvent {
   final String name;
@@ -58,9 +63,14 @@ class LoginRequested extends AuthEvent {
 }
 
 class GoogleLoginRequested extends AuthEvent {
-  final String? idToken;
+  const GoogleLoginRequested();
+}
 
-  const GoogleLoginRequested({this.idToken});
+// Set Password (after Google registration for new accounts)
+class SetPasswordRequested extends AuthEvent {
+  final String password;
+
+  const SetPasswordRequested({required this.password});
 }
 
 // General Auth Events

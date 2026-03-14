@@ -12,6 +12,7 @@ import '../../domain/domain.dart';
 import '../bloc/location_bloc.dart';
 import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
+import '../../../../shared/dialogs/app_dialog.dart';
 
 /// Add/Edit Location Page
 /// SC-LOC-03: Thêm/Sửa địa điểm kinh doanh
@@ -493,13 +494,22 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline),
                       color: Colors.red,
-                      onPressed: () {
-                        context.read<LocationBloc>().add(
-                          RemoveEmployeeFromTabRequested(
-                            locationId: widget.location!.id,
-                            employeeId: employee.id,
-                          ),
+                      onPressed: () async {
+                        final confirmed = await AppDialog.delete(
+                          context,
+                          title: l10n.translate('product.confirm_delete_title'),
+                          message: l10n.translate('product.confirm_delete_message'),
+                          confirmText: l10n.translate('common.delete'),
                         );
+
+                        if (confirmed == true && mounted) {
+                          context.read<LocationBloc>().add(
+                            RemoveEmployeeFromLocationRequested(
+                              locationId: widget.location!.id,
+                              employeeId: employee.id,
+                            ),
+                          );
+                        }
                       },
                     ),
                   );

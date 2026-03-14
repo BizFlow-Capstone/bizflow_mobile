@@ -163,6 +163,20 @@ class RemoveEmployeeFromTabRequested extends LocationEvent {
   List<Object?> get props => [locationId, employeeId];
 }
 
+/// Remove employee from location (API call)
+class RemoveEmployeeFromLocationRequested extends LocationEvent {
+  final String locationId;
+  final String employeeId;
+
+  const RemoveEmployeeFromLocationRequested({
+    required this.locationId,
+    required this.employeeId,
+  });
+
+  @override
+  List<Object?> get props => [locationId, employeeId];
+}
+
 /// Save all employee assignments to server (batch API call)
 class SaveLocationEmployeesRequested extends LocationEvent {
   final String locationId;

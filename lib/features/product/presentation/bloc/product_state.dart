@@ -156,6 +156,17 @@ class ProductSaleItemsLoaded extends ProductState {
   List<Object?> get props => [saleItems];
 }
 
+/// Product detail loaded
+class ProductDetailLoaded extends ProductState {
+  final ProductEntity product;
+
+  const ProductDetailLoaded({required this.product});
+
+  @override
+  List<Object?> get props => [product];
+}
+
+
 /// Failure state
 class ProductFailure extends ProductState {
   final String message;

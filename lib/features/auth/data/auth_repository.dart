@@ -1,7 +1,33 @@
-import 'auth_api_service.dart';
+﻿import 'auth_api_service.dart';
 import 'models/auth_response.dart';
+import '../../../core/storage/secure_storage.dart';
 
 abstract class AuthRepository {
+  Future<AuthResponse> loginWithPhone({
+    required String phone,
+    required String password,
+  });
+
+  Future<AuthResponse> loginWithEmail({
+    required String email,
+    required String password,
+  });
+
+  Future<AuthResponse> loginWithGoogle();
+
+  Future<AuthResponse> loginWithGoogleToken(String idToken);
+
+  Future<AuthResponse> setPassword({required String password});
+
+  Future<AuthResponse> refreshToken();
+
+  Future<void> logout();
+
+  Future<bool> isLoggedIn();
+
+  Future<String?> getStoredAccessToken();
+
+  // Legacy stubs
   Future<AuthResponse> register({
     required String name,
     required String phone,
@@ -15,18 +41,113 @@ abstract class AuthRepository {
   });
 
   Future<AuthResponse> resendOtp({required String phone});
-
-  Future<AuthResponse> googleRegister({
-    required String idToken,
-    required String email,
-    required String name,
-  });
 }
 
 class AuthRepositoryImpl implements AuthRepository {
   final AuthApiService _apiService;
+  final SecureStorage _secureStorage;
 
-  AuthRepositoryImpl(this._apiService);
+  AuthRepositoryImpl(this._apiService, this._secureStorage);
+
+  @override
+  Future<AuthResponse> loginWithPhone({
+    required String phone,
+    required String password,
+  }) async {
+    try {
+      final response = await _apiService.loginWithPhone(
+        phone: phone,
+        password: password,
+      );
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<AuthResponse> loginWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final response = await _apiService.loginWithEmail(
+        email: email,
+        password: password,
+      );
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<AuthResponse> loginWithGoogle() async {
+    try {
+      // Google Sign-In is handled in AuthBloc; this method receives the idToken
+      // from the caller after Google Sign-In completes
+      throw UnimplementedError(
+        'Call loginWithGoogleToken(idToken) instead',
+      );
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  Future<AuthResponse> loginWithGoogleToken(String idToken) async {
+    try {
+      final response = await _apiService.loginWithGoogle(idToken: idToken);
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<AuthResponse> setPassword({required String password}) async {
+    try {
+      final response = await _apiService.setPassword(password: password);
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<AuthResponse> refreshToken() async {
+    try {
+      final storedRefreshToken = await _secureStorage.getRefreshToken();
+      if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
+        return AuthResponse(success: false, message: 'No refresh token stored');
+      }
+      final response = await _apiService.refreshToken(
+        refreshToken: storedRefreshToken,
+      );
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<void> logout() async {
+    try {
+      final storedRefreshToken = await _secureStorage.getRefreshToken();
+      if (storedRefreshToken != null && storedRefreshToken.isNotEmpty) {
+        await _apiService.logout(refreshToken: storedRefreshToken);
+      }
+    } catch (_) {
+      // Always clear local tokens, even if API call fails
+    } finally {
+      await _secureStorage.clearAuthTokens();
+    }
+  }
+
+  @override
+  Future<bool> isLoggedIn() => _secureStorage.hasAccessToken();
+
+  @override
+  Future<String?> getStoredAccessToken() => _secureStorage.getAccessToken();
 
   @override
   Future<AuthResponse> register({
@@ -35,20 +156,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String email,
     required String password,
   }) async {
-    try {
-      final response = await _apiService.register(
-        name: name,
-        phone: phone,
-        email: email,
-        password: password,
-      );
-      return AuthResponse.fromJson(response);
-    } catch (e) {
-      return AuthResponse(
-        success: false,
-        message: e.toString().replaceAll('Exception: ', ''),
-      );
-    }
+    return AuthResponse(success: false, message: 'Registration not supported via this endpoint');
   }
 
   @override
@@ -56,51 +164,23 @@ class AuthRepositoryImpl implements AuthRepository {
     required String phone,
     required String otpCode,
   }) async {
-    try {
-      final response = await _apiService.verifyOtp(
-        phone: phone,
-        otpCode: otpCode,
-      );
-      return AuthResponse.fromJson(response);
-    } catch (e) {
-      return AuthResponse(
-        success: false,
-        message: e.toString().replaceAll('Exception: ', ''),
-      );
-    }
+    // OTP registration not yet supported by backend
+    return AuthResponse(
+      success: false,
+      message: 'OTP registration not yet supported',
+    );
   }
 
   @override
   Future<AuthResponse> resendOtp({required String phone}) async {
-    try {
-      final response = await _apiService.resendOtp(phone: phone);
-      return AuthResponse.fromJson(response);
-    } catch (e) {
-      return AuthResponse(
-        success: false,
-        message: e.toString().replaceAll('Exception: ', ''),
-      );
-    }
+    return AuthResponse(
+      success: false,
+      message: 'OTP registration not yet supported',
+    );
   }
 
-  @override
-  Future<AuthResponse> googleRegister({
-    required String idToken,
-    required String email,
-    required String name,
-  }) async {
-    try {
-      final response = await _apiService.googleRegister(
-        idToken: idToken,
-        email: email,
-        name: name,
-      );
-      return AuthResponse.fromJson(response);
-    } catch (e) {
-      return AuthResponse(
-        success: false,
-        message: e.toString().replaceAll('Exception: ', ''),
-      );
-    }
+  AuthResponse _errorResponse(Object e) {
+    final msg = e.toString().replaceAll('Exception: ', '');
+    return AuthResponse(success: false, message: msg);
   }
 }

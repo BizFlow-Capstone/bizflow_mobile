@@ -7,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import 'models/product_dto.dart';
 import 'models/business_type_model.dart';
+import '../../../core/storage/secure_storage.dart';
 
 /// Product API Service - Handles product-related API calls
 ///
@@ -15,6 +16,11 @@ class ProductApiService {
   final ApiClient _apiClient;
 
   ProductApiService({required ApiClient apiClient}) : _apiClient = apiClient;
+
+  /// Helper to get auth token from SecureStorage
+  Future<String?> _getAuthToken() async {
+    return await SecureStorage().read(key: SecureStorageKeys.accessToken);
+  }
 
   /// Get products for a location (Legacy endpoint)
   ///
@@ -255,19 +261,20 @@ class ProductApiService {
     try {
       debugPrint('=== CREATE PRODUCT MULTIPART ===');
 
-      // Filter out base unit from PriceTiers to avoid duplicate unit error
+      // Include only additional unit conversions in PriceTiers
       final List<Map<String, dynamic>> finalPriceTiers = [];
+      
       if (priceTiers != null) {
         for (var tier in priceTiers) {
           final tierUnit = tier['Unit'] ?? tier['unit'];
           final tierQty = tier['Quantity'] ?? tier['quantity'];
 
-          // Skip if it's the base unit with quantity 1
+          // Skip if it's the base unit - handled by SellingPrice
           if ((tierUnit == unit) && (tierQty == 1 || tierQty == 1.0)) {
             continue;
           }
 
-          // Ensure PascalCase keys for the JSON string as per description
+          // Ensure PascalCase keys for the JSON string
           finalPriceTiers.add({
             'Unit': tierUnit,
             'Quantity': tierQty,
@@ -283,9 +290,8 @@ class ProductApiService {
         'LocationId': locationId,
         'TrackInventory': trackInventory,
         if (sku != null) 'Sku': sku,
+        if (price != null) 'SellingPrice': price,
         if (costPrice != null) 'CostPrice': costPrice,
-        // Send selling price as 'Price' (PascalCase) - likely undocumented top-level field
-        if (price != null) 'Price': price,
         if (stock != null) 'Stock': stock,
         if (manufacturer != null) 'Manufacturer': manufacturer,
         if (finalPriceTiers.isNotEmpty)
@@ -309,10 +315,15 @@ class ProductApiService {
 
       final dio = Dio();
       final baseUrl = _apiClient.baseUrl;
-      dio.options.headers = {'Accept-Language': 'en'};
+      final token = await _getAuthToken();
+
+      dio.options.headers = {
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
 
       // SSL Bypass
-      (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate =
+      (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
           (HttpClient client) {
             client.badCertificateCallback = (cert, host, port) => true;
             return client;
@@ -333,8 +344,14 @@ class ProductApiService {
         );
       }
     } on DioException catch (e) {
-      debugPrint('DioException: ${e.response?.data}');
-      rethrow;
+      debugPrint('DioException [${e.response?.statusCode}]: ${e.response?.data}');
+      if (e.response?.statusCode == 403) {
+        throw Exception('🔒 Permission denied (403)');
+      }
+      if (e.response?.statusCode == 415) {
+        throw Exception('🖼️ Invalid image type (415)');
+      }
+      throw Exception(e.message ?? 'Network error');
     } catch (e) {
       debugPrint('ProductApiService._createProductWithImage error: $e');
       rethrow;
@@ -412,8 +429,9 @@ class ProductApiService {
     try {
       debugPrint('=== UPDATE PRODUCT MULTIPART ===');
 
-      // Filter out base unit from PriceTiers to avoid duplicate unit error
+      // Include only additional unit conversions in PriceTiers
       final List<Map<String, dynamic>> finalPriceTiers = [];
+      
       if (priceTiers != null) {
         for (var tier in priceTiers) {
           final tierUnit = tier['Unit'] ?? tier['unit'];
@@ -439,9 +457,8 @@ class ProductApiService {
         'RemoveImage': removeImage,
         if (sku != null) 'Sku': sku,
         if (trackInventory != null) 'TrackInventory': trackInventory,
+        if (price != null) 'SellingPrice': price,
         if (costPrice != null) 'CostPrice': costPrice,
-        // Send selling price as 'Price' (PascalCase)
-        if (price != null) 'Price': price,
         if (stock != null) 'Stock': stock,
         if (manufacturer != null) 'Manufacturer': manufacturer,
         if (finalPriceTiers.isNotEmpty)
@@ -465,9 +482,14 @@ class ProductApiService {
 
       final dio = Dio();
       final baseUrl = _apiClient.baseUrl;
-      dio.options.headers = {'Accept-Language': 'en'};
+      final token = await _getAuthToken();
 
-      (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate =
+      dio.options.headers = {
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      };
+
+      (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
           (HttpClient client) {
             client.badCertificateCallback = (cert, host, port) => true;
             return client;
@@ -524,7 +546,7 @@ class ProductApiService {
       final body = {'status': status ? 'active' : 'inactive'};
       debugPrint('Request Body: $body');
 
-      final response = await _apiClient.put(
+      final response = await _apiClient.patch(
         ApiEndpoints.updateProductStatus(productId),
         body: body,
       );

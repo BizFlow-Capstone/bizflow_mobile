@@ -158,7 +158,7 @@ class LocationApiService {
       final body = UpdateStatusRequestDto(isActive: isActive).toJson();
       debugPrint('Request Body: $body');
 
-      final response = await _apiClient.put(
+      final response = await _apiClient.patch(
         ApiEndpoints.updateLocationStatus(locationId),
         body: body,
       );
@@ -347,6 +347,65 @@ class LocationApiService {
       throw Exception('API Error: ${e.message}');
     } catch (e) {
       debugPrint('LocationApiService.getLocationEmployees error: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete a business location
+  ///
+  /// API: DELETE /api/location/me/owned/{id}
+  /// Returns: String (message from server)
+  Future<String> deleteLocation(String locationId) async {
+    try {
+      final response = await _apiClient.delete(
+        ApiEndpoints.deleteLocation(locationId),
+      );
+
+      if (response.isSuccess) {
+        return response.message ?? 'Location deleted successfully';
+      } else {
+        throw Exception(response.message ?? 'Failed to delete location');
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: You are not the owner');
+      } else if (e.statusCode == 404) {
+        throw Exception('Location not found');
+      }
+      throw Exception('Error deleting location: ${e.message}');
+    } catch (e) {
+      debugPrint('LocationApiService.deleteLocation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Remove an employee from a location
+  ///
+  /// API: DELETE /api/location/{locationId}/employees/{employeeId}
+  /// Returns: String (message from server)
+  Future<String> removeEmployeeFromLocation({
+    required String locationId,
+    required String employeeId,
+  }) async {
+    try {
+      final response = await _apiClient.delete(
+        ApiEndpoints.removeEmployeeFromLocation(locationId, employeeId),
+      );
+
+      if (response.isSuccess) {
+        return response.message ?? 'Employee removed successfully';
+      } else {
+        throw Exception(response.message ?? 'Failed to remove employee');
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: You are not the owner');
+      } else if (e.statusCode == 404) {
+        throw Exception('Location or employee not found');
+      }
+      throw Exception('Error removing employee: ${e.message}');
+    } catch (e) {
+      debugPrint('LocationApiService.removeEmployeeFromLocation error: $e');
       rethrow;
     }
   }

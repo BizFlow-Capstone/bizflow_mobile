@@ -10,6 +10,8 @@ import 'core/routing/app_router.dart';
 import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/auth/data/auth_api_service.dart';
+import 'features/auth/data/auth_repository.dart';
 import 'features/employee/data/employee_api_service.dart';
 import 'features/employee/data/employee_repository.dart';
 import 'features/employee/data/employee_management_repository.dart';
@@ -49,6 +51,9 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late LocalizationProvider _localizationProvider;
   late ApiClient _apiClient;
+  late SecureStorage _secureStorage;
+  late AuthApiService _authApiService;
+  late AuthRepository _authRepository;
   late LocationApiService _locationApiService;
   late LocationRepository _locationRepository;
   late EmployeeApiService _employeeApiService;
@@ -67,11 +72,18 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _localizationProvider = LocalizationProvider();
 
+    // Secure storage (token management)
+    _secureStorage = SecureStorage();
+
     // Initialize API Client with interceptors
     _apiClient = ApiClient(
       baseUrl: AppConfig.baseUrl,
       timeout: AppConfig.apiTimeout,
       requestInterceptors: [
+        // Auth bearer token interceptor
+        AuthInterceptor(
+          getToken: () => _secureStorage.getAccessToken(),
+        ),
         // Language interceptor - reads from LocalizationProvider
         LanguageInterceptor(
           getCurrentLanguage: () =>
@@ -82,6 +94,10 @@ class _MyAppState extends State<MyApp> {
           ? [LoggingInterceptor()]
           : [],
     );
+
+    // Auth service and repository
+    _authApiService = AuthApiService(apiClient: _apiClient);
+    _authRepository = AuthRepositoryImpl(_authApiService, _secureStorage);
 
     // Initialize Services (calls ApiClient)
     _locationApiService = LocationApiService(apiClient: _apiClient);
@@ -114,8 +130,11 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider.value(value: _localizationProvider),
         ChangeNotifierProvider.value(value: BusinessContext()),
         BlocProvider(
-          create: (context) =>
-              AuthBloc(locationRepository: _locationRepository),
+          create: (context) => AuthBloc(
+            locationRepository: _locationRepository,
+            authRepository: _authRepository,
+            secureStorage: _secureStorage,
+          ),
         ),
         BlocProvider(
           create: (context) => LocationBloc(
@@ -157,7 +176,7 @@ class _MyAppState extends State<MyApp> {
                 locale: localizationProvider.currentLocale,
                 navigatorKey: AppRouter.navigatorKey,
                 onGenerateRoute: AppRouter.generateRoute,
-                initialRoute: AppRoutes.home,
+                initialRoute: AppRoutes.splash,
               );
             },
           );

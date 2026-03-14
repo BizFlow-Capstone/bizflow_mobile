@@ -80,6 +80,24 @@ class AppDialog extends StatelessWidget {
     );
   }
 
+  /// Show delete confirmation dialog
+  static Future<bool?> delete(
+    BuildContext context, {
+    required String title,
+    String? message,
+    String? confirmText,
+    String? cancelText,
+  }) {
+    return show(
+      context,
+      title: title,
+      message: message,
+      type: AppDialogType.error,
+      confirmText: confirmText ?? 'Delete',
+      cancelText: cancelText ?? 'Cancel',
+    );
+  }
+
   /// Show success dialog
   static Future<bool?> success(
     BuildContext context, {

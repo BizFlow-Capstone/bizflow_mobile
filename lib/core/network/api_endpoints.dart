@@ -3,10 +3,19 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   // Auth
-  static const String login = '/auth/login';
+  static const String googleAuth = '/api/auth/google';
+  static const String loginPhone = '/api/auth/login/phone';
+  static const String loginEmail = '/api/auth/login/email';
+  static const String setPassword = '/api/auth/set-password';
+  static const String refreshTokenEndpoint = '/api/auth/refresh';
+  static const String logoutEndpoint = '/api/auth/logout';
+  static const String credentials = '/api/auth/credentials';
+
+  // Legacy aliases (kept for compatibility if any file references them)
+  static const String login = '/api/auth/login/email';
   static const String register = '/auth/register';
-  static const String logout = '/auth/logout';
-  static const String refreshToken = '/auth/refresh-token';
+  static const String logout = '/api/auth/logout';
+  static const String refreshToken = '/api/auth/refresh';
   static const String forgotPassword = '/auth/forgot-password';
   static const String resetPassword = '/auth/reset-password';
 
@@ -34,6 +43,12 @@ class ApiEndpoints {
       '/api/location/$id/employees';
   static String getLocationEmployees(String id) =>
       '/api/location/me/owned/$id/employees';
+  static String deleteLocation(String id) => '/api/location/me/owned/$id';
+  static String removeEmployeeFromLocation(
+    String locationId,
+    String employeeId,
+  ) =>
+      '/api/location/$locationId/employees/$employeeId';
 
   // Order/Invoice
   static const String orders = '/api/order/my-orders';

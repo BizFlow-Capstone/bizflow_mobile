@@ -28,6 +28,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<UpdateProductStatusRequested>(_onUpdateProductStatusRequested);
     on<LoadProductSaleItemsRequested>(_onLoadProductSaleItemsRequested);
     on<ImportInventoryRequested>(_onImportInventoryRequested);
+    on<LoadProductDetailRequested>(_onLoadProductDetailRequested);
   }
 
   // In-memory cache for products
@@ -78,9 +79,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     LoadProductsByLocationRequested event,
     Emitter<ProductState> emit,
   ) async {
-    emit(const ProductLoading());
-
     final cacheKey = 'cache_products_${event.locationId}';
+    
+    // Check if we have cached data first to decide if we show a full loading state
+    final cachedData = await CacheManager().get(cacheKey);
+    if (cachedData == null) {
+      emit(const ProductLoading());
+    }
 
     await CacheManager().fetchWithSWR<List<ProductEntity>>(
       key: cacheKey,
@@ -237,12 +242,23 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           final dynamic rawSalePrice =
               item['salePrice'] ??
               item['SalePrice'] ??
+              item['sale_price'] ??
               item['price'] ??
-              item['Price'];
-          final double resolvedSalePrice =
-              (rawSalePrice as num?)?.toDouble() ?? 0.0;
+              item['Price'] ??
+              item['unitPrice'] ??
+              item['UnitPrice'];
+          
+          double parseDouble(dynamic value) {
+            if (value == null) return 0.0;
+            if (value is num) return value.toDouble();
+            if (value is String) return double.tryParse(value) ?? 0.0;
+            return 0.0;
+          }
 
-          final dynamic rawCostPrice = item['costPrice'] ?? item['CostPrice'];
+          final double resolvedSalePrice = parseDouble(rawSalePrice);
+
+          final dynamic rawCostPrice =
+              item['costPrice'] ?? item['CostPrice'] ?? item['cost_price'];
           final double? resolvedCostPrice = (rawCostPrice as num?)?.toDouble();
 
           // 'stock' is the inventory field from the list API
@@ -250,7 +266,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['stock'] ??
               item['Stock'] ??
               item['quantity'] ??
-              item['Quantity'];
+              item['Quantity'] ??
+              item['currentStock'] ??
+              item['stock_quantity'];
           final int resolvedQty = (rawQty as num?)?.toInt() ?? 0;
 
           return ProductEntity(
@@ -260,7 +278,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
                 (item['description'] ?? item['Description']) as String?,
             price: resolvedSalePrice,
             quantity: resolvedQty,
-            imageUrl: (item['imageUrl'] ?? item['ImageUrl']) as String?,
+            imageUrl: (item['imageUrl'] ??
+                    item['ImageUrl'] ??
+                    item['image'] ??
+                    item['Image'])
+                as String?,
             barcode:
                 (item['barcode'] ??
                         item['Barcode'] ??
@@ -758,7 +780,42 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     }
   }
 
+  Future<void> _onLoadProductDetailRequested(
+    LoadProductDetailRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    final cacheKey = 'cache_product_detail_${event.productId}';
+
+    await CacheManager().fetchWithSWR<ProductEntity?>(
+      key: cacheKey,
+      fetcher: () async {
+        debugPrint('ProductBloc: Background loading detail for ${event.productId}');
+        return await repository.getProductDetail(event.productId);
+      },
+      fromJson: (json) {
+        return ProductEntity.fromMap(json);
+      },
+      toJson: (product) {
+        return product?.toMap() ?? {};
+      },
+      onData: (product, isFromCache) {
+        if (product != null) {
+          emit(ProductDetailLoaded(product: product));
+        }
+      },
+      onError: (e) {
+        debugPrint('ProductBloc._onLoadProductDetailRequested error: $e');
+        if (state is! ProductDetailLoaded) {
+          emit(ProductFailure(
+            message: 'Failed to load product detail: ${e.toString()}',
+          ));
+        }
+      },
+    );
+  }
+
   /// Helper to update product cache after mutations
+
   Future<void> _updateProductCache(String locationId) async {
     final cacheKey = 'cache_products_$locationId';
     await CacheManager().set(cacheKey, {

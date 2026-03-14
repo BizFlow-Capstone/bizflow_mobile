@@ -46,3 +46,8 @@ app.*.map.json
 
 # Old report files (consolidated to 6 files)
 /report/
+
+# Environment / secret config files
+/config/*.json
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

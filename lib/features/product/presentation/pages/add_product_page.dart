@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -291,6 +292,37 @@ class _AddProductPageState extends State<AddProductPage> {
       return;
     }
 
+    // Validate prices and stock
+    if (_costPriceController.text.isNotEmpty) {
+      final costPrice = double.tryParse(_costPriceController.text.replaceAll(RegExp(r'[,.]'), ''));
+      if (costPrice == null || costPrice < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n?.translate('product.invalid_cost_price') ?? 'Giá vốn không hợp lệ')),
+        );
+        return;
+      }
+    }
+
+    if (_salePriceController.text.isNotEmpty) {
+      final salePrice = double.tryParse(_salePriceController.text.replaceAll(RegExp(r'[,.]'), ''));
+      if (salePrice == null || salePrice < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n?.translate('product.invalid_sale_price') ?? 'Giá bán không hợp lệ')),
+        );
+        return;
+      }
+    }
+
+    if (_quantityController.text.isNotEmpty) {
+      final quantity = int.tryParse(_quantityController.text.replaceAll(RegExp(r'[,.]'), ''));
+      if (quantity == null || quantity < 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n?.translate('product.invalid_stock') ?? 'Tồn kho không hợp lệ')),
+        );
+        return;
+      }
+    }
+
     context.read<ProductBloc>().add(
       AddProductRequested(
         locationId: widget.locationId,
@@ -309,7 +341,7 @@ class _AddProductPageState extends State<AddProductPage> {
               )
             : null,
         quantity: _quantityController.text.isNotEmpty
-            ? int.tryParse(_quantityController.text)
+            ? int.tryParse(_quantityController.text.replaceAll(RegExp(r'[,.]'), ''))
             : null,
         unit: _unitController.text.isNotEmpty ? _unitController.text : null,
         isActive: _isActive,
@@ -389,28 +421,34 @@ class _AddProductPageState extends State<AddProductPage> {
                       borderRadius: BorderRadius.circular(12),
                       color: const Color.fromARGB(255, 255, 255, 255),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.cloud_upload_outlined,
-                          size: 48,
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(height: AppSpacing.md),
-                        Text(
-                          _selectedImagePath != null
-                              ? _selectedImagePath!.split('/').last
-                              : l10n.translate('product.upload_image'),
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: _selectedImagePath != null
-                                ? AppColors.secondary
-                                : AppColors.textSecondary,
+                    child: _selectedImagePath != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              File(_selectedImagePath!),
+                              width: double.infinity,
+                              height: 200,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.cloud_upload_outlined,
+                                size: 48,
+                                color: AppColors.textSecondary,
+                              ),
+                              SizedBox(height: AppSpacing.md),
+                              Text(
+                                l10n.translate('product.upload_image'),
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
                   ),
                 ),
                 SizedBox(height: AppSpacing.lg),
@@ -526,7 +564,7 @@ class _AddProductPageState extends State<AddProductPage> {
                   children: [
                     Expanded(
                       child: _buildTextFieldWithLabel(
-                        label: l10n.translate('product.quantity'),
+                        label: l10n.translate('product.stock'),
                         controller: _quantityController,
                         hint: '0',
                         keyboardType: TextInputType.number,

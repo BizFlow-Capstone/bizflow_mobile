@@ -40,9 +40,8 @@ class AppConfig {
       case 'staging':
         return 'https://staging-api.bizflow.com';
       default:
-        // Development - HTTPS for compatibility with backend redirect
-        // Backend: https://192.168.1.9:7271
-        return 'https://$host:7271';
+        // Development (Docker): API is exposed at http://<host>:8080
+        return 'http://$host:8080';
     }
   }
 

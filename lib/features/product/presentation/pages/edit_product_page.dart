@@ -30,6 +30,7 @@ class EditProductPage extends StatefulWidget {
   final bool isActive;
   final String? businessTypeId;
   final String? manufacturer;
+  final String? imageUrl;
 
   const EditProductPage({
     super.key,
@@ -46,6 +47,7 @@ class EditProductPage extends StatefulWidget {
     this.isActive = true,
     this.businessTypeId,
     this.manufacturer,
+    this.imageUrl,
   });
 
   @override
@@ -343,9 +345,9 @@ class _EditProductPageState extends State<EditProductPage> {
       return;
     }
 
-    // Validate prices and quantity
+    // Validate prices and stock
     if (_costPriceController.text.isNotEmpty) {
-      final costPrice = double.tryParse(_costPriceController.text);
+      final costPrice = double.tryParse(_costPriceController.text.replaceAll(RegExp(r'[,.]'), ''));
       if (costPrice == null || costPrice < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.translate('product.invalid_cost_price'))),
@@ -355,7 +357,7 @@ class _EditProductPageState extends State<EditProductPage> {
     }
 
     if (_salePriceController.text.isNotEmpty) {
-      final salePrice = double.tryParse(_salePriceController.text);
+      final salePrice = double.tryParse(_salePriceController.text.replaceAll(RegExp(r'[,.]'), ''));
       if (salePrice == null || salePrice < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.translate('product.invalid_sale_price'))),
@@ -365,10 +367,10 @@ class _EditProductPageState extends State<EditProductPage> {
     }
 
     if (_quantityController.text.isNotEmpty) {
-      final quantity = int.tryParse(_quantityController.text);
+      final quantity = int.tryParse(_quantityController.text.replaceAll(RegExp(r'[,.]'), ''));
       if (quantity == null || quantity < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.translate('product.invalid_quantity'))),
+          SnackBar(content: Text(l10n.translate('product.invalid_stock'))),
         );
         return;
       }
@@ -529,59 +531,56 @@ class _EditProductPageState extends State<EditProductPage> {
                                 File(_selectedImagePath!),
                                 fit: BoxFit.cover,
                               ),
-                              Container(
-                                color: Colors.black26,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.edit,
-                                      size: 48,
-                                      color: AppColors.white,
-                                    ),
-                                    SizedBox(height: AppSpacing.md),
-                                    Text(
-                                      l10n.translate('product.change_image'),
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: AppColors.white,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              _buildEditOverlay(),
                             ],
                           )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.cloud_upload_outlined,
-                                size: 48,
-                                color: AppColors.textSecondary,
-                              ),
-                              SizedBox(height: AppSpacing.md),
-                              Text(
-                                l10n.translate('product.upload_image'),
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              if (_selectedImagePath == null)
-                                Padding(
-                                  padding: EdgeInsets.only(top: AppSpacing.md),
-                                  child: Text(
-                                    l10n.translate('common.tap_to_select'),
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: AppColors.textSecondary,
+                        : (widget.imageUrl != null &&
+                                widget.imageUrl!.isNotEmpty &&
+                                !_removeImage)
+                            ? Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.network(
+                                    widget.imageUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            _buildUploadPlaceholder(),
+                                  ),
+                                  _buildEditOverlay(),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: IconButton(
+                                      icon: Icon(
+                                        Icons.delete,
+                                        color: AppColors.error,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          _removeImage = true;
+                                        });
+                                      },
                                     ),
                                   ),
-                                ),
-                            ],
-                          ),
+                                ],
+                              )
+                            : _buildUploadPlaceholder(),
                   ),
                 ),
+                if (_removeImage && widget.imageUrl != null)
+                  Padding(
+                    padding: EdgeInsets.only(top: AppSpacing.sm),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _removeImage = false;
+                        });
+                      },
+                      icon: const Icon(Icons.undo, size: 16),
+                      label: Text(l10n.translate('product.undo_remove_image')),
+                    ),
+                  ),
                 SizedBox(height: AppSpacing.lg),
 
                 // Status Section
@@ -705,7 +704,7 @@ class _EditProductPageState extends State<EditProductPage> {
                   children: [
                     Expanded(
                       child: _buildTextFieldWithLabel(
-                        label: l10n.translate('product.quantity'),
+                        label: l10n.translate('product.stock'),
                         controller: _quantityController,
                         hint: '0',
                         keyboardType: TextInputType.number,
@@ -1106,6 +1105,60 @@ class _EditProductPageState extends State<EditProductPage> {
         Text(
           '+ ${l10n.translate('common.add')}',
           style: AppTextStyles.bodySmall.copyWith(color: AppColors.secondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditOverlay() {
+    return Container(
+      color: Colors.black26,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.edit,
+            size: 48,
+            color: AppColors.white,
+          ),
+          SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.translate('product.change_image'),
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.white,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadPlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.cloud_upload_outlined,
+          size: 48,
+          color: AppColors.textSecondary,
+        ),
+        SizedBox(height: AppSpacing.md),
+        Text(
+          l10n.translate('product.upload_image'),
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        Padding(
+          padding: EdgeInsets.only(top: AppSpacing.md),
+          child: Text(
+            l10n.translate('common.tap_to_select'),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
         ),
       ],
     );

@@ -71,6 +71,38 @@ class SecureStorageKeys {
   static const String refreshToken = 'secure_refresh_token';
   static const String pinCode = 'pin_code';
   static const String biometricKey = 'biometric_key';
+}
 
-  // Add more secure keys here...
+/// Token management helpers
+extension SecureStorageTokenExtension on SecureStorage {
+  /// Save both access and refresh tokens
+  Future<void> saveAuthTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    await write(key: SecureStorageKeys.accessToken, value: accessToken);
+    await write(key: SecureStorageKeys.refreshToken, value: refreshToken);
+  }
+
+  /// Get stored access token
+  Future<String?> getAccessToken() {
+    return read(key: SecureStorageKeys.accessToken);
+  }
+
+  /// Get stored refresh token
+  Future<String?> getRefreshToken() {
+    return read(key: SecureStorageKeys.refreshToken);
+  }
+
+  /// Clear all auth tokens (on logout)
+  Future<void> clearAuthTokens() async {
+    await delete(key: SecureStorageKeys.accessToken);
+    await delete(key: SecureStorageKeys.refreshToken);
+  }
+
+  /// Check if user has a stored access token
+  Future<bool> hasAccessToken() async {
+    final token = await getAccessToken();
+    return token != null && token.isNotEmpty;
+  }
 }

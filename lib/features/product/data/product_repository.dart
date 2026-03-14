@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../domain/entities/product_entity.dart';
 import 'product_api_service.dart';
+import 'models/product_dto.dart';
 
 /// Product Repository - Orchestrates product data flow
 ///
@@ -27,6 +28,10 @@ class ProductRepository {
               imageUrl: dto.imageUrl,
               businessTypeId: dto.businessTypeId,
               manufacturer: dto.manufacturer,
+              businessLocationName: dto.businessLocationName,
+              unit: dto.unit,
+              barcode: dto.barcode,
+              isActive: dto.isActive,
               saleItems: dto.saleItems,
             ),
           )
@@ -72,9 +77,35 @@ class ProductRepository {
   }
 
   /// Get product detail with images and sale items
-  Future<dynamic> getProductDetail(String productId) async {
+  Future<ProductEntity?> getProductDetail(String productId) async {
     try {
-      return await _service.getProductDetail(productId);
+      final response = await _service.getProductDetail(productId);
+      if (response != null &&
+          response is Map<String, dynamic> &&
+          response['success'] == true &&
+          response['data'] != null) {
+        final dto = ProductDto.fromJson(
+          response['data'] as Map<String, dynamic>,
+        );
+        return ProductEntity(
+          id: dto.id,
+          name: dto.name,
+          description: dto.description,
+          price: dto.price,
+          costPrice: dto.costPrice,
+          salePrice: dto.salePrice,
+          quantity: dto.quantity,
+          imageUrl: dto.imageUrl,
+          businessTypeId: dto.businessTypeId,
+          manufacturer: dto.manufacturer,
+          businessLocationName: dto.businessLocationName,
+          unit: dto.unit,
+          barcode: dto.barcode,
+          isActive: dto.isActive,
+          saleItems: dto.saleItems,
+        );
+      }
+      return null;
     } catch (e) {
       debugPrint('ProductRepository.getProductDetail error: $e');
       rethrow;

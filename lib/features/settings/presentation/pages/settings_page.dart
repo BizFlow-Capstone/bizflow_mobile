@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../shared/context/business_context.dart';
-import '../../../../shared/cache/cache_manager.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_event.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 
 /// Settings Page - Trang cài đặt hệ thống
 /// Theo thiết kế SC-ORD-05
@@ -18,7 +20,13 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is LogoutSuccess) {
+          AppRouter.navigateAndClearStack(AppRoutes.login);
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
@@ -159,29 +167,42 @@ class SettingsPage extends StatelessWidget {
               // Logout Button
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await BusinessContext().clear();
-                    await CacheManager().clearAll();
-                    if (context.mounted) {
-                      AppRouter.navigateAndClearStack(AppRoutes.login);
-                    }
+                child: BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    return OutlinedButton.icon(
+                      onPressed: state is LogoutInProgress
+                          ? null
+                          : () => context
+                              .read<AuthBloc>()
+                              .add(const LogoutRequested()),
+                      icon: state is LogoutInProgress
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.danger,
+                              ),
+                            )
+                          : const Icon(Icons.logout, color: AppColors.danger),
+                      label: Text(
+                        l10n.translate('settings_page.logout'),
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.danger),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppSpacing.radiusMd),
+                        ),
+                      ),
+                    );
                   },
-                  icon: const Icon(Icons.logout, color: AppColors.danger),
-                  label: Text(
-                    l10n.translate('settings_page.logout'),
-                    style: AppTextStyles.titleMedium.copyWith(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.danger),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -219,6 +240,7 @@ class SettingsPage extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

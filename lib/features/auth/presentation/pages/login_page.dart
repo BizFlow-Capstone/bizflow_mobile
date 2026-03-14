@@ -15,6 +15,7 @@ import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 import 'register_page.dart';
+import '../../../../core/routing/app_router.dart';
 
 // Import AuthErrorCode from bloc
 export '../bloc/auth_bloc.dart' show AuthErrorCode;
@@ -95,16 +96,11 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleGoogleLogin() {
-    // Call BLoC to handle Google login
-    // TODO: Get idToken từ Google Sign-In
-    // context.read<AuthBloc>().add(
-    //   GoogleLoginRequested(idToken: idToken),
-    // );
+    context.read<AuthBloc>().add(const GoogleLoginRequested());
   }
 
   void _handleForgotPassword(AppLocalizations l10n) {
-    // TODO: Navigate to forgot password page
-    _showSuccess(l10n.translate('auth.forgot_password'));
+    Navigator.pushNamed(context, AppRoutes.forgotPassword);
   }
 
   bool _isValidEmail(String email) {
@@ -223,11 +219,12 @@ class _LoginPageContent extends StatelessWidget {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
-          _showSuccess(context, l10n.translate('auth.login_success'));
-          // TODO: Navigate to home screen
+          AppRouter.navigateAndClearStack(AppRoutes.home);
+        } else if (state is GoogleLoginSetPasswordRequired) {
+          AppRouter.navigateAndClearStack(AppRoutes.setPassword);
         } else if (state is LoginFailure) {
-          final errorMessage = _mapErrorCodeToLocalization(state.errorCode);
-          _showError(context, errorMessage);
+          final msg = state.serverMessage ?? _mapErrorCodeToLocalization(state.errorCode);
+          _showError(context, msg);
         }
       },
       child: SafeArea(
@@ -415,16 +412,21 @@ class _LoginPageContent extends StatelessWidget {
   }
 
   Widget _buildGoogleButton(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.divider),
-        borderRadius: AppSpacing.borderRadiusMd,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onGoogleLogin,
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, state) {
+        final isLoading = state is LoginInProgress;
+        return Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isLoading ? AppColors.divider.withOpacity(0.5) : AppColors.divider,
+            ),
+            borderRadius: AppSpacing.borderRadiusMd,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isLoading ? null : onGoogleLogin,
           borderRadius: AppSpacing.borderRadiusMd,
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -449,6 +451,8 @@ class _LoginPageContent extends StatelessWidget {
           ),
         ),
       ),
+    );
+      },
     );
   }
 

@@ -142,4 +142,30 @@ class LocationRepository {
       rethrow;
     }
   }
+
+  /// Delete a business location
+  Future<String> deleteLocation(String locationId) async {
+    try {
+      return await _service.deleteLocation(locationId);
+    } catch (e) {
+      debugPrint('LocationRepository.deleteLocation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Remove an employee from a location
+  Future<String> removeEmployeeFromLocation({
+    required String locationId,
+    required String employeeId,
+  }) async {
+    try {
+      return await _service.removeEmployeeFromLocation(
+        locationId: locationId,
+        employeeId: employeeId,
+      );
+    } catch (e) {
+      debugPrint('LocationRepository.removeEmployeeFromLocation error: $e');
+      rethrow;
+    }
+  }
 }

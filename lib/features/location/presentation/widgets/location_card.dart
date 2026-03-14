@@ -9,6 +9,7 @@ class LocationCard extends StatelessWidget {
   final VoidCallback onTap;
   final Function(bool) onToggleStatus;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
   final VoidCallback onAddManager;
 
   const LocationCard({
@@ -17,6 +18,7 @@ class LocationCard extends StatelessWidget {
     required this.onTap,
     required this.onToggleStatus,
     required this.onEdit,
+    required this.onDelete,
     required this.onAddManager,
   });
 
@@ -157,6 +159,26 @@ class LocationCard extends StatelessWidget {
                           Icons.edit_outlined,
                           size: 18,
                           color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: AppSpacing.sm),
+
+                    // Delete Button
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: AppColors.error,
                         ),
                       ),
                     ),

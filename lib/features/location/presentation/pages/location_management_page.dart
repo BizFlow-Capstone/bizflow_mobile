@@ -12,6 +12,7 @@ import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
 import '../widgets/location_card.dart';
 import 'add_edit_location_page.dart';
+import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../product/presentation/pages/product_management_page.dart';
 import '../../domain/entities/location_entity.dart';
 
@@ -56,9 +57,24 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
     });
   }
 
-  @override
+  void _handleLocationDelete(LocationEntity location) async {
+    final confirmed = await AppDialog.delete(
+      context,
+      title: l10n.translate('product.confirm_delete_title'), // Reusing product confirm delete for now
+      message: l10n.translate('product.confirm_delete_message'),
+      confirmText: l10n.translate('common.delete'),
+    );
+
+    if (confirmed == true && mounted) {
+      context.read<LocationBloc>().add(
+        DeleteLocationRequested(locationId: location.id),
+      );
+    }
+  }
+
+  late AppLocalizations l10n;
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    l10n = AppLocalizations.of(context);
 
     // Return a wrapper widget that contains both body and drawer
     // _GlobalAppBarShell will wrap this with Scaffold
@@ -83,6 +99,7 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
         },
         onToggleStatus: _handleLocationToggleStatus,
         onEdit: _handleLocationEdit,
+        onDelete: _handleLocationDelete,
       ),
     );
   }
@@ -96,6 +113,7 @@ class _LocationPageContent extends StatelessWidget {
   final Function(LocationItem) onLocationSelected;
   final Function(String, bool) onToggleStatus;
   final Function(LocationEntity) onEdit;
+  final Function(LocationEntity) onDelete;
 
   const _LocationPageContent({
     required this.l10n,
@@ -103,6 +121,7 @@ class _LocationPageContent extends StatelessWidget {
     required this.onLocationSelected,
     required this.onToggleStatus,
     required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -298,6 +317,7 @@ class _LocationPageContent extends StatelessWidget {
                             onToggleStatus: (isActive) =>
                                 onToggleStatus(location.id, isActive),
                             onEdit: () => onEdit(location),
+                            onDelete: () => onDelete(location),
                             onAddManager: () {
                               AppSnackBar.show(
                                 context,

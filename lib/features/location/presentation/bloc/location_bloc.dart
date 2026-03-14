@@ -27,6 +27,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     on<AddEmployeeToLocationFromTabRequested>(_onAddEmployeeToLocationFromTab);
     on<RemoveEmployeeFromTabRequested>(_onRemoveEmployeeFromTab);
     on<SaveLocationEmployeesRequested>(_onSaveLocationEmployees);
+    on<RemoveEmployeeFromLocationRequested>(_onRemoveEmployeeFromLocationRequested);
   }
 
   // Cache locations in memory
@@ -251,17 +252,12 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   ) async {
     emit(LocationDeleteInProgress(locationId: event.locationId));
     try {
-      // TODO: Call repository to delete location
-      await Future.delayed(const Duration(milliseconds: 500));
+      await repository.deleteLocation(event.locationId);
 
-      _locations.removeWhere((loc) => loc.id == event.locationId);
-
-      await CacheManager().set('my_owned_locations', {
-        'data': _locations.map((e) => e.toMap()).toList(),
-      });
+      // Refresh locations list
+      add(const LoadLocationsRequested());
 
       emit(LocationDeleteSuccess(locationId: event.locationId));
-      emit(LocationsLoaded(locations: _locations));
     } catch (e) {
       emit(LocationFailure(message: e.toString()));
     }
@@ -349,7 +345,6 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     }
   }
 
-  /// Save all employee assignments to server (batch API call)
   Future<void> _onSaveLocationEmployees(
     SaveLocationEmployeesRequested event,
     Emitter<LocationState> emit,
@@ -375,6 +370,29 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
           allEmployees: allEmployees,
         ),
       );
+    } catch (e) {
+      emit(LocationFailure(message: e.toString()));
+    }
+  }
+
+  Future<void> _onRemoveEmployeeFromLocationRequested(
+    RemoveEmployeeFromLocationRequested event,
+    Emitter<LocationState> emit,
+  ) async {
+    emit(LocationDeleteInProgress(locationId: event.locationId));
+    try {
+      await repository.removeEmployeeFromLocation(
+        locationId: event.locationId,
+        employeeId: event.employeeId,
+      );
+
+      // Refresh employee list for this location
+      add(LoadLocationEmployeesRequested(
+        locationId: event.locationId,
+        currentEmployeeIds: _currentLocationEmployeeIds,
+      ));
+
+      emit(LocationDeleteSuccess(locationId: event.locationId));
     } catch (e) {
       emit(LocationFailure(message: e.toString()));
     }

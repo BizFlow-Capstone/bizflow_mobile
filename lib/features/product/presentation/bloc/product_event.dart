@@ -262,3 +262,11 @@ class LoadMoreProductsRequested extends ProductEvent {
   @override
   List<Object?> get props => [locationId];
 }
+class LoadProductDetailRequested extends ProductEvent {
+  final String productId;
+
+  const LoadProductDetailRequested({required this.productId});
+
+  @override
+  List<Object?> get props => [productId];
+}

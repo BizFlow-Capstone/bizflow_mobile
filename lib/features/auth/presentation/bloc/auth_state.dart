@@ -5,9 +5,14 @@ abstract class AuthState {
   const AuthState();
 }
 
-// Initial State
+// Initial / Checking State
 class AuthInitial extends AuthState {
   const AuthInitial();
+}
+
+/// Checking stored token on app startup
+class AuthCheckingStatus extends AuthState {
+  const AuthCheckingStatus();
 }
 
 // Loading State
@@ -56,29 +61,64 @@ class LoginInProgress extends AuthState {
 }
 
 class LoginSuccess extends AuthState {
-  final String token;
+  final String accessToken;
   final Map<String, dynamic> user;
 
-  const LoginSuccess({required this.token, required this.user});
+  const LoginSuccess({required this.accessToken, required this.user});
 }
 
 class LoginFailure extends AuthState {
   final AuthErrorCode errorCode;
+  final String? serverMessage;
 
-  const LoginFailure({required this.errorCode});
+  const LoginFailure({required this.errorCode, this.serverMessage});
+}
+
+/// Google login returned isNewAccount=true — navigate to SetPassword
+class GoogleLoginSetPasswordRequired extends AuthState {
+  final String accessToken;
+  final String refreshToken;
+
+  const GoogleLoginSetPasswordRequired({
+    required this.accessToken,
+    required this.refreshToken,
+  });
+}
+
+// Set Password States
+class SetPasswordInProgress extends AuthState {
+  const SetPasswordInProgress();
+}
+
+class SetPasswordSuccess extends AuthState {
+  const SetPasswordSuccess();
+}
+
+class SetPasswordFailure extends AuthState {
+  final String message;
+
+  const SetPasswordFailure({required this.message});
 }
 
 // Authenticated State
 class AuthAuthenticated extends AuthState {
-  final String token;
-  final Map<String, dynamic> user;
+  final String accessToken;
 
-  const AuthAuthenticated({required this.token, required this.user});
+  const AuthAuthenticated({required this.accessToken});
 }
 
 // Unauthenticated State
 class AuthUnauthenticated extends AuthState {
   const AuthUnauthenticated();
+}
+
+// Logout States
+class LogoutInProgress extends AuthState {
+  const LogoutInProgress();
+}
+
+class LogoutSuccess extends AuthState {
+  const LogoutSuccess();
 }
 
 // Error State
