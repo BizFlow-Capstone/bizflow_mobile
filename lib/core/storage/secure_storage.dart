@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-// import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Secure Storage Service - Quản lý lưu trữ bảo mật
 /// Dùng cho token, password, sensitive data
@@ -8,58 +8,44 @@ class SecureStorage {
   factory SecureStorage() => _instance;
   SecureStorage._internal();
 
-  // TODO: Uncomment khi thêm package flutter_secure_storage
-  // final FlutterSecureStorage _storage = const FlutterSecureStorage(
-  //   aOptions: AndroidOptions(
-  //     encryptedSharedPreferences: true,
-  //   ),
-  //   iOptions: IOSOptions(
-  //     accessibility: KeychainAccessibility.first_unlock_this_device,
-  //   ),
-  // );
-
-  // Tạm thời dùng Map để lưu (chỉ trong memory - không bảo mật)
-  // Khi production, thay bằng flutter_secure_storage
-  final Map<String, String> _tempStorage = {};
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      encryptedSharedPreferences: true,
+    ),
+  );
 
   /// Write value
   Future<void> write({required String key, required String value}) async {
-    // TODO: await _storage.write(key: key, value: value);
-    _tempStorage[key] = value;
+    await _storage.write(key: key, value: value);
     debugPrint('SecureStorage: Write key=$key');
   }
 
   /// Read value
   Future<String?> read({required String key}) async {
-    // TODO: return await _storage.read(key: key);
     debugPrint('SecureStorage: Read key=$key');
-    return _tempStorage[key];
+    return _storage.read(key: key);
   }
 
   /// Delete value
   Future<void> delete({required String key}) async {
-    // TODO: await _storage.delete(key: key);
-    _tempStorage.remove(key);
+    await _storage.delete(key: key);
     debugPrint('SecureStorage: Delete key=$key');
   }
 
   /// Delete all
   Future<void> deleteAll() async {
-    // TODO: await _storage.deleteAll();
-    _tempStorage.clear();
+    await _storage.deleteAll();
     debugPrint('SecureStorage: Delete all');
   }
 
   /// Check if key exists
   Future<bool> containsKey({required String key}) async {
-    // TODO: return await _storage.containsKey(key: key);
-    return _tempStorage.containsKey(key);
+    return _storage.containsKey(key: key);
   }
 
   /// Read all
   Future<Map<String, String>> readAll() async {
-    // TODO: return await _storage.readAll();
-    return Map.from(_tempStorage);
+    return _storage.readAll();
   }
 }
 

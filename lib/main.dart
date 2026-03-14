@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'core/config/app_config.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/network/api_client.dart';
+import 'core/network/api_endpoints.dart';
 import 'core/providers/localization_provider.dart';
 import 'core/routing/app_router.dart';
 import 'core/storage/secure_storage.dart';
@@ -77,24 +78,54 @@ class _MyAppState extends State<MyApp> {
     // Secure storage (token management)
     _secureStorage = SecureStorage();
 
+    final authInterceptor = AuthInterceptor(
+      getToken: () => _secureStorage.getAccessToken(),
+    );
+
+    final languageInterceptor = LanguageInterceptor(
+      getCurrentLanguage: () =>
+          _localizationProvider.currentLocale.languageCode,
+    );
+
+    final requestInterceptors = <RequestInterceptor>[
+      authInterceptor,
+      languageInterceptor,
+    ];
+
+    final responseInterceptors = <ResponseInterceptor>[
+      if (AppConfig.enableLogging) LoggingInterceptor(),
+      TokenRefreshInterceptor(
+        getRefreshToken: () => _secureStorage.getRefreshToken(),
+        onTokenRefreshed: ({
+          required String accessToken,
+          required String refreshToken,
+        }) async {
+          await _secureStorage.saveAuthTokens(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+          );
+        },
+        onRefreshFailed: () async {
+          await _secureStorage.clearAuthTokens();
+          await BusinessContext().clear();
+          await UserProfileContext().clear();
+          await CacheManager().clearAll();
+          AppRouter.globalAppBarState.reset();
+          AppRouter.navigateAndClearStack(AppRoutes.login);
+        },
+        baseUrl: AppConfig.baseUrl,
+        refreshEndpoint: ApiEndpoints.refreshTokenEndpoint,
+        timeout: AppConfig.apiTimeout,
+        requestInterceptors: [languageInterceptor],
+      ),
+    ];
+
     // Initialize API Client with interceptors
     _apiClient = ApiClient(
       baseUrl: AppConfig.baseUrl,
       timeout: AppConfig.apiTimeout,
-      requestInterceptors: [
-        // Auth bearer token interceptor
-        AuthInterceptor(
-          getToken: () => _secureStorage.getAccessToken(),
-        ),
-        // Language interceptor - reads from LocalizationProvider
-        LanguageInterceptor(
-          getCurrentLanguage: () =>
-              _localizationProvider.currentLocale.languageCode,
-        ),
-      ],
-      responseInterceptors: AppConfig.enableLogging
-          ? [LoggingInterceptor()]
-          : [],
+      requestInterceptors: requestInterceptors,
+      responseInterceptors: responseInterceptors,
     );
 
     // Auth service and repository
