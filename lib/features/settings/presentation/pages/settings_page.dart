@@ -64,7 +64,7 @@ class SettingsPage extends StatelessWidget {
                 iconBgColor: const Color(0xFFE8EAF6),
                 title: l10n.translate('settings_page.personal_info'),
                 subtitle: l10n.translate('settings_page.personal_info_sub'),
-                onTap: () {},
+                onTap: () => AppRouter.navigateTo(AppRoutes.profile),
               ),
               const SizedBox(height: AppSpacing.sm),
               _buildSettingsTile(
@@ -136,7 +136,7 @@ class SettingsPage extends StatelessWidget {
                 iconBgColor: const Color(0xFFFFEBEE),
                 title: l10n.translate('settings_page.security_settings'),
                 subtitle: l10n.translate('settings_page.security_settings_sub'),
-                onTap: () {},
+                onTap: () => AppRouter.navigateTo(AppRoutes.profile),
               ),
               const SizedBox(height: AppSpacing.sm),
               _buildSettingsTile(

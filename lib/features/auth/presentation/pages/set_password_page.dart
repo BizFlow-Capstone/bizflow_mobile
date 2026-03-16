@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -25,11 +26,9 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
   final _passwordFocus = FocusNode();
   final _confirmFocus = FocusNode();
 
-  bool _isPasswordVisible = false;
-  bool _isConfirmVisible = false;
-
   @override
   void dispose() {
+    FocusManager.instance.primaryFocus?.unfocus();
     _passwordController.dispose();
     _confirmController.dispose();
     _passwordFocus.dispose();
@@ -66,17 +65,22 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is SetPasswordSuccess) {
-          PostAuthNavigation.route(context);
+          FocusScope.of(context).unfocus();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            PostAuthNavigation.route(context);
+          });
         } else if (state is SetPasswordFailure) {
           _showError(state.message);
         }
       },
       child: Scaffold(
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.surface,
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: Colors.transparent,
+          backgroundColor: AppColors.surface,
           surfaceTintColor: AppColors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
           automaticallyImplyLeading: false,
           title: Text(
             l10n.translate('auth.set_password_title'),
@@ -85,79 +89,71 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
         ),
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  l10n.translate('auth.set_password_subtitle'),
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textSecondary,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Image.asset(
+                      'assets/images/logos/Bizflow.png',
+                      height: 64,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.business,
+                        size: 64,
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-
-                // Password field
-                AppTextField(
-                  controller: _passwordController,
-                  focusNode: _passwordFocus,
-                  label: l10n.translate('auth.password'),
-                  hintText: l10n.translate('auth.enter_password'),
-                  obscureText: !_isPasswordVisible,
-                  textInputAction: TextInputAction.next,
-                  suffixIcon: GestureDetector(
-                    onTap: () =>
-                        setState(() => _isPasswordVisible = !_isPasswordVisible),
-                    child: Icon(
-                      _isPasswordVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    l10n.translate('auth.set_password_subtitle'),
+                    style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  onSubmitted: (_) =>
-                      FocusScope.of(context).requestFocus(_confirmFocus),
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // Confirm password field
-                AppTextField(
-                  controller: _confirmController,
-                  focusNode: _confirmFocus,
-                  label: l10n.translate('auth.confirm_password'),
-                  hintText: l10n.translate('auth.enter_password'),
-                  obscureText: !_isConfirmVisible,
-                  textInputAction: TextInputAction.done,
-                  suffixIcon: GestureDetector(
-                    onTap: () =>
-                        setState(() => _isConfirmVisible = !_isConfirmVisible),
-                    child: Icon(
-                      _isConfirmVisible
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      color: AppColors.textSecondary,
-                    ),
+                  const SizedBox(height: AppSpacing.xl),
+                  AppPasswordField(
+                    controller: _passwordController,
+                    focusNode: _passwordFocus,
+                    label: l10n.translate('auth.password'),
+                    hintText: l10n.translate('auth.enter_password'),
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) =>
+                        FocusScope.of(context).requestFocus(_confirmFocus),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-
-                // Submit button
-                BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, state) {
-                    return AppButton(
-                      label: l10n.translate('auth.set_password_button'),
-                      isFullWidth: true,
-                      isLoading: state is SetPasswordInProgress,
-                      onPressed: state is SetPasswordInProgress
-                          ? null
-                          : () => _handleSubmit(l10n),
-                      type: AppButtonType.primary,
-                      size: AppButtonSize.large,
-                    );
-                  },
-                ),
-              ],
+                  const SizedBox(height: AppSpacing.md),
+                  AppPasswordField(
+                    controller: _confirmController,
+                    focusNode: _confirmFocus,
+                    label: l10n.translate('auth.confirm_password'),
+                    hintText: l10n.translate('auth.enter_password'),
+                    textInputAction: TextInputAction.done,
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  BlocBuilder<AuthBloc, AuthState>(
+                    builder: (context, state) {
+                      return AppButton(
+                        label: l10n.translate('auth.set_password_button'),
+                        isFullWidth: true,
+                        isLoading: state is SetPasswordInProgress,
+                        onPressed: state is SetPasswordInProgress
+                            ? null
+                            : () => _handleSubmit(l10n),
+                        type: AppButtonType.primary,
+                        size: AppButtonSize.large,
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),

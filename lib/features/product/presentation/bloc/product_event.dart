@@ -47,16 +47,16 @@ class SearchProductsRequested extends ProductEvent {
 class FilterProductsRequested extends ProductEvent {
   final String locationId;
   final String? status;
-  final String? category;
+  final String? businessTypeId;
 
   const FilterProductsRequested({
     required this.locationId,
     this.status,
-    this.category,
+    this.businessTypeId,
   });
 
   @override
-  List<Object?> get props => [locationId, status, category];
+  List<Object?> get props => [locationId, status, businessTypeId];
 }
 
 /// Sort products
@@ -262,6 +262,7 @@ class LoadMoreProductsRequested extends ProductEvent {
   @override
   List<Object?> get props => [locationId];
 }
+
 class LoadProductDetailRequested extends ProductEvent {
   final String productId;
 

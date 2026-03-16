@@ -127,10 +127,10 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
         surfaceTintColor: AppColors.white,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -207,125 +207,130 @@ class _VerifyOtpPageContent extends StatelessWidget {
       },
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.lg,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Icon
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF23C4C1).withOpacity(0.1),
-                  shape: BoxShape.circle,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/logos/Bizflow.png',
+                  height: 64,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.business,
+                    size: 64,
+                    color: AppColors.primary,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.phonelink_lock,
-                  size: 40,
-                  color: Color(0xFF23C4C1),
+                SizedBox(height: AppSpacing.lg),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.phonelink_lock,
+                    size: 40,
+                    color: AppColors.primary,
+                  ),
                 ),
-              ),
-              SizedBox(height: AppSpacing.lg),
-
-              // Title
-              Text(
-                l10n.translate('auth.verify_phone_title'),
-                style: AppTextStyles.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              // Description
-              Text(
-                '${l10n.translate('auth.verify_otp_subtitle')}\n$phoneNumber',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+                SizedBox(height: AppSpacing.lg),
+                Text(
+                  l10n.translate('auth.verify_phone_title'),
+                  style: AppTextStyles.headlineSmall,
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: AppSpacing.xl),
-
-              // OTP Input Boxes
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(6, (index) => _buildOtpBox(index)),
-              ),
-              SizedBox(height: AppSpacing.xl),
-
-              // Verify Button
-              BlocBuilder<AuthBloc, AuthState>(
-                builder: (context, state) {
-                  return AppButton(
-                    label: l10n.translate('auth.verify_button'),
-                    isFullWidth: true,
-                    isLoading: state is OtpVerificationInProgress,
-                    onPressed: state is OtpVerificationInProgress
-                        ? null
-                        : onVerify,
-                    type: AppButtonType.primary,
-                    size: AppButtonSize.large,
-                  );
-                },
-              ),
-              SizedBox(height: AppSpacing.xl),
-
-              // Resend Section
-              if (canResend)
-                GestureDetector(
-                  onTap: onResend,
-                  child: Row(
+                SizedBox(height: AppSpacing.md),
+                Text(
+                  '${l10n.translate('auth.verify_otp_subtitle')}\n$phoneNumber',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: AppSpacing.xl),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(6, (index) => _buildOtpBox(index)),
+                ),
+                SizedBox(height: AppSpacing.xl),
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    return AppButton(
+                      label: l10n.translate('auth.verify_button'),
+                      isFullWidth: true,
+                      isLoading: state is OtpVerificationInProgress,
+                      onPressed: state is OtpVerificationInProgress
+                          ? null
+                          : onVerify,
+                      type: AppButtonType.primary,
+                      size: AppButtonSize.large,
+                    );
+                  },
+                ),
+                SizedBox(height: AppSpacing.xl),
+                if (canResend)
+                  GestureDetector(
+                    onTap: onResend,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${l10n.translate('auth.didnt_receive')} ',
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                        Text(
+                          l10n.translate('auth.resend_otp'),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(' • ', style: AppTextStyles.bodyMedium),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Text(
+                            l10n.translate('auth.change_phone_number'),
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        '${l10n.translate('auth.didnt_receive')} ',
+                        '${l10n.translate('auth.resend_after')} ',
                         style: AppTextStyles.bodyMedium,
                       ),
                       Text(
-                        l10n.translate('auth.resend_otp'),
+                        '$remainingSeconds${l10n.translate('auth.seconds')}',
                         style: AppTextStyles.bodyMedium.copyWith(
-                          color: const Color(0xFF23C4C1),
+                          color: AppColors.primary,
                           fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(' • ', style: AppTextStyles.bodyMedium),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Text(
-                          l10n.translate('auth.change_phone_number'),
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: const Color(0xFF23C4C1),
-                            fontWeight: FontWeight.w600,
-                          ),
                         ),
                       ),
                     ],
                   ),
-                )
-              else
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${l10n.translate('auth.resend_after')} ',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                    Text(
-                      '$remainingSeconds${l10n.translate('auth.seconds')}',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: const Color(0xFF23C4C1),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                const SafeArea(
+                  top: false,
+                  child: SizedBox(height: AppSpacing.md),
                 ),
-              const SafeArea(
-                top: false,
-                child: SizedBox(height: AppSpacing.md),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

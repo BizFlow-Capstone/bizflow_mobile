@@ -122,8 +122,18 @@ class ProductEntity {
       return null;
     }
 
-    final double priceValue = parseDouble(map['sellingPrice'] ?? map['SellingPrice'] ?? map['price'] ?? map['Price']);
-    final double? salePriceValue = parseDoubleNullable(map['sellingPrice'] ?? map['SellingPrice'] ?? map['salePrice'] ?? map['SalePrice']);
+    final double priceValue = parseDouble(
+      map['sellingPrice'] ??
+          map['SellingPrice'] ??
+          map['price'] ??
+          map['Price'],
+    );
+    final double? salePriceValue = parseDoubleNullable(
+      map['sellingPrice'] ??
+          map['SellingPrice'] ??
+          map['salePrice'] ??
+          map['SalePrice'],
+    );
 
     return ProductEntity(
       id: map['id']?.toString() ?? '',
@@ -134,7 +144,17 @@ class ProductEntity {
       imageUrl: map['imageUrl'] as String?,
       barcode: map['barcode'] as String?,
       category: map['category'] as String?,
-      costPrice: parseDoubleNullable(map['costPrice'] ?? map['CostPrice']),
+      costPrice: parseDoubleNullable(
+        map['costPrice'] ??
+            map['CostPrice'] ??
+            map['cost_price'] ??
+            map['purchasePrice'] ??
+            map['PurchasePrice'] ??
+            map['purchase_price'] ??
+            map['importPrice'] ??
+            map['ImportPrice'] ??
+            map['import_price'],
+      ),
       salePrice: salePriceValue ?? priceValue,
       unit: map['unit'] as String?,
       isActive: map['isActive'] as bool? ?? true,

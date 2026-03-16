@@ -141,3 +141,17 @@ class AddEmployeeToLocationSuccess extends LocationState {
 class SaveLocationEmployeesSuccess extends LocationState {
   const SaveLocationEmployeesSuccess();
 }
+
+/// Employee removed from location immediately (server-side)
+class RemoveEmployeeFromLocationSuccess extends LocationState {
+  final String locationId;
+  final String employeeId;
+
+  const RemoveEmployeeFromLocationSuccess({
+    required this.locationId,
+    required this.employeeId,
+  });
+
+  @override
+  List<Object?> get props => [locationId, employeeId];
+}

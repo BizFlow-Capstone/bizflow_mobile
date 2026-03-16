@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'dart:convert';
 import 'auth_event.dart';
@@ -13,6 +15,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../location/data/location_repository.dart';
 import '../../data/auth_repository.dart';
 import '../../data/models/auth_response.dart';
+import '../../data/models/credentials_response.dart';
 
 /// Error codes for auth operations
 /// These codes are mapped to localization keys in UI layer
@@ -43,6 +46,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     serverClientId: !kIsWeb && _clientId.isNotEmpty ? _clientId : null,
     scopes: ['email', 'profile'],
   );
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+
+  String? _pendingPhoneNumber;
+  String? _pendingPhoneNumberE164;
+  String? _pendingPassword;
+  String? _pendingFullName;
+  String? _pendingVerificationId;
+
+  String? _pendingLinkPhoneNumber;
+  String? _pendingLinkPhoneNumberE164;
+  String? _pendingLinkPhonePassword;
+  String? _pendingLinkPhoneVerificationId;
 
   AuthBloc({
     required this.locationRepository,
@@ -57,6 +72,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<SetPasswordRequested>(_onSetPasswordRequested);
     on<VerifyOtpRequested>(_onVerifyOtpRequested);
     on<ResendOtpRequested>(_onResendOtpRequested);
+    on<RegisterWithPhoneRequested>(_onRegisterWithPhoneRequested);
+    on<PhoneOtpCodeSubmitted>(_onPhoneOtpCodeSubmitted);
+    on<ResendPhoneOtpRequested>(_onResendPhoneOtpRequested);
+    on<LoadCredentialsRequested>(_onLoadCredentialsRequested);
+    on<LinkEmailRequested>(_onLinkEmailRequested);
+    on<LinkGoogleRequested>(_onLinkGoogleRequested);
+    on<StartLinkPhoneRequested>(_onStartLinkPhoneRequested);
+    on<SubmitLinkPhoneOtpRequested>(_onSubmitLinkPhoneOtpRequested);
+    on<ResendLinkPhoneOtpRequested>(_onResendLinkPhoneOtpRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<ClearAuthError>(_onClearAuthError);
   }
@@ -73,14 +97,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   /// Check stored token on app startup → route to home or login
-  Future<void> _onAppStarted(
-    AppStarted event,
-    Emitter<AuthState> emit,
-  ) async {
+  Future<void> _onAppStarted(AppStarted event, Emitter<AuthState> emit) async {
     emit(const AuthCheckingStatus());
     try {
       final loggedIn = await authRepository.isLoggedIn();
       if (loggedIn) {
+        final needsSetPassword = await secureStorage.getNeedsSetPassword();
+        if (needsSetPassword) {
+          emit(const NeedsSetPasswordOnResume());
+          return;
+        }
         final token = await authRepository.getStoredAccessToken();
         emit(AuthAuthenticated(accessToken: token ?? ''));
       } else {
@@ -112,10 +138,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
 
       if (!result.success || result.accessToken == null) {
-        emit(LoginFailure(
-          errorCode: AuthErrorCode.loginFailed,
-          serverMessage: result.message,
-        ));
+        emit(
+          LoginFailure(
+            errorCode: AuthErrorCode.loginFailed,
+            serverMessage: result.message,
+          ),
+        );
         return;
       }
 
@@ -123,6 +151,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken ?? '',
       );
+      await secureStorage.setNeedsSetPassword(false);
       await UserProfileContext().saveProfile(
         fullName: result.fullName,
         avatarUrl: result.avatarUrl,
@@ -132,18 +161,22 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         avatarUrl: result.avatarUrl,
       );
       await _prefetchLocations();
-      emit(LoginSuccess(
-        accessToken: result.accessToken!,
-        user: {
-          if (result.fullName != null) 'fullName': result.fullName,
-          if (result.avatarUrl != null) 'avatarUrl': result.avatarUrl,
-        },
-      ));
+      emit(
+        LoginSuccess(
+          accessToken: result.accessToken!,
+          user: {
+            if (result.fullName != null) 'fullName': result.fullName,
+            if (result.avatarUrl != null) 'avatarUrl': result.avatarUrl,
+          },
+        ),
+      );
     } catch (e) {
-      emit(LoginFailure(
-        errorCode: AuthErrorCode.loginFailed,
-        serverMessage: e.toString(),
-      ));
+      emit(
+        LoginFailure(
+          errorCode: AuthErrorCode.loginFailed,
+          serverMessage: e.toString(),
+        ),
+      );
     }
   }
 
@@ -154,6 +187,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(LoginInProgress());
     try {
+      await _resetGoogleSessionForAccountPicker();
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         // User cancelled sign-in
@@ -175,10 +209,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
       final result = await authRepository.loginWithGoogleToken(idToken);
       if (!result.success || result.accessToken == null) {
-        emit(LoginFailure(
-          errorCode: AuthErrorCode.loginFailed,
-          serverMessage: result.message,
-        ));
+        emit(
+          LoginFailure(
+            errorCode: AuthErrorCode.loginFailed,
+            serverMessage: result.message,
+          ),
+        );
         return;
       }
 
@@ -197,23 +233,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
 
       if (result.isNewAccount == true) {
+        await secureStorage.setNeedsSetPassword(true);
         // New account — must set password before accessing the app
-        emit(GoogleLoginSetPasswordRequired(
-          accessToken: result.accessToken!,
-          refreshToken: result.refreshToken ?? '',
-        ));
+        emit(
+          GoogleLoginSetPasswordRequired(
+            accessToken: result.accessToken!,
+            refreshToken: result.refreshToken ?? '',
+          ),
+        );
       } else {
+        await secureStorage.setNeedsSetPassword(false);
         await _prefetchLocations();
-        emit(LoginSuccess(
-          accessToken: result.accessToken!,
-          user: const {},
-        ));
+        emit(LoginSuccess(accessToken: result.accessToken!, user: const {}));
       }
     } catch (e) {
-      emit(LoginFailure(
-        errorCode: AuthErrorCode.loginFailed,
-        serverMessage: e.toString(),
-      ));
+      emit(
+        LoginFailure(
+          errorCode: AuthErrorCode.loginFailed,
+          serverMessage: e.toString(),
+        ),
+      );
     }
   }
 
@@ -224,10 +263,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(SetPasswordInProgress());
     try {
-      final result = await authRepository.setPassword(
-        password: event.password,
-      );
+      final result = await authRepository.setPassword(password: event.password);
       if (result.success) {
+        await secureStorage.setNeedsSetPassword(false);
         await _prefetchLocations();
         emit(const SetPasswordSuccess());
       } else {
@@ -270,6 +308,450 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     // No-op
   }
 
+  Future<void> _onRegisterWithPhoneRequested(
+    RegisterWithPhoneRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const PhoneRegisterInProgress());
+    final normalizedPhone = _normalizePhoneToE164(event.phone);
+    if (normalizedPhone == null) {
+      emit(
+        const PhoneRegisterFailure(
+          message: 'Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng.',
+        ),
+      );
+      return;
+    }
+
+    _pendingPhoneNumber = event.phone;
+    _pendingPhoneNumberE164 = normalizedPhone;
+    _pendingPassword = event.password;
+    _pendingFullName = event.fullName;
+
+    final completer = Completer<String>();
+    PhoneAuthCredential? autoVerifiedCredential;
+
+    try {
+      await _firebaseAuth.verifyPhoneNumber(
+        phoneNumber: normalizedPhone,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          autoVerifiedCredential = credential;
+          if (!completer.isCompleted) {
+            completer.complete('__AUTO_VERIFIED__');
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (!completer.isCompleted) {
+            completer.completeError(
+              Exception('${e.code}: ${e.message ?? 'OTP send failed'}'),
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+
+      final verificationId = await completer.future;
+
+      if (verificationId == '__AUTO_VERIFIED__') {
+        if (autoVerifiedCredential == null) {
+          emit(
+            const PhoneRegisterFailure(
+              message: 'Auto verification failed. Please try again.',
+            ),
+          );
+          return;
+        }
+
+        await _completePhoneRegisterWithCredential(
+          phoneCredential: autoVerifiedCredential!,
+          emit: emit,
+        );
+        return;
+      }
+
+      _pendingVerificationId = verificationId;
+      emit(PhoneOtpCodeSent(phone: event.phone));
+    } catch (e) {
+      emit(
+        PhoneRegisterFailure(
+          message: e.toString().replaceAll('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onPhoneOtpCodeSubmitted(
+    PhoneOtpCodeSubmitted event,
+    Emitter<AuthState> emit,
+  ) async {
+    final verificationId = _pendingVerificationId;
+
+    if (verificationId == null) {
+      emit(const PhoneRegisterFailure(message: 'Invalid OTP session'));
+      return;
+    }
+
+    emit(const PhoneRegisterInProgress());
+    try {
+      final phoneCredential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: event.smsCode,
+      );
+
+      await _completePhoneRegisterWithCredential(
+        phoneCredential: phoneCredential,
+        emit: emit,
+      );
+    } catch (e) {
+      emit(
+        PhoneRegisterFailure(
+          message: e.toString().replaceAll('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onResendPhoneOtpRequested(
+    ResendPhoneOtpRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final phone = _pendingPhoneNumber;
+    final password = _pendingPassword;
+    if (phone == null || password == null) {
+      emit(const PhoneRegisterFailure(message: 'Invalid OTP session'));
+      return;
+    }
+    add(
+      RegisterWithPhoneRequested(
+        phone: phone,
+        password: password,
+        fullName: _pendingFullName,
+      ),
+    );
+  }
+
+  Future<void> _onLoadCredentialsRequested(
+    LoadCredentialsRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const CredentialsLoading());
+
+    final cachedCredentialTypes = await secureStorage.getCredentialTypes();
+    if (cachedCredentialTypes.isNotEmpty) {
+      emit(CredentialsLoaded(credentialTypes: cachedCredentialTypes));
+    }
+
+    final CredentialsResponse result = await authRepository.getCredentials();
+    if (!result.success) {
+      if (cachedCredentialTypes.isNotEmpty) {
+        return;
+      }
+      emit(CredentialsFailure(message: result.message));
+      return;
+    }
+
+    final normalizedCredentialTypes = result.credentialTypes
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+
+    await secureStorage.setCredentialTypes(normalizedCredentialTypes);
+    emit(CredentialsLoaded(credentialTypes: normalizedCredentialTypes));
+  }
+
+  Future<void> _onLinkEmailRequested(
+    LinkEmailRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const LinkCredentialInProgress());
+    final result = await authRepository.linkEmail(
+      email: event.email,
+      password: event.password,
+    );
+    if (!result.success) {
+      emit(LinkCredentialFailure(message: result.message));
+      return;
+    }
+
+    await _addLinkedCredentialTypeToCache('email');
+    emit(const LinkCredentialSuccess(linkedType: 'email'));
+    add(const LoadCredentialsRequested());
+  }
+
+  Future<void> _onLinkGoogleRequested(
+    LinkGoogleRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const LinkCredentialInProgress());
+    try {
+      await _resetGoogleSessionForAccountPicker();
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        emit(const LinkCredentialFailure(message: 'Google linking canceled'));
+        return;
+      }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null || idToken.isEmpty) {
+        emit(const LinkCredentialFailure(message: 'Google token not found'));
+        return;
+      }
+
+      final result = await authRepository.linkGoogle(idToken: idToken);
+      if (!result.success) {
+        emit(LinkCredentialFailure(message: result.message));
+        return;
+      }
+
+      await _addLinkedCredentialTypeToCache('google');
+      emit(const LinkCredentialSuccess(linkedType: 'google'));
+      add(const LoadCredentialsRequested());
+    } catch (e) {
+      emit(
+        LinkCredentialFailure(
+          message: e.toString().replaceAll('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onStartLinkPhoneRequested(
+    StartLinkPhoneRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const LinkCredentialInProgress());
+    final normalizedPhone = _normalizePhoneToE164(event.phone);
+    if (normalizedPhone == null) {
+      emit(
+        const LinkCredentialFailure(
+          message: 'Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng.',
+        ),
+      );
+      return;
+    }
+
+    _pendingLinkPhoneNumber = event.phone;
+    _pendingLinkPhoneNumberE164 = normalizedPhone;
+    _pendingLinkPhonePassword = event.password;
+
+    final completer = Completer<String>();
+    PhoneAuthCredential? autoVerifiedCredential;
+
+    try {
+      await _firebaseAuth.verifyPhoneNumber(
+        phoneNumber: normalizedPhone,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          autoVerifiedCredential = credential;
+          if (!completer.isCompleted) {
+            completer.complete('__AUTO_VERIFIED__');
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (!completer.isCompleted) {
+            completer.completeError(
+              Exception('${e.code}: ${e.message ?? 'OTP send failed'}'),
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+
+      final verificationId = await completer.future;
+
+      if (verificationId == '__AUTO_VERIFIED__') {
+        if (autoVerifiedCredential == null) {
+          emit(
+            const LinkCredentialFailure(
+              message: 'Auto verification failed. Please try again.',
+            ),
+          );
+          return;
+        }
+
+        await _completeLinkPhoneWithCredential(
+          phoneCredential: autoVerifiedCredential!,
+          emit: emit,
+        );
+        return;
+      }
+
+      _pendingLinkPhoneVerificationId = verificationId;
+      emit(LinkPhoneOtpCodeSent(phone: event.phone));
+    } catch (e) {
+      emit(
+        LinkCredentialFailure(
+          message: e.toString().replaceAll('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onSubmitLinkPhoneOtpRequested(
+    SubmitLinkPhoneOtpRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final verificationId = _pendingLinkPhoneVerificationId;
+
+    if (verificationId == null) {
+      emit(const LinkCredentialFailure(message: 'Invalid OTP session'));
+      return;
+    }
+
+    emit(const LinkCredentialInProgress());
+
+    try {
+      final phoneCredential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: event.smsCode,
+      );
+
+      await _completeLinkPhoneWithCredential(
+        phoneCredential: phoneCredential,
+        emit: emit,
+      );
+    } catch (e) {
+      emit(
+        LinkCredentialFailure(
+          message: e.toString().replaceAll('Exception: ', ''),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onResendLinkPhoneOtpRequested(
+    ResendLinkPhoneOtpRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    final phone = _pendingLinkPhoneNumber;
+    if (phone == null) {
+      emit(const LinkCredentialFailure(message: 'Invalid OTP session'));
+      return;
+    }
+
+    add(
+      StartLinkPhoneRequested(
+        phone: phone,
+        password: _pendingLinkPhonePassword,
+      ),
+    );
+  }
+
+  Future<void> _completePhoneRegisterWithCredential({
+    required PhoneAuthCredential phoneCredential,
+    required Emitter<AuthState> emit,
+  }) async {
+    final phone = _pendingPhoneNumber;
+    final password = _pendingPassword;
+
+    if (phone == null || password == null) {
+      emit(const PhoneRegisterFailure(message: 'Invalid OTP session'));
+      return;
+    }
+
+    final userCredential = await _firebaseAuth.signInWithCredential(
+      phoneCredential,
+    );
+    final firebaseUser = userCredential.user;
+    final firebaseIdToken = await firebaseUser?.getIdToken();
+
+    if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+      emit(const PhoneRegisterFailure(message: 'Cannot get Firebase token'));
+      return;
+    }
+
+    final result = await authRepository.registerWithPhone(
+      phone: phone,
+      password: password,
+      firebaseIdToken: firebaseIdToken,
+      fullName: _pendingFullName,
+    );
+
+    if (!result.success || result.accessToken == null) {
+      emit(PhoneRegisterFailure(message: result.message));
+      return;
+    }
+
+    await secureStorage.saveAuthTokens(
+      accessToken: result.accessToken!,
+      refreshToken: result.refreshToken ?? '',
+    );
+    await secureStorage.setNeedsSetPassword(false);
+
+    await UserProfileContext().saveProfile(
+      fullName: result.fullName,
+      avatarUrl: result.avatarUrl,
+    );
+    AppRouter.globalAppBarState.updateProfile(
+      name: result.fullName,
+      avatarUrl: result.avatarUrl,
+    );
+
+    await _prefetchLocations();
+    await _firebaseAuth.signOut();
+    emit(
+      LoginSuccess(
+        accessToken: result.accessToken!,
+        user: {
+          if (result.fullName != null) 'fullName': result.fullName,
+          if (result.avatarUrl != null) 'avatarUrl': result.avatarUrl,
+        },
+      ),
+    );
+  }
+
+  Future<void> _completeLinkPhoneWithCredential({
+    required PhoneAuthCredential phoneCredential,
+    required Emitter<AuthState> emit,
+  }) async {
+    final phone = _pendingLinkPhoneNumber;
+
+    if (phone == null) {
+      emit(const LinkCredentialFailure(message: 'Invalid OTP session'));
+      return;
+    }
+
+    final userCredential = await _firebaseAuth.signInWithCredential(
+      phoneCredential,
+    );
+    final firebaseUser = userCredential.user;
+    final firebaseIdToken = await firebaseUser?.getIdToken();
+
+    if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+      emit(const LinkCredentialFailure(message: 'Cannot get Firebase token'));
+      return;
+    }
+
+    final result = await authRepository.linkPhone(
+      phone: phone,
+      firebaseIdToken: firebaseIdToken,
+      password: _pendingLinkPhonePassword,
+    );
+
+    await _firebaseAuth.signOut();
+
+    if (!result.success) {
+      emit(LinkCredentialFailure(message: result.message));
+      return;
+    }
+
+    await _addLinkedCredentialTypeToCache('phone');
+    emit(const LinkCredentialSuccess(linkedType: 'phone'));
+    add(const LoadCredentialsRequested());
+  }
+
   /// Handle Logout
   Future<void> _onLogoutRequested(
     LogoutRequested event,
@@ -278,20 +760,43 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(LogoutInProgress());
     try {
       await authRepository.logout();
-      await _googleSignIn.signOut();
+      await _resetGoogleSessionForAccountPicker();
     } catch (e) {
       debugPrint('Logout error (ignored): $e');
     }
     await BusinessContext().clear();
     await UserProfileContext().clear();
     await CacheManager().clearAll();
+    await secureStorage.clearNeedsSetPassword();
+    await secureStorage.clearCredentialTypes();
     AppRouter.globalAppBarState.reset();
     emit(LogoutSuccess());
+  }
+
+  Future<void> _addLinkedCredentialTypeToCache(String type) async {
+    final normalizedType = type.trim().toLowerCase();
+    if (normalizedType.isEmpty) {
+      return;
+    }
+
+    final current = await secureStorage.getCredentialTypes();
+    final updated = {...current, normalizedType}.toList();
+    await secureStorage.setCredentialTypes(updated);
   }
 
   /// Handle Clear Error
   void _onClearAuthError(ClearAuthError event, Emitter<AuthState> emit) {
     emit(AuthInitial());
+  }
+
+  Future<void> _resetGoogleSessionForAccountPicker() async {
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+
+    try {
+      await _googleSignIn.disconnect();
+    } catch (_) {}
   }
 
   String _extractTokenMetadata(String token) {
@@ -319,5 +824,42 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (_) {
       return 'unparsable';
     }
+  }
+
+  String? _normalizePhoneToE164(String input) {
+    final cleaned = input.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    if (cleaned.isEmpty) return null;
+
+    if (cleaned.startsWith('+')) {
+      final numeric = cleaned.substring(1).replaceAll(RegExp(r'\D'), '');
+      final e164 = '+$numeric';
+      return RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(e164) ? e164 : null;
+    }
+
+    final numeric = cleaned.replaceAll(RegExp(r'\D'), '');
+    if (numeric.isEmpty) return null;
+
+    if (numeric.startsWith('0')) {
+      final normalized = '+84${numeric.substring(1)}';
+      return RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(normalized)
+          ? normalized
+          : null;
+    }
+
+    if (numeric.startsWith('84')) {
+      final normalized = '+$numeric';
+      return RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(normalized)
+          ? normalized
+          : null;
+    }
+
+    if (numeric.length == 9) {
+      final normalized = '+84$numeric';
+      return RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(normalized)
+          ? normalized
+          : null;
+    }
+
+    return null;
   }
 }

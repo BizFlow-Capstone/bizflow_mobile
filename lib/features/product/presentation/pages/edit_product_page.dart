@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -157,6 +158,19 @@ class _EditProductPageState extends State<EditProductPage> {
         SnackBar(content: Text('${l10n.translate('common.error')}: $e')),
       );
     }
+  }
+
+  String? _resolveImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return null;
+    final value = rawUrl.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    final normalizedBase = AppConfig.baseUrl.endsWith('/')
+        ? AppConfig.baseUrl.substring(0, AppConfig.baseUrl.length - 1)
+        : AppConfig.baseUrl;
+    final normalizedPath = value.startsWith('/') ? value : '/$value';
+    return '$normalizedBase$normalizedPath';
   }
 
   /// Show dialog to add or edit price tier
@@ -347,7 +361,9 @@ class _EditProductPageState extends State<EditProductPage> {
 
     // Validate prices and stock
     if (_costPriceController.text.isNotEmpty) {
-      final costPrice = double.tryParse(_costPriceController.text.replaceAll(RegExp(r'[,.]'), ''));
+      final costPrice = double.tryParse(
+        _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
+      );
       if (costPrice == null || costPrice < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.translate('product.invalid_cost_price'))),
@@ -357,7 +373,9 @@ class _EditProductPageState extends State<EditProductPage> {
     }
 
     if (_salePriceController.text.isNotEmpty) {
-      final salePrice = double.tryParse(_salePriceController.text.replaceAll(RegExp(r'[,.]'), ''));
+      final salePrice = double.tryParse(
+        _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
+      );
       if (salePrice == null || salePrice < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.translate('product.invalid_sale_price'))),
@@ -367,7 +385,9 @@ class _EditProductPageState extends State<EditProductPage> {
     }
 
     if (_quantityController.text.isNotEmpty) {
-      final quantity = int.tryParse(_quantityController.text.replaceAll(RegExp(r'[,.]'), ''));
+      final quantity = int.tryParse(
+        _quantityController.text.replaceAll(RegExp(r'[,.]'), ''),
+      );
       if (quantity == null || quantity < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.translate('product.invalid_stock'))),
@@ -534,38 +554,36 @@ class _EditProductPageState extends State<EditProductPage> {
                               _buildEditOverlay(),
                             ],
                           )
-                        : (widget.imageUrl != null &&
-                                widget.imageUrl!.isNotEmpty &&
-                                !_removeImage)
-                            ? Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Image.network(
-                                    widget.imageUrl!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            _buildUploadPlaceholder(),
+                        : ((_resolveImageUrl(widget.imageUrl) != null) &&
+                              !_removeImage)
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                _resolveImageUrl(widget.imageUrl)!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildUploadPlaceholder(),
+                              ),
+                              _buildEditOverlay(),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.delete,
+                                    color: AppColors.error,
                                   ),
-                                  _buildEditOverlay(),
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: IconButton(
-                                      icon: Icon(
-                                        Icons.delete,
-                                        color: AppColors.error,
-                                      ),
-                                      onPressed: () {
-                                        setState(() {
-                                          _removeImage = true;
-                                        });
-                                      },
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : _buildUploadPlaceholder(),
+                                  onPressed: () {
+                                    setState(() {
+                                      _removeImage = true;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          )
+                        : _buildUploadPlaceholder(),
                   ),
                 ),
                 if (_removeImage && widget.imageUrl != null)
@@ -1116,17 +1134,11 @@ class _EditProductPageState extends State<EditProductPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.edit,
-            size: 48,
-            color: AppColors.white,
-          ),
+          Icon(Icons.edit, size: 48, color: AppColors.white),
           SizedBox(height: AppSpacing.md),
           Text(
             l10n.translate('product.change_image'),
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.white,
-            ),
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.white),
             textAlign: TextAlign.center,
           ),
         ],

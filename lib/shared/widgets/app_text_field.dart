@@ -58,8 +58,22 @@ class AppTextField extends StatelessWidget {
     this.contentPadding,
   });
 
+  bool _isControllerUsable(TextEditingController? target) {
+    if (target == null) return false;
+    try {
+      target.value;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final effectiveController = _isControllerUsable(controller)
+        ? controller
+        : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -69,7 +83,7 @@ class AppTextField extends StatelessWidget {
           SizedBox(height: AppSpacing.xs),
         ],
         TextFormField(
-          controller: controller,
+          controller: effectiveController,
           obscureText: obscureText,
           enabled: enabled,
           readOnly: readOnly,
@@ -137,6 +151,7 @@ class AppTextField extends StatelessWidget {
 /// AppPasswordField - Password TextField với toggle visibility
 class AppPasswordField extends StatefulWidget {
   final TextEditingController? controller;
+  final FocusNode? focusNode;
   final String? label;
   final String? hintText;
   final String? errorText;
@@ -148,6 +163,7 @@ class AppPasswordField extends StatefulWidget {
   const AppPasswordField({
     super.key,
     this.controller,
+    this.focusNode,
     this.label,
     this.hintText,
     this.errorText,
@@ -168,6 +184,7 @@ class _AppPasswordFieldState extends State<AppPasswordField> {
   Widget build(BuildContext context) {
     return AppTextField(
       controller: widget.controller,
+      focusNode: widget.focusNode,
       label: widget.label,
       hintText: widget.hintText,
       errorText: widget.errorText,
@@ -209,6 +226,15 @@ class AppSearchField extends StatelessWidget {
     this.onSubmitted,
   });
 
+  bool _hasText(TextEditingController? target) {
+    if (target == null) return false;
+    try {
+      return target.text.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AppTextField(
@@ -218,7 +244,7 @@ class AppSearchField extends StatelessWidget {
       onSubmitted: onSubmitted,
       textInputAction: TextInputAction.search,
       prefixIcon: Icon(Icons.search, color: AppColors.textHint),
-      suffixIcon: controller?.text.isNotEmpty == true
+      suffixIcon: _hasText(controller)
           ? IconButton(
               icon: Icon(Icons.clear, color: AppColors.textHint),
               onPressed: () {

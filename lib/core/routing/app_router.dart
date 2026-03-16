@@ -8,6 +8,9 @@ import '../../features/auth/presentation/pages/verify_otp_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/set_password_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/auth_event.dart';
+import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
@@ -28,6 +31,7 @@ import '../../features/invoice_template/presentation/pages/advanced_invoice_temp
 import '../../features/employee/presentation/pages/employee_list_page.dart';
 import '../../features/employee/presentation/pages/add_employee_page.dart';
 import '../../features/employee/presentation/pages/edit_employee_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
 import '../../shared/widgets/app_bar_custom.dart';
@@ -161,16 +165,13 @@ class AppRouter {
         return _buildRoute(
           settings,
           _GlobalAppBarShell(
-            child: const LocationManagementPage(),
             showAddLocationFab: true,
+            child: const LocationManagementPage(),
           ),
         );
 
       case AppRoutes.addEditLocation:
-        return _buildRoute(
-          settings,
-          const AddEditLocationPage(),
-        );
+        return _buildRoute(settings, const AddEditLocationPage());
 
       case AppRoutes.noLocation:
         return _buildRoute(settings, const NoLocationPage());
@@ -187,22 +188,13 @@ class AppRouter {
         );
 
       case AppRoutes.orderList:
-        return _buildRoute(
-          settings,
-          const OrderListScreen(),
-        );
+        return _buildRoute(settings, const OrderListScreen());
 
       case AppRoutes.orderCreateSelection:
-        return _buildRoute(
-          settings,
-          const OrderCreationSelectionScreen(),
-        );
+        return _buildRoute(settings, const OrderCreationSelectionScreen());
 
       case AppRoutes.orderStatus:
-        return _buildRoute(
-          settings,
-          const OrderStatusScreen(),
-        );
+        return _buildRoute(settings, const OrderStatusScreen());
 
       case AppRoutes.subscriptionPlans:
         return _buildRoute(settings, const SubscriptionPlansPage());
@@ -221,10 +213,7 @@ class AppRouter {
         );
 
       case AppRoutes.profile:
-        return _buildRoute(
-          settings,
-          _GlobalAppBarShell(child: const _PlaceholderPage(title: 'Profile')),
-        );
+        return _buildRoute(settings, const ProfilePage());
 
       case AppRoutes.settings:
         return _buildRoute(settings, const SettingsPage());
@@ -246,37 +235,22 @@ class AppRouter {
         );
 
       case AppRoutes.debtList:
-        return _buildRoute(
-          settings,
-           const DebtListPage(),
-        );
+        return _buildRoute(settings, const DebtListPage());
 
       case AppRoutes.importHistory:
         return _buildRoute(settings, const ImportHistoryPage());
 
       case AppRoutes.invoiceTemplate:
-        return _buildRoute(
-          settings,
-          const InvoiceTemplatePage(),
-        );
+        return _buildRoute(settings, const InvoiceTemplatePage());
 
       case AppRoutes.advancedInvoiceTemplate:
-        return _buildRoute(
-          settings,
-          const AdvancedInvoiceTemplatePage(),
-        );
+        return _buildRoute(settings, const AdvancedInvoiceTemplatePage());
 
       case AppRoutes.employeeList:
-        return _buildRoute(
-          settings,
-          const EmployeeListPage(),
-        );
+        return _buildRoute(settings, const EmployeeListPage());
 
       case AppRoutes.addEmployee:
-        return _buildRoute(
-          settings,
-          const AddEmployeePage(),
-        );
+        return _buildRoute(settings, const AddEmployeePage());
 
       case AppRoutes.editEmployee:
         final args = settings.arguments as Map<String, dynamic>?;
@@ -362,68 +336,118 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: AppRouter.globalAppBarState,
-      builder: (context, _) {
-        return Scaffold(
-          key: _scaffoldKey,
-          // Global AppBar
-          appBar: CustomAppBar(
-            userName: AppRouter.globalAppBarState.userName,
-            avatarUrl: AppRouter.globalAppBarState.avatarUrl,
-            scaffoldKey: _scaffoldKey,
-            notificationCount: 2, // Mock: 2 unread notifications
-            onLocaleChange: (locale) {
-              AppRouter.globalAppBarState.setLocale(locale);
-            },
-            onNotificationTap: () {
-              AppRouter.navigateTo(AppRoutes.notifications);
-            },
-            onSettingsTap: () {
-              AppRouter.navigateTo(AppRoutes.settings);
-            },
-          ),
-          // Drawer
-          drawer: Consumer<BusinessContext>(
-            builder: (context, businessContext, _) {
-              return BlocBuilder<LocationBloc, LocationState>(
-                builder: (context, state) {
-                  // Get locations for sidebar
-                  final l10n = AppLocalizations.of(context);
-                  List<LocationItem> locations = [];
-                  LocationItem? selectedLocation;
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is LogoutSuccess) {
+          AppRouter.navigateAndClearStack(AppRoutes.login);
+        }
+      },
+      child: ListenableBuilder(
+        listenable: AppRouter.globalAppBarState,
+        builder: (context, _) {
+          return Scaffold(
+            key: _scaffoldKey,
+            // Global AppBar
+            appBar: CustomAppBar(
+              userName: AppRouter.globalAppBarState.userName,
+              avatarUrl: AppRouter.globalAppBarState.avatarUrl,
+              scaffoldKey: _scaffoldKey,
+              notificationCount: 2, // Mock: 2 unread notifications
+              onLocaleChange: (locale) {
+                AppRouter.globalAppBarState.setLocale(locale);
+              },
+              onNotificationTap: () {
+                AppRouter.navigateTo(AppRoutes.notifications);
+              },
+              onSettingsTap: () {
+                AppRouter.navigateTo(AppRoutes.settings);
+              },
+            ),
+            // Drawer
+            drawer: Consumer<BusinessContext>(
+              builder: (context, businessContext, _) {
+                return BlocBuilder<LocationBloc, LocationState>(
+                  builder: (context, state) {
+                    // Get locations for sidebar
+                    final l10n = AppLocalizations.of(context);
+                    List<LocationItem> locations = [];
+                    LocationItem? selectedLocation;
 
-                  if (state is LocationsLoaded) {
-                    locations = state.locations
-                        .map(
-                          (loc) => LocationItem(
-                            id: loc.id,
-                            name: loc.name,
-                            isActive: loc.isActive,
-                          ),
-                        )
-                        .toList();
+                    if (state is LocationsLoaded) {
+                      locations = state.locations
+                          .map(
+                            (loc) => LocationItem(
+                              id: loc.id,
+                              name: loc.name,
+                              isActive: loc.isActive,
+                            ),
+                          )
+                          .toList();
 
-                    // Resolve selectedLocation from businessContext
-                    if (businessContext.currentBusinessId != null) {
-                      try {
-                        selectedLocation = locations.firstWhere(
-                          (loc) => loc.id == businessContext.currentBusinessId,
-                        );
-                      } catch (_) {
-                        // Safe fallback
+                      // Resolve selectedLocation from businessContext
+                      if (businessContext.currentBusinessId != null) {
+                        try {
+                          selectedLocation = locations.firstWhere(
+                            (loc) =>
+                                loc.id == businessContext.currentBusinessId,
+                          );
+                        } catch (_) {
+                          // Safe fallback
+                        }
+                      } else if (locations.isNotEmpty) {
+                        // Fallback if no context selected
+                        selectedLocation = locations.first;
                       }
-                    } else if (locations.isNotEmpty) {
-                      // Fallback if no context selected
-                      selectedLocation = locations.first;
                     }
-                  }
 
-                  return SidebarWidget(
-                    locations: locations,
-                    selectedLocation: selectedLocation,
-                    onAddLocation: () {
-                      Navigator.pop(context);
+                    return SidebarWidget(
+                      locations: locations,
+                      selectedLocation: selectedLocation,
+                      onAddLocation: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AddEditLocationPage(),
+                          ),
+                        );
+                      },
+                      onLogout: () {
+                        final authBloc = context.read<AuthBloc>();
+                        Navigator.pop(context);
+                        AppRouter.navigateAndClearStack(AppRoutes.login);
+                        authBloc.add(const LogoutRequested());
+                      },
+                      onGuide: () {
+                        AppSnackBar.show(
+                          context,
+                          message: l10n.translate('sidebar.guide'),
+                          type: AppSnackBarType.info,
+                        );
+                      },
+                      onAccountSettings: () {
+                        AppRouter.navigateTo(AppRoutes.profile);
+                      },
+                      onLocationSelected: (location) {
+                        businessContext.switchBusinessLocation(
+                          location.id,
+                          location.name,
+                        );
+                        // Go back to Home
+                        AppRouter.navigateAndClearStack(AppRoutes.home);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+            // Body
+            body: widget.child,
+            // FAB - positioned at bottom-right
+            floatingActionButton: widget.showAddLocationFab
+                ? FloatingActionButton(
+                    backgroundColor: const Color(0xFF23C4C1),
+                    onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -431,78 +455,12 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                         ),
                       );
                     },
-                    onLogout: () {
-                      businessContext.clear();
-                      AppSnackBar.show(
-                        context,
-                        message: l10n.translate('sidebar.logout'),
-                        type: AppSnackBarType.info,
-                      );
-                    },
-                    onGuide: () {
-                      AppSnackBar.show(
-                        context,
-                        message: l10n.translate('sidebar.guide'),
-                        type: AppSnackBarType.info,
-                      );
-                    },
-                    onAccountSettings: () {
-                      AppSnackBar.show(
-                        context,
-                        message: l10n.translate('sidebar.account_settings'),
-                        type: AppSnackBarType.info,
-                      );
-                    },
-                    onLocationSelected: (location) {
-                      businessContext.switchBusinessLocation(
-                        location.id,
-                        location.name,
-                      );
-                      // Go back to Home
-                      AppRouter.navigateAndClearStack(AppRoutes.home);
-                    },
-                  );
-                },
-              );
-            },
-          ),
-          // Body
-          body: widget.child,
-          // FAB - positioned at bottom-right
-          floatingActionButton: widget.showAddLocationFab
-              ? FloatingActionButton(
-                  backgroundColor: const Color(0xFF23C4C1),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AddEditLocationPage(),
-                      ),
-                    );
-                  },
-                  child: const Icon(Icons.add, color: Colors.white),
-                )
-              : null,
-          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        );
-      },
-    );
-  }
-}
-
-/// Placeholder page - Dùng tạm khi chưa có page thật
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderPage({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '$title Page\n(Placeholder)',
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.headlineMedium,
+                    child: const Icon(Icons.add, color: Colors.white),
+                  )
+                : null,
+            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          );
+        },
       ),
     );
   }

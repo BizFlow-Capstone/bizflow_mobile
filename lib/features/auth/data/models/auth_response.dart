@@ -3,6 +3,7 @@ class AuthResponse {
   final String message;
   final String? messageCode;
   final String? phone;
+
   /// Access token (API returns as 'token')
   final String? accessToken;
   final String? refreshToken;
@@ -23,8 +24,14 @@ class AuthResponse {
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? json;
-    final account = data['account'] as Map<String, dynamic>?;
+    final rawData = json['data'];
+    final data = rawData is Map<String, dynamic>
+        ? rawData
+        : (rawData is Map ? Map<String, dynamic>.from(rawData) : json);
+    final rawAccount = data['account'];
+    final account = rawAccount is Map<String, dynamic>
+        ? rawAccount
+        : (rawAccount is Map ? Map<String, dynamic>.from(rawAccount) : null);
     return AuthResponse(
       success: json['success'] as bool? ?? false,
       message: json['message'] as String? ?? '',

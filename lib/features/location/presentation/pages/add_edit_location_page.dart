@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -63,6 +64,10 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     );
     _selectedManagerId = widget.location?.id;
 
+    if (widget.location == null) {
+      _prefillTaxCodeFromRegister();
+    }
+
     // Load location employees for employee tab (edit mode only)
     if (widget.location != null) {
       context.read<LocationBloc>().add(
@@ -71,6 +76,17 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
           currentEmployeeIds: widget.location!.employeeIds,
         ),
       );
+    }
+  }
+
+  Future<void> _prefillTaxCodeFromRegister() async {
+    final savedTaxCode = await SecureStorage().getRegisterTaxCode();
+    if (!mounted) return;
+    if ((savedTaxCode ?? '').isEmpty) return;
+    if (_taxCodeController.text.trim().isEmpty) {
+      setState(() {
+        _taxCodeController.text = savedTaxCode!.trim();
+      });
     }
   }
 
@@ -512,18 +528,22 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                         final confirmed = await AppDialog.delete(
                           context,
                           title: l10n.translate('product.confirm_delete_title'),
-                          message: l10n.translate('product.confirm_delete_message'),
+                          message: l10n.translate(
+                            'product.confirm_delete_message',
+                          ),
                           confirmText: l10n.translate('common.delete'),
                         );
 
-                        if (confirmed == true && mounted) {
-                          context.read<LocationBloc>().add(
-                            RemoveEmployeeFromLocationRequested(
-                              locationId: widget.location!.id,
-                              employeeId: employee.id,
-                            ),
-                          );
+                        if (!context.mounted || confirmed != true) {
+                          return;
                         }
+
+                        context.read<LocationBloc>().add(
+                          RemoveEmployeeFromLocationRequested(
+                            locationId: widget.location!.id,
+                            employeeId: employee.id,
+                          ),
+                        );
                       },
                     ),
                   );
@@ -612,6 +632,11 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                   AppSnackBar.success(
                     context,
                     l10n.translate('location.employee_update_success'),
+                  );
+                } else if (state is RemoveEmployeeFromLocationSuccess) {
+                  AppSnackBar.success(
+                    context,
+                    l10n.translate('location.employee_remove_success'),
                   );
                 } else if (state is LocationFailure) {
                   AppSnackBar.error(context, state.message);

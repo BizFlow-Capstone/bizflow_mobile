@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:convert';
 
 /// Secure Storage Service - Quản lý lưu trữ bảo mật
 /// Dùng cho token, password, sensitive data
@@ -9,9 +10,7 @@ class SecureStorage {
   SecureStorage._internal();
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
-    aOptions: AndroidOptions(
-      encryptedSharedPreferences: true,
-    ),
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
   /// Write value
@@ -55,8 +54,11 @@ class SecureStorageKeys {
 
   static const String accessToken = 'secure_access_token';
   static const String refreshToken = 'secure_refresh_token';
+  static const String needsSetPassword = 'secure_needs_set_password';
   static const String pinCode = 'pin_code';
   static const String biometricKey = 'biometric_key';
+  static const String registerTaxCode = 'register_tax_code';
+  static const String credentialTypes = 'secure_credential_types';
 }
 
 /// Token management helpers
@@ -90,5 +92,68 @@ extension SecureStorageTokenExtension on SecureStorage {
   Future<bool> hasAccessToken() async {
     final token = await getAccessToken();
     return token != null && token.isNotEmpty;
+  }
+
+  Future<void> setNeedsSetPassword(bool value) async {
+    await write(
+      key: SecureStorageKeys.needsSetPassword,
+      value: value ? '1' : '0',
+    );
+  }
+
+  Future<bool> getNeedsSetPassword() async {
+    final value = await read(key: SecureStorageKeys.needsSetPassword);
+    return value == '1';
+  }
+
+  Future<void> clearNeedsSetPassword() async {
+    await delete(key: SecureStorageKeys.needsSetPassword);
+  }
+
+  Future<void> setRegisterTaxCode(String taxCode) async {
+    await write(key: SecureStorageKeys.registerTaxCode, value: taxCode);
+  }
+
+  Future<String?> getRegisterTaxCode() async {
+    return read(key: SecureStorageKeys.registerTaxCode);
+  }
+
+  Future<void> setCredentialTypes(List<String> credentialTypes) async {
+    final normalized = credentialTypes
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    await write(
+      key: SecureStorageKeys.credentialTypes,
+      value: jsonEncode(normalized),
+    );
+  }
+
+  Future<List<String>> getCredentialTypes() async {
+    final raw = await read(key: SecureStorageKeys.credentialTypes);
+    if (raw == null || raw.trim().isEmpty) {
+      return const <String>[];
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        return const <String>[];
+      }
+
+      return decoded
+          .map((e) => e?.toString().trim().toLowerCase())
+          .whereType<String>()
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList();
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
+  Future<void> clearCredentialTypes() async {
+    await delete(key: SecureStorageKeys.credentialTypes);
   }
 }

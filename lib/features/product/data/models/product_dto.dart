@@ -98,8 +98,18 @@ class ProductDto {
     double resolvedSalePrice = parseDouble(rawSalePrice);
 
     final dynamic rawCostPrice =
-        json['costPrice'] ?? json['CostPrice'] ?? json['cost_price'];
-    final double? resolvedCostPrice = (rawCostPrice as num?)?.toDouble();
+        json['costPrice'] ??
+        json['CostPrice'] ??
+        json['cost_price'] ??
+        json['purchasePrice'] ??
+        json['PurchasePrice'] ??
+        json['purchase_price'] ??
+        json['importPrice'] ??
+        json['ImportPrice'] ??
+        json['import_price'];
+    final double? resolvedCostPrice = rawCostPrice == null
+        ? null
+        : parseDouble(rawCostPrice);
 
     // 'stock' is the inventory field from the list API
     final dynamic rawQty =
@@ -160,12 +170,15 @@ class ProductDto {
       businessTypeId:
           (json['businessTypeId'] ?? json['BusinessTypeId']) as String?,
       manufacturer: (json['manufacturer'] ?? json['Manufacturer']) as String?,
-      businessLocationName: (json['businessLocationName'] ??
-          json['BusinessLocationName']) as String?,
+      businessLocationName:
+          (json['businessLocationName'] ?? json['BusinessLocationName'])
+              as String?,
       unit: finalUnit,
-      barcode: (json['sku'] ?? json['Sku'] ?? json['barcode'] ?? json['Barcode'])
-          as String?,
-      isActive: (json['status'] ?? json['Status']) == 'active' ||
+      barcode:
+          (json['sku'] ?? json['Sku'] ?? json['barcode'] ?? json['Barcode'])
+              as String?,
+      isActive:
+          (json['status'] ?? json['Status']) == 'active' ||
           (json['isActive'] ?? json['IsActive']) == true,
       saleItems: saleItems,
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'core/config/app_config.dart';
 import 'core/localization/app_localizations.dart';
@@ -38,6 +39,7 @@ import 'shared/cache/cache_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   await CacheManager().init();
   await BusinessContext().init();
   await UserProfileContext().init();
@@ -96,15 +98,16 @@ class _MyAppState extends State<MyApp> {
       if (AppConfig.enableLogging) LoggingInterceptor(),
       TokenRefreshInterceptor(
         getRefreshToken: () => _secureStorage.getRefreshToken(),
-        onTokenRefreshed: ({
-          required String accessToken,
-          required String refreshToken,
-        }) async {
-          await _secureStorage.saveAuthTokens(
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-          );
-        },
+        onTokenRefreshed:
+            ({
+              required String accessToken,
+              required String refreshToken,
+            }) async {
+              await _secureStorage.saveAuthTokens(
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+              );
+            },
         onRefreshFailed: () async {
           await _secureStorage.clearAuthTokens();
           await BusinessContext().clear();
@@ -188,12 +191,13 @@ class _MyAppState extends State<MyApp> {
           create: (context) => ProductBloc(repository: _productRepository),
         ),
         BlocProvider(
-          create: (context) => InvoiceTemplateBloc(
-            repository: _invoiceTemplateRepository,
-          )..add(const LoadInvoiceTemplateRequested()),
+          create: (context) =>
+              InvoiceTemplateBloc(repository: _invoiceTemplateRepository)
+                ..add(const LoadInvoiceTemplateRequested()),
         ),
         BlocProvider(
-          create: (context) => EmployeeBloc(repository: _employeeManagementRepository),
+          create: (context) =>
+              EmployeeBloc(repository: _employeeManagementRepository),
         ),
         Provider<ImportRepository>.value(value: _importRepository),
       ],

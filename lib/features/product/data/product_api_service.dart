@@ -56,8 +56,8 @@ class ProductApiService {
   /// Supports filtering by: name, SKU, status, business type, price range, stock range
   Future<dynamic> getProducts({
     int? locationId,
-    String? name,
-    String? sku,
+    String? search,
+    String? businessTypeId,
     double? minCostPrice,
     double? maxCostPrice,
     int? minStock,
@@ -69,15 +69,17 @@ class ProductApiService {
   }) async {
     try {
       debugPrint('=== GET PRODUCTS REQUEST ===');
-      debugPrint('Filters: name=$name, sku=$sku, status=$status');
+      debugPrint(
+        'Filters: search=$search, businessTypeId=$businessTypeId, status=$status',
+      );
       debugPrint('Pagination: page=$pageNumber, size=$pageSize');
 
       final queryParams = <String, dynamic>{
         'PageNumber': pageNumber,
         'PageSize': pageSize,
         if (locationId != null) 'LocationId': locationId,
-        if (name != null) 'Name': name,
-        if (sku != null) 'Sku': sku,
+        if (search != null) 'Search': search,
+        if (businessTypeId != null) 'BusinessTypeId': businessTypeId,
         if (minCostPrice != null) 'MinCostPrice': minCostPrice,
         if (maxCostPrice != null) 'MaxCostPrice': maxCostPrice,
         if (minStock != null) 'MinStock': minStock,
@@ -263,7 +265,7 @@ class ProductApiService {
 
       // Include only additional unit conversions in PriceTiers
       final List<Map<String, dynamic>> finalPriceTiers = [];
-      
+
       if (priceTiers != null) {
         for (var tier in priceTiers) {
           final tierUnit = tier['Unit'] ?? tier['unit'];
@@ -344,7 +346,9 @@ class ProductApiService {
         );
       }
     } on DioException catch (e) {
-      debugPrint('DioException [${e.response?.statusCode}]: ${e.response?.data}');
+      debugPrint(
+        'DioException [${e.response?.statusCode}]: ${e.response?.data}',
+      );
       if (e.response?.statusCode == 403) {
         throw Exception('🔒 Permission denied (403)');
       }
@@ -431,7 +435,7 @@ class ProductApiService {
 
       // Include only additional unit conversions in PriceTiers
       final List<Map<String, dynamic>> finalPriceTiers = [];
-      
+
       if (priceTiers != null) {
         for (var tier in priceTiers) {
           final tierUnit = tier['Unit'] ?? tier['unit'];

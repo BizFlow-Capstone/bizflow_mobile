@@ -45,8 +45,8 @@ class ProductRepository {
   /// Get all products with filters and pagination
   Future<dynamic> getProducts({
     int? locationId,
-    String? name,
-    String? sku,
+    String? search,
+    String? businessTypeId,
     double? minCostPrice,
     double? maxCostPrice,
     int? minStock,
@@ -59,8 +59,8 @@ class ProductRepository {
     try {
       return await _service.getProducts(
         locationId: locationId,
-        name: name,
-        sku: sku,
+        search: search,
+        businessTypeId: businessTypeId,
         minCostPrice: minCostPrice,
         maxCostPrice: maxCostPrice,
         minStock: minStock,

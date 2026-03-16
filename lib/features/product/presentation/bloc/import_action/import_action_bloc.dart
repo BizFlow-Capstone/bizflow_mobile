@@ -86,13 +86,12 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
         event.importId,
         event.request,
       );
-      final importData = ImportDetailModel.fromJson(response['data']);
       // Invalidate import history cache
       await CacheManager().remove('cache_import_history');
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
-          importDetail: importData,
+          importDetail: state.importDetail,
           successMessage: response['message'],
         ),
       );

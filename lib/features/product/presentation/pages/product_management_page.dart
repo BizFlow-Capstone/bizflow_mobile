@@ -8,6 +8,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
+import '../../data/models/business_type_model.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
 import '../../../../shared/widgets/app_barcode_scanner.dart';
@@ -37,12 +38,14 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   late TextEditingController _searchController;
   late ScrollController _scrollController;
   bool _showFabMenu = false;
+  List<BusinessTypeDto> _businessTypes = [];
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
     _scrollController = ScrollController()..addListener(_onScroll);
+    context.read<ProductBloc>().add(const LoadBusinessTypesRequested());
     _loadProducts();
   }
 
@@ -101,11 +104,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   }
 
   void _openFilterDialog(ProductsLoaded state) async {
-    final categories = state.products
-        .map((p) => p.category)
-        .where((c) => c != null && c.isNotEmpty)
-        .cast<String>()
-        .toSet()
+    final businessTypeOptions = _businessTypes
+        .map((type) => {'id': type.businessTypeId, 'name': type.name})
         .toList();
 
     final result = await showModalBottomSheet<Map<String, String?>>(
@@ -114,20 +114,20 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => ProductFilterSortDialog(
         initialStatus: state.filterStatus,
-        initialCategory: state.filterCategory,
+        initialBusinessTypeId: state.filterBusinessTypeId,
         initialSort: state.sortBy,
-        categories: categories,
+        businessTypeOptions: businessTypeOptions,
       ),
     );
 
     if (result != null && mounted) {
       if (result['status'] != state.filterStatus ||
-          result['category'] != state.filterCategory) {
+          result['businessTypeId'] != state.filterBusinessTypeId) {
         context.read<ProductBloc>().add(
           FilterProductsRequested(
             locationId: widget.locationId,
             status: result['status'],
-            category: result['category'],
+            businessTypeId: result['businessTypeId'],
           ),
         );
       }
@@ -293,7 +293,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             builder: (context, state) {
               if (state is ProductsLoaded &&
                   (state.filterStatus != null ||
-                      state.filterCategory != null ||
+                      state.filterBusinessTypeId != null ||
                       state.sortBy != null)) {
                 return Padding(
                   padding: EdgeInsets.symmetric(
@@ -347,7 +347,11 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           Expanded(
             child: BlocConsumer<ProductBloc, ProductState>(
               listener: (context, state) {
-                if (state is ProductDeleteSuccess) {
+                if (state is BusinessTypesLoaded) {
+                  setState(() {
+                    _businessTypes = state.businessTypes;
+                  });
+                } else if (state is ProductDeleteSuccess) {
                   // Reload the product list after a successful deletion
                   context.read<ProductBloc>().add(
                     LoadProductsByLocationRequested(

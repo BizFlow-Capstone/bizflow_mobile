@@ -26,7 +26,7 @@ class ProductsLoaded extends ProductState {
   final String locationId;
   final String? searchQuery;
   final String? filterStatus;
-  final String? filterCategory;
+  final String? filterBusinessTypeId;
   final String? sortBy;
   final bool hasReachedMax;
   final int currentPage;
@@ -37,7 +37,7 @@ class ProductsLoaded extends ProductState {
     required this.locationId,
     this.searchQuery,
     this.filterStatus,
-    this.filterCategory,
+    this.filterBusinessTypeId,
     this.sortBy,
     this.hasReachedMax = false,
     this.currentPage = 1,
@@ -49,7 +49,7 @@ class ProductsLoaded extends ProductState {
     String? locationId,
     String? searchQuery,
     String? filterStatus,
-    String? filterCategory,
+    String? filterBusinessTypeId,
     String? sortBy,
     bool? hasReachedMax,
     int? currentPage,
@@ -60,7 +60,7 @@ class ProductsLoaded extends ProductState {
       locationId: locationId ?? this.locationId,
       searchQuery: searchQuery ?? this.searchQuery,
       filterStatus: filterStatus ?? this.filterStatus,
-      filterCategory: filterCategory ?? this.filterCategory,
+      filterBusinessTypeId: filterBusinessTypeId ?? this.filterBusinessTypeId,
       sortBy: sortBy ?? this.sortBy,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       currentPage: currentPage ?? this.currentPage,
@@ -74,7 +74,7 @@ class ProductsLoaded extends ProductState {
     locationId,
     searchQuery,
     filterStatus,
-    filterCategory,
+    filterBusinessTypeId,
     sortBy,
     hasReachedMax,
     currentPage,
@@ -165,7 +165,6 @@ class ProductDetailLoaded extends ProductState {
   @override
   List<Object?> get props => [product];
 }
-
 
 /// Failure state
 class ProductFailure extends ProductState {

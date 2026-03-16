@@ -107,6 +107,10 @@ class AuthAuthenticated extends AuthState {
   const AuthAuthenticated({required this.accessToken});
 }
 
+class NeedsSetPasswordOnResume extends AuthState {
+  const NeedsSetPasswordOnResume();
+}
+
 // Unauthenticated State
 class AuthUnauthenticated extends AuthState {
   const AuthUnauthenticated();
@@ -119,6 +123,60 @@ class LogoutInProgress extends AuthState {
 
 class LogoutSuccess extends AuthState {
   const LogoutSuccess();
+}
+
+class CredentialsLoading extends AuthState {
+  const CredentialsLoading();
+}
+
+class CredentialsLoaded extends AuthState {
+  final List<String> credentialTypes;
+
+  const CredentialsLoaded({required this.credentialTypes});
+}
+
+class CredentialsFailure extends AuthState {
+  final String message;
+
+  const CredentialsFailure({required this.message});
+}
+
+class LinkCredentialInProgress extends AuthState {
+  const LinkCredentialInProgress();
+}
+
+class LinkCredentialSuccess extends AuthState {
+  final String linkedType;
+
+  const LinkCredentialSuccess({required this.linkedType});
+}
+
+class LinkCredentialFailure extends AuthState {
+  final String message;
+
+  const LinkCredentialFailure({required this.message});
+}
+
+class LinkPhoneOtpCodeSent extends AuthState {
+  final String phone;
+
+  const LinkPhoneOtpCodeSent({required this.phone});
+}
+
+class PhoneRegisterInProgress extends AuthState {
+  const PhoneRegisterInProgress();
+}
+
+class PhoneOtpCodeSent extends AuthState {
+  final String phone;
+
+  const PhoneOtpCodeSent({required this.phone});
+}
+
+class PhoneRegisterFailure extends AuthState {
+  final String message;
+
+  const PhoneRegisterFailure({required this.message});
 }
 
 // Error State

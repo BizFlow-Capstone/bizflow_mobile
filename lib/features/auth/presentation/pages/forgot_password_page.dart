@@ -15,10 +15,10 @@ class ForgotPasswordPage extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.surface,
         surfaceTintColor: AppColors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -30,39 +30,58 @@ class ForgotPasswordPage extends StatelessWidget {
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.lock_reset,
-                size: 72,
-                color: Color(0xFF23C4C1),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                l10n.translate('auth.forgot_password'),
-                style: AppTextStyles.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'Tính năng này sẽ sớm ra mắt.',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/logos/Bizflow.png',
+                  height: 64,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.business,
+                    size: 64,
+                    color: AppColors.primary,
+                  ),
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AppButton(
-                label: l10n.translate('common.back'),
-                isFullWidth: true,
-                onPressed: () => AppRouter.pop(),
-                type: AppButtonType.outlined,
-                size: AppButtonSize.large,
-              ),
-            ],
+                const SizedBox(height: AppSpacing.lg),
+                const Icon(
+                  Icons.lock_reset,
+                  size: 64,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  l10n.translate('auth.forgot_password'),
+                  style: AppTextStyles.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Tính năng này sẽ sớm ra mắt.',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                AppButton(
+                  label: l10n.translate('common.back'),
+                  isFullWidth: true,
+                  onPressed: () => AppRouter.pop(),
+                  type: AppButtonType.outlined,
+                  size: AppButtonSize.large,
+                ),
+              ],
+            ),
           ),
         ),
       ),

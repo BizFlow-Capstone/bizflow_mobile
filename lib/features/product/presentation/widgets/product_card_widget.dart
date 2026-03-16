@@ -242,6 +242,7 @@ class ProductCardWidget extends StatelessWidget {
                                 isActive: product.isActive,
                                 businessTypeId: product.businessTypeId,
                                 manufacturer: product.manufacturer,
+                                imageUrl: product.imageUrl,
                               ),
                             ),
                           );

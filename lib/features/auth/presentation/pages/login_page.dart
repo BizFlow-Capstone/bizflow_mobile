@@ -144,9 +144,10 @@ class _LoginPageState extends State<LoginPage> {
     final localizationProvider = Provider.of<LocalizationProvider>(context);
 
     return Scaffold(
+      backgroundColor: AppColors.surface,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.surface,
         surfaceTintColor: AppColors.white,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         actions: [
@@ -220,195 +221,208 @@ class _LoginPageContent extends StatelessWidget {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is LoginSuccess) {
-          PostAuthNavigation.route(context);
+          FocusScope.of(context).unfocus();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            PostAuthNavigation.route(context);
+          });
         } else if (state is GoogleLoginSetPasswordRequired) {
-          AppRouter.navigateAndClearStack(AppRoutes.setPassword);
+          FocusScope.of(context).unfocus();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            AppRouter.navigateAndClearStack(AppRoutes.setPassword);
+          });
         } else if (state is LoginFailure) {
-          final msg = state.serverMessage ?? _mapErrorCodeToLocalization(state.errorCode);
+          final msg =
+              state.serverMessage ??
+              _mapErrorCodeToLocalization(state.errorCode);
           _showError(context, msg);
         }
       },
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              SizedBox(height: AppSpacing.xl),
-
-              // Logo or Title
-              Text(
-                l10n.translate('auth.login_title'),
-                style: AppTextStyles.headlineSmall,
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: AppSpacing.sm),
-
-              // Subtitle
-              Text(
-                l10n.translate('auth.login_subtitle'),
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textSecondary,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                const SizedBox(height: AppSpacing.sm),
+                _buildLogoHeader(),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  l10n.translate('auth.login_title'),
+                  style: AppTextStyles.headlineSmall,
+                  textAlign: TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: AppSpacing.xl),
-
-              // Email/Phone Field
-              AppTextField(
-                controller: emailPhoneController,
-                focusNode: emailPhoneFocus,
-                label: l10n.translate('auth.email_or_phone'),
-                hintText: l10n.translate('auth.enter_email_or_phone'),
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                onSubmitted: (_) {
-                  FocusScope.of(context).requestFocus(passwordFocus);
-                },
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              // Password Field
-              AppTextField(
-                controller: passwordController,
-                focusNode: passwordFocus,
-                label: l10n.translate('auth.password'),
-                hintText: l10n.translate('auth.enter_password'),
-                obscureText: !isPasswordVisible,
-                textInputAction: TextInputAction.done,
-                suffixIcon: GestureDetector(
-                  onTap: () => onPasswordVisibilityChanged(!isPasswordVisible),
-                  child: Icon(
-                    isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                SizedBox(height: AppSpacing.sm),
+                Text(
+                  l10n.translate('auth.login_subtitle'),
+                  style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textSecondary,
                   ),
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              // Remember Me & Forgot Password Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Remember Me Checkbox
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: Checkbox(
-                          value: rememberMe,
-                          onChanged: (value) {
-                            onRememberMeChanged(value ?? false);
-                          },
-                          activeColor: const Color(0xFF23C4C1),
-                          side: BorderSide(
-                            color: rememberMe
-                                ? const Color(0xFF23C4C1)
-                                : AppColors.divider,
+                SizedBox(height: AppSpacing.xl),
+                AppTextField(
+                  controller: emailPhoneController,
+                  focusNode: emailPhoneFocus,
+                  label: l10n.translate('auth.email_or_phone'),
+                  hintText: l10n.translate('auth.enter_email_or_phone'),
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  onSubmitted: (_) {
+                    FocusScope.of(context).requestFocus(passwordFocus);
+                  },
+                ),
+                SizedBox(height: AppSpacing.md),
+                AppTextField(
+                  controller: passwordController,
+                  focusNode: passwordFocus,
+                  label: l10n.translate('auth.password'),
+                  hintText: l10n.translate('auth.enter_password'),
+                  obscureText: !isPasswordVisible,
+                  textInputAction: TextInputAction.done,
+                  suffixIcon: GestureDetector(
+                    onTap: () =>
+                        onPasswordVisibilityChanged(!isPasswordVisible),
+                    child: Icon(
+                      isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.md),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: Checkbox(
+                            value: rememberMe,
+                            onChanged: (value) {
+                              onRememberMeChanged(value ?? false);
+                            },
+                            activeColor: AppColors.primary,
+                            side: BorderSide(
+                              color: rememberMe
+                                  ? AppColors.primary
+                                  : AppColors.divider,
+                            ),
                           ),
                         ),
-                      ),
-                      SizedBox(width: AppSpacing.sm),
-                      Text(
-                        l10n.translate('auth.remember_me'),
-                        style: AppTextStyles.bodySmall,
-                      ),
-                    ],
-                  ),
-                  // Forgot Password Link
-                  GestureDetector(
-                    onTap: onForgotPassword,
-                    child: Text(
-                      l10n.translate('auth.forgot_password'),
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: const Color(0xFF23C4C1),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: AppSpacing.xl),
-
-              // Login Button
-              BlocBuilder<AuthBloc, AuthState>(
-                builder: (context, state) {
-                  return AppButton(
-                    label: l10n.translate('auth.login_button'),
-                    isFullWidth: true,
-                    isLoading: state is LoginInProgress,
-                    onPressed: state is LoginInProgress ? null : onLogin,
-                    type: AppButtonType.primary,
-                    size: AppButtonSize.large,
-                  );
-                },
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              // Divider
-              Row(
-                children: [
-                  Expanded(
-                    child: Divider(color: AppColors.divider, thickness: 1),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                    ),
-                    child: Text(
-                      l10n.translate('auth.or_divider'),
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Divider(color: AppColors.divider, thickness: 1),
-                  ),
-                ],
-              ),
-              SizedBox(height: AppSpacing.md),
-
-              // Google Login Button
-              _buildGoogleButton(context),
-              SizedBox(height: AppSpacing.lg),
-
-              // Don't have account
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${l10n.translate('auth.dont_have_account')} ',
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RegisterPage(),
+                        SizedBox(width: AppSpacing.sm),
+                        Text(
+                          l10n.translate('auth.remember_me'),
+                          style: AppTextStyles.bodySmall,
                         ),
-                      );
-                    },
-                    child: Text(
-                      l10n.translate('auth.dont_have_account_signup'),
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: const Color(0xFF23C4C1),
-                        fontWeight: FontWeight.w600,
+                      ],
+                    ),
+                    GestureDetector(
+                      onTap: onForgotPassword,
+                      child: Text(
+                        l10n.translate('auth.forgot_password'),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SafeArea(
-                top: false,
-                child: SizedBox(height: AppSpacing.md),
-              ),
-            ],
+                  ],
+                ),
+                SizedBox(height: AppSpacing.xl),
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    return AppButton(
+                      label: l10n.translate('auth.login_button'),
+                      isFullWidth: true,
+                      isLoading: state is LoginInProgress,
+                      onPressed: state is LoginInProgress ? null : onLogin,
+                      type: AppButtonType.primary,
+                      size: AppButtonSize.large,
+                    );
+                  },
+                ),
+                SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(color: AppColors.divider, thickness: 1),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                      ),
+                      child: Text(
+                        l10n.translate('auth.or_divider'),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(color: AppColors.divider, thickness: 1),
+                    ),
+                  ],
+                ),
+                SizedBox(height: AppSpacing.md),
+                _buildGoogleButton(context),
+                SizedBox(height: AppSpacing.lg),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${l10n.translate('auth.dont_have_account')} ',
+                      style: AppTextStyles.bodyMedium,
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterPage(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        l10n.translate('auth.dont_have_account_signup'),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SafeArea(
+                  top: false,
+                  child: SizedBox(height: AppSpacing.md),
+                ),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLogoHeader() {
+    return Image.asset(
+      'assets/images/logos/Bizflow.png',
+      height: 64,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) =>
+          const Icon(Icons.business, size: 64, color: AppColors.primary),
     );
   }
 
@@ -420,7 +434,9 @@ class _LoginPageContent extends StatelessWidget {
           width: double.infinity,
           decoration: BoxDecoration(
             border: Border.all(
-              color: isLoading ? AppColors.divider.withOpacity(0.5) : AppColors.divider,
+              color: isLoading
+                  ? AppColors.divider.withOpacity(0.5)
+                  : AppColors.divider,
             ),
             borderRadius: AppSpacing.borderRadiusMd,
           ),
@@ -428,31 +444,31 @@ class _LoginPageContent extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               onTap: isLoading ? null : onGoogleLogin,
-          borderRadius: AppSpacing.borderRadiusMd,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Google Icon - inline branded widget
-                const GoogleIcon(),
-                SizedBox(width: AppSpacing.md),
-                Text(
-                  l10n.translate('auth.or_login_google'),
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
+              borderRadius: AppSpacing.borderRadiusMd,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
                 ),
-              ],
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Google Icon - inline branded widget
+                    const GoogleIcon(),
+                    SizedBox(width: AppSpacing.md),
+                    Text(
+                      l10n.translate('auth.or_login_google'),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
-    );
+        );
       },
     );
   }

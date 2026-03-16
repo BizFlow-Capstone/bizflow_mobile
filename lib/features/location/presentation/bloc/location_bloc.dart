@@ -27,7 +27,9 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     on<AddEmployeeToLocationFromTabRequested>(_onAddEmployeeToLocationFromTab);
     on<RemoveEmployeeFromTabRequested>(_onRemoveEmployeeFromTab);
     on<SaveLocationEmployeesRequested>(_onSaveLocationEmployees);
-    on<RemoveEmployeeFromLocationRequested>(_onRemoveEmployeeFromLocationRequested);
+    on<RemoveEmployeeFromLocationRequested>(
+      _onRemoveEmployeeFromLocationRequested,
+    );
   }
 
   // Cache locations in memory
@@ -379,7 +381,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     RemoveEmployeeFromLocationRequested event,
     Emitter<LocationState> emit,
   ) async {
-    emit(LocationDeleteInProgress(locationId: event.locationId));
+    emit(const LocationLoading());
     try {
       await repository.removeEmployeeFromLocation(
         locationId: event.locationId,
@@ -387,12 +389,19 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       );
 
       // Refresh employee list for this location
-      add(LoadLocationEmployeesRequested(
-        locationId: event.locationId,
-        currentEmployeeIds: _currentLocationEmployeeIds,
-      ));
+      add(
+        LoadLocationEmployeesRequested(
+          locationId: event.locationId,
+          currentEmployeeIds: _currentLocationEmployeeIds,
+        ),
+      );
 
-      emit(LocationDeleteSuccess(locationId: event.locationId));
+      emit(
+        RemoveEmployeeFromLocationSuccess(
+          locationId: event.locationId,
+          employeeId: event.employeeId,
+        ),
+      );
     } catch (e) {
       emit(LocationFailure(message: e.toString()));
     }

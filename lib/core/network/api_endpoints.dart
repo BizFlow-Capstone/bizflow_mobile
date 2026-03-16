@@ -4,12 +4,16 @@ class ApiEndpoints {
 
   // Auth
   static const String googleAuth = '/api/auth/google';
+  static const String registerPhone = '/api/auth/register/phone';
   static const String loginPhone = '/api/auth/login/phone';
   static const String loginEmail = '/api/auth/login/email';
   static const String setPassword = '/api/auth/set-password';
   static const String refreshTokenEndpoint = '/api/auth/refresh';
   static const String logoutEndpoint = '/api/auth/logout';
   static const String credentials = '/api/auth/credentials';
+  static const String linkPhone = '/api/auth/link/phone';
+  static const String linkEmail = '/api/auth/link/email';
+  static const String linkGoogle = '/api/auth/link/google';
 
   // Legacy aliases (kept for compatibility if any file references them)
   static const String login = '/api/auth/login/email';
@@ -47,8 +51,7 @@ class ApiEndpoints {
   static String removeEmployeeFromLocation(
     String locationId,
     String employeeId,
-  ) =>
-      '/api/location/$locationId/employees/$employeeId';
+  ) => '/api/location/$locationId/employees/$employeeId';
 
   // Order/Invoice
   static const String orders = '/api/order/my-orders';

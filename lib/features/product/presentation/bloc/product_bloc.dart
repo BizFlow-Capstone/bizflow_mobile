@@ -40,7 +40,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   // Filter and search state
   String? _searchQuery;
   String? _filterStatus;
-  String? _filterCategory;
+  String? _filterBusinessTypeId;
 
   Future<void> _onLoadBusinessTypesRequested(
     LoadBusinessTypesRequested event,
@@ -80,7 +80,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     final cacheKey = 'cache_products_${event.locationId}';
-    
+
     // Check if we have cached data first to decide if we show a full loading state
     final cachedData = await CacheManager().get(cacheKey);
     if (cachedData == null) {
@@ -95,8 +95,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         );
         final response = await repository.getProducts(
           locationId: int.tryParse(event.locationId),
-          name: _searchQuery,
-          sku: _searchQuery,
+          search: _searchQuery,
+          businessTypeId: _filterBusinessTypeId,
           status: _filterStatus,
         );
         debugPrint('ProductBloc: Response received');
@@ -121,7 +121,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             locationId: event.locationId,
             searchQuery: _searchQuery,
             filterStatus: _filterStatus,
-            filterCategory: _filterCategory,
+            filterBusinessTypeId: _filterBusinessTypeId,
             apiMessage: null,
           ),
         );
@@ -143,8 +143,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       debugPrint('ProductBloc: Refreshing products');
       final response = await repository.getProducts(
         locationId: int.tryParse(event.locationId),
-        name: _searchQuery,
-        sku: _searchQuery,
+        search: _searchQuery,
+        businessTypeId: _filterBusinessTypeId,
         status: _filterStatus,
       );
 
@@ -159,7 +159,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           locationId: event.locationId,
           searchQuery: _searchQuery,
           filterStatus: _filterStatus,
-          filterCategory: _filterCategory,
+          filterBusinessTypeId: _filterBusinessTypeId,
           apiMessage: null, // do not show API success message for GET
         ),
       );
@@ -184,8 +184,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
       final response = await repository.getProducts(
         locationId: int.tryParse(event.locationId),
-        name: _searchQuery,
-        sku: _searchQuery,
+        search: _searchQuery,
+        businessTypeId: _filterBusinessTypeId,
         status: _filterStatus,
         pageNumber: nextPage,
       );
@@ -247,7 +247,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['Price'] ??
               item['unitPrice'] ??
               item['UnitPrice'];
-          
+
           double parseDouble(dynamic value) {
             if (value == null) return 0.0;
             if (value is num) return value.toDouble();
@@ -258,8 +258,18 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           final double resolvedSalePrice = parseDouble(rawSalePrice);
 
           final dynamic rawCostPrice =
-              item['costPrice'] ?? item['CostPrice'] ?? item['cost_price'];
-          final double? resolvedCostPrice = (rawCostPrice as num?)?.toDouble();
+              item['costPrice'] ??
+              item['CostPrice'] ??
+              item['cost_price'] ??
+              item['purchasePrice'] ??
+              item['PurchasePrice'] ??
+              item['purchase_price'] ??
+              item['importPrice'] ??
+              item['ImportPrice'] ??
+              item['import_price'];
+          final double? resolvedCostPrice = rawCostPrice == null
+              ? null
+              : parseDouble(rawCostPrice);
 
           // 'stock' is the inventory field from the list API
           final dynamic rawQty =
@@ -278,11 +288,12 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
                 (item['description'] ?? item['Description']) as String?,
             price: resolvedSalePrice,
             quantity: resolvedQty,
-            imageUrl: (item['imageUrl'] ??
-                    item['ImageUrl'] ??
-                    item['image'] ??
-                    item['Image'])
-                as String?,
+            imageUrl:
+                (item['imageUrl'] ??
+                        item['ImageUrl'] ??
+                        item['image'] ??
+                        item['Image'])
+                    as String?,
             barcode:
                 (item['barcode'] ??
                         item['Barcode'] ??
@@ -329,7 +340,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     _filterStatus = event.status;
-    _filterCategory = event.category;
+    _filterBusinessTypeId = event.businessTypeId;
     add(LoadProductsByLocationRequested(locationId: event.locationId));
   }
 
@@ -362,7 +373,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           locationId: event.locationId,
           searchQuery: _searchQuery,
           filterStatus: _filterStatus,
-          filterCategory: _filterCategory,
+          filterBusinessTypeId: _filterBusinessTypeId,
           sortBy: event.sortBy,
         ),
       );
@@ -378,7 +389,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     _searchQuery = null;
     _filterStatus = null;
-    _filterCategory = null;
+    _filterBusinessTypeId = null;
     add(LoadProductsByLocationRequested(locationId: event.locationId));
   }
 
@@ -789,7 +800,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     await CacheManager().fetchWithSWR<ProductEntity?>(
       key: cacheKey,
       fetcher: () async {
-        debugPrint('ProductBloc: Background loading detail for ${event.productId}');
+        debugPrint(
+          'ProductBloc: Background loading detail for ${event.productId}',
+        );
         return await repository.getProductDetail(event.productId);
       },
       fromJson: (json) {
@@ -806,9 +819,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       onError: (e) {
         debugPrint('ProductBloc._onLoadProductDetailRequested error: $e');
         if (state is! ProductDetailLoaded) {
-          emit(ProductFailure(
-            message: 'Failed to load product detail: ${e.toString()}',
-          ));
+          emit(
+            ProductFailure(
+              message: 'Failed to load product detail: ${e.toString()}',
+            ),
+          );
         }
       },
     );

@@ -27,7 +27,9 @@ class _SplashPageState extends State<SplashPage> {
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is AuthAuthenticated) {
+        if (state is NeedsSetPasswordOnResume) {
+          AppRouter.navigateAndClearStack(AppRoutes.setPassword);
+        } else if (state is AuthAuthenticated) {
           PostAuthNavigation.route(context);
         } else if (state is AuthUnauthenticated) {
           AppRouter.navigateAndClearStack(AppRoutes.login);
@@ -63,9 +65,7 @@ class _SplashPageState extends State<SplashPage> {
                 ),
               ),
               const SizedBox(height: 48),
-              const CircularProgressIndicator(
-                color: Color(0xFF23C4C1),
-              ),
+              const CircularProgressIndicator(color: Color(0xFF23C4C1)),
             ],
           ),
         ),

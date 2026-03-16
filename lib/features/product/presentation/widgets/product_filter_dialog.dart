@@ -3,16 +3,16 @@ import '../../../../core/localization/app_localizations.dart';
 
 class ProductFilterSortDialog extends StatefulWidget {
   final String? initialStatus;
-  final String? initialCategory;
+  final String? initialBusinessTypeId;
   final String? initialSort;
-  final List<String> categories;
+  final List<Map<String, String>> businessTypeOptions;
 
   const ProductFilterSortDialog({
     super.key,
     this.initialStatus,
-    this.initialCategory,
+    this.initialBusinessTypeId,
     this.initialSort,
-    required this.categories,
+    required this.businessTypeOptions,
   });
 
   @override
@@ -22,14 +22,14 @@ class ProductFilterSortDialog extends StatefulWidget {
 
 class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
   String? _selectedStatus;
-  String? _selectedCategory;
+  String? _selectedBusinessTypeId;
   String? _selectedSort;
 
   @override
   void initState() {
     super.initState();
     _selectedStatus = widget.initialStatus;
-    _selectedCategory = widget.initialCategory;
+    _selectedBusinessTypeId = widget.initialBusinessTypeId;
     _selectedSort = widget.initialSort;
   }
 
@@ -82,7 +82,7 @@ class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
                       // Instantly clear and apply
                       Navigator.pop(context, {
                         'status': null,
-                        'category': null,
+                        'businessTypeId': null,
                         'sort': null,
                       });
                     },
@@ -93,7 +93,10 @@ class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
               const SizedBox(height: 24),
               Text(
                 l10n.translate('product.sort_title'),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -113,7 +116,10 @@ class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
               const SizedBox(height: 24),
               Text(
                 l10n.translate('product.status'),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -147,9 +153,9 @@ class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
                 ],
               ),
               const SizedBox(height: 24),
-              if (widget.categories.isNotEmpty) ...[
+              if (widget.businessTypeOptions.isNotEmpty) ...[
                 Text(
-                  l10n.translate('product.category'),
+                  l10n.translate('product.business_type'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -161,18 +167,22 @@ class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
                   children: [
                     FilterChip(
                       label: Text(l10n.translate('product.filter_all')),
-                      selected: _selectedCategory == null,
+                      selected: _selectedBusinessTypeId == null,
                       onSelected: (selected) {
-                        setState(() => _selectedCategory = null);
+                        setState(() => _selectedBusinessTypeId = null);
                       },
                     ),
-                    ...widget.categories.map((category) {
+                    ...widget.businessTypeOptions.map((businessType) {
+                      final businessTypeId = businessType['id'];
+                      final businessTypeName = businessType['name'] ?? '';
                       return FilterChip(
-                        label: Text(category),
-                        selected: _selectedCategory == category,
+                        label: Text(businessTypeName),
+                        selected: _selectedBusinessTypeId == businessTypeId,
                         onSelected: (selected) {
                           setState(
-                            () => _selectedCategory = selected ? category : null,
+                            () => _selectedBusinessTypeId = selected
+                                ? businessTypeId
+                                : null,
                           );
                         },
                       );
@@ -188,7 +198,7 @@ class _ProductFilterSortDialogState extends State<ProductFilterSortDialog> {
                   onPressed: () {
                     Navigator.pop(context, {
                       'status': _selectedStatus,
-                      'category': _selectedCategory,
+                      'businessTypeId': _selectedBusinessTypeId,
                       'sort': _selectedSort,
                     });
                   },

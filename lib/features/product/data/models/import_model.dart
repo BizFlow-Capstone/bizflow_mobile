@@ -1,4 +1,4 @@
-/// Import Models - Manual JSON serialization (no code generation required)
+// Import Models - Manual JSON serialization (no code generation required)
 
 class ImportItemModel {
   final int productId;
@@ -57,6 +57,7 @@ class ImportHistoryItemModel {
   final double totalAmount;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final String? imageUrl;
 
   ImportHistoryItemModel({
     required this.importId,
@@ -71,26 +72,46 @@ class ImportHistoryItemModel {
     required this.totalAmount,
     required this.createdAt,
     this.updatedAt,
+    this.imageUrl,
   });
 
   factory ImportHistoryItemModel.fromJson(Map<String, dynamic> json) {
+    DateTime parseDateTime(dynamic value, DateTime fallback) {
+      if (value is String) {
+        return DateTime.tryParse(value) ?? fallback;
+      }
+      return fallback;
+    }
+
     return ImportHistoryItemModel(
-      importId: json['importId'] as int,
-      importCode: json['importCode'] as String,
-      importType: json['importType'] as String,
-      status: json['status'] as String,
-      businessLocationId: json['businessLocationId'] as int,
-      businessLocationName: json['businessLocationName'] as String,
+      importId: (json['importId'] ?? json['ImportId'] ?? 0) as int,
+      importCode: (json['importCode'] ?? json['ImportCode'] ?? '').toString(),
+      importType: (json['importType'] ?? json['ImportType'] ?? '').toString(),
+      status: (json['status'] ?? json['Status'] ?? '').toString(),
+      businessLocationId:
+          (json['businessLocationId'] ?? json['BusinessLocationId'] ?? 0)
+              as int,
+      businessLocationName:
+          (json['businessLocationName'] ?? json['BusinessLocationName'] ?? '')
+              .toString(),
       supplier: json['supplier'] as String?,
       note: json['note'] as String?,
-      receivedAt: json['receivedAt'] != null
-          ? DateTime.tryParse(json['receivedAt'] as String)
+      receivedAt: (json['receivedAt'] ?? json['ReceivedAt']) != null
+          ? DateTime.tryParse(
+              (json['receivedAt'] ?? json['ReceivedAt']) as String,
+            )
           : null,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.tryParse(json['updatedAt'] as String)
+      createdAt: parseDateTime(
+        json['createdAt'] ?? json['CreatedAt'],
+        DateTime.now(),
+      ),
+      updatedAt: (json['updatedAt'] ?? json['UpdatedAt']) != null
+          ? DateTime.tryParse(
+              (json['updatedAt'] ?? json['UpdatedAt']) as String,
+            )
           : null,
+      imageUrl: (json['imageUrl'] ?? json['ImageUrl']) as String?,
     );
   }
 
@@ -108,6 +129,7 @@ class ImportHistoryItemModel {
       'totalAmount': totalAmount,
       'createdAt': createdAt.toIso8601String(),
       if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+      if (imageUrl != null) 'imageUrl': imageUrl,
     };
   }
 }
@@ -203,6 +225,8 @@ class UpdateImportRequest {
   final String note;
   final DateTime? receivedAt;
   final List<ImportItemModel> items;
+  final String? imagePath;
+  final bool removeImage;
 
   UpdateImportRequest({
     required this.importType,
@@ -210,6 +234,8 @@ class UpdateImportRequest {
     required this.note,
     this.receivedAt,
     required this.items,
+    this.imagePath,
+    this.removeImage = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -219,6 +245,8 @@ class UpdateImportRequest {
       'note': note,
       if (receivedAt != null) 'receivedAt': receivedAt!.toIso8601String(),
       'items': items.map((e) => e.toJson()).toList(),
+      'removeImage': removeImage,
+      if (imagePath != null) 'imagePath': imagePath,
     };
   }
 }

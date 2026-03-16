@@ -66,6 +66,60 @@ class GoogleLoginRequested extends AuthEvent {
   const GoogleLoginRequested();
 }
 
+class RegisterWithPhoneRequested extends AuthEvent {
+  final String phone;
+  final String password;
+  final String? fullName;
+
+  const RegisterWithPhoneRequested({
+    required this.phone,
+    required this.password,
+    this.fullName,
+  });
+}
+
+class PhoneOtpCodeSubmitted extends AuthEvent {
+  final String smsCode;
+
+  const PhoneOtpCodeSubmitted({required this.smsCode});
+}
+
+class ResendPhoneOtpRequested extends AuthEvent {
+  const ResendPhoneOtpRequested();
+}
+
+class LoadCredentialsRequested extends AuthEvent {
+  const LoadCredentialsRequested();
+}
+
+class LinkEmailRequested extends AuthEvent {
+  final String email;
+  final String password;
+
+  const LinkEmailRequested({required this.email, required this.password});
+}
+
+class LinkGoogleRequested extends AuthEvent {
+  const LinkGoogleRequested();
+}
+
+class StartLinkPhoneRequested extends AuthEvent {
+  final String phone;
+  final String? password;
+
+  const StartLinkPhoneRequested({required this.phone, this.password});
+}
+
+class SubmitLinkPhoneOtpRequested extends AuthEvent {
+  final String smsCode;
+
+  const SubmitLinkPhoneOtpRequested({required this.smsCode});
+}
+
+class ResendLinkPhoneOtpRequested extends AuthEvent {
+  const ResendLinkPhoneOtpRequested();
+}
+
 // Set Password (after Google registration for new accounts)
 class SetPasswordRequested extends AuthEvent {
   final String password;

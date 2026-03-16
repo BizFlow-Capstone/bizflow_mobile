@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../data/import_repository.dart';
 import '../../data/models/import_model.dart';
@@ -65,6 +67,9 @@ class _StockImportViewState extends State<_StockImportView> {
   List<ImportItemModel> _selectedItems = [];
 
   String? _selectedImagePath;
+  String? _existingImageUrl;
+  bool _removeImage = false;
+  bool _confirmAfterUpdate = false;
   final ImagePicker _imagePicker = ImagePicker();
 
   late TextEditingController _noteController;
@@ -95,8 +100,10 @@ class _StockImportViewState extends State<_StockImportView> {
       );
 
       if (pickedFile != null) {
+        if (!mounted) return;
         setState(() {
           _selectedImagePath = pickedFile.path;
+          _removeImage = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -107,6 +114,7 @@ class _StockImportViewState extends State<_StockImportView> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${l10n.translate('common.error')}: $e')),
       );
@@ -139,6 +147,8 @@ class _StockImportViewState extends State<_StockImportView> {
         supplier: _supplierController.text,
         note: _noteController.text,
         receivedAt: null,
+        imagePath: _selectedImagePath,
+        removeImage: _removeImage,
         items: _selectedItems,
       );
       context.read<ImportActionBloc>().add(
@@ -184,9 +194,18 @@ class _StockImportViewState extends State<_StockImportView> {
                 );
                 context.read<ImportActionBloc>().add(CreateImportEvent(req));
               } else {
-                final req = ConfirmImportRequest(receivedAt: DateTime.now());
+                _confirmAfterUpdate = true;
+                final req = UpdateImportRequest(
+                  importType: _hasInvoice ? 'INVOICE' : 'MANUAL',
+                  supplier: _supplierController.text,
+                  note: _noteController.text,
+                  receivedAt: null,
+                  imagePath: _selectedImagePath,
+                  removeImage: _removeImage,
+                  items: _selectedItems,
+                );
                 context.read<ImportActionBloc>().add(
-                  ConfirmImportEvent(widget.importId!, req),
+                  UpdateImportEvent(widget.importId!, req),
                 );
               }
             },
@@ -343,7 +362,7 @@ class _StockImportViewState extends State<_StockImportView> {
                         const SizedBox(width: 12),
                         Text(
                           formatCurrency.format(
-                            (item.importPrice ?? 0) * (item.quantity ?? 0),
+                            (item.costPrice) * (item.quantity),
                           ),
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.textPrimary,
@@ -459,6 +478,15 @@ class _StockImportViewState extends State<_StockImportView> {
     return BlocConsumer<ImportActionBloc, ImportActionState>(
       listener: (context, state) {
         if (state.status == ImportActionStatus.success) {
+          if (_confirmAfterUpdate && widget.importId != null) {
+            _confirmAfterUpdate = false;
+            final req = ConfirmImportRequest(receivedAt: DateTime.now());
+            context.read<ImportActionBloc>().add(
+              ConfirmImportEvent(widget.importId!, req),
+            );
+            return;
+          }
+
           if (state.successMessage != null) {
             _showSuccessSnackBar(state.successMessage!);
           }
@@ -481,6 +509,8 @@ class _StockImportViewState extends State<_StockImportView> {
             _supplierController.text = detail.supplier ?? '';
             _noteController.text = detail.note ?? '';
             _selectedItems = List.from(detail.items);
+            _existingImageUrl = detail.imageUrl;
+            _removeImage = false;
           });
         }
       },
@@ -583,36 +613,88 @@ class _StockImportViewState extends State<_StockImportView> {
                       onTap: _pickImage,
                       child: Container(
                         width: double.infinity,
-                        height: 120,
+                        height: 160,
                         decoration: BoxDecoration(
                           border: Border.all(color: AppColors.divider),
                           borderRadius: BorderRadius.circular(8),
                           color: AppColors.background,
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.camera_alt_outlined,
-                              size: 32,
-                              color: AppColors.textSecondary,
-                            ),
-                            SizedBox(height: AppSpacing.xs),
-                            Text(
-                              _selectedImagePath != null
-                                  ? _selectedImagePath!.split('/').last
-                                  : l10n.translate(
+                        child:
+                            (_selectedImagePath != null ||
+                                (_existingImageUrl?.isNotEmpty == true &&
+                                    !_removeImage))
+                            ? Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: _selectedImagePath != null
+                                        ? Image.file(
+                                            File(_selectedImagePath!),
+                                            fit: BoxFit.cover,
+                                          )
+                                        : Image.network(
+                                            _existingImageUrl!,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                Container(
+                                                  color: AppColors.background,
+                                                ),
+                                          ),
+                                  ),
+                                  Positioned(
+                                    right: 8,
+                                    top: 8,
+                                    child: InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          if (_selectedImagePath != null) {
+                                            _selectedImagePath = null;
+                                          } else if (_existingImageUrl !=
+                                                  null &&
+                                              _existingImageUrl!.isNotEmpty) {
+                                            _removeImage = true;
+                                          }
+                                        });
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black45,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                        ),
+                                        padding: const EdgeInsets.all(4),
+                                        child: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.camera_alt_outlined,
+                                    size: 32,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    l10n.translate(
                                       'stock_import.upload_invoice',
                                     ),
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: _selectedImagePath != null
-                                    ? AppColors.secondary
-                                    : AppColors.textSecondary,
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
                               ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
                       ),
                     ),
                     SizedBox(height: AppSpacing.md),
@@ -713,15 +795,56 @@ class _StockImportViewState extends State<_StockImportView> {
                                       color: AppColors.textPrimary,
                                     ),
                                   ),
-                                  Text(
-                                    NumberFormat.currency(
-                                      locale: 'vi_VN',
-                                      symbol: 'đ',
-                                    ).format(cost),
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: AppColors.textSecondary,
+                                  if (isEditable)
+                                    SizedBox(
+                                      width: 150,
+                                      child: TextFormField(
+                                        key: ValueKey(
+                                          'cost_${item.productId}_${item.quantity}',
+                                        ),
+                                        initialValue:
+                                            CurrencyFormatter.formatNumber(
+                                              cost,
+                                            ),
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          CurrencyInputFormatter(),
+                                        ],
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          labelText: l10n.translate(
+                                            'stock_import.cost_price_label',
+                                          ),
+                                          border: const OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          final parsed = double.tryParse(
+                                            value.replaceAll(',', '').trim(),
+                                          );
+                                          if (parsed == null) return;
+                                          setState(() {
+                                            _selectedItems[index] =
+                                                ImportItemModel(
+                                                  productId: item.productId,
+                                                  productName: item.productName,
+                                                  quantity: item.quantity,
+                                                  costPrice: parsed,
+                                                  baseUnit: item.baseUnit,
+                                                );
+                                          });
+                                        },
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      NumberFormat.currency(
+                                        locale: 'vi_VN',
+                                        symbol: 'đ',
+                                      ).format(cost),
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -752,10 +875,42 @@ class _StockImportViewState extends State<_StockImportView> {
                                     },
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(
-                                    '${item.quantity}',
-                                    style: AppTextStyles.bodyMedium.copyWith(
-                                      fontWeight: FontWeight.w600,
+                                  SizedBox(
+                                    width: 56,
+                                    child: TextFormField(
+                                      key: ValueKey(
+                                        'qty_${item.productId}_${item.quantity}',
+                                      ),
+                                      initialValue: item.quantity.toString(),
+                                      textAlign: TextAlign.center,
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
+                                      decoration: const InputDecoration(
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 8,
+                                        ),
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      onChanged: (value) {
+                                        final parsed = int.tryParse(value);
+                                        if (parsed == null || parsed <= 0) {
+                                          return;
+                                        }
+                                        setState(() {
+                                          _selectedItems[index] =
+                                              ImportItemModel(
+                                                productId: item.productId,
+                                                productName: item.productName,
+                                                quantity: parsed,
+                                                costPrice: item.costPrice,
+                                                baseUnit: item.baseUnit,
+                                              );
+                                        });
+                                      },
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -873,7 +1028,7 @@ class _StockImportViewState extends State<_StockImportView> {
         color: AppColors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -943,6 +1098,8 @@ class _ProductSelectorSheet extends StatefulWidget {
 class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
   late List<ImportItemModel> _items;
   String _searchQuery = '';
+  final Map<int, double> _costPriceCache = {};
+  final Set<int> _loadingCostPriceProductIds = {};
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -952,10 +1109,12 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     _items = List.from(widget.selectedItems);
   }
 
-  void _addOrIncrement(ProductEntity product) {
+  Future<void> _addOrIncrement(ProductEntity product) async {
     final idx = _items.indexWhere(
       (e) => e.productId == int.tryParse(product.id),
     );
+    final resolvedCostPrice = await _resolveCostPrice(product);
+    if (!mounted) return;
     setState(() {
       if (idx >= 0) {
         final existing = _items[idx];
@@ -972,7 +1131,85 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
             productId: int.tryParse(product.id) ?? 0,
             productName: product.name,
             quantity: 1,
-            costPrice: product.costPrice ?? product.salePrice ?? product.price,
+            costPrice: resolvedCostPrice,
+            baseUnit: product.unit ?? 'cái',
+          ),
+        );
+      }
+    });
+  }
+
+  Future<double> _resolveCostPrice(ProductEntity product) async {
+    final productId = int.tryParse(product.id) ?? 0;
+
+    if (_costPriceCache.containsKey(productId)) {
+      return _costPriceCache[productId]!;
+    }
+
+    if (product.costPrice != null) {
+      _costPriceCache[productId] = product.costPrice!;
+      return product.costPrice!;
+    }
+
+    try {
+      final detail = await context
+          .read<ProductBloc>()
+          .repository
+          .getProductDetail(product.id);
+      final resolved = detail?.costPrice ?? 0;
+      _costPriceCache[productId] = resolved;
+      return resolved;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  Future<void> _prefetchCostPrice(ProductEntity product) async {
+    final productId = int.tryParse(product.id) ?? 0;
+    if (productId <= 0) return;
+    if (_costPriceCache.containsKey(productId)) return;
+    if (_loadingCostPriceProductIds.contains(productId)) return;
+
+    _loadingCostPriceProductIds.add(productId);
+    final resolved = await _resolveCostPrice(product);
+    if (!mounted) return;
+    setState(() {
+      _costPriceCache[productId] = resolved;
+    });
+    _loadingCostPriceProductIds.remove(productId);
+  }
+
+  Future<void> _setQuantity(ProductEntity product, int quantity) async {
+    final idx = _items.indexWhere(
+      (e) => e.productId == int.tryParse(product.id),
+    );
+    final resolvedCostPrice = await _resolveCostPrice(product);
+    if (!mounted) return;
+
+    setState(() {
+      if (quantity <= 0) {
+        if (idx >= 0) {
+          _items.removeAt(idx);
+        }
+        return;
+      }
+
+      if (idx >= 0) {
+        final existing = _items[idx];
+        _items[idx] = ImportItemModel(
+          productId: existing.productId,
+          productName: existing.productName,
+          quantity: quantity,
+          costPrice: existing.costPrice,
+          baseUnit: existing.baseUnit,
+        );
+      } else {
+        _items.add(
+          ImportItemModel(
+            productId: int.tryParse(product.id) ?? 0,
+            productName: product.name,
+            quantity: quantity,
+            costPrice: resolvedCostPrice,
             baseUnit: product.unit ?? 'cái',
           ),
         );
@@ -1024,222 +1261,256 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
       builder: (_, scrollController) {
         return SafeArea(
           child: Column(
-          children: [
-            // Handle
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.divider,
-                  borderRadius: BorderRadius.circular(2),
+            children: [
+              // Handle
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    l10n.translate('stock_import.select_product'),
-                    style: AppTextStyles.titleLarge.copyWith(
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      widget.onItemsChanged(_items);
-                      Navigator.pop(context);
-                    },
-                    child: Text(
-                      l10n.translate(
-                        'stock_import.done_with_count',
-                        params: {
-                          'count': _items
-                              .fold<int>(0, (sum, e) => sum + e.quantity)
-                              .toString(),
-                        },
-                      ),
-                      style: AppTextStyles.labelLarge.copyWith(
-                        color: AppColors.secondary,
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      l10n.translate('stock_import.select_product'),
+                      style: AppTextStyles.titleLarge.copyWith(
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            // Search bar
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: TextField(
-                onChanged: (v) {
-                  setState(() => _searchQuery = v.toLowerCase());
-                  context.read<ProductBloc>().add(
-                    SearchProductsRequested(
-                      query: v,
-                      locationId: widget.locationId,
-                    ),
-                  );
-                },
-                decoration: InputDecoration(
-                  hintText: l10n.translate('common.search_products'),
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                ),
-              ),
-            ),
-            // Product list
-            Expanded(
-              child: BlocBuilder<ProductBloc, ProductState>(
-                builder: (context, state) {
-                  if (state is ProductLoading) {
-                    return const Center(child: AppLoadingIndicator());
-                  }
-                  if (state is ProductFailure) {
-                    return Center(
+                    TextButton(
+                      onPressed: () {
+                        widget.onItemsChanged(_items);
+                        Navigator.pop(context);
+                      },
                       child: Text(
-                        state.message,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.error,
+                        l10n.translate(
+                          'stock_import.done_with_count',
+                          params: {
+                            'count': _items
+                                .fold<int>(0, (sum, e) => sum + e.quantity)
+                                .toString(),
+                          },
+                        ),
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: AppColors.secondary,
                         ),
                       ),
+                    ),
+                  ],
+                ),
+              ),
+              // Search bar
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                child: TextField(
+                  onChanged: (v) {
+                    setState(() => _searchQuery = v.toLowerCase());
+                    context.read<ProductBloc>().add(
+                      SearchProductsRequested(
+                        query: v,
+                        locationId: widget.locationId,
+                      ),
                     );
-                  }
-                  if (state is ProductsLoaded) {
-                    final products = _searchQuery.isEmpty
-                        ? state.products
-                        : state.products
-                              .where(
-                                (p) =>
-                                    p.name.toLowerCase().contains(_searchQuery),
-                              )
-                              .toList();
-
-                    if (products.isEmpty) {
+                  },
+                  decoration: InputDecoration(
+                    hintText: l10n.translate('common.search_products'),
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  ),
+                ),
+              ),
+              // Product list
+              Expanded(
+                child: BlocBuilder<ProductBloc, ProductState>(
+                  builder: (context, state) {
+                    if (state is ProductLoading) {
+                      return const Center(child: AppLoadingIndicator());
+                    }
+                    if (state is ProductFailure) {
                       return Center(
                         child: Text(
-                          l10n.translate('stock_import.no_products_found'),
+                          state.message,
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
+                            color: AppColors.error,
                           ),
                         ),
                       );
                     }
+                    if (state is ProductsLoaded) {
+                      final products = _searchQuery.isEmpty
+                          ? state.products
+                          : state.products
+                                .where(
+                                  (p) => p.name.toLowerCase().contains(
+                                    _searchQuery,
+                                  ),
+                                )
+                                .toList();
 
-                    return ListView.separated(
-                      controller: scrollController,
-                      itemCount: products.length,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                        vertical: AppSpacing.sm,
-                      ),
-                      separatorBuilder: (_, __) =>
-                          Divider(color: AppColors.divider),
-                      itemBuilder: (ctx, index) {
-                        final product = products[index];
-                        final qty = _quantityFor(product);
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            product.name,
+                      if (products.isEmpty) {
+                        return Center(
+                          child: Text(
+                            l10n.translate('stock_import.no_products_found'),
                             style: AppTextStyles.bodyMedium.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${l10n.translate('stock_import.cost_price_label')}${fmtPrice.format(product.costPrice ?? 0)}${l10n.translate('stock_import.stock_label')}${product.quantity} ${product.unit ?? ''}',
-                            style: AppTextStyles.bodySmall.copyWith(
                               color: AppColors.textSecondary,
                             ),
                           ),
-                          trailing: qty > 0
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      onPressed: () =>
-                                          _removeOrDecrement(product),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.warning.withOpacity(
-                                          0.1,
+                        );
+                      }
+
+                      return ListView.separated(
+                        controller: scrollController,
+                        itemCount: products.length,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        separatorBuilder: (_, __) =>
+                            Divider(color: AppColors.divider),
+                        itemBuilder: (ctx, index) {
+                          final product = products[index];
+                          _prefetchCostPrice(product);
+                          final qty = _quantityFor(product);
+                          final displayCostPrice =
+                              _costPriceCache[int.tryParse(product.id) ?? 0] ??
+                              product.costPrice ??
+                              0;
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              product.name,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${l10n.translate('stock_import.cost_price_label')}${CurrencyFormatter.formatNumber(displayCostPrice)}${l10n.translate('stock_import.stock_label')}${product.quantity} ${product.unit ?? ''}',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            trailing: qty > 0
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                          color: AppColors.textSecondary,
                                         ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
+                                        onPressed: () =>
+                                            _removeOrDecrement(product),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        width: 56,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.warning.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: AppColors.warning,
+                                          ),
+                                        ),
+                                        child: TextFormField(
+                                          key: ValueKey(
+                                            'selector_qty_${product.id}_$qty',
+                                          ),
+                                          initialValue: qty.toString(),
+                                          textAlign: TextAlign.center,
+                                          keyboardType: TextInputType.number,
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter
+                                                .digitsOnly,
+                                          ],
+                                          decoration: const InputDecoration(
+                                            isDense: true,
+                                            counterText: '',
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  horizontal: 4,
+                                                  vertical: 6,
+                                                ),
+                                            border: InputBorder.none,
+                                          ),
+                                          style: AppTextStyles.bodyMedium
+                                              .copyWith(
+                                                color: AppColors.warning,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                          onChanged: (value) {
+                                            final parsed = int.tryParse(value);
+                                            if (parsed == null) return;
+                                            _setQuantity(product, parsed);
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.add_circle,
                                           color: AppColors.warning,
                                         ),
+                                        onPressed: () =>
+                                            _addOrIncrement(product),
                                       ),
-                                      child: Text(
-                                        '$qty',
-                                        style: AppTextStyles.bodyMedium
-                                            .copyWith(
-                                              color: AppColors.warning,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                      ),
+                                    ],
+                                  )
+                                : IconButton(
+                                    icon: const Icon(
+                                      Icons.add_circle_outline,
+                                      color: AppColors.warning,
                                     ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.add_circle,
-                                        color: AppColors.warning,
-                                      ),
-                                      onPressed: () => _addOrIncrement(product),
-                                    ),
-                                  ],
-                                )
-                              : IconButton(
-                                  icon: const Icon(
-                                    Icons.add_circle_outline,
-                                    color: AppColors.warning,
+                                    onPressed: () => _addOrIncrement(product),
                                   ),
-                                  onPressed: () => _addOrIncrement(product),
-                                ),
-                        );
-                      },
-                    );
-                  }
-                  // Initial state or not loaded yet
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const AppLoadingIndicator(),
-                        SizedBox(height: AppSpacing.md),
-                        Text(
-                          l10n.translate('stock_import.loading_products'),
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
+                          );
+                        },
+                      );
+                    }
+                    // Initial state or not loaded yet
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const AppLoadingIndicator(),
+                          SizedBox(height: AppSpacing.md),
+                          Text(
+                            l10n.translate('stock_import.loading_products'),
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            SafeArea(top: false, child: const SizedBox.shrink()),
-          ],
-        ),
+              SafeArea(top: false, child: const SizedBox.shrink()),
+            ],
+          ),
         );
       },
     );
