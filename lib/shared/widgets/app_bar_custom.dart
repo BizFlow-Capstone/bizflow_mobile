@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/providers/localization_provider.dart';
 import 'language_switcher.dart';
 import 'sidebar_widget.dart';
+import 'app_sync_status_text.dart';
 
 /// Custom AppBar Component
 /// Sử dụng cho các trang chính (Location, Product, etc.)
@@ -46,7 +47,7 @@ class CustomAppBar extends StatefulWidget implements PreferredSizeWidget {
   State<CustomAppBar> createState() => _CustomAppBarState();
 
   @override
-  Size get preferredSize => const Size.fromHeight(56);
+  Size get preferredSize => const Size.fromHeight(74);
 }
 
 class _CustomAppBarState extends State<CustomAppBar> {
@@ -200,6 +201,7 @@ class _CustomAppBarState extends State<CustomAppBar> {
         ),
         SizedBox(width: AppSpacing.sm),
       ],
+      bottom: const AppSyncStatusText(),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_form_screen.dart';
 
 class OrderManualInputScreen extends StatelessWidget {
@@ -22,6 +23,7 @@ class OrderManualInputScreen extends StatelessWidget {
           ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: Center(

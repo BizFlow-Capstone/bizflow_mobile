@@ -23,7 +23,8 @@
     "image_selected": "Image selected",
     "tap_to_select": "Tap to select",
     "required_field": "This field is required",
-    "detail": "Detail"
+    "detail": "Detail",
+    "error_occurred": "An error occurred, please try again"
   },
   "auth": {
     "login": "Login",
@@ -206,6 +207,11 @@
   "appbar": {
     "greeting": "Hello,"
   },
+  "sync": {
+    "syncing": "Syncing...",
+    "updated_at": "Updated at {time}",
+    "idle": "Ready to sync"
+  },
   "sidebar": {
     "add_location": "Add",
     "guide": "How to use app",
@@ -326,7 +332,33 @@
       "default_unit2": "Can",
       "barcode_section": "Barcode",
       "pricing": "Pricing",
-      "profit": "Profit"
+      "profit": "Profit",
+      "cost_history_title": "Cost Price Change History",
+      "current_cost_price": "Current cost price",
+      "no_cost_history": "No cost price history",
+      "cost_history_note": "Only confirmed import events are shown. Quantity is per import event.",
+      "cost_history_import_qty": "Imported quantity"
+    },
+    "bulk_adjust": {
+      "title": "Adjust selling prices",
+      "delta_section": "Adjust by fixed amount",
+      "increase_label": "Increase",
+      "decrease_label": "Decrease",
+      "selected_count": "Selected",
+      "no_sale_items": "No sale items for this product",
+      "select_sale_items_required": "Please select at least one sale item",
+      "delta_required": "Please enter increase or decrease amount",
+      "apply_button": "Apply adjustment",
+      "success": "Selling prices updated successfully"
+    },
+    "stock_adjust": {
+      "title": "Adjust stock",
+      "stock": "New stock",
+      "cost_price": "Cost price (optional)",
+      "memo": "Memo",
+      "invalid_stock": "Invalid stock value",
+      "apply_button": "Confirm",
+      "success": "Stock updated successfully"
     }
   },
   "stock_import": {
@@ -674,5 +706,63 @@
     "add_success": "Employee added successfully",
     "update_success": "Employee updated successfully",
     "delete_success": "Employee deleted successfully"
+  },
+  "accounting": {
+    "title": "Accounting",
+    "tab_period": "Accounting Period",
+    "tab_gl": "General Ledger",
+    "tab_cost_revenue": "Revenue & Cost",
+    "tab_books_reports": "Books & Reports",
+    "rule_engine_suggestion": "Rule Engine Suggestion",
+    "current_revenue_hint": "Current cumulative revenue: 620,000,000đ",
+    "suggested_group_value": "Suggested: Group 2 • Method 2",
+    "period_settings": "Period Settings",
+    "period_name": "Period Name",
+    "period_type": "Period Type",
+    "period_quarterly": "Quarterly",
+    "period_yearly": "Yearly",
+    "accounting_method": "Accounting Method",
+    "method_1": "Method 1 (% of revenue)",
+    "method_2": "Method 2 (revenue - cost)",
+    "opening_cash": "Opening Cash",
+    "note": "Note",
+    "all": "All",
+    "add_manual_gl": "Add Manual GL Entry",
+    "description": "Description",
+    "amount": "Amount",
+    "channel": "Money Channel",
+    "channel_cash": "Cash",
+    "channel_bank": "Bank",
+    "channel_debt": "Debt",
+    "entry_type": "Entry Type",
+    "debit": "Debit",
+    "credit": "Credit",
+    "revenue_list": "Revenue List",
+    "cost_list": "Cost List",
+    "edit_revenue": "Update Revenue",
+    "edit_cost": "Update Cost",
+    "accounting_books": "Accounting Book Templates",
+    "export": "Export",
+    "export_success": "Book exported successfully",
+    "tax_payments": "Tax Payments",
+    "edit_tax_payment": "Update Tax Payment",
+    "reference_number": "Reference Number",
+    "report_generator": "Report Generator",
+    "from_date": "From Date",
+    "to_date": "To Date",
+    "report_format": "Format",
+    "format_pdf": "PDF",
+    "format_xlsx": "Excel (XLSX)",
+    "generate_report": "Generate Report",
+    "report_generated_success": "Report generated successfully",
+    "confirm_title": "Confirm Update",
+    "confirm_save_period_settings": "Are you sure you want to save these accounting period settings?",
+    "confirm_add_gl_entry": "Are you sure you want to add this manual GL entry?",
+    "confirm_update_item": "Are you sure you want to update this data?",
+    "confirm_update_tax_payment": "Are you sure you want to update this tax payment?",
+    "confirm_generate_report": "Are you sure you want to generate a report with current filters?",
+    "confirm_export_book": "Are you sure you want to export this accounting book template?",
+    "saved_success": "Saved successfully",
+    "updated_success": "Updated successfully"
   }
 }

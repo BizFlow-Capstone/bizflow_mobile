@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_payment_option_screen.dart';
 
 class OrderFormScreen extends StatefulWidget {
@@ -63,6 +64,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
             ),
           ),
         ],
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: SingleChildScrollView(

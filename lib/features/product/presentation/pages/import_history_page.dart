@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_loading.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/import_repository.dart';
 import '../bloc/import_history/import_history_bloc.dart';
 import '../bloc/import_history/import_history_event.dart';
@@ -112,6 +113,7 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
               onPressed: _showFilterBottomSheet,
             ),
           ],
+          bottom: const AppSyncStatusText(),
         ),
         body: BlocBuilder<ImportHistoryBloc, ImportHistoryState>(
           builder: (context, state) {

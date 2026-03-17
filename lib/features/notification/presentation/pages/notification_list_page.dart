@@ -5,6 +5,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 
 /// Mock notification data
 class _MockNotification {
@@ -143,6 +144,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
           onPressed: () => Navigator.pop(context),
           color: Colors.black,
         ),
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: _notifications.isEmpty

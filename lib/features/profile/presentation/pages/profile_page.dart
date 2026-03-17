@@ -7,6 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/context/user_profile_context.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
@@ -73,6 +74,7 @@ class _ProfilePageState extends State<ProfilePage> {
             onPressed: () => Navigator.pop(context),
             color: Colors.black,
           ),
+          bottom: const AppSyncStatusText(),
         ),
         body: SafeArea(
           child: BlocBuilder<AuthBloc, AuthState>(

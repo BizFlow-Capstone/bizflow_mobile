@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../core/storage/local_storage.dart';
+import 'sync_status_controller.dart';
 
 /// Quản lý việc lưu trữ cache tạm thời cho SWR Pattern
 /// Dữ liệu lưu dưới dạng JSON String vào Local Storage
@@ -81,6 +82,7 @@ class CacheManager {
     }
 
     // 2. Sync-Implicit: Gọi API server ngầm ở Background
+    SyncStatusController().startSync();
     try {
       final serverData = await fetcher();
 
@@ -91,8 +93,10 @@ class CacheManager {
       if (toJson != null) {
         await set(key, toJson(serverData));
       }
+      SyncStatusController().endSync(updatedAt: DateTime.now());
     } catch (e) {
       debugPrint('SWR Fetcher Error: $e');
+      SyncStatusController().endSync();
       if (!hasLocalData && onError != null) {
         // Chỉ ném lỗi lên UI nếu như không có local data để fallback
         onError(e);

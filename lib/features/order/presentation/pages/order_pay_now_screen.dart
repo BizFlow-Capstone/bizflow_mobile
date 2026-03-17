@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 
 class OrderPayNowScreen extends StatefulWidget {
   final double totalAmount;
@@ -22,6 +23,7 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
       appBar: AppBar(
         title: Text(l10n.translate('order_create.pay_now')),
         elevation: 0,
+        bottom: const AppSyncStatusText(),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

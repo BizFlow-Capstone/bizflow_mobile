@@ -4,6 +4,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 
 /// Notification Detail Page
 class NotificationDetailPage extends StatelessWidget {
@@ -42,6 +43,7 @@ class NotificationDetailPage extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
           color: Colors.black,
         ),
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: SingleChildScrollView(

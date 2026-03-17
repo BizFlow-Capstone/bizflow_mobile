@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'package:file_picker/file_picker.dart';
 import 'order_form_screen.dart';
 
@@ -52,6 +53,7 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
           ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: Center(

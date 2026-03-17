@@ -29,6 +29,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<LoadProductSaleItemsRequested>(_onLoadProductSaleItemsRequested);
     on<ImportInventoryRequested>(_onImportInventoryRequested);
     on<LoadProductDetailRequested>(_onLoadProductDetailRequested);
+    on<ApplyLocalPriceAdjustmentRequested>(_onApplyLocalPriceAdjustment);
   }
 
   // In-memory cache for products
@@ -826,6 +827,46 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           );
         }
       },
+    );
+  }
+
+  Future<void> _onApplyLocalPriceAdjustment(
+    ApplyLocalPriceAdjustmentRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (_products.isEmpty || event.affectedProductIds.isEmpty) {
+      return;
+    }
+
+    double clampNonNegative(double value) => value < 0 ? 0 : value;
+
+    _products = _products.map((product) {
+      if (!event.affectedProductIds.contains(product.id)) {
+        return product;
+      }
+
+      final baseSalePrice = product.salePrice ?? product.price;
+      final nextSalePrice = clampNonNegative(baseSalePrice + event.deltaAmount);
+
+      return product.copyWith(
+        salePrice: nextSalePrice,
+        price: nextSalePrice,
+      );
+    }).toList();
+
+    await _updateProductCache(event.locationId);
+
+    emit(
+      ProductsLoaded(
+        products: _products,
+        hasReachedMax: _products.length < 20,
+        currentPage: 1,
+        locationId: event.locationId,
+        searchQuery: _searchQuery,
+        filterStatus: _filterStatus,
+        filterBusinessTypeId: _filterBusinessTypeId,
+        apiMessage: null,
+      ),
     );
   }
 

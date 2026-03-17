@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../data/product_repository.dart';
 import 'edit_product_page.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
@@ -31,6 +33,12 @@ class ProductDetailPage extends StatefulWidget {
 
 class _ProductDetailPageState extends State<ProductDetailPage> {
   late ProductEntity _currentProduct;
+  bool _isCostHistoryLoading = false;
+  String? _costHistoryError;
+  double _historyCurrentCostPrice = 0;
+  List<_CostPriceHistoryItem> _costPriceHistory = const [];
+
+  ProductRepository get _repository => context.read<ProductBloc>().repository;
 
   @override
   void initState() {
@@ -40,6 +48,100 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     context.read<ProductBloc>().add(
       LoadProductDetailRequested(productId: widget.product.id),
     );
+    _loadCostPriceHistory();
+  }
+
+  Future<void> _loadCostPriceHistory() async {
+    if (mounted) {
+      setState(() {
+        _isCostHistoryLoading = true;
+        _costHistoryError = null;
+      });
+    }
+
+    try {
+      final response = await _repository.getProductCostPriceHistory(
+        _currentProduct.id,
+      );
+      final data = _extractCostPriceHistoryData(response);
+
+      if (!mounted) return;
+      setState(() {
+        _historyCurrentCostPrice = data.$1;
+        _costPriceHistory = data.$2;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _costHistoryError = e.toString().replaceFirst('Exception: ', '');
+        _costPriceHistory = const [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isCostHistoryLoading = false);
+      }
+    }
+  }
+
+  (double, List<_CostPriceHistoryItem>) _extractCostPriceHistoryData(
+    dynamic response,
+  ) {
+    Map<String, dynamic>? payload;
+    if (response is Map<String, dynamic>) {
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        payload = data;
+      } else {
+        payload = response;
+      }
+    }
+
+    if (payload == null) {
+      return (0, const []);
+    }
+
+    double parseDouble(dynamic value) {
+      if (value == null) return 0;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    DateTime? parseDate(dynamic value) {
+      if (value is String && value.isNotEmpty) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
+    final rawHistory = payload['history'];
+    final items = rawHistory is List
+        ? rawHistory
+              .map((item) {
+                if (item is! Map<String, dynamic>) return null;
+                return _CostPriceHistoryItem(
+                  importCode: (item['importCode'] ?? '').toString(),
+                  costPrice: parseDouble(item['costPrice']),
+                  quantity: parseInt(item['quantity']),
+                  totalPrice: parseDouble(item['totalPrice']),
+                  supplier: (item['supplier'] ?? '').toString(),
+                  receivedAt: parseDate(item['receivedAt']),
+                  createdAt: parseDate(item['createdAt']),
+                );
+              })
+              .whereType<_CostPriceHistoryItem>()
+              .toList()
+        : <_CostPriceHistoryItem>[];
+
+    return (parseDouble(payload['currentCostPrice']), items);
   }
 
   @override
@@ -47,10 +149,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final l10n = AppLocalizations.of(context);
 
     return BlocBuilder<ProductBloc, ProductState>(
-      buildWhen:
-          (previous, current) =>
-              current is ProductDetailLoaded &&
-              current.product.id == widget.product.id,
+      buildWhen: (previous, current) =>
+          current is ProductDetailLoaded &&
+          current.product.id == widget.product.id,
       builder: (context, state) {
         if (state is ProductDetailLoaded) {
           _currentProduct = state.product;
@@ -64,6 +165,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               context.read<ProductBloc>().add(
                 LoadProductDetailRequested(productId: widget.product.id),
               );
+              await _loadCostPriceHistory();
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -97,6 +199,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
                   // Price Section
                   _buildPriceSection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Cost Price History Section
+                  _buildCostPriceHistorySection(context, l10n),
                   const SafeArea(
                     top: false,
                     child: SizedBox(height: AppSpacing.xl),
@@ -153,9 +259,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         child: CachedNetworkImage(
           imageUrl: _currentProduct.imageUrl!,
           fit: BoxFit.cover,
-          placeholder: (context, url) => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          placeholder: (context, url) =>
+              const Center(child: CircularProgressIndicator()),
           errorWidget: (context, url, error) => Center(
             child: Icon(
               Icons.broken_image_outlined,
@@ -185,6 +290,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         style: AppTextStyles.titleMedium.copyWith(color: AppColors.textPrimary),
       ),
       actions: [
+        IconButton(
+          icon: const Icon(Icons.inventory_2_outlined),
+          tooltip:
+              l10n?.translate('product.stock_adjust.title') ?? 'Chỉnh tồn kho',
+          onPressed: () => _showAdjustStockDialog(l10n),
+        ),
         Padding(
           padding: EdgeInsets.only(right: AppSpacing.md),
           child: Center(
@@ -193,23 +304,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 final result = await Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder:
-                        (context) => EditProductPage(
-                          productId: _currentProduct.id,
-                          locationId: widget.locationId,
-                          productName: _currentProduct.name,
-                          barcode: _currentProduct.barcode,
-                          category: _currentProduct.category,
-                          costPrice: _currentProduct.costPrice,
-                          salePrice: _currentProduct.salePrice,
-                          quantity: _currentProduct.quantity,
-                          unit: _currentProduct.unit,
-                          description: _currentProduct.description,
-                          isActive: _currentProduct.isActive,
-                          businessTypeId: _currentProduct.businessTypeId,
-                          manufacturer: _currentProduct.manufacturer,
-                          imageUrl: _currentProduct.imageUrl,
-                        ),
+                    builder: (context) => EditProductPage(
+                      productId: _currentProduct.id,
+                      locationId: widget.locationId,
+                      productName: _currentProduct.name,
+                      barcode: _currentProduct.barcode,
+                      category: _currentProduct.category,
+                      costPrice: _currentProduct.costPrice,
+                      salePrice: _currentProduct.salePrice,
+                      quantity: _currentProduct.quantity,
+                      unit: _currentProduct.unit,
+                      description: _currentProduct.description,
+                      isActive: _currentProduct.isActive,
+                      businessTypeId: _currentProduct.businessTypeId,
+                      manufacturer: _currentProduct.manufacturer,
+                      imageUrl: _currentProduct.imageUrl,
+                    ),
                   ),
                 );
                 if (result == true && context.mounted) {
@@ -229,6 +339,172 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _showAdjustStockDialog(AppLocalizations? l10n) async {
+    final stockController = TextEditingController(
+      text: _currentProduct.quantity.toString(),
+    );
+    final memoController = TextEditingController();
+    final costPriceController = TextEditingController(
+      text: _currentProduct.costPrice != null
+          ? CurrencyFormatter.formatNumber(_currentProduct.costPrice!)
+          : '',
+    );
+    bool isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                l10n?.translate('product.stock_adjust.title') ??
+                    'Chỉnh tồn kho',
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: stockController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText:
+                            l10n?.translate('product.stock_adjust.stock') ??
+                            'Tồn kho mới',
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: costPriceController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [CurrencyInputFormatter()],
+                      decoration: InputDecoration(
+                        labelText:
+                            l10n?.translate(
+                              'product.stock_adjust.cost_price',
+                            ) ??
+                            'Giá nhập (tùy chọn)',
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: memoController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText:
+                            l10n?.translate('product.stock_adjust.memo') ??
+                            'Ghi chú',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: Text(l10n?.translate('common.cancel') ?? 'Hủy'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final stock = int.tryParse(stockController.text);
+                          final parsedCostPrice = CurrencyFormatter.parse(
+                            costPriceController.text,
+                          );
+
+                          if (stock == null || stock < 0) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  l10n?.translate(
+                                        'product.stock_adjust.invalid_stock',
+                                      ) ??
+                                      'Tồn kho không hợp lệ',
+                                ),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() => isSubmitting = true);
+                          try {
+                            await _repository.adjustProductStock(
+                              productId: _currentProduct.id,
+                              stock: stock,
+                              memo: memoController.text,
+                              costPrice: parsedCostPrice?.toDouble(),
+                            );
+
+                            if (!mounted) return;
+                            Navigator.pop(dialogContext);
+
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  l10n?.translate(
+                                        'product.stock_adjust.success',
+                                      ) ??
+                                      'Cập nhật tồn kho thành công',
+                                ),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+
+                            context.read<ProductBloc>().add(
+                              LoadProductDetailRequested(
+                                productId: _currentProduct.id,
+                              ),
+                            );
+                            context.read<ProductBloc>().add(
+                              LoadProductsByLocationRequested(
+                                locationId: widget.locationId,
+                              ),
+                            );
+                            _loadCostPriceHistory();
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  e.toString().replaceFirst('Exception: ', ''),
+                                ),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                            setDialogState(() => isSubmitting = false);
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          l10n?.translate(
+                                'product.stock_adjust.apply_button',
+                              ) ??
+                              'Xác nhận',
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    stockController.dispose();
+    memoController.dispose();
+    costPriceController.dispose();
   }
 
   Widget _buildProductDetailsSection(
@@ -308,19 +584,16 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  color:
-                      _currentProduct.isActive
-                          ? AppColors.success
-                          : AppColors.error,
+                  color: _currentProduct.isActive
+                      ? AppColors.success
+                      : AppColors.error,
                 ),
                 child: Text(
-                   _currentProduct.isActive
-                       ? (l10n?.translate('product.detail.status_active') ??
-                             'Đang hoạt động')
-                       : (l10n?.translate(
-                               'product.detail.status_inactive',
-                             ) ??
-                             'Ngừng hoạt động'),
+                  _currentProduct.isActive
+                      ? (l10n?.translate('product.detail.status_active') ??
+                            'Đang hoạt động')
+                      : (l10n?.translate('product.detail.status_inactive') ??
+                            'Ngừng hoạt động'),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,
@@ -364,9 +637,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 'Tên nhà sản xuất',
             value:
                 (_currentProduct.manufacturer != null &&
-                        _currentProduct.manufacturer!.isNotEmpty)
-                    ? _currentProduct.manufacturer!
-                    : noData,
+                    _currentProduct.manufacturer!.isNotEmpty)
+                ? _currentProduct.manufacturer!
+                : noData,
           ),
         ],
       ),
@@ -501,7 +774,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               SizedBox(
                 width: 100,
                 child: Text(
-                  l10n?.translate('product.detail.conversion_qty') ?? 'Số lượng',
+                  l10n?.translate('product.detail.conversion_qty') ??
+                      'Số lượng',
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -527,53 +801,56 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           SizedBox(height: AppSpacing.sm),
 
           // Dynamic Rows (Skip the item that matches the base unit)
-          ..._currentProduct.saleItems.where((item) {
-            final itemUnit = item['unit'] ?? item['Unit'] ?? '';
-            return itemUnit != _currentProduct.unit;
-          }).map((item) {
-            final unit = item['unit'] ?? item['Unit'] ?? '';
-            final qty = item['quantity'] ?? item['Quantity'] ?? 0;
-            final price = item['price'] ?? item['Price'] ?? 0;
+          ..._currentProduct.saleItems
+              .where((item) {
+                final itemUnit = item['unit'] ?? item['Unit'] ?? '';
+                return itemUnit != _currentProduct.unit;
+              })
+              .map((item) {
+                final unit = item['unit'] ?? item['Unit'] ?? '';
+                final qty = item['quantity'] ?? item['Quantity'] ?? 0;
+                final price = item['price'] ?? item['Price'] ?? 0;
 
-            return Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      unit.toString(),
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textPrimary,
+                return Padding(
+                  padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          unit.toString(),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  SizedBox(width: AppSpacing.md),
-                  SizedBox(
-                    width: 100,
-                    child: Text(
-                      '1 $unit = $qty ${_currentProduct.unit ?? ''}',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textSecondary,
+                      SizedBox(width: AppSpacing.md),
+                      SizedBox(
+                        width: 100,
+                        child: Text(
+                          '1 $unit = $qty ${_currentProduct.unit ?? ''}',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  SizedBox(width: AppSpacing.md),
-                  SizedBox(
-                    width: 100,
-                    child: Text(
-                      _formatPrice(price.toDouble()),
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
+                      SizedBox(width: AppSpacing.md),
+                      SizedBox(
+                        width: 100,
+                        child: Text(
+                          _formatPrice(price.toDouble()),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
                       ),
-                      textAlign: TextAlign.right,
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          }).toList(),
+                );
+              })
+              .toList(),
         ],
       ),
     );
@@ -647,8 +924,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildPriceSection(BuildContext context, AppLocalizations? l10n) {
-    final profit = (_currentProduct.salePrice ?? 0) -
-        (_currentProduct.costPrice ?? 0);
+    final profit =
+        (_currentProduct.salePrice ?? 0) - (_currentProduct.costPrice ?? 0);
 
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -691,6 +968,156 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             value: _formatPrice(profit),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCostPriceHistorySection(
+    BuildContext context,
+    AppLocalizations? l10n,
+  ) {
+    String formatDate(DateTime? value) {
+      if (value == null) return '--';
+      return DateFormat('dd/MM/yyyy HH:mm').format(value.toLocal());
+    }
+
+    final title =
+        l10n?.translate('product.detail.cost_history_title') ??
+        'Lịch sử chỉnh giá vốn';
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.white,
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          shape: const RoundedRectangleBorder(side: BorderSide.none),
+          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+          tilePadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          childrenPadding: EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: AppSpacing.md,
+          ),
+          title: Text(
+            title,
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            '${l10n?.translate('product.detail.current_cost_price') ?? 'Giá vốn hiện tại'}: ${_formatPrice(_historyCurrentCostPrice)}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          children: [
+            if (_isCostHistoryLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_costHistoryError != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _costHistoryError!,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadCostPriceHistory,
+                    child: Text(l10n?.translate('common.retry') ?? 'Thử lại'),
+                  ),
+                ],
+              )
+            else if (_costPriceHistory.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.no_cost_history') ??
+                      'Chưa có lịch sử giá vốn',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.cost_history_note') ??
+                      'Chỉ hiển thị các lần nhập kho đã xác nhận. Số lượng là theo từng lần nhập.',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            if (_costPriceHistory.isNotEmpty)
+              ..._costPriceHistory.map(
+                (item) => Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.importCode.isNotEmpty ? item.importCode : '#',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '${l10n?.translate('product.cost_price') ?? 'Giá vốn'}: ${_formatPrice(item.costPrice)}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        '${l10n?.translate('product.detail.cost_history_import_qty') ?? 'Số lượng nhập'}: ${item.quantity}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        '${l10n?.translate('stock_import.receipt_total') ?? 'Tổng tiền'}: ${_formatPrice(item.totalPrice)}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      if (item.supplier.isNotEmpty)
+                        Text(
+                          '${l10n?.translate('stock_import.receipt_supplier') ?? 'Nhà cung cấp'}: ${item.supplier}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      Text(
+                        '${l10n?.translate('stock_import.receipt_date') ?? 'Ngày nhập'}: ${formatDate(item.receivedAt ?? item.createdAt)}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -744,4 +1171,24 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   String _formatPrice(double price) {
     return CurrencyFormatter.formatVND(price);
   }
+}
+
+class _CostPriceHistoryItem {
+  final String importCode;
+  final double costPrice;
+  final int quantity;
+  final double totalPrice;
+  final String supplier;
+  final DateTime? receivedAt;
+  final DateTime? createdAt;
+
+  const _CostPriceHistoryItem({
+    required this.importCode,
+    required this.costPrice,
+    required this.quantity,
+    required this.totalPrice,
+    required this.supplier,
+    required this.receivedAt,
+    required this.createdAt,
+  });
 }

@@ -8,6 +8,7 @@ import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
 import '../widgets/order_filter.dart';
 import 'order_creation_selection_screen.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 
 /// Order List Screen (SC-ORD-02) - Displays list of draft invoices/orders
 class OrderListScreen extends StatefulWidget {
@@ -93,6 +94,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             color: Colors.black,
           ),
         ],
+        bottom: const AppSyncStatusText(),
       ),
       body: BlocBuilder<OrderBloc, OrderState>(
         builder: (context, state) {
@@ -119,7 +121,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
                     child: Text(
-                      state.message,
+                      l10n.translate('common.error_occurred'),
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),

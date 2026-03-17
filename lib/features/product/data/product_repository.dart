@@ -122,6 +122,52 @@ class ProductRepository {
     }
   }
 
+  /// Get product cost price history
+  Future<dynamic> getProductCostPriceHistory(String productId) async {
+    try {
+      return await _service.getProductCostPriceHistory(productId);
+    } catch (e) {
+      debugPrint('ProductRepository.getProductCostPriceHistory error: $e');
+      rethrow;
+    }
+  }
+
+  /// Bulk adjust selected sale-item selling prices
+  Future<dynamic> bulkAdjustSellingPrice({
+    required List<int> saleItemIds,
+    required double deltaAmount,
+  }) async {
+    try {
+      return await _service.bulkAdjustSellingPrice(
+        saleItemIds: saleItemIds,
+        deltaAmount: deltaAmount,
+      );
+    } catch (e) {
+      debugPrint('ProductRepository.bulkAdjustSellingPrice error: $e');
+      rethrow;
+    }
+  }
+
+  /// Adjust product stock manually
+  Future<dynamic> adjustProductStock({
+    required String productId,
+    required int stock,
+    String? memo,
+    double? costPrice,
+  }) async {
+    try {
+      return await _service.adjustProductStock(
+        productId: productId,
+        stock: stock,
+        memo: memo,
+        costPrice: costPrice,
+      );
+    } catch (e) {
+      debugPrint('ProductRepository.adjustProductStock error: $e');
+      rethrow;
+    }
+  }
+
   /// Create new product
   Future<dynamic> createProduct({
     required String productName,

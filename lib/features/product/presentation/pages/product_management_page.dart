@@ -12,8 +12,12 @@ import '../../data/models/business_type_model.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
 import '../../../../shared/widgets/app_barcode_scanner.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../../shared/utils/formatters.dart';
+import '../../domain/entities/product_entity.dart';
 import '../widgets/product_filter_dialog.dart';
 import 'add_product_page.dart';
+import 'bulk_adjust_selling_price_page.dart';
 import 'import_history_page.dart';
 
 /// Product Management by Location Page
@@ -142,6 +146,48 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     }
   }
 
+  Future<void> _showQuickAdjustStockDialog(ProductEntity product) async {
+    final l10n = AppLocalizations.of(context);
+    final productBloc = context.read<ProductBloc>();
+
+    final formData = await showDialog<_QuickAdjustStockFormData>(
+      context: context,
+      builder: (dialogContext) => _QuickAdjustStockDialog(
+        initialStock: product.quantity,
+        initialCostPrice: product.costPrice,
+      ),
+    );
+
+    if (!mounted || formData == null) return;
+
+    try {
+      await productBloc.repository.adjustProductStock(
+        productId: product.id,
+        stock: formData.stock,
+        memo: formData.memo,
+        costPrice: formData.costPrice,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.translate('product.stock_adjust.success')),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      productBloc.add(RefreshProductsRequested(locationId: widget.locationId));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -178,6 +224,26 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         centerTitle: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.price_change_outlined),
+            tooltip: l10n.translate('product.bulk_adjust.title'),
+            color: AppColors.textPrimary,
+            onPressed: () {
+              Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      BulkAdjustSellingPricePage(locationId: widget.locationId),
+                ),
+              ).then((updated) {
+                if (updated == true && mounted) {
+                  context.read<ProductBloc>().add(
+                    RefreshProductsRequested(locationId: widget.locationId),
+                  );
+                }
+              });
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Lịch sử nhập kho',
             color: AppColors.textPrimary,
@@ -195,6 +261,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             },
           ),
         ],
+        bottom: const AppSyncStatusText(),
       ),
       body: Column(
         children: [
@@ -448,6 +515,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         return ProductCardWidget(
                           product: product,
                           locationId: widget.locationId,
+                          onQuickAdjustStock: () =>
+                              _showQuickAdjustStockDialog(product),
                         );
                       },
                     ),
@@ -471,11 +540,21 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         ),
                         SizedBox(height: AppSpacing.md),
                         Text(
-                          state.message,
+                          l10n.translate('common.error_occurred'),
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.textSecondary,
                           ),
                           textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: AppSpacing.lg),
+                        ElevatedButton(
+                          onPressed: () {
+                            context.read<ProductBloc>().add(
+                              RefreshProductsRequested(
+                                  locationId: widget.locationId),
+                            );
+                          },
+                          child: Text(l10n.translate('common.retry')),
                         ),
                       ],
                     ),
@@ -509,6 +588,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         return ProductCardWidget(
                           product: currentProducts[index],
                           locationId: widget.locationId,
+                          onQuickAdjustStock: () => _showQuickAdjustStockDialog(
+                            currentProducts[index],
+                          ),
                         );
                       },
                     ),
@@ -537,6 +619,137 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           });
         },
       ),
+    );
+  }
+}
+
+class _QuickAdjustStockFormData {
+  final int stock;
+  final String memo;
+  final double? costPrice;
+
+  const _QuickAdjustStockFormData({
+    required this.stock,
+    required this.memo,
+    required this.costPrice,
+  });
+}
+
+class _QuickAdjustStockDialog extends StatefulWidget {
+  final int initialStock;
+  final double? initialCostPrice;
+
+  const _QuickAdjustStockDialog({
+    required this.initialStock,
+    required this.initialCostPrice,
+  });
+
+  @override
+  State<_QuickAdjustStockDialog> createState() =>
+      _QuickAdjustStockDialogState();
+}
+
+class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
+  late final TextEditingController _stockController;
+  late final TextEditingController _memoController;
+  late final TextEditingController _costPriceController;
+
+  @override
+  void initState() {
+    super.initState();
+    _stockController = TextEditingController(
+      text: widget.initialStock.toString(),
+    );
+    _memoController = TextEditingController();
+    _costPriceController = TextEditingController(
+      text: widget.initialCostPrice != null
+          ? CurrencyFormatter.formatNumber(widget.initialCostPrice!)
+          : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _stockController.dispose();
+    _memoController.dispose();
+    _costPriceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return AlertDialog(
+      title: Text(l10n.translate('product.stock_adjust.title')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _stockController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: l10n.translate('product.stock_adjust.stock'),
+              ),
+            ),
+            SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _costPriceController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyInputFormatter()],
+              decoration: InputDecoration(
+                labelText: l10n.translate('product.stock_adjust.cost_price'),
+              ),
+            ),
+            SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _memoController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: l10n.translate('product.stock_adjust.memo'),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.translate('common.cancel')),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final stock = int.tryParse(_stockController.text);
+            final parsedCostPrice = CurrencyFormatter.parse(
+              _costPriceController.text,
+            );
+
+            if (stock == null || stock < 0) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    l10n.translate('product.stock_adjust.invalid_stock'),
+                  ),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+              return;
+            }
+
+            Navigator.pop(
+              context,
+              _QuickAdjustStockFormData(
+                stock: stock,
+                memo: _memoController.text,
+                costPrice: parsedCostPrice?.toDouble(),
+              ),
+            );
+          },
+          child: Text(l10n.translate('product.stock_adjust.apply_button')),
+        ),
+      ],
     );
   }
 }

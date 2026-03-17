@@ -23,7 +23,8 @@
     "image_selected": "Ảnh đã được chọn",
     "tap_to_select": "Nhấn để chọn",
     "required_field": "Trường này là bắt buộc",
-    "detail": "Chi tiết"
+    "detail": "Chi tiết",
+    "error_occurred": "Có lỗi xảy ra, vui lòng thử lại"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -210,6 +211,11 @@
   "appbar": {
     "greeting": "Xin chào,"
   },
+  "sync": {
+    "syncing": "Đang đồng bộ...",
+    "updated_at": "Đã cập nhật lúc {time}",
+    "idle": "Sẵn sàng đồng bộ"
+  },
   "sidebar": {
     "add_location": "Thêm",
     "guide": "Hướng dẫn dùng app",
@@ -330,7 +336,33 @@
       "default_unit2": "Lon",
       "barcode_section": "Mã vạch",
       "pricing": "Giá cả",
-      "profit": "Lợi nhuận"
+      "profit": "Lợi nhuận",
+      "cost_history_title": "Lịch sử chỉnh giá vốn",
+      "current_cost_price": "Giá vốn hiện tại",
+      "no_cost_history": "Chưa có lịch sử giá vốn",
+      "cost_history_note": "Chỉ hiển thị các lần nhập kho đã xác nhận. Số lượng là theo từng lần nhập.",
+      "cost_history_import_qty": "Số lượng nhập"
+    },
+    "bulk_adjust": {
+      "title": "Điều chỉnh giá bán",
+      "delta_section": "Điều chỉnh theo giá trị cố định",
+      "increase_label": "Giá tăng",
+      "decrease_label": "Giá giảm",
+      "selected_count": "Đã chọn",
+      "no_sale_items": "Sản phẩm chưa có quy đổi đơn vị",
+      "select_sale_items_required": "Vui lòng chọn ít nhất một sale item",
+      "delta_required": "Vui lòng nhập giá tăng hoặc giảm",
+      "apply_button": "Áp dụng điều chỉnh",
+      "success": "Điều chỉnh giá bán thành công"
+    },
+    "stock_adjust": {
+      "title": "Chỉnh tồn kho",
+      "stock": "Tồn kho mới",
+      "cost_price": "Giá nhập (tùy chọn)",
+      "memo": "Ghi chú",
+      "invalid_stock": "Tồn kho không hợp lệ",
+      "apply_button": "Xác nhận",
+      "success": "Cập nhật tồn kho thành công"
     }
   },
   "stock_import": {
@@ -717,5 +749,63 @@
     "add_success": "Thêm nhân viên thành công",
     "update_success": "Cập nhật nhân viên thành công",
     "delete_success": "Xóa nhân viên thành công"
+  },
+  "accounting": {
+    "title": "Accounting",
+    "tab_period": "Kỳ kế toán",
+    "tab_gl": "Sổ cái",
+    "tab_cost_revenue": "Doanh thu & Chi phí",
+    "tab_books_reports": "Sổ & Báo cáo",
+    "rule_engine_suggestion": "Gợi ý từ Rule Engine",
+    "current_revenue_hint": "Doanh thu lũy kế hiện tại: 620,000,000đ",
+    "suggested_group_value": "Gợi ý: Nhóm 2 • Cách 2",
+    "period_settings": "Thiết lập kỳ kế toán",
+    "period_name": "Tên kỳ",
+    "period_type": "Loại kỳ",
+    "period_quarterly": "Theo quý",
+    "period_yearly": "Theo năm",
+    "accounting_method": "Phương pháp tính thuế",
+    "method_1": "Cách 1 (% doanh thu)",
+    "method_2": "Cách 2 (doanh thu - chi phí)",
+    "opening_cash": "Số dư tiền đầu kỳ",
+    "note": "Ghi chú",
+    "all": "Tất cả",
+    "add_manual_gl": "Thêm bút toán thủ công",
+    "description": "Diễn giải",
+    "amount": "Số tiền",
+    "channel": "Kênh tiền",
+    "channel_cash": "Tiền mặt",
+    "channel_bank": "Chuyển khoản",
+    "channel_debt": "Ghi nợ",
+    "entry_type": "Kiểu bút toán",
+    "debit": "Nợ",
+    "credit": "Có",
+    "revenue_list": "Danh sách doanh thu",
+    "cost_list": "Danh sách chi phí",
+    "edit_revenue": "Cập nhật doanh thu",
+    "edit_cost": "Cập nhật chi phí",
+    "accounting_books": "Mẫu sổ kế toán",
+    "export": "Xuất sổ",
+    "export_success": "Xuất sổ thành công",
+    "tax_payments": "Thuế đã nộp",
+    "edit_tax_payment": "Cập nhật thuế đã nộp",
+    "reference_number": "Số tham chiếu",
+    "report_generator": "Tạo báo cáo",
+    "from_date": "Từ ngày",
+    "to_date": "Đến ngày",
+    "report_format": "Định dạng",
+    "format_pdf": "PDF",
+    "format_xlsx": "Excel (XLSX)",
+    "generate_report": "Tạo báo cáo",
+    "report_generated_success": "Tạo báo cáo thành công",
+    "confirm_title": "Xác nhận cập nhật",
+    "confirm_save_period_settings": "Bạn có chắc muốn lưu thiết lập kỳ kế toán này không?",
+    "confirm_add_gl_entry": "Bạn có chắc muốn thêm bút toán thủ công này không?",
+    "confirm_update_item": "Bạn có chắc muốn cập nhật dữ liệu này không?",
+    "confirm_update_tax_payment": "Bạn có chắc muốn cập nhật thông tin thuế đã nộp không?",
+    "confirm_generate_report": "Bạn có chắc muốn tạo báo cáo với bộ lọc hiện tại không?",
+    "confirm_export_book": "Bạn có chắc muốn xuất mẫu sổ kế toán này không?",
+    "saved_success": "Lưu thành công",
+    "updated_success": "Cập nhật thành công"
   }
 }

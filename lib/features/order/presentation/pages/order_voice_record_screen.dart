@@ -4,6 +4,7 @@ import '../../../../core/localization/app_localizations.dart';
 import 'package:record/record.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_form_screen.dart';
 
 class OrderVoiceRecordScreen extends StatefulWidget {
@@ -88,6 +89,7 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
           ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: Center(

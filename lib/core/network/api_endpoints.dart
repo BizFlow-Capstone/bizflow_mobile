@@ -79,6 +79,12 @@ class ApiEndpoints {
       '/api/my-business/product/$productId/status';
   static String getProductSaleItems(String productId) =>
       '/api/my-business/product/$productId/sale-items';
+  static String getProductCostPriceHistory(String productId) =>
+      '/api/my-business/product/$productId/cost-price-history';
+  static String adjustProductStock(String productId) =>
+      '/api/my-business/product/$productId/stock';
+  static const String bulkAdjustSellingPrice =
+      '/api/my-business/products/sale-items/selling-price';
 
   // Business Types
   static const String businessTypes = '/api/business-types';

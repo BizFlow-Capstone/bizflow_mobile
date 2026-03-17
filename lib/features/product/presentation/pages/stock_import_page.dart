@@ -11,6 +11,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_loading.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/import_repository.dart';
 import '../../data/models/import_model.dart';
 import '../../domain/entities/product_entity.dart';
@@ -545,6 +546,7 @@ class _StockImportViewState extends State<_StockImportView> {
                   onPressed: _onCancelDelete,
                 ),
             ],
+            bottom: const AppSyncStatusText(),
           ),
           body:
               (state.status == ImportActionStatus.loading ||
@@ -1343,7 +1345,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                     if (state is ProductFailure) {
                       return Center(
                         child: Text(
-                          state.message,
+                          l10n.translate('common.error_occurred'),
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: AppColors.error,
                           ),

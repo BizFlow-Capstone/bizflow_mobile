@@ -211,7 +211,7 @@ class _LocationPageContent extends StatelessWidget {
                         horizontal: AppSpacing.xl,
                       ),
                       child: Text(
-                        message,
+                        l10n.translate('common.error_occurred'),
                         style: AppTextStyles.bodyMedium.copyWith(
                           color: AppColors.textSecondary,
                         ),

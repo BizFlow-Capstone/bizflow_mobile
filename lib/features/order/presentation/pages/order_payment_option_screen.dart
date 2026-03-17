@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_debt_screen.dart';
 import 'order_pay_now_screen.dart';
 
@@ -17,6 +18,7 @@ class OrderPaymentOptionScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(l10n.translate('order_create.payment_method_title')),
         elevation: 0,
+        bottom: const AppSyncStatusText(),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

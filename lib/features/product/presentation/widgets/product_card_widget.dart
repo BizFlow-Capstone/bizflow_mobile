@@ -17,11 +17,13 @@ import '../pages/product_detail_page.dart';
 class ProductCardWidget extends StatelessWidget {
   final ProductEntity product;
   final String locationId;
+  final VoidCallback? onQuickAdjustStock;
 
   const ProductCardWidget({
     super.key,
     required this.product,
     required this.locationId,
+    this.onQuickAdjustStock,
   });
 
   String _getStatusBadgeText(BuildContext context) {
@@ -70,20 +72,22 @@ class ProductCardWidget extends StatelessWidget {
                   child: product.imageUrl != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                            child: CachedNetworkImage(
-                              imageUrl: product.imageUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                color: AppColors.background,
-                                child: const Center(
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CachedNetworkImage(
+                            imageUrl: product.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: AppColors.background,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
                               ),
-                              errorWidget: (context, url, error) => Icon(
-                                Icons.image_not_supported_outlined,
-                                color: AppColors.textSecondary,
-                              ),
                             ),
+                            errorWidget: (context, url, error) => Icon(
+                              Icons.image_not_supported_outlined,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         )
                       : Icon(
                           Icons.shopping_bag_outlined,
@@ -174,11 +178,31 @@ class ProductCardWidget extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '${product.quantity} ${product.unit ?? 'cái'}',
-                      style: AppTextStyles.titleSmall.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${product.quantity} ${product.unit ?? 'cái'}',
+                          style: AppTextStyles.titleSmall.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        if (onQuickAdjustStock != null) ...[
+                          SizedBox(width: AppSpacing.xs),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: onQuickAdjustStock,
+                            child: Padding(
+                              padding: EdgeInsets.all(AppSpacing.xs),
+                              child: Icon(
+                                Icons.tune,
+                                size: 18,
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),

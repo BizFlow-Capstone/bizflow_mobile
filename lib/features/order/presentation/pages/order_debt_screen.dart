@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_debt_confirmation_screen.dart';
 
 class OrderDebtScreen extends StatefulWidget {
@@ -43,6 +44,7 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
       appBar: AppBar(
         title: Text(l10n.translate('order_create.debt')),
         elevation: 0,
+        bottom: const AppSyncStatusText(),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

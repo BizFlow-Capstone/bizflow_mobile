@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_audio_upload_screen.dart';
 import 'order_voice_record_screen.dart';
 import 'order_manual_input_screen.dart';
@@ -25,6 +26,7 @@ class OrderCreationSelectionScreen extends StatelessWidget {
           ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: Padding(

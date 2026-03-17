@@ -271,3 +271,20 @@ class LoadProductDetailRequested extends ProductEvent {
   @override
   List<Object?> get props => [productId];
 }
+
+/// Apply local price changes immediately for better UX,
+/// then server refresh can reconcile exact values.
+class ApplyLocalPriceAdjustmentRequested extends ProductEvent {
+  final String locationId;
+  final List<String> affectedProductIds;
+  final double deltaAmount;
+
+  const ApplyLocalPriceAdjustmentRequested({
+    required this.locationId,
+    required this.affectedProductIds,
+    required this.deltaAmount,
+  });
+
+  @override
+  List<Object?> get props => [locationId, affectedProductIds, deltaAmount];
+}

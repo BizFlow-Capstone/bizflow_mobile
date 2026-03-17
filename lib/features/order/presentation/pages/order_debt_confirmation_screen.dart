@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 
 class OrderDebtConfirmationScreen extends StatelessWidget {
   final double totalAmount;
@@ -21,6 +22,7 @@ class OrderDebtConfirmationScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(l10n.translate('order_create.debt_confirm')),
         elevation: 0,
+        bottom: const AppSyncStatusText(),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

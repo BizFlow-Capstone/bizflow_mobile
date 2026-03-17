@@ -19,10 +19,12 @@ class AdvancedInvoiceTemplatePage extends StatefulWidget {
   const AdvancedInvoiceTemplatePage({super.key});
 
   @override
-  State<AdvancedInvoiceTemplatePage> createState() => _AdvancedInvoiceTemplatePageState();
+  State<AdvancedInvoiceTemplatePage> createState() =>
+      _AdvancedInvoiceTemplatePageState();
 }
 
-class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePage> {
+class _AdvancedInvoiceTemplatePageState
+    extends State<AdvancedInvoiceTemplatePage> {
   // Form controllers
   final _businessNameController = TextEditingController();
   final _businessAddressController = TextEditingController();
@@ -65,7 +67,9 @@ class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePag
   @override
   void initState() {
     super.initState();
-    context.read<InvoiceTemplateBloc>().add(const LoadInvoiceTemplateRequested());
+    context.read<InvoiceTemplateBloc>().add(
+      const LoadInvoiceTemplateRequested(),
+    );
   }
 
   @override
@@ -91,7 +95,7 @@ class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePag
       _businessTaxController.text = tpl.businessTaxCode;
       _businessLogoController.text = tpl.businessLogoUrl;
       _noteTextController.text = tpl.footerNoteText;
-      
+
       _selectedTemplate = tpl.templateType;
       _primaryColor = tpl.primaryColor;
       _secondaryColor = tpl.secondaryColor;
@@ -155,10 +159,16 @@ class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePag
       appliedLocationIds: _appliedLocations,
     );
 
-    context.read<InvoiceTemplateBloc>().add(SaveInvoiceTemplateRequested(request: req));
+    context.read<InvoiceTemplateBloc>().add(
+      SaveInvoiceTemplateRequested(request: req),
+    );
   }
 
-  Widget _buildToggleItem(String title, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildToggleItem(
+    String title,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return InkWell(
       onTap: () => onChanged(!value),
       child: Padding(
@@ -185,7 +195,10 @@ class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePag
         decoration: InputDecoration(
           labelText: label,
           border: const OutlineInputBorder(),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
         ),
       ),
     );
@@ -213,240 +226,440 @@ class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePag
       ),
       body: SafeArea(
         child: BlocConsumer<InvoiceTemplateBloc, InvoiceTemplateState>(
-        listener: (context, state) {
-          if (state is InvoiceTemplateSaveSuccess) {
-            AppSnackBar.show(context, message: l10n.translate('invoice_template.save_success'), type: AppSnackBarType.success);
-          } else if (state is InvoiceTemplateFailure) {
-            AppSnackBar.show(context, message: state.message, type: AppSnackBarType.error);
-          }
-        },
-        builder: (context, state) {
-          if (state is InvoiceTemplateInitial || state is InvoiceTemplateLoading && _businessNameController.text.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          listener: (context, state) {
+            if (state is InvoiceTemplateSaveSuccess) {
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('invoice_template.save_success'),
+                type: AppSnackBarType.success,
+              );
+            } else if (state is InvoiceTemplateFailure) {
+              AppSnackBar.show(
+                context,
+                message: state.message,
+                type: AppSnackBarType.error,
+              );
+            }
+          },
+          builder: (context, state) {
+            if (state is InvoiceTemplateInitial ||
+                state is InvoiceTemplateLoading &&
+                    _businessNameController.text.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          if (state is InvoiceTemplateLoaded) {
-            _populateData(state);
-          }
+            if (state is InvoiceTemplateLoaded) {
+              _populateData(state);
+            }
 
-          return Stack(
-            children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header text
-                    Text(
-                      l10n.translate('invoice_template.advanced_subtitle'),
-                      style: AppTextStyles.labelMedium.copyWith(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
+            return Stack(
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Header text
+                      Text(
+                        l10n.translate('invoice_template.advanced_subtitle'),
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
 
-                    // Section 1: Template Choices (Horizontal Scroll)
-                    Text(l10n.translate('invoice_template.select_template'), style: AppTextStyles.titleMedium),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 120,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
+                      // Section 1: Template Choices (Horizontal Scroll)
+                      Text(
+                        l10n.translate('invoice_template.select_template'),
+                        style: AppTextStyles.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 120,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            _buildTemplateCard(
+                              'basic',
+                              Icons.description_outlined,
+                              l10n.translate('invoice_template.tpl_basic'),
+                            ),
+                            _buildTemplateCard(
+                              'professional',
+                              Icons.business_center_outlined,
+                              l10n.translate('invoice_template.tpl_prof'),
+                            ),
+                            _buildTemplateCard(
+                              'retail',
+                              Icons.storefront_outlined,
+                              l10n.translate('invoice_template.tpl_retail'),
+                            ),
+                            _buildTemplateCard(
+                              'fnb',
+                              Icons.restaurant_menu_outlined,
+                              l10n.translate('invoice_template.tpl_fnb'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // Section 1.5: Live Preview
+                      Text(
+                        l10n.translate('invoice_template.live_preview'),
+                        style: AppTextStyles.titleMedium,
+                      ),
+                      ListenableBuilder(
+                        listenable: Listenable.merge([
+                          _businessNameController,
+                          _businessAddressController,
+                          _businessPhoneController,
+                          _noteTextController,
+                        ]),
+                        builder: (context, _) {
+                          return InvoicePreviewWidget(
+                            businessName: _businessNameController.text,
+                            businessAddress: _businessAddressController.text,
+                            businessPhone: _businessPhoneController.text,
+                            showStt: showStt,
+                            showItemName: showItemName,
+                            showQuantity: showQuantity,
+                            showUnit: showUnit,
+                            showUnitPrice: showUnitPrice,
+                            showItemDiscount: showItemDiscount,
+                            showItemVat: showItemVat,
+                            showItemTotalAmount: showItemTotalAmount,
+                            showCustomerName: showCustomerName,
+                            showCustomerPhone: showCustomerPhone,
+                            showCustomerAddress: showCustomerAddress,
+                            showCustomerEmail: showCustomerEmail,
+                            showCustomerTaxCode: showCustomerTaxCode,
+                            showTotalVat: showTotalVat,
+                            showTotalDiscount: showTotalDiscount,
+                            showSubTotal: showSubTotal,
+                            showFooterNote: showFooterNote,
+                            footerNoteText: _noteTextController.text,
+                            showSignature: showSignature,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      // Section 2: Business Info
+                      ExpansionTile(
+                        shape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        collapsedShape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        title: Text(
+                          l10n.translate('invoice_template.business_info'),
+                          style: AppTextStyles.titleMedium,
+                        ),
+                        initiallyExpanded: true,
+                        childrenPadding: const EdgeInsets.all(16),
                         children: [
-                          _buildTemplateCard('basic', Icons.description_outlined, l10n.translate('invoice_template.tpl_basic')),
-                          _buildTemplateCard('professional', Icons.business_center_outlined, l10n.translate('invoice_template.tpl_prof')),
-                          _buildTemplateCard('retail', Icons.storefront_outlined, l10n.translate('invoice_template.tpl_retail')),
-                          _buildTemplateCard('fnb', Icons.restaurant_menu_outlined, l10n.translate('invoice_template.tpl_fnb')),
+                          _buildTextField(
+                            l10n.translate('invoice_template.business_name'),
+                            _businessNameController,
+                          ),
+                          _buildTextField(
+                            l10n.translate('invoice_template.business_address'),
+                            _businessAddressController,
+                          ),
+                          _buildTextField(
+                            l10n.translate('invoice_template.business_phone'),
+                            _businessPhoneController,
+                          ),
+                          _buildTextField(
+                            l10n.translate('invoice_template.business_email'),
+                            _businessEmailController,
+                          ),
+                          _buildTextField(
+                            l10n.translate(
+                              'invoice_template.business_tax_code',
+                            ),
+                            _businessTaxController,
+                          ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
+                      const SizedBox(height: 8),
 
-                    // Section 1.5: Live Preview
-                    Text(l10n.translate('invoice_template.live_preview'), style: AppTextStyles.titleMedium),
-                    ListenableBuilder(
-                      listenable: Listenable.merge([
-                        _businessNameController,
-                        _businessAddressController,
-                        _businessPhoneController,
-                        _noteTextController,
-                      ]),
-                      builder: (context, _) {
-                        return InvoicePreviewWidget(
-                          businessName: _businessNameController.text,
-                          businessAddress: _businessAddressController.text,
-                          businessPhone: _businessPhoneController.text,
-                          showStt: showStt,
-                          showItemName: showItemName,
-                          showQuantity: showQuantity,
-                          showUnit: showUnit,
-                          showUnitPrice: showUnitPrice,
-                          showItemDiscount: showItemDiscount,
-                          showItemVat: showItemVat,
-                          showItemTotalAmount: showItemTotalAmount,
-                          showCustomerName: showCustomerName,
-                          showCustomerPhone: showCustomerPhone,
-                          showCustomerAddress: showCustomerAddress,
-                          showCustomerEmail: showCustomerEmail,
-                          showCustomerTaxCode: showCustomerTaxCode,
-                          showTotalVat: showTotalVat,
-                          showTotalDiscount: showTotalDiscount,
-                          showSubTotal: showSubTotal,
-                          showFooterNote: showFooterNote,
-                          footerNoteText: _noteTextController.text,
-                          showSignature: showSignature,
-                        );
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
+                      // Section 3: Table Columns (Eye toggles)
+                      ExpansionTile(
+                        shape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        collapsedShape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        title: Text(
+                          l10n.translate('invoice_template.table_config'),
+                          style: AppTextStyles.titleMedium,
+                        ),
+                        children: [
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_stt'),
+                            showStt,
+                            (v) => setState(() => showStt = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_item_name'),
+                            showItemName,
+                            (v) => setState(() => showItemName = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_qty'),
+                            showQuantity,
+                            (v) => setState(() => showQuantity = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_unit'),
+                            showUnit,
+                            (v) => setState(() => showUnit = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_price'),
+                            showUnitPrice,
+                            (v) => setState(() => showUnitPrice = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_discount'),
+                            showItemDiscount,
+                            (v) => setState(() => showItemDiscount = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_vat'),
+                            showItemVat,
+                            (v) => setState(() => showItemVat = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_amount'),
+                            showItemTotalAmount,
+                            (v) => setState(() => showItemTotalAmount = v),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
 
-                    // Section 2: Business Info
-                    ExpansionTile(
-                      title: Text(l10n.translate('invoice_template.business_info'), style: AppTextStyles.titleMedium),
-                      initiallyExpanded: true,
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        _buildTextField(l10n.translate('invoice_template.business_name'), _businessNameController),
-                        _buildTextField(l10n.translate('invoice_template.business_address'), _businessAddressController),
-                        _buildTextField(l10n.translate('invoice_template.business_phone'), _businessPhoneController),
-                        _buildTextField(l10n.translate('invoice_template.business_email'), _businessEmailController),
-                        _buildTextField(l10n.translate('invoice_template.business_tax_code'), _businessTaxController),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
+                      // Section 4: Customer Info
+                      ExpansionTile(
+                        shape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        collapsedShape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        title: Text(
+                          l10n.translate('invoice_template.customer_config'),
+                          style: AppTextStyles.titleMedium,
+                        ),
+                        children: [
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_cus_name'),
+                            showCustomerName,
+                            (v) => setState(() => showCustomerName = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_cus_phone'),
+                            showCustomerPhone,
+                            (v) => setState(() => showCustomerPhone = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_cus_address'),
+                            showCustomerAddress,
+                            (v) => setState(() => showCustomerAddress = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_cus_email'),
+                            showCustomerEmail,
+                            (v) => setState(() => showCustomerEmail = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_cus_tax'),
+                            showCustomerTaxCode,
+                            (v) => setState(() => showCustomerTaxCode = v),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
 
-                    // Section 3: Table Columns (Eye toggles)
-                    ExpansionTile(
-                      title: Text(l10n.translate('invoice_template.table_config'), style: AppTextStyles.titleMedium),
-                      children: [
-                        _buildToggleItem(l10n.translate('invoice_template.show_stt'), showStt, (v) => setState(() => showStt = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_item_name'), showItemName, (v) => setState(() => showItemName = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_qty'), showQuantity, (v) => setState(() => showQuantity = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_unit'), showUnit, (v) => setState(() => showUnit = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_price'), showUnitPrice, (v) => setState(() => showUnitPrice = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_discount'), showItemDiscount, (v) => setState(() => showItemDiscount = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_vat'), showItemVat, (v) => setState(() => showItemVat = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_amount'), showItemTotalAmount, (v) => setState(() => showItemTotalAmount = v)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Section 4: Customer Info
-                    ExpansionTile(
-                      title: Text(l10n.translate('invoice_template.customer_config'), style: AppTextStyles.titleMedium),
-                      children: [
-                        _buildToggleItem(l10n.translate('invoice_template.show_cus_name'), showCustomerName, (v) => setState(() => showCustomerName = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_cus_phone'), showCustomerPhone, (v) => setState(() => showCustomerPhone = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_cus_address'), showCustomerAddress, (v) => setState(() => showCustomerAddress = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_cus_email'), showCustomerEmail, (v) => setState(() => showCustomerEmail = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_cus_tax'), showCustomerTaxCode, (v) => setState(() => showCustomerTaxCode = v)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    // Section 5: Display Specs
-                    ExpansionTile(
-                      title: Text(l10n.translate('invoice_template.display_config'), style: AppTextStyles.titleMedium),
-                      children: [
-                        _buildToggleItem(l10n.translate('invoice_template.show_total_vat'), showTotalVat, (v) => setState(() => showTotalVat = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_total_discount'), showTotalDiscount, (v) => setState(() => showTotalDiscount = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_subtotal'), showSubTotal, (v) => setState(() => showSubTotal = v)),
-                        _buildToggleItem(l10n.translate('invoice_template.show_note'), showFooterNote, (v) => setState(() => showFooterNote = v)),
-                        if (showFooterNote)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                            child: TextField(
-                              controller: _noteTextController,
-                              maxLines: 2,
-                              decoration: InputDecoration(
-                                labelText: l10n.translate('invoice_template.note'),
-                                hintText: l10n.translate('invoice_template.note_hint'),
-                                border: const OutlineInputBorder(),
+                      // Section 5: Display Specs
+                      ExpansionTile(
+                        shape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        collapsedShape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        title: Text(
+                          l10n.translate('invoice_template.display_config'),
+                          style: AppTextStyles.titleMedium,
+                        ),
+                        children: [
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_total_vat'),
+                            showTotalVat,
+                            (v) => setState(() => showTotalVat = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate(
+                              'invoice_template.show_total_discount',
+                            ),
+                            showTotalDiscount,
+                            (v) => setState(() => showTotalDiscount = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_subtotal'),
+                            showSubTotal,
+                            (v) => setState(() => showSubTotal = v),
+                          ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_note'),
+                            showFooterNote,
+                            (v) => setState(() => showFooterNote = v),
+                          ),
+                          if (showFooterNote)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16.0,
+                                vertical: 8.0,
+                              ),
+                              child: TextField(
+                                controller: _noteTextController,
+                                maxLines: 2,
+                                decoration: InputDecoration(
+                                  labelText: l10n.translate(
+                                    'invoice_template.note',
+                                  ),
+                                  hintText: l10n.translate(
+                                    'invoice_template.note_hint',
+                                  ),
+                                  border: const OutlineInputBorder(),
+                                ),
                               ),
                             ),
+                          _buildToggleItem(
+                            l10n.translate('invoice_template.show_signature'),
+                            showSignature,
+                            (v) => setState(() => showSignature = v),
                           ),
-                        _buildToggleItem(l10n.translate('invoice_template.show_signature'), showSignature, (v) => setState(() => showSignature = v)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Section 6: Apply to Locations
-                    ExpansionTile(
-                      title: Text(l10n.translate('invoice_template.applied_locations'), style: AppTextStyles.titleMedium),
-                      children: [
-                        BlocBuilder<LocationBloc, LocationState>(
-                          builder: (context, locState) {
-                            if (locState is LocationsLoaded) {
-                              return Wrap(
-                                spacing: 8,
-                                children: locState.locations.map((loc) {
-                                  final isSelected = _appliedLocations.contains(loc.id);
-                                  return FilterChip(
-                                    label: Text(loc.name),
-                                    selected: isSelected,
-                                    onSelected: (selected) {
-                                      setState(() {
-                                        if (selected) {
-                                          _appliedLocations.add(loc.id);
-                                        } else {
-                                          _appliedLocations.remove(loc.id);
-                                        }
-                                      });
-                                    },
-                                    selectedColor: AppColors.secondary.withValues(alpha: 0.2),
-                                    checkmarkColor: AppColors.secondary,
-                                  );
-                                }).toList(),
-                              );
-                            }
-                            return const Center(child: CircularProgressIndicator());
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-
-                    const SizedBox(height: 100), // padding for bottom bar
-                  ],
-                ),
-              ),
-              
-              // Bottom Bar
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, -5),
+                        ],
                       ),
+                      const SizedBox(height: 8),
+
+                      // Section 6: Apply to Locations
+                      ExpansionTile(
+                        shape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        collapsedShape: const RoundedRectangleBorder(
+                          side: BorderSide.none,
+                        ),
+                        title: Text(
+                          l10n.translate('invoice_template.applied_locations'),
+                          style: AppTextStyles.titleMedium,
+                        ),
+                        children: [
+                          BlocBuilder<LocationBloc, LocationState>(
+                            builder: (context, locState) {
+                              if (locState is LocationsLoaded) {
+                                return Wrap(
+                                  spacing: 8,
+                                  children: locState.locations.map((loc) {
+                                    final isSelected = _appliedLocations
+                                        .contains(loc.id);
+                                    return FilterChip(
+                                      label: Text(loc.name),
+                                      selected: isSelected,
+                                      onSelected: (selected) {
+                                        setState(() {
+                                          if (selected) {
+                                            _appliedLocations.add(loc.id);
+                                          } else {
+                                            _appliedLocations.remove(loc.id);
+                                          }
+                                        });
+                                      },
+                                      selectedColor: AppColors.secondary
+                                          .withValues(alpha: 0.2),
+                                      checkmarkColor: AppColors.secondary,
+                                    );
+                                  }).toList(),
+                                );
+                              }
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+
+                      const SizedBox(height: 100), // padding for bottom bar
                     ],
                   ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: state is InvoiceTemplateSaveInProgress ? null : _onSave,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+
+                // Bottom Bar
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -5),
+                        ),
+                      ],
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: state is InvoiceTemplateSaveInProgress
+                            ? null
+                            : _onSave,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: state is InvoiceTemplateSaveInProgress
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                l10n.translate('invoice_template.save'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
-                      child: state is InvoiceTemplateSaveInProgress
-                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : Text(l10n.translate('invoice_template.save'), style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 
   Widget _buildTemplateCard(String id, IconData icon, String title) {
@@ -457,7 +670,9 @@ class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePag
         width: 100,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.secondary.withValues(alpha: 0.1) : Colors.white,
+          color: isSelected
+              ? AppColors.secondary.withValues(alpha: 0.1)
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.secondary : Colors.grey.shade300,
@@ -467,7 +682,11 @@ class _AdvancedInvoiceTemplatePageState extends State<AdvancedInvoiceTemplatePag
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 32, color: isSelected ? AppColors.secondary : Colors.grey.shade600),
+            Icon(
+              icon,
+              size: 32,
+              color: isSelected ? AppColors.secondary : Colors.grey.shade600,
+            ),
             const SizedBox(height: 8),
             Text(
               title,

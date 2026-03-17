@@ -5,6 +5,7 @@ import '../bloc/order_bloc.dart';
 import '../bloc/order_event.dart';
 import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 
 /// Order Status Screen (SC-ORD-02.2)
 /// Displays unpublished invoices and draft orders with tabs
@@ -45,18 +46,26 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
       appBar: AppBar(
         title: Text(l10n.translate('order.status_title')),
         elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(
-              text: l10n.translate('order.tab_draft'),
-              icon: const Icon(Icons.edit, size: 18),
-            ),
-            Tab(
-              text: l10n.translate('order.tab_pending'),
-              icon: const Icon(Icons.pending_actions, size: 18),
-            ),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(66),
+          child: Column(
+            children: [
+              const AppSyncStatusText(),
+              TabBar(
+                controller: _tabController,
+                tabs: [
+                  Tab(
+                    text: l10n.translate('order.tab_draft'),
+                    icon: const Icon(Icons.edit, size: 18),
+                  ),
+                  Tab(
+                    text: l10n.translate('order.tab_pending'),
+                    icon: const Icon(Icons.pending_actions, size: 18),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         actions: [
           IconButton(
@@ -232,7 +241,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              message,
+              l10n.translate('common.error_occurred'),
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),

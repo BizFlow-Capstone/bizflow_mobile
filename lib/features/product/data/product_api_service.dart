@@ -192,6 +192,132 @@ class ProductApiService {
     }
   }
 
+  /// Get product cost price history from confirmed imports
+  ///
+  /// API: GET /api/my-business/product/{productId}/cost-price-history
+  Future<dynamic> getProductCostPriceHistory(String productId) async {
+    try {
+      debugPrint('=== GET PRODUCT COST PRICE HISTORY REQUEST ===');
+      debugPrint('ProductId: $productId');
+
+      final response = await _apiClient.get(
+        ApiEndpoints.getProductCostPriceHistory(productId),
+      );
+
+      debugPrint('=== GET PRODUCT COST PRICE HISTORY RESPONSE ===');
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Data: ${response.data}');
+
+      if (response.isSuccess && response.data != null) {
+        return response.data;
+      }
+
+      throw Exception(response.message ?? 'Failed to load cost price history');
+    } on ApiException catch (e) {
+      debugPrint(
+        'ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}',
+      );
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: Only owner can view cost history');
+      } else if (e.statusCode == 404) {
+        throw Exception('Product not found');
+      }
+      throw Exception('Error loading cost price history: ${e.message}');
+    } catch (e) {
+      debugPrint('ProductApiService.getProductCostPriceHistory error: $e');
+      rethrow;
+    }
+  }
+
+  /// Bulk adjust selected sale-item selling prices
+  ///
+  /// API: PATCH /api/my-business/products/sale-items/selling-price
+  Future<dynamic> bulkAdjustSellingPrice({
+    required List<int> saleItemIds,
+    required double deltaAmount,
+  }) async {
+    try {
+      debugPrint('=== BULK ADJUST SELLING PRICE REQUEST ===');
+      debugPrint('saleItemIds: $saleItemIds');
+      debugPrint('deltaAmount: $deltaAmount');
+
+      final response = await _apiClient.patch(
+        ApiEndpoints.bulkAdjustSellingPrice,
+        body: {'deltaAmount': deltaAmount, 'saleItemIds': saleItemIds},
+      );
+
+      debugPrint('=== BULK ADJUST SELLING PRICE RESPONSE ===');
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Data: ${response.data}');
+
+      if (response.isSuccess) {
+        return response.data;
+      }
+
+      throw Exception(response.message ?? 'Failed to adjust selling prices');
+    } on ApiException catch (e) {
+      debugPrint(
+        'ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}',
+      );
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: Only owner can adjust prices');
+      }
+      throw Exception('Error adjusting selling prices: ${e.message}');
+    } catch (e) {
+      debugPrint('ProductApiService.bulkAdjustSellingPrice error: $e');
+      rethrow;
+    }
+  }
+
+  /// Manual stock adjustment with optional memo and cost price
+  ///
+  /// API: PATCH /api/my-business/product/{productId}/stock
+  Future<dynamic> adjustProductStock({
+    required String productId,
+    required int stock,
+    String? memo,
+    double? costPrice,
+  }) async {
+    try {
+      debugPrint('=== ADJUST PRODUCT STOCK REQUEST ===');
+      debugPrint('productId: $productId, stock: $stock');
+
+      final Map<String, dynamic> body = {
+        'stock': stock,
+        if (memo != null && memo.trim().isNotEmpty) 'memo': memo.trim(),
+        if (costPrice != null) 'costPrice': costPrice,
+      };
+
+      final response = await _apiClient.patch(
+        ApiEndpoints.adjustProductStock(productId),
+        body: body,
+      );
+
+      debugPrint('=== ADJUST PRODUCT STOCK RESPONSE ===');
+      debugPrint('Status: ${response.statusCode}');
+      debugPrint('Data: ${response.data}');
+
+      if (response.isSuccess) {
+        return response.data;
+      }
+
+      throw Exception(response.message ?? 'Failed to adjust product stock');
+    } on ApiException catch (e) {
+      debugPrint(
+        'ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}',
+      );
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: Only owner can adjust stock');
+      } else if (e.statusCode == 404) {
+        throw Exception('Product not found');
+      }
+      throw Exception('Error adjusting product stock: ${e.message}');
+    } catch (e) {
+      debugPrint('ProductApiService.adjustProductStock error: $e');
+      rethrow;
+    }
+  }
+
   /// Create new product with image and price tiers
   ///
   /// API: POST /api/my-business/product

@@ -142,6 +142,7 @@ class _HomePageState extends State<HomePage> {
                       AppRouter.navigateTo(AppRoutes.orderCreateSelection),
                   onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
                   onDebt: () => AppRouter.navigateTo(AppRoutes.debtList),
+                  onReport: () => AppRouter.navigateTo(AppRoutes.accounting),
                 ),
                 SizedBox(height: AppSpacing.lg),
 
