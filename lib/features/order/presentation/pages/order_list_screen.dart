@@ -8,11 +8,12 @@ import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
 import '../widgets/order_filter.dart';
 import 'order_creation_selection_screen.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 
 /// Order List Screen (SC-ORD-02) - Displays list of draft invoices/orders
 class OrderListScreen extends StatefulWidget {
-  const OrderListScreen({Key? key}) : super(key: key);
+  const OrderListScreen({super.key});
 
   @override
   State<OrderListScreen> createState() => _OrderListScreenState();
@@ -31,15 +32,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   void _loadDraftOrders() {
     context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
-  }
-
-  void _loadAllOrders() {
-    context.read<OrderBloc>().add(
-      LoadOrdersRequested(
-        status: _currentStatusFilter,
-        locationId: _currentLocationFilter,
-      ),
-    );
   }
 
   void _applyFilter(Map<String, dynamic> filters) {
@@ -96,44 +88,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
         ],
         bottom: const AppSyncStatusText(),
       ),
-      body: BlocBuilder<OrderBloc, OrderState>(
+      body: BlocConsumer<OrderBloc, OrderState>(
+        listener: (context, state) {
+          if (state is OrderError) {
+            AppSnackBar.show(
+              context,
+              message: state.message.isNotEmpty
+                  ? state.message
+                  : l10n.translate('common.error_occurred'),
+              type: AppSnackBarType.error,
+            );
+          }
+        },
         builder: (context, state) {
           if (state is OrdersLoading) {
             return Center(child: CircularProgressIndicator());
-          }
-
-          if (state is OrderError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(
-                    l10n.translate('order.error_title'),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[800],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      l10n.translate('common.error_occurred'),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: _refreshOrders,
-                    child: Text(l10n.translate('common.retry')),
-                  ),
-                ],
-              ),
-            );
           }
 
           List<dynamic> orders = [];
@@ -143,6 +112,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
             orders = state.orders;
           } else if (state is OrdersFiltered) {
             orders = state.orders;
+          } else if (state is OrderError) {
+            orders = [];
           }
 
           if (orders.isEmpty) {

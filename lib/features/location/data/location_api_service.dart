@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../employee/data/models/employee_dto.dart';
@@ -15,6 +16,8 @@ class LocationApiService {
   final ApiClient _apiClient;
 
   LocationApiService({required ApiClient apiClient}) : _apiClient = apiClient;
+
+  String get _currentBaseUrl => AppConfig.baseUrl;
 
   /// Get business locations owned by current user
   ///
@@ -55,8 +58,7 @@ class LocationApiService {
           'No network connection\n\n'
           'Check:\n'
           '• Is backend running?\n'
-          '• Port: 7270\n'
-          '• URL: https://10.0.2.2:7270',
+          '• URL: $_currentBaseUrl',
         );
       } else if (e.statusCode == -2) {
         throw Exception(
@@ -70,9 +72,9 @@ class LocationApiService {
           '${e.message}\n\n'
           'Solutions:\n'
           '1. Check backend is running: dotnet run\n'
-          '2. Ensure port 7270 is not blocked\n'
+          '2. Ensure backend port is not blocked\n'
           '3. Hot restart app (press R)\n'
-          '4. Check URL: https://10.0.2.2:7270',
+          '4. Check URL: $_currentBaseUrl',
         );
       } else if (e.statusCode == 401) {
         throw Exception('Session expired\n\nPlease login again');

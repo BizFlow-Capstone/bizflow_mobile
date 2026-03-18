@@ -49,13 +49,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
   String? _pendingPhoneNumber;
-  String? _pendingPhoneNumberE164;
   String? _pendingPassword;
   String? _pendingFullName;
   String? _pendingVerificationId;
 
   String? _pendingLinkPhoneNumber;
-  String? _pendingLinkPhoneNumberE164;
   String? _pendingLinkPhonePassword;
   String? _pendingLinkPhoneVerificationId;
 
@@ -324,7 +322,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     _pendingPhoneNumber = event.phone;
-    _pendingPhoneNumberE164 = normalizedPhone;
     _pendingPassword = event.password;
     _pendingFullName = event.fullName;
 
@@ -538,7 +535,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     _pendingLinkPhoneNumber = event.phone;
-    _pendingLinkPhoneNumberE164 = normalizedPhone;
     _pendingLinkPhonePassword = event.password;
 
     final completer = Completer<String>();

@@ -8,6 +8,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
@@ -145,17 +146,18 @@ class _EditProductPageState extends State<EditProductPage> {
           _removeImage =
               false; // Reset removeImage flag if new image is selected
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
+        AppSnackBar.show(
+          context,
+          message:
               '${l10n.translate('common.image_selected')}: ${pickedFile.name}',
-            ),
-          ),
+          type: AppSnackBarType.info,
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.translate('common.error')}: $e')),
+      AppSnackBar.show(
+        context,
+        message: '${l10n.translate('common.error')}: $e',
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -353,8 +355,10 @@ class _EditProductPageState extends State<EditProductPage> {
   /// Submit form to update product
   void _submitForm() {
     if (_productNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('common.required_field'))),
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('common.required_field'),
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -365,8 +369,10 @@ class _EditProductPageState extends State<EditProductPage> {
         _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
       );
       if (costPrice == null || costPrice < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.translate('product.invalid_cost_price'))),
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('product.invalid_cost_price'),
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -377,8 +383,10 @@ class _EditProductPageState extends State<EditProductPage> {
         _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
       );
       if (salePrice == null || salePrice < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.translate('product.invalid_sale_price'))),
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('product.invalid_sale_price'),
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -389,25 +397,28 @@ class _EditProductPageState extends State<EditProductPage> {
         _quantityController.text.replaceAll(RegExp(r'[,.]'), ''),
       );
       if (quantity == null || quantity < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.translate('product.invalid_stock'))),
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('product.invalid_stock'),
+          type: AppSnackBarType.error,
         );
         return;
       }
     }
 
     if (widget.productId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('product.invalid_id')),
-          backgroundColor: AppColors.error,
-        ),
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('product.invalid_id'),
+        type: AppSnackBarType.error,
       );
       return;
     }
     if (_selectedBusinessTypeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('common.required_field'))),
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('common.required_field'),
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -478,8 +489,10 @@ class _EditProductPageState extends State<EditProductPage> {
         listener: (context, state) {
           if (state is ProductUpdateSuccess) {
             // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.translate('product.edit_success'))),
+            AppSnackBar.show(
+              context,
+              message: l10n.translate('product.edit_success'),
+              type: AppSnackBarType.success,
             );
             // Navigate back and return true to indicate success
             Future.delayed(const Duration(milliseconds: 500), () {
@@ -487,11 +500,10 @@ class _EditProductPageState extends State<EditProductPage> {
             });
           } else if (state is ProductDeleteSuccess) {
             // Show delete success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.translate('product.delete_success')),
-                backgroundColor: AppColors.success,
-              ),
+            AppSnackBar.show(
+              context,
+              message: l10n.translate('product.delete_success'),
+              type: AppSnackBarType.success,
             );
             // Navigate back and return true to indicate success
             Future.delayed(const Duration(milliseconds: 500), () {
@@ -518,11 +530,10 @@ class _EditProductPageState extends State<EditProductPage> {
               _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
+            AppSnackBar.show(
+              context,
+              message: state.message,
+              type: AppSnackBarType.error,
             );
           }
         },
@@ -640,7 +651,7 @@ class _EditProductPageState extends State<EditProductPage> {
                           ),
                         );
                       },
-                      activeColor: AppColors.secondary,
+                      activeThumbColor: AppColors.secondary,
                     ),
                   ],
                 ),
@@ -809,7 +820,7 @@ class _EditProductPageState extends State<EditProductPage> {
                                   ),
                                 ),
                               );
-                            }).toList(),
+                            }),
                             SizedBox(height: AppSpacing.md),
                           ],
                         ),

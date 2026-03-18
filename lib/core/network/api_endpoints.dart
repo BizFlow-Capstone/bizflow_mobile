@@ -105,4 +105,15 @@ class ApiEndpoints {
       '/api/my-business/accounting/import/$id';
   static String deleteImport(String id) =>
       '/api/my-business/accounting/import/$id';
+
+  // Debtor
+  static const String debtors = '/api/my-business/debtors';
+  static String debtorDetail(String debtorId) =>
+      '/api/my-business/debtors/$debtorId';
+  static String debtorPayments(String debtorId) =>
+      '/api/my-business/debtors/$debtorId/payments';
+  static String debtorStatus(String debtorId) =>
+      '/api/my-business/debtors/$debtorId/status';
+  static String activeDebtorsByLocation(String locationId) =>
+      '/api/my-business/debtors/locations/$locationId';
 }

@@ -1,4 +1,5 @@
 /// Stock Import Entity - Domain model for stock import operations
+library;
 
 /// Status of a stock import order
 enum StockImportStatus {

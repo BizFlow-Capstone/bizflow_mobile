@@ -6,7 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'order_form_screen.dart';
 
 class OrderAudioUploadScreen extends StatefulWidget {
-  const OrderAudioUploadScreen({Key? key}) : super(key: key);
+  const OrderAudioUploadScreen({super.key});
 
   @override
   State<OrderAudioUploadScreen> createState() => _OrderAudioUploadScreenState();

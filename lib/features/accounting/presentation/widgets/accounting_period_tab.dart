@@ -61,7 +61,7 @@ class AccountingPeriodTab extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: periodType,
+                  initialValue: periodType,
                   items: [
                     DropdownMenuItem(
                       value: 'quarterly',
@@ -81,7 +81,7 @@ class AccountingPeriodTab extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: accountingMethod,
+                  initialValue: accountingMethod,
                   items: [
                     DropdownMenuItem(
                       value: 'method_1',

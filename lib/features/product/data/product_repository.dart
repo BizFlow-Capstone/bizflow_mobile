@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import '../domain/entities/product_entity.dart';
 import 'product_api_service.dart';
 import 'models/product_dto.dart';
+import '../../../shared/cache/cache_manager.dart';
+import '../../../shared/context/business_context.dart';
 
 /// Product Repository - Orchestrates product data flow
 ///
@@ -114,12 +116,43 @@ class ProductRepository {
 
   /// Get product sale items (price tiers/unit conversions)
   Future<dynamic> getProductSaleItems(String productId) async {
+    final businessId = BusinessContext().currentBusinessId ?? 'all';
+    final cacheKey = 'cache_sale_items_${businessId}_$productId';
+
+    final cached = await CacheManager().get(cacheKey);
+
     try {
-      return await _service.getProductSaleItems(productId);
+      final response = await _service.getProductSaleItems(productId);
+      final normalized = _normalizeSaleItems(response);
+      await CacheManager().set(cacheKey, {'data': normalized});
+      return {'data': normalized};
     } catch (e) {
       debugPrint('ProductRepository.getProductSaleItems error: $e');
+      if (cached != null) {
+        return {'data': cached['data'] ?? <dynamic>[]};
+      }
       rethrow;
     }
+  }
+
+  List<Map<String, dynamic>> _normalizeSaleItems(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      final data = response['data'];
+      if (data is List) {
+        return data.whereType<Map<String, dynamic>>().toList();
+      }
+      if (data is Map<String, dynamic> && data['saleItems'] is List) {
+        return (data['saleItems'] as List)
+            .whereType<Map<String, dynamic>>()
+            .toList();
+      }
+    }
+
+    if (response is List) {
+      return response.whereType<Map<String, dynamic>>().toList();
+    }
+
+    return <Map<String, dynamic>>[];
   }
 
   /// Get product cost price history

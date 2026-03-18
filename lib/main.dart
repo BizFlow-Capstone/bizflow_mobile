@@ -32,6 +32,9 @@ import 'features/product/data/product_repository.dart';
 import 'features/product/presentation/bloc/product_bloc.dart';
 import 'features/product/data/import_api_service.dart';
 import 'features/product/data/import_repository.dart';
+import 'features/debt/data/debtor_api_service.dart';
+import 'features/debt/data/debtor_repository.dart';
+import 'features/debt/presentation/bloc/debtor_bloc.dart';
 
 import 'shared/context/business_context.dart';
 import 'shared/context/user_profile_context.dart';
@@ -69,6 +72,8 @@ class _MyAppState extends State<MyApp> {
   late ProductRepository _productRepository;
   late ImportApiService _importApiService;
   late ImportRepository _importRepository;
+  late DebtorApiService _debtorApiService;
+  late DebtorRepository _debtorRepository;
   late InvoiceTemplateRepository _invoiceTemplateRepository;
   late EmployeeManagementRepository _employeeManagementRepository;
 
@@ -141,6 +146,7 @@ class _MyAppState extends State<MyApp> {
     _orderApiService = OrderApiService(apiClient: _apiClient);
     _productApiService = ProductApiService(apiClient: _apiClient);
     _importApiService = ImportApiService(apiClient: _apiClient);
+    _debtorApiService = DebtorApiService(apiClient: _apiClient);
 
     // Initialize Repositories (calls Services)
     _locationRepository = LocationRepository(service: _locationApiService);
@@ -148,6 +154,7 @@ class _MyAppState extends State<MyApp> {
     _orderRepository = OrderRepository(apiService: _orderApiService);
     _productRepository = ProductRepository(service: _productApiService);
     _importRepository = ImportRepository(_importApiService);
+    _debtorRepository = DebtorRepository(service: _debtorApiService);
     _invoiceTemplateRepository = InvoiceTemplateRepositoryMock();
     _employeeManagementRepository = EmployeeManagementRepositoryMock();
 
@@ -189,6 +196,9 @@ class _MyAppState extends State<MyApp> {
         ),
         BlocProvider(
           create: (context) => ProductBloc(repository: _productRepository),
+        ),
+        BlocProvider(
+          create: (context) => DebtorBloc(repository: _debtorRepository),
         ),
         BlocProvider(
           create: (context) =>

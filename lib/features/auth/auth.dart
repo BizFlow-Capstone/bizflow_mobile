@@ -1,4 +1,5 @@
 /// Auth Feature Exports
+library;
 
 // Presentation (all: bloc, pages, widgets)
 export 'presentation/presentation.dart';

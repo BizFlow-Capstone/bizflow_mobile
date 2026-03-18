@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/import_repository.dart';
 import '../../../data/models/import_model.dart';
 import '../../../../../shared/cache/cache_manager.dart';
+import '../../../../../shared/context/business_context.dart';
 import 'import_history_event.dart';
 import 'import_history_state.dart';
 
@@ -28,18 +29,38 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
       state.fromDate != null ||
       state.toDate != null;
 
+  int? get _currentBusinessLocationId {
+    final id = BusinessContext().currentBusinessId;
+    if (id == null) return null;
+    return int.tryParse(id);
+  }
+
+  String _cacheKey({required int? locationId}) {
+    final businessId = BusinessContext().currentBusinessId ?? 'all';
+    final status = state.statusFilter ?? 'all';
+    final type = state.typeFilter ?? 'all';
+    final from = state.fromDate?.toIso8601String() ?? 'none';
+    final to = state.toDate?.toIso8601String() ?? 'none';
+    final location = locationId?.toString() ?? 'all';
+    return 'cache_import_history_${businessId}_${location}_${status}_${type}_${from}_${to}';
+  }
+
   Future<void> _onLoadImportHistory(
     LoadImportHistory event,
     Emitter<ImportHistoryState> emit,
   ) async {
     emit(state.copyWith(status: ImportHistoryStatus.loading));
 
+    final effectiveLocationId = state.businessLocationId ?? _currentBusinessLocationId;
+    final cacheKey = _cacheKey(locationId: effectiveLocationId);
+
     // Chỉ dùng SWR cache cho trang đầu tiên khi không có filter
     if (!_hasActiveFilters) {
       await CacheManager().fetchWithSWR<List<ImportHistoryItemModel>>(
-        key: 'cache_import_history',
+        key: cacheKey,
         fetcher: () async {
           final response = await _repository.getImports(
+            businessLocationId: effectiveLocationId,
             pageNumber: 1,
             pageSize: _pageSize,
           );
@@ -86,7 +107,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
         final response = await _repository.getImports(
           status: state.statusFilter,
           importType: state.typeFilter,
-          businessLocationId: state.businessLocationId,
+          businessLocationId: effectiveLocationId,
           fromDate: state.fromDate,
           toDate: state.toDate,
           pageNumber: 1,
@@ -121,8 +142,9 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
     LoadMoreImportHistory event,
     Emitter<ImportHistoryState> emit,
   ) async {
-    if (state.hasReachedMax || state.status == ImportHistoryStatus.loadingMore)
+    if (state.hasReachedMax || state.status == ImportHistoryStatus.loadingMore) {
       return;
+    }
 
     emit(state.copyWith(status: ImportHistoryStatus.loadingMore));
     try {
@@ -130,7 +152,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
       final response = await _repository.getImports(
         status: state.statusFilter,
         importType: state.typeFilter,
-        businessLocationId: state.businessLocationId,
+        businessLocationId: state.businessLocationId ?? _currentBusinessLocationId,
         fromDate: state.fromDate,
         toDate: state.toDate,
         pageNumber: nextPage,

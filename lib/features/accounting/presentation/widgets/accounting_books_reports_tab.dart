@@ -130,7 +130,7 @@ class AccountingBooksReportsTab extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<String>(
-                value: reportFormat,
+                initialValue: reportFormat,
                 items: [
                   DropdownMenuItem(
                     value: 'pdf',

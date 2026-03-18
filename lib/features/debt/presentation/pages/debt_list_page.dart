@@ -1,52 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/formatters.dart';
-import '../widgets/payment_update_sheet.dart';
+import '../../domain/entities/debtor_entity.dart';
+import '../bloc/debtor_bloc.dart';
+import '../bloc/debtor_event.dart';
+import '../bloc/debtor_state.dart';
+import 'debt_detail_page.dart';
+import '../../../location/presentation/bloc/location_bloc.dart';
+import '../../../location/presentation/bloc/location_state.dart';
 
-/// Mock data models
-class _MockDebtOrder {
-  final String code;
-  final DateTime date;
-  final double totalAmount;
-  final double paidAmount;
 
-  const _MockDebtOrder({
-    required this.code,
-    required this.date,
-    required this.totalAmount,
-    required this.paidAmount,
-  });
-
-  double get remaining => totalAmount - paidAmount;
-  double get progressPercent =>
-      totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
-}
-
-class _MockDebtCustomer {
-  final String name;
-  final String phone;
-  final double totalDebt;
-  final double totalPaid;
-  final List<_MockDebtOrder> orders;
-
-  const _MockDebtCustomer({
-    required this.name,
-    required this.phone,
-    required this.totalDebt,
-    required this.totalPaid,
-    required this.orders,
-  });
-
-  int get orderCount => orders.length;
-  double get remaining => totalDebt - totalPaid;
-}
-
-/// Debt List Page - Quản lý công nợ / Khách quen
-/// Theo thiết kế SC-ORD-03, SC-ORD-03.1, SC-ORD-03.2
 class DebtListPage extends StatefulWidget {
   const DebtListPage({super.key});
 
@@ -55,68 +26,185 @@ class DebtListPage extends StatefulWidget {
 }
 
 class _DebtListPageState extends State<DebtListPage> {
-  // Track expanded customer cards
   final Set<int> _expandedCards = {};
+  final TextEditingController _searchController = TextEditingController();
+  int? _selectedLocationId;
 
-  // Mock data
-  final List<_MockDebtCustomer> _customers = [
-    _MockDebtCustomer(
-      name: 'Nguyễn Văn An',
-      phone: '0912345678',
-      totalDebt: 10800000,
-      totalPaid: 5000000,
-      orders: [
-        _MockDebtOrder(
-          code: 'DH-2024-001',
-          date: DateTime(2024, 1, 15),
-          totalAmount: 5800000,
-          paidAmount: 2000000,
-        ),
-        _MockDebtOrder(
-          code: 'DH-2024-005',
-          date: DateTime(2024, 1, 10),
-          totalAmount: 10000000,
-          paidAmount: 3000000,
-        ),
-      ],
-    ),
-    _MockDebtCustomer(
-      name: 'Trần Thị Bình',
-      phone: '0987654321',
-      totalDebt: 1700000,
-      totalPaid: 1500000,
-      orders: [
-        _MockDebtOrder(
-          code: 'DH-2024-003',
-          date: DateTime(2024, 1, 12),
-          totalAmount: 1700000,
-          paidAmount: 1500000,
-        ),
-      ],
-    ),
-    _MockDebtCustomer(
-      name: 'Lê Hoàng Cường',
-      phone: '0909123456',
-      totalDebt: 12500000,
-      totalPaid: 0,
-      orders: [
-        _MockDebtOrder(
-          code: 'DH-2024-002',
-          date: DateTime(2024, 1, 14),
-          totalAmount: 7500000,
-          paidAmount: 0,
-        ),
-        _MockDebtOrder(
-          code: 'DH-2024-006',
-          date: DateTime(2024, 1, 8),
-          totalAmount: 5000000,
-          paidAmount: 0,
-        ),
-      ],
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadDebtors();
+  }
 
-  double get _totalDebt => _customers.fold(0.0, (sum, c) => sum + c.remaining);
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _loadDebtors({
+    String? search,
+    bool? isActive,
+    int? locationId,
+    bool clearLocation = false,
+  }) {
+    final int? locId;
+    if (clearLocation) {
+      locId = null;
+    } else {
+      locId = locationId ?? _selectedLocationId;
+    }
+    context.read<DebtorBloc>().add(
+      LoadDebtorsRequested(
+        search: search,
+        isActive: isActive,
+        businessLocationIds: locId != null ? [locId] : null,
+      ),
+    );
+  }
+
+  /// Shows filter bottom sheet and applies the selected filters.
+  void _showFilterSheet(DebtorState state, List<dynamic> locations) {
+    bool? tempIsActive = state.isActive;
+    int? tempLocationId = _selectedLocationId;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final l10n = AppLocalizations.of(context);
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.md,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Bộ lọc',
+                        style: AppTextStyles.titleMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setSheetState(() {
+                            tempIsActive = null;
+                            tempLocationId = null;
+                          });
+                        },
+                        child: const Text('Đặt lại'),
+                      ),
+                    ],
+                  ),
+                  const Divider(),
+                  const SizedBox(height: AppSpacing.sm),
+                  // --- Status filter ---
+                  Text(
+                    'Trạng thái',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    children: [
+                      ChoiceChip(
+                        label: Text(l10n.translate('debt.filter_all')),
+                        selected: tempIsActive == null,
+                        onSelected: (_) =>
+                            setSheetState(() => tempIsActive = null),
+                      ),
+                      ChoiceChip(
+                        label: Text(l10n.translate('debt.filter_active')),
+                        selected: tempIsActive == true,
+                        onSelected: (_) =>
+                            setSheetState(() => tempIsActive = true),
+                      ),
+                      ChoiceChip(
+                        label: Text(l10n.translate('debt.filter_inactive')),
+                        selected: tempIsActive == false,
+                        onSelected: (_) =>
+                            setSheetState(() => tempIsActive = false),
+                      ),
+                    ],
+                  ),
+                  // --- Location filter (only if > 1 location) ---
+                  if (locations.length > 1) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Địa điểm kinh doanh',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      runSpacing: AppSpacing.xs,
+                      children: [
+                        ChoiceChip(
+                          label: Text(l10n.translate('debt.filter_all')),
+                          selected: tempLocationId == null,
+                          onSelected: (_) =>
+                              setSheetState(() => tempLocationId = null),
+                        ),
+                        ...locations.map((loc) {
+                          final locId = int.tryParse(loc.id.toString());
+                          return ChoiceChip(
+                            label: Text(loc.name),
+                            selected: tempLocationId == locId,
+                            onSelected: (_) => setSheetState(
+                              () => tempLocationId =
+                                  tempLocationId == locId ? null : locId,
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.lg),
+                  // Apply button
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        setState(() => _selectedLocationId = tempLocationId);
+                        _loadDebtors(
+                          search: _searchController.text,
+                          isActive: tempIsActive,
+                          locationId: tempLocationId,
+                        );
+                      },
+                      child: const Text('Áp dụng'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,86 +229,206 @@ class _DebtListPageState extends State<DebtListPage> {
           onPressed: () => Navigator.pop(context),
           color: Colors.black,
         ),
+        actions: [
+          IconButton(
+            onPressed: () => _showDebtorForm(),
+            icon: const Icon(Icons.person_add_alt_1_outlined),
+          ),
+        ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Summary Cards
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  // Total Debt Card
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: AppColors.danger,
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusMd,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.translate('debt.total_debt'),
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: Colors.white.withValues(alpha: 0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            CurrencyFormatter.formatVND(_totalDebt),
-                            style: AppTextStyles.titleLarge.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  // Customer Count Card
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2C2C2C),
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusMd,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.translate('debt.customer_count'),
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: Colors.white.withValues(alpha: 0.8),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${_customers.length} ${l10n.translate('debt.customers')}',
-                            style: AppTextStyles.titleLarge.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        child: BlocConsumer<DebtorBloc, DebtorState>(
+          listener: (context, state) {
+            if (state.lastMessageCode == 'DEBTOR_DELETED') {
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('debt.delete_success'),
+                type: AppSnackBarType.success,
+              );
+            }
+            if (state.lastMessageCode == 'DEBTOR_STATUS_ACTIVATED' ||
+                state.lastMessageCode == 'DEBTOR_STATUS_DEACTIVATED') {
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('debt.status_updated'),
+                type: AppSnackBarType.success,
+              );
+            }
+            if (state.lastMessageCode == 'DEBTOR_CREATED') {
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('debt.create_success'),
+                type: AppSnackBarType.success,
+              );
+            }
+            if (state.lastMessageCode == 'DEBTOR_UPDATED') {
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('debt.update_success'),
+                type: AppSnackBarType.success,
+              );
+            }
+            if (state.lastMessageCode == 'DEBT_ADJUSTMENT_RECORDED') {
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('debt.adjust_success'),
+                type: AppSnackBarType.success,
+              );
+            }
+            if (state.status == DebtorStatus.failure &&
+                state.errorMessage != null &&
+                state.errorMessage!.isNotEmpty) {
+              AppSnackBar.show(
+                context,
+                message: state.errorMessage!,
+                type: AppSnackBarType.error,
+              );
+            }
+          },
+          builder: (context, state) {
+            final customers = state.debtors;
+            final totalDebt = customers.fold<double>(
+              0,
+              (sum, c) => sum + c.currentBalance,
+            );
 
-            // Customer List
-            Expanded(
-              child: _customers.isEmpty
-                  ? Center(
+            return Column(
+              children: [
+                // ---- Search + Filter button row ----
+                BlocBuilder<LocationBloc, LocationState>(
+                  builder: (context, locationState) {
+                    final locations = locationState is LocationsLoaded
+                        ? locationState.locations
+                            .where((l) => l.isActive)
+                            .toList()
+                        : <dynamic>[];
+
+                    // Count active filters for badge
+                    final activeFilterCount =
+                        (state.isActive != null ? 1 : 0) +
+                        (_selectedLocationId != null ? 1 : 0);
+
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        AppSpacing.md,
+                        AppSpacing.md,
+                        AppSpacing.sm,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _searchController,
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: (value) =>
+                                  _loadDebtors(search: value),
+                              decoration: InputDecoration(
+                                prefixIcon: const Icon(Icons.search),
+                                hintText:
+                                    l10n.translate('debt.search_hint'),
+                                suffixIcon:
+                                    _searchController.text.isNotEmpty
+                                        ? IconButton(
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              _loadDebtors();
+                                              setState(() {});
+                                            },
+                                            icon: const Icon(Icons.close),
+                                          )
+                                        : null,
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          // Filter button with badge
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              IconButton.outlined(
+                                onPressed: () => _showFilterSheet(
+                                  state,
+                                  locations,
+                                ),
+                                icon: const Icon(Icons.tune_rounded),
+                                style: IconButton.styleFrom(
+                                  foregroundColor: activeFilterCount > 0
+                                      ? Theme.of(context).colorScheme.primary
+                                      : null,
+                                  side: activeFilterCount > 0
+                                      ? BorderSide(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          width: 1.5,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              if (activeFilterCount > 0)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    width: 18,
+                                    height: 18,
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '$activeFilterCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildSummaryCard(
+                          title: l10n.translate('debt.total_debt'),
+                          value: CurrencyFormatter.formatVND(totalDebt),
+                          bgColor: AppColors.danger,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: _buildSummaryCard(
+                          title: l10n.translate('debt.customer_count'),
+                          value:
+                              '${customers.length} ${l10n.translate('debt.customers')}',
+                          bgColor: const Color(0xFF2C2C2C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (state.status == DebtorStatus.loading && customers.isEmpty)
+                  const Expanded(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (customers.isEmpty)
+                  Expanded(
+                    child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -245,29 +453,92 @@ class _DebtListPageState extends State<DebtListPage> {
                           ),
                         ],
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        bottom: 40,
-                      ),
-                      itemCount: _customers.length,
-                      itemBuilder: (context, index) {
-                        return _buildCustomerCard(context, index);
-                      },
                     ),
-            ),
-          ],
+                  )
+                else
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: () async => _loadDebtors(
+                        search: _searchController.text,
+                        isActive: state.isActive,
+                      ),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(
+                          left: AppSpacing.md,
+                          right: AppSpacing.md,
+                          bottom: 40,
+                        ),
+                        itemCount: customers.length,
+                        itemBuilder: (context, index) {
+                          return _buildCustomerCard(
+                            context,
+                            customers[index],
+                            index,
+                            l10n,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showDebtorForm(),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _buildCustomerCard(BuildContext context, int index) {
-    final l10n = AppLocalizations.of(context);
-    final customer = _customers[index];
+  Widget _buildSummaryCard({
+    required String title,
+    required String value,
+    required Color bgColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: AppTextStyles.labelSmall.copyWith(
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: AppTextStyles.titleLarge.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomerCard(
+    BuildContext context,
+    DebtorEntity customer,
+    int index,
+    AppLocalizations l10n,
+  ) {
     final isExpanded = _expandedCards.contains(index);
+    final locationDisplay = customer.businessLocationName.trim().isNotEmpty
+        ? customer.businessLocationName.trim()
+        : ((customer.address ?? '').trim().isNotEmpty
+              ? (customer.address ?? '').trim()
+              : l10n.translate('common.no_data'));
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -284,7 +555,6 @@ class _DebtListPageState extends State<DebtListPage> {
       ),
       child: Column(
         children: [
-          // Customer Header (always visible)
           InkWell(
             onTap: () {
               setState(() {
@@ -300,16 +570,39 @@ class _DebtListPageState extends State<DebtListPage> {
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Column(
                 children: [
-                  // Name + Expand icon
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        customer.name,
-                        style: AppTextStyles.titleMedium.copyWith(
-                          fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Text(
+                          customer.name,
+                          style: AppTextStyles.titleMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: customer.isActive
+                              ? AppColors.success.withValues(alpha: 0.15)
+                              : AppColors.textHint.withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          customer.isActive
+                              ? l10n.translate('debt.status_active')
+                              : l10n.translate('debt.status_inactive'),
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: customer.isActive
+                                ? AppColors.success
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Icon(
                         isExpanded
                             ? Icons.keyboard_arrow_up
@@ -319,7 +612,6 @@ class _DebtListPageState extends State<DebtListPage> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  // Phone
                   Row(
                     children: [
                       Icon(
@@ -337,22 +629,16 @@ class _DebtListPageState extends State<DebtListPage> {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  // Debt summary row
                   Row(
                     children: [
                       _buildDebtColumn(
                         l10n.translate('debt.total_owed'),
-                        CurrencyFormatter.formatVND(customer.totalDebt),
+                        CurrencyFormatter.formatVND(customer.currentBalance),
                         AppColors.danger,
                       ),
                       _buildDebtColumn(
-                        l10n.translate('debt.total_paid'),
-                        CurrencyFormatter.formatVND(customer.totalPaid),
-                        AppColors.success,
-                      ),
-                      _buildDebtColumn(
-                        l10n.translate('debt.order_count'),
-                        customer.orderCount.toString(),
+                        l10n.translate('debt.location'),
+                        locationDisplay,
                         AppColors.textPrimary,
                       ),
                     ],
@@ -361,8 +647,6 @@ class _DebtListPageState extends State<DebtListPage> {
               ),
             ),
           ),
-
-          // Expanded Detail
           if (isExpanded) ...[
             const Divider(height: 1),
             Padding(
@@ -370,36 +654,155 @@ class _DebtListPageState extends State<DebtListPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    l10n.translate('debt.order_details'),
-                    style: AppTextStyles.labelMedium.copyWith(
-                      color: AppColors.textSecondary,
+                  if ((customer.address ?? '').isNotEmpty &&
+                      (customer.address ?? '').trim() != locationDisplay) ...[
+                    Text(
+                      '${l10n.translate('debt.address')}: ${customer.address}',
+                      style: AppTextStyles.labelMedium,
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  // Orders list
-                  ...customer.orders.map(
-                    (order) => _buildOrderCard(context, order),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  // Update payment button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _showPaymentSheet(context, customer),
-                      icon: const Icon(Icons.payment, size: 18),
-                      label: Text(l10n.translate('debt.update_payment')),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusMd,
-                          ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ],
+                  if ((customer.notes ?? '').isNotEmpty) ...[
+                    Text(
+                      '${l10n.translate('debt.note')}: ${customer.notes}',
+                      style: AppTextStyles.labelMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    DebtDetailPage(debtorId: customer.debtorId),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.receipt_long_outlined),
+                          label: Text(l10n.translate('debt.view_detail')),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showDebtAdjustmentDialog(customer),
+                          icon: const Icon(Icons.swap_vert_circle_outlined),
+                          label: Text(l10n.translate('debt.adjust_debt')),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 420) {
+                        return Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () =>
+                                        _showDebtorForm(existing: customer),
+                                    icon: const Icon(Icons.edit_outlined),
+                                    label: Text(l10n.translate('common.edit')),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      context.read<DebtorBloc>().add(
+                                        ToggleDebtorStatusRequested(
+                                          debtorId: customer.debtorId,
+                                          isActive: !customer.isActive,
+                                        ),
+                                      );
+                                    },
+                                    icon: Icon(
+                                      customer.isActive
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                    ),
+                                    label: Text(
+                                      customer.isActive
+                                          ? l10n.translate('debt.deactivate')
+                                          : l10n.translate('debt.activate'),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _confirmDelete(customer),
+                                icon: const Icon(Icons.delete_outline),
+                                label: Text(l10n.translate('common.delete')),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.danger,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  _showDebtorForm(existing: customer),
+                              icon: const Icon(Icons.edit_outlined),
+                              label: Text(l10n.translate('common.edit')),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                context.read<DebtorBloc>().add(
+                                  ToggleDebtorStatusRequested(
+                                    debtorId: customer.debtorId,
+                                    isActive: !customer.isActive,
+                                  ),
+                                );
+                              },
+                              icon: Icon(
+                                customer.isActive
+                                    ? Icons.visibility_off_outlined
+                                    : Icons.visibility_outlined,
+                              ),
+                              label: Text(
+                                customer.isActive
+                                    ? l10n.translate('debt.deactivate')
+                                    : l10n.translate('debt.activate'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _confirmDelete(customer),
+                              icon: const Icon(Icons.delete_outline),
+                              label: Text(l10n.translate('common.delete')),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.danger,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -429,192 +832,375 @@ class _DebtListPageState extends State<DebtListPage> {
               color: valueColor,
               fontWeight: FontWeight.bold,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildOrderCard(BuildContext context, _MockDebtOrder order) {
+  Future<void> _confirmDelete(DebtorEntity customer) async {
     final l10n = AppLocalizations.of(context);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        children: [
-          // Order code + Total
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                order.code,
-                style: AppTextStyles.titleSmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    l10n.translate('debt.total_amount'),
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                  Text(
-                    CurrencyFormatter.formatVND(order.totalAmount),
-                    style: AppTextStyles.titleSmall.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+    final normalDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.translate('debt.delete_confirm_title')),
+          content: Text(
+            l10n
+                .translate('debt.delete_confirm_message')
+                .replaceAll('{name}', customer.name),
           ),
-          const SizedBox(height: 4),
-          // Date
-          Row(
-            children: [
-              Icon(Icons.calendar_today, size: 12, color: AppColors.textHint),
-              const SizedBox(width: 4),
-              Text(
-                '${order.date.day.toString().padLeft(2, '0')}/${order.date.month.toString().padLeft(2, '0')}/${order.date.year}',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.textSecondary,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Progress bar
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.translate('debt.payment_progress'),
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: order.progressPercent / 100,
-                        backgroundColor: AppColors.divider,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          order.progressPercent >= 100
-                              ? AppColors.success
-                              : AppColors.primary,
-                        ),
-                        minHeight: 6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Text(
-                '${order.progressPercent.round()}',
-                style: AppTextStyles.titleSmall.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                '%',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          // Paid + Remaining row
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.translate('debt.paid_amount'),
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                    Text(
-                      CurrencyFormatter.formatVND(order.paidAmount),
-                      style: AppTextStyles.titleSmall.copyWith(
-                        color: AppColors.success,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.translate('debt.remaining'),
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                    ),
-                    Text(
-                      CurrencyFormatter.formatVND(order.remaining),
-                      style: AppTextStyles.titleSmall.copyWith(
-                        color: AppColors.danger,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l10n.translate('common.delete')),
+            ),
+          ],
+        );
+      },
     );
+
+    if (normalDelete != true || !mounted) return;
+
+    try {
+      context.read<DebtorBloc>().add(
+        DeleteDebtorRequested(debtorId: customer.debtorId, force: false),
+      );
+    } catch (_) {
+      if (!mounted) return;
+    }
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
+    final state = context.read<DebtorBloc>().state;
+    final errorText = state.errorMessage?.toLowerCase() ?? '';
+    final needsForce =
+        errorText.contains('nợ') ||
+        errorText.contains('debt') ||
+        errorText.contains('cannot delete') ||
+        errorText.contains('force');
+
+    if (!needsForce) return;
+
+    final forceDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.translate('debt.force_delete_title')),
+          content: Text(l10n.translate('debt.force_delete_message')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.danger,
+                foregroundColor: Colors.white,
+              ),
+              child: Text(l10n.translate('debt.force_delete')),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (forceDelete == true && mounted) {
+      context.read<DebtorBloc>().add(
+        DeleteDebtorRequested(debtorId: customer.debtorId, force: true),
+      );
+    }
   }
 
-  void _showPaymentSheet(BuildContext context, _MockDebtCustomer customer) {
-    showModalBottomSheet(
+  Future<void> _showDebtorForm({DebtorEntity? existing}) async {
+    final l10n = AppLocalizations.of(context);
+    final nameController = TextEditingController(text: existing?.name ?? '');
+    final phoneController = TextEditingController(text: existing?.phone ?? '');
+    final addressController = TextEditingController(
+      text: existing?.address ?? '',
+    );
+    final notesController = TextEditingController(text: existing?.notes ?? '');
+    final creditLimitController = TextEditingController(
+      text: existing == null ? '' : existing.creditLimit.toInt().toString(),
+    );
+
+    final confirmed = await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => PaymentUpdateSheet(
-        customerName: customer.name,
-        customerPhone: customer.phone,
-        totalDebt: customer.totalDebt,
-        totalPaid: customer.totalPaid,
-        remaining: customer.remaining,
-        onConfirm: (amount, note) {
-          Navigator.pop(context);
-          // Mock confirm - update UI
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Thanh toán ${CurrencyFormatter.formatVND(amount)} thành công',
-              ),
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            existing == null
+                ? l10n.translate('debt.create_title')
+                : l10n.translate('debt.edit_title'),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('order_create.customer_name'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('order_create.customer_phone'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: addressController,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('debt.address'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: notesController,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('debt.note'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                TextField(
+                  controller: creditLimitController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('debt.credit_limit'),
+                  ),
+                ),
+              ],
             ),
-          );
-        },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(l10n.translate('common.save')),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final name = nameController.text.trim();
+    if (name.isEmpty) {
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('common.required_field'),
+        type: AppSnackBarType.warning,
+      );
+      return;
+    }
+
+    final creditLimit = double.tryParse(
+      creditLimitController.text.replaceAll(',', ''),
+    );
+
+    if (existing == null) {
+      final locationId = int.tryParse(
+        BusinessContext().currentBusinessId ?? '',
+      );
+      if (locationId == null || locationId <= 0) {
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('debt.location_required'),
+          type: AppSnackBarType.warning,
+        );
+        return;
+      }
+      context.read<DebtorBloc>().add(
+        CreateDebtorRequested(
+          businessLocationId: locationId,
+          name: name,
+          phone: phoneController.text.trim().isEmpty
+              ? null
+              : phoneController.text.trim(),
+          address: addressController.text.trim().isEmpty
+              ? null
+              : addressController.text.trim(),
+          notes: notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
+          creditLimit: creditLimit,
+        ),
+      );
+    } else {
+      context.read<DebtorBloc>().add(
+        UpdateDebtorRequested(
+          debtorId: existing.debtorId,
+          name: name,
+          phone: phoneController.text.trim().isEmpty
+              ? null
+              : phoneController.text.trim(),
+          address: addressController.text.trim().isEmpty
+              ? null
+              : addressController.text.trim(),
+          notes: notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
+          creditLimit: creditLimit,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showDebtAdjustmentDialog(DebtorEntity customer) async {
+    final l10n = AppLocalizations.of(context);
+    final amountController = TextEditingController();
+    final noteController = TextEditingController();
+    String direction = 'increase';
+    String paymentMethod = 'cash';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(l10n.translate('debt.adjust_title')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: direction,
+                      isExpanded: true,
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      decoration: InputDecoration(
+                        labelText: l10n.translate('debt.adjust_type'),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusSm,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                          vertical: AppSpacing.sm,
+                        ),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'increase',
+                          child: Text(l10n.translate('debt.adjust_increase')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'decrease',
+                          child: Text(l10n.translate('debt.adjust_reduce')),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setDialogState(() => direction = value);
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    TextField(
+                      controller: amountController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: l10n.translate('debt.adjust_amount'),
+                      ),
+                    ),
+                    if (direction == 'decrease') ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      DropdownButtonFormField<String>(
+                        initialValue: paymentMethod,
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'cash',
+                            child: Text(
+                              l10n.translate('order_create.pay_method_cash'),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'bank',
+                            child: Text(
+                              l10n.translate('order_create.pay_method_transfer'),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() => paymentMethod = value);
+                        },
+                        decoration: InputDecoration(
+                          labelText: l10n.translate('debt.payment_method'),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusSm,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.sm,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.sm),
+                    TextField(
+                      controller: noteController,
+                      decoration: InputDecoration(
+                        labelText: l10n.translate('debt.note'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(l10n.translate('common.cancel')),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: Text(l10n.translate('common.confirm')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final rawAmount = double.tryParse(
+      amountController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
+    );
+    if (rawAmount == null || rawAmount <= 0) return;
+
+    final signedAmount = direction == 'decrease' ? -rawAmount : rawAmount;
+
+    context.read<DebtorBloc>().add(
+      RecordDebtAdjustmentRequested(
+        debtorId: customer.debtorId,
+        amount: signedAmount,
+        paymentMethod: direction == 'increase' ? 'cash' : paymentMethod,
+        notes: noteController.text.trim().isEmpty
+            ? null
+            : noteController.text.trim(),
       ),
     );
   }

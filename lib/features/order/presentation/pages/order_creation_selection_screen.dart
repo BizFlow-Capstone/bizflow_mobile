@@ -8,7 +8,7 @@ import 'order_manual_input_screen.dart';
 
 /// Screen SC-ORD-01: User selects method to create an order
 class OrderCreationSelectionScreen extends StatelessWidget {
-  const OrderCreationSelectionScreen({Key? key}) : super(key: key);
+  const OrderCreationSelectionScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

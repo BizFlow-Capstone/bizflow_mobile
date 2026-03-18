@@ -1,4 +1,5 @@
 /// Auth Domain Layer Exports
+library;
 
 // Entities
 export 'entities/user.dart';

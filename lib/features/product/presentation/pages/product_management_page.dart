@@ -13,6 +13,7 @@ import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
 import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/entities/product_entity.dart';
 import '../widgets/product_filter_dialog.dart';
@@ -43,6 +44,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   late ScrollController _scrollController;
   bool _showFabMenu = false;
   List<BusinessTypeDto> _businessTypes = [];
+  String? _lastApiMessage;
 
   @override
   void initState() {
@@ -169,21 +171,19 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('product.stock_adjust.success')),
-          backgroundColor: AppColors.success,
-        ),
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('product.stock_adjust.success'),
+        type: AppSnackBarType.success,
       );
 
       productBloc.add(RefreshProductsRequested(locationId: widget.locationId));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: AppColors.error,
-        ),
+      AppSnackBar.show(
+        context,
+        message: e.toString().replaceFirst('Exception: ', ''),
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -418,6 +418,12 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   setState(() {
                     _businessTypes = state.businessTypes;
                   });
+                } else if (state is ProductFailure) {
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('common.error_occurred'),
+                    type: AppSnackBarType.error,
+                  );
                 } else if (state is ProductDeleteSuccess) {
                   // Reload the product list after a successful deletion
                   context.read<ProductBloc>().add(
@@ -425,26 +431,23 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                       locationId: widget.locationId,
                     ),
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l10n.translate('product.delete_success')),
-                      backgroundColor: AppColors.success,
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('product.delete_success'),
+                    type: AppSnackBarType.success,
                   );
                 } else if (state is ProductsLoaded &&
                     state.apiMessage != null &&
                     state.apiMessage!.isNotEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.apiMessage!),
-                      backgroundColor: AppColors.primary,
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                      behavior: SnackBarBehavior.floating,
+                  if (_lastApiMessage != state.apiMessage) {
+                    _lastApiMessage = state.apiMessage;
+                    AppSnackBar.show(
+                      context,
+                      message: state.apiMessage!,
+                      type: AppSnackBarType.info,
                       duration: const Duration(seconds: 2),
-                    ),
-                  );
+                    );
+                  }
                 }
               },
               builder: (context, state) {
@@ -519,44 +522,6 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                               _showQuickAdjustStockDialog(product),
                         );
                       },
-                    ),
-                  );
-                } else if (state is ProductFailure) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: AppColors.error,
-                        ),
-                        SizedBox(height: AppSpacing.lg),
-                        Text(
-                          l10n.translate('common.error'),
-                          style: AppTextStyles.titleSmall.copyWith(
-                            color: AppColors.error,
-                          ),
-                        ),
-                        SizedBox(height: AppSpacing.md),
-                        Text(
-                          l10n.translate('common.error_occurred'),
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: AppSpacing.lg),
-                        ElevatedButton(
-                          onPressed: () {
-                            context.read<ProductBloc>().add(
-                              RefreshProductsRequested(
-                                  locationId: widget.locationId),
-                            );
-                          },
-                          child: Text(l10n.translate('common.retry')),
-                        ),
-                      ],
                     ),
                   );
                 }
@@ -727,13 +692,10 @@ class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
             );
 
             if (stock == null || stock < 0) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    l10n.translate('product.stock_adjust.invalid_stock'),
-                  ),
-                  backgroundColor: AppColors.error,
-                ),
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('product.stock_adjust.invalid_stock'),
+                type: AppSnackBarType.error,
               );
               return;
             }

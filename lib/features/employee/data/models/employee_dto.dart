@@ -1,4 +1,5 @@
 /// Employee DTO - Data Transfer Object
+library;
 
 /// Employee Response from API
 class EmployeeResponseDto {

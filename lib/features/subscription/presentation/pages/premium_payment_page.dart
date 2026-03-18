@@ -397,7 +397,7 @@ class _InfoLine extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            '${label}:',
+            '$label:',
             style: AppTextStyles.bodySmall.copyWith(
               color: AppColors.textSecondary,
             ),

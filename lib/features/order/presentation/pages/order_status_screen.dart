@@ -5,12 +5,13 @@ import '../bloc/order_bloc.dart';
 import '../bloc/order_event.dart';
 import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 
 /// Order Status Screen (SC-ORD-02.2)
 /// Displays unpublished invoices and draft orders with tabs
 class OrderStatusScreen extends StatefulWidget {
-  const OrderStatusScreen({Key? key}) : super(key: key);
+  const OrderStatusScreen({super.key});
 
   @override
   State<OrderStatusScreen> createState() => _OrderStatusScreenState();
@@ -74,14 +75,21 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           ),
         ],
       ),
-      body: BlocBuilder<OrderBloc, OrderState>(
+      body: BlocConsumer<OrderBloc, OrderState>(
+        listener: (context, state) {
+          if (state is OrderError) {
+            AppSnackBar.show(
+              context,
+              message: state.message.isNotEmpty
+                  ? state.message
+                  : l10n.translate('common.error_occurred'),
+              type: AppSnackBarType.error,
+            );
+          }
+        },
         builder: (context, state) {
           if (state is OrdersLoading) {
             return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state is OrderError) {
-            return _buildErrorWidget(context, state.message, _refreshOrders);
           }
 
           return TabBarView(
@@ -211,45 +219,6 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           Text(
             subtitle,
             style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorWidget(
-    BuildContext context,
-    String message,
-    VoidCallback onRetry,
-  ) {
-    final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
-          const SizedBox(height: 16),
-          Text(
-            l10n.translate('order.error_title'),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              l10n.translate('common.error_occurred'),
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: onRetry,
-            child: Text(l10n.translate('common.retry')),
           ),
         ],
       ),

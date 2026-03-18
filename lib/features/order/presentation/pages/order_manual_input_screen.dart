@@ -5,7 +5,7 @@ import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_form_screen.dart';
 
 class OrderManualInputScreen extends StatelessWidget {
-  const OrderManualInputScreen({Key? key}) : super(key: key);
+  const OrderManualInputScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

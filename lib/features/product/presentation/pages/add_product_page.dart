@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
@@ -38,7 +39,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
   // Image and price tiers
   String? _selectedImagePath;
-  List<Map<String, dynamic>> _priceTiers = [];
+  final List<Map<String, dynamic>> _priceTiers = [];
 
   bool _isActive = true;
   String? _selectedBusinessTypeId;
@@ -86,19 +87,18 @@ class _AddProductPageState extends State<AddProductPage> {
         setState(() {
           _selectedImagePath = pickedFile.path;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
+        AppSnackBar.show(
+          context,
+          message:
               '${l10n?.translate('common.image_selected') ?? 'Image selected'}: ${pickedFile.name}',
-            ),
-          ),
+          type: AppSnackBarType.info,
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${l10n?.translate('common.error') ?? 'Error'}: $e'),
-        ),
+      AppSnackBar.show(
+        context,
+        message: '${l10n?.translate('common.error') ?? 'Error'}: $e',
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -171,13 +171,12 @@ class _AddProductPageState extends State<AddProductPage> {
               if (unitController.text.isEmpty ||
                   quantityController.text.isEmpty ||
                   priceController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
+                AppSnackBar.show(
+                  context,
+                  message:
                       l10n?.translate('common.required_field') ??
-                          'Vui lòng nhập đủ thông tin',
-                    ),
-                  ),
+                      'Vui lòng nhập đủ thông tin',
+                  type: AppSnackBarType.warning,
                 );
                 return;
               }
@@ -190,13 +189,12 @@ class _AddProductPageState extends State<AddProductPage> {
                   0;
 
               if (quantity <= 0 || price < 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
+                AppSnackBar.show(
+                  context,
+                  message:
                       l10n?.translate('product.invalid_value') ??
-                          'Giá trị không hợp lệ',
-                    ),
-                  ),
+                      'Giá trị không hợp lệ',
+                  type: AppSnackBarType.error,
                 );
                 return;
               }
@@ -258,36 +256,33 @@ class _AddProductPageState extends State<AddProductPage> {
 
   void _submitForm() {
     if (_productNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+      AppSnackBar.show(
+        context,
+        message:
             l10n?.translate('common.required_field') ??
-                'Vui lòng nhập tên sản phẩm',
-          ),
-        ),
+            'Vui lòng nhập tên sản phẩm',
+        type: AppSnackBarType.warning,
       );
       return;
     }
 
     if (_unitController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+      AppSnackBar.show(
+        context,
+        message:
             l10n?.translate('common.required_field') ?? 'Vui lòng chọn đơn vị',
-          ),
-        ),
+        type: AppSnackBarType.warning,
       );
       return;
     }
 
     if (_selectedBusinessTypeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
+      AppSnackBar.show(
+        context,
+        message:
             l10n?.translate('common.required_field') ??
-                'Vui lòng chọn loại hình kinh doanh',
-          ),
-        ),
+            'Vui lòng chọn loại hình kinh doanh',
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -296,8 +291,12 @@ class _AddProductPageState extends State<AddProductPage> {
     if (_costPriceController.text.isNotEmpty) {
       final costPrice = double.tryParse(_costPriceController.text.replaceAll(RegExp(r'[,.]'), ''));
       if (costPrice == null || costPrice < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n?.translate('product.invalid_cost_price') ?? 'Giá vốn không hợp lệ')),
+        AppSnackBar.show(
+          context,
+          message:
+              l10n?.translate('product.invalid_cost_price') ??
+              'Giá vốn không hợp lệ',
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -306,8 +305,12 @@ class _AddProductPageState extends State<AddProductPage> {
     if (_salePriceController.text.isNotEmpty) {
       final salePrice = double.tryParse(_salePriceController.text.replaceAll(RegExp(r'[,.]'), ''));
       if (salePrice == null || salePrice < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n?.translate('product.invalid_sale_price') ?? 'Giá bán không hợp lệ')),
+        AppSnackBar.show(
+          context,
+          message:
+              l10n?.translate('product.invalid_sale_price') ??
+              'Giá bán không hợp lệ',
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -316,8 +319,11 @@ class _AddProductPageState extends State<AddProductPage> {
     if (_quantityController.text.isNotEmpty) {
       final quantity = int.tryParse(_quantityController.text.replaceAll(RegExp(r'[,.]'), ''));
       if (quantity == null || quantity < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n?.translate('product.invalid_stock') ?? 'Tồn kho không hợp lệ')),
+        AppSnackBar.show(
+          context,
+          message:
+              l10n?.translate('product.invalid_stock') ?? 'Tồn kho không hợp lệ',
+          type: AppSnackBarType.error,
         );
         return;
       }
@@ -387,8 +393,10 @@ class _AddProductPageState extends State<AddProductPage> {
         listener: (context, state) {
           if (state is ProductAddSuccess) {
             // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.translate('product.add_success'))),
+            AppSnackBar.show(
+              context,
+              message: l10n.translate('product.add_success'),
+              type: AppSnackBarType.success,
             );
             // Navigate back and return true to trigger reload
             Future.delayed(const Duration(milliseconds: 500), () {
@@ -399,9 +407,11 @@ class _AddProductPageState extends State<AddProductPage> {
               _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
-            ScaffoldMessenger.of(
+            AppSnackBar.show(
               context,
-            ).showSnackBar(SnackBar(content: Text(state.message)));
+              message: state.message,
+              type: AppSnackBarType.error,
+            );
           }
         },
         child: SingleChildScrollView(
@@ -482,7 +492,7 @@ class _AddProductPageState extends State<AddProductPage> {
                           _isActive = value;
                         });
                       },
-                      activeColor: AppColors.secondary,
+                      activeThumbColor: AppColors.secondary,
                     ),
                   ],
                 ),

@@ -231,7 +231,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     ),
                     const SizedBox(height: AppSpacing.md),
                     DropdownButtonFormField<String>(
-                      value: channel,
+                      initialValue: channel,
                       items: [
                         DropdownMenuItem(
                           value: 'cash',
@@ -253,8 +253,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         ),
                       ],
                       onChanged: (value) {
-                        if (value != null)
+                        if (value != null) {
                           setStateDialog(() => channel = value);
+                        }
                       },
                       decoration: InputDecoration(
                         labelText: l10n.translate('accounting.channel'),
@@ -262,7 +263,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     ),
                     const SizedBox(height: AppSpacing.md),
                     DropdownButtonFormField<String>(
-                      value: entryType,
+                      initialValue: entryType,
                       items: [
                         DropdownMenuItem(
                           value: 'debit',

@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/import_repository.dart';
@@ -250,24 +251,18 @@ class _StockImportViewState extends State<_StockImportView> {
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.error,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-      ),
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: AppSnackBarType.error,
     );
   }
 
   void _showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-      ),
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: AppSnackBarType.success,
     );
   }
 
@@ -1250,11 +1245,6 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final NumberFormat fmtPrice = NumberFormat.currency(
-      locale: 'vi_VN',
-      symbol: 'đ',
-    );
-
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       maxChildSize: 0.95,
@@ -1337,7 +1327,18 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
               ),
               // Product list
               Expanded(
-                child: BlocBuilder<ProductBloc, ProductState>(
+                child: BlocConsumer<ProductBloc, ProductState>(
+                  listener: (context, state) {
+                    if (state is ProductFailure) {
+                      AppSnackBar.show(
+                        context,
+                        message: state.message.isNotEmpty
+                            ? state.message
+                            : l10n.translate('common.error_occurred'),
+                        type: AppSnackBarType.error,
+                      );
+                    }
+                  },
                   builder: (context, state) {
                     if (state is ProductLoading) {
                       return const Center(child: AppLoadingIndicator());
@@ -1345,9 +1346,9 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                     if (state is ProductFailure) {
                       return Center(
                         child: Text(
-                          l10n.translate('common.error_occurred'),
+                          l10n.translate('stock_import.no_products_found'),
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.error,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       );

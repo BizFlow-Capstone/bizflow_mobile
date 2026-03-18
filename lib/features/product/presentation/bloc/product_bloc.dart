@@ -5,6 +5,7 @@ import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
 import '../../data/models/business_type_model.dart';
 import '../../../../shared/cache/cache_manager.dart';
+import '../../../../shared/context/business_context.dart';
 import 'product_event.dart';
 import 'product_state.dart';
 
@@ -469,11 +470,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       emit(
         ProductsLoaded(
           products: _products,
-          hasReachedMax: this.state is ProductsLoaded
-              ? (this.state as ProductsLoaded).hasReachedMax
+          hasReachedMax: state is ProductsLoaded
+              ? (state as ProductsLoaded).hasReachedMax
               : false,
-          currentPage: this.state is ProductsLoaded
-              ? (this.state as ProductsLoaded).currentPage
+          currentPage: state is ProductsLoaded
+              ? (state as ProductsLoaded).currentPage
               : 1,
           locationId: event.locationId,
         ),
@@ -545,11 +546,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         emit(
           ProductsLoaded(
             products: _products,
-            hasReachedMax: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).hasReachedMax
+            hasReachedMax: state is ProductsLoaded
+                ? (state as ProductsLoaded).hasReachedMax
                 : false,
-            currentPage: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).currentPage
+            currentPage: state is ProductsLoaded
+                ? (state as ProductsLoaded).currentPage
                 : 1,
             locationId: locationId.toString(),
           ),
@@ -578,11 +579,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         emit(
           ProductsLoaded(
             products: _products,
-            hasReachedMax: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).hasReachedMax
+            hasReachedMax: state is ProductsLoaded
+                ? (state as ProductsLoaded).hasReachedMax
                 : false,
-            currentPage: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).currentPage
+            currentPage: state is ProductsLoaded
+                ? (state as ProductsLoaded).currentPage
                 : 1,
             locationId: locationId.toString(),
           ),
@@ -619,11 +620,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       emit(
         ProductsLoaded(
           products: _products,
-          hasReachedMax: this.state is ProductsLoaded
-              ? (this.state as ProductsLoaded).hasReachedMax
+          hasReachedMax: state is ProductsLoaded
+              ? (state as ProductsLoaded).hasReachedMax
               : false,
-          currentPage: this.state is ProductsLoaded
-              ? (this.state as ProductsLoaded).currentPage
+          currentPage: state is ProductsLoaded
+              ? (state as ProductsLoaded).currentPage
               : 1,
           locationId: event.locationId,
         ),
@@ -662,11 +663,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         emit(
           ProductsLoaded(
             products: _products,
-            hasReachedMax: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).hasReachedMax
+            hasReachedMax: state is ProductsLoaded
+                ? (state as ProductsLoaded).hasReachedMax
                 : false,
-            currentPage: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).currentPage
+            currentPage: state is ProductsLoaded
+                ? (state as ProductsLoaded).currentPage
                 : 1,
             locationId: _products[index].locationId?.toString() ?? '1',
           ),
@@ -687,11 +688,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         emit(
           ProductsLoaded(
             products: _products,
-            hasReachedMax: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).hasReachedMax
+            hasReachedMax: state is ProductsLoaded
+                ? (state as ProductsLoaded).hasReachedMax
                 : false,
-            currentPage: this.state is ProductsLoaded
-                ? (this.state as ProductsLoaded).currentPage
+            currentPage: state is ProductsLoaded
+                ? (state as ProductsLoaded).currentPage
                 : 1,
             locationId: '1',
           ),
@@ -711,61 +712,69 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     LoadProductSaleItemsRequested event,
     Emitter<ProductState> emit,
   ) async {
-    try {
-      debugPrint(
-        'ProductBloc: Loading sale items for product: ${event.productId}',
-      );
+    final businessId = BusinessContext().currentBusinessId ?? 'all';
+    final cacheKey = 'cache_sale_items_${businessId}_${event.productId}';
 
-      final response = await repository.getProductSaleItems(event.productId);
+    await CacheManager().fetchWithSWR<List<Map<String, dynamic>>>(
+      key: cacheKey,
+      fetcher: () async {
+        final response = await repository.getProductSaleItems(event.productId);
+        return _extractSaleItems(response);
+      },
+      fromJson: (json) {
+        final list = json['data'];
+        if (list is! List) return <Map<String, dynamic>>[];
+        return list.whereType<Map<String, dynamic>>().toList();
+      },
+      toJson: (data) {
+        return {'data': data};
+      },
+      onData: (saleItems, _) {
+        emit(ProductSaleItemsLoaded(saleItems: saleItems));
+      },
+      onError: (e) {
+        debugPrint(
+          'ProductBloc._onLoadProductSaleItemsRequested: No sale items found or error: $e',
+        );
+        emit(const ProductSaleItemsLoaded(saleItems: []));
+      },
+    );
+  }
 
-      debugPrint('ProductBloc: Sale items response: $response');
-
-      // Parse sale items from response
-      List<Map<String, dynamic>> saleItems = [];
-      if (response is List<dynamic>) {
-        saleItems = response.map((item) {
-          if (item is Map<String, dynamic>) {
-            return {
-              'Unit': item['unit'] as String? ?? '',
-              'Quantity': item['quantity'] as int? ?? 0,
-              'Price': item['price'] as num? ?? 0,
-            };
-          }
-          return <String, dynamic>{};
-        }).toList();
-      } else if (response is Map<String, dynamic>) {
-        final data = response['data'];
-        List<dynamic> itemsList = [];
-
-        if (data is List<dynamic>) {
-          itemsList = data;
-        } else if (data is Map<String, dynamic> &&
-            data['saleItems'] is List<dynamic>) {
-          itemsList = data['saleItems'] as List<dynamic>;
-        }
-
-        if (itemsList.isNotEmpty) {
-          saleItems = itemsList.map((item) {
-            if (item is Map<String, dynamic>) {
-              return {
+  List<Map<String, dynamic>> _extractSaleItems(dynamic response) {
+    List<Map<String, dynamic>> saleItems = [];
+    if (response is List<dynamic>) {
+      saleItems = response
+          .whereType<Map<String, dynamic>>()
+          .map((item) => {
                 'Unit': item['unit'] as String? ?? '',
                 'Quantity': item['quantity'] as int? ?? 0,
                 'Price': item['price'] as num? ?? 0,
-              };
-            }
-            return <String, dynamic>{};
-          }).toList();
-        }
+              })
+          .toList();
+    } else if (response is Map<String, dynamic>) {
+      final data = response['data'];
+      List<dynamic> itemsList = [];
+
+      if (data is List<dynamic>) {
+        itemsList = data;
+      } else if (data is Map<String, dynamic> &&
+          data['saleItems'] is List<dynamic>) {
+        itemsList = data['saleItems'] as List<dynamic>;
       }
 
-      emit(ProductSaleItemsLoaded(saleItems: saleItems));
-    } catch (e) {
-      debugPrint(
-        'ProductBloc._onLoadProductSaleItemsRequested: No sale items found or error: $e',
-      );
-      // Treat as empty list if loading fails (e.g., 404 not found is common if no tiers exist)
-      emit(const ProductSaleItemsLoaded(saleItems: []));
+      if (itemsList.isNotEmpty) {
+        saleItems = itemsList
+            .whereType<Map<String, dynamic>>()
+            .map((item) => {
+                  'Unit': item['unit'] as String? ?? '',
+                  'Quantity': item['quantity'] as int? ?? 0,
+                  'Price': item['price'] as num? ?? 0,
+                })
+            .toList();
+      }
     }
+    return saleItems;
   }
 
   Future<void> _onImportInventoryRequested(

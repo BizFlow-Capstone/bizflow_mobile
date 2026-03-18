@@ -7,6 +7,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/import_repository.dart';
@@ -115,24 +116,22 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
           ],
           bottom: const AppSyncStatusText(),
         ),
-        body: BlocBuilder<ImportHistoryBloc, ImportHistoryState>(
+        body: BlocConsumer<ImportHistoryBloc, ImportHistoryState>(
+          listener: (context, state) {
+            if (state.status == ImportHistoryStatus.failure) {
+              AppSnackBar.show(
+                context,
+                message:
+                    state.errorMessage ?? l10n.translate('common.error_occurred'),
+                type: AppSnackBarType.error,
+              );
+            }
+          },
           builder: (context, state) {
             if (state.status == ImportHistoryStatus.initial ||
                 state.status == ImportHistoryStatus.loading &&
                     state.items.isEmpty) {
               return const Center(child: AppLoadingIndicator());
-            }
-
-            if (state.status == ImportHistoryStatus.failure &&
-                state.items.isEmpty) {
-              return Center(
-                child: Text(
-                  state.errorMessage ?? l10n.translate('common.error'),
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.error,
-                  ),
-                ),
-              );
             }
 
             if (state.items.isEmpty) {
@@ -253,7 +252,7 @@ class _ImportHistoryCard extends StatelessWidget {
   final dynamic item; // ImportHistoryItemModel
   final VoidCallback onTap;
 
-  _ImportHistoryCard({required this.item, required this.onTap});
+  const _ImportHistoryCard({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

@@ -8,11 +8,11 @@ class OrderFilterBottomSheet extends StatefulWidget {
   final ValueChanged<Map<String, dynamic>> onApply;
 
   const OrderFilterBottomSheet({
-    Key? key,
+    super.key,
     this.initialStatus,
     this.initialLocationId,
     required this.onApply,
-  }) : super(key: key);
+  });
 
   @override
   State<OrderFilterBottomSheet> createState() => _OrderFilterBottomSheetState();

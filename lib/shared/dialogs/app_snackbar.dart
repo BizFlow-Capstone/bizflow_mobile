@@ -10,6 +10,11 @@ enum AppSnackBarType { info, success, warning, error }
 class AppSnackBar {
   AppSnackBar._();
 
+  static String? _lastMessage;
+  static AppSnackBarType? _lastType;
+  static DateTime? _lastShownAt;
+  static const Duration _dedupeWindow = Duration(milliseconds: 900);
+
   /// Show snackbar
   static void show(
     BuildContext context, {
@@ -20,8 +25,30 @@ class AppSnackBar {
     VoidCallback? onAction,
     bool showCloseIcon = false,
   }) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (context is Element && !context.mounted) return;
+    if (message.trim().isEmpty) return;
+
+    final now = DateTime.now();
+    final shouldSkip =
+        _lastMessage == message &&
+        _lastType == type &&
+        _lastShownAt != null &&
+        now.difference(_lastShownAt!) < _dedupeWindow;
+    if (shouldSkip) return;
+
+    _lastMessage = message;
+    _lastType = type;
+    _lastShownAt = now;
+
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final bottomInset =
+        (mediaQuery?.viewInsets.bottom ?? 0) +
+        (mediaQuery?.padding.bottom ?? 0) +
+        16;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Row(
           children: [
@@ -39,7 +66,7 @@ class AppSnackBar {
         ),
         backgroundColor: _getBackgroundColor(type),
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+        margin: EdgeInsets.fromLTRB(16, 0, 16, bottomInset),
         shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
         duration: duration,
         action: actionLabel != null
@@ -112,15 +139,19 @@ class AppToast {
   AppToast._();
 
   static void show(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
+    if (context is Element && !context.mounted) return;
+    if (message.trim().isEmpty) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
       SnackBar(
         content: Text(
           message,
           style: AppTextStyles.bodyMedium.copyWith(color: AppColors.white),
           textAlign: TextAlign.center,
         ),
-        backgroundColor: AppColors.textPrimary.withOpacity(0.9),
+        backgroundColor: AppColors.textPrimary.withValues(alpha: 0.9),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: AppSpacing.borderRadiusFull,

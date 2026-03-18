@@ -73,6 +73,7 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
   }
 
   late AppLocalizations l10n;
+  @override
   Widget build(BuildContext context) {
     l10n = AppLocalizations.of(context);
 
@@ -194,42 +195,26 @@ class _LocationPageContent extends StatelessWidget {
               );
             }
 
-            // Error state
-            if (state is LocationFailure || state is LocationError) {
-              final message = state is LocationFailure
-                  ? state.message
-                  : (state as LocationError).message;
+            List<LocationEntity> locations = [];
+            if (state is LocationsLoaded) {
+              locations = state.locations;
+            }
 
+            if (locations.isEmpty) {
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 64, color: AppColors.error),
-                    SizedBox(height: AppSpacing.lg),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xl,
-                      ),
-                      child: Text(
-                        l10n.translate('common.error_occurred'),
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
+                    Icon(
+                      Icons.location_city_outlined,
+                      size: 64,
+                      color: AppColors.textSecondary,
                     ),
-                    SizedBox(height: AppSpacing.xl),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        context.read<LocationBloc>().add(
-                          const LoadLocationsRequested(),
-                        );
-                      },
-                      icon: const Icon(Icons.refresh),
-                      label: Text(l10n.translate('common.retry')),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.white,
+                    SizedBox(height: AppSpacing.lg),
+                    Text(
+                      l10n.translate('location.no_locations'),
+                      style: AppTextStyles.titleSmall.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -237,104 +222,76 @@ class _LocationPageContent extends StatelessWidget {
               );
             }
 
-            if (state is LocationsLoaded) {
-              final locations = state.locations;
-
-              if (locations.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.location_city_outlined,
-                        size: 64,
-                        color: AppColors.textSecondary,
+            return Column(
+              children: [
+                // Search Bar
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: l10n.translate('location.search_placeholder'),
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
+                        borderSide: BorderSide(color: AppColors.divider),
                       ),
-                      SizedBox(height: AppSpacing.lg),
-                      Text(
-                        l10n.translate('location.no_locations'),
-                        style: AppTextStyles.titleSmall.copyWith(
-                          color: AppColors.textSecondary,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return Column(
-                children: [
-                  // Search Bar
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: l10n.translate('location.search_placeholder'),
-                        prefixIcon: const Icon(Icons.search),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusSm,
-                          ),
-                          borderSide: BorderSide(color: AppColors.divider),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusSm,
-                          ),
-                          borderSide: BorderSide(color: AppColors.divider),
-                        ),
+                        borderSide: BorderSide(color: AppColors.divider),
                       ),
                     ),
                   ),
-                  // Location List
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: AppSpacing.sm,
-                        bottom: 80.0,
-                      ),
-                      itemCount: locations.length,
-                      itemBuilder: (context, index) {
-                        final location = locations[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: LocationCard(
-                            location: location,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ProductManagementPage(
-                                    locationId: location.id,
-                                    locationName: location.name,
-                                    locationAddress: location.address,
-                                  ),
+                ),
+                // Location List
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.only(
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
+                      top: AppSpacing.sm,
+                      bottom: 80.0,
+                    ),
+                    itemCount: locations.length,
+                    itemBuilder: (context, index) {
+                      final location = locations[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                        child: LocationCard(
+                          location: location,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProductManagementPage(
+                                  locationId: location.id,
+                                  locationName: location.name,
+                                  locationAddress: location.address,
                                 ),
-                              );
-                            },
-                            onToggleStatus: (isActive) =>
-                                onToggleStatus(location.id, isActive),
-                            onEdit: () => onEdit(location),
-                            onDelete: () => onDelete(location),
-                            onAddManager: () {
-                              AppSnackBar.show(
-                                context,
-                                message: 'Thêm nhân viên quản lý',
-                                type: AppSnackBarType.info,
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    ),
+                              ),
+                            );
+                          },
+                          onToggleStatus: (isActive) =>
+                              onToggleStatus(location.id, isActive),
+                          onEdit: () => onEdit(location),
+                          onDelete: () => onDelete(location),
+                          onAddManager: () {
+                            AppSnackBar.show(
+                              context,
+                              message: 'Thêm nhân viên quản lý',
+                              type: AppSnackBarType.info,
+                            );
+                          },
+                        ),
+                      );
+                    },
                   ),
-                ],
-              );
-            }
-
-            return const SizedBox.shrink();
+                ),
+              ],
+            );
           },
         ),
       ),

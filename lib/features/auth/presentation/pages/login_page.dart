@@ -128,16 +128,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -478,16 +468,6 @@ class _LoginPageContent extends StatelessWidget {
       SnackBar(
         content: Text(message),
         backgroundColor: AppColors.danger,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.success,
         duration: const Duration(seconds: 2),
       ),
     );

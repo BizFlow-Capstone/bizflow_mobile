@@ -121,7 +121,7 @@ class LocationCard extends StatelessWidget {
                         SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
-                            '${location.ownerName}',
+                            location.ownerName,
                             style: AppTextStyles.bodySmall.copyWith(
                               color: location.isActive
                                   ? AppColors.textSecondary

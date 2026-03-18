@@ -8,7 +8,7 @@ import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_form_screen.dart';
 
 class OrderVoiceRecordScreen extends StatefulWidget {
-  const OrderVoiceRecordScreen({Key? key}) : super(key: key);
+  const OrderVoiceRecordScreen({super.key});
 
   @override
   State<OrderVoiceRecordScreen> createState() => _OrderVoiceRecordScreenState();

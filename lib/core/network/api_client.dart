@@ -399,11 +399,24 @@ class ApiClient {
       // Build URL
       var uri = Uri.parse('$baseUrl$path');
       if (queryParams != null && queryParams.isNotEmpty) {
-        uri = uri.replace(
-          queryParameters: queryParams.map(
-            (key, value) => MapEntry(key, value.toString()),
-          ),
-        );
+        // Build query string manually to support multi-value params (List).
+        // e.g. BusinessLocationIds=[5,6] → ?BusinessLocationIds=5&BusinessLocationIds=6
+        final parts = <String>[];
+        for (final entry in queryParams.entries) {
+          final value = entry.value;
+          if (value is List) {
+            for (final item in value) {
+              parts.add(
+                '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(item.toString())}',
+              );
+            }
+          } else {
+            parts.add(
+              '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(value.toString())}',
+            );
+          }
+        }
+        uri = uri.replace(query: parts.join('&'));
       }
 
       if (kDebugMode) {
