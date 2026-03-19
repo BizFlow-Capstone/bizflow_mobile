@@ -18,10 +18,12 @@ class EmployeeResponseDto {
   });
 
   factory EmployeeResponseDto.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>?;
-    final employeeList = data != null
-        ? (data['employees'] as List<dynamic>? ?? [])
-        : [];
+    final rawData = json['data'];
+    final employeeList = switch (rawData) {
+      List<dynamic> list => list,
+      Map<String, dynamic> map => (map['employees'] as List<dynamic>? ?? []),
+      _ => <dynamic>[],
+    };
 
     return EmployeeResponseDto(
       employees: employeeList
@@ -37,21 +39,42 @@ class EmployeeResponseDto {
 
 /// Single Employee DTO
 class EmployeeDto {
-  final String userId;
+  final String profileId;
   final String userName;
   final String phone;
+  final String email;
+  final String? avatarUrl;
+  final bool isAlreadyHired;
 
-  EmployeeDto({required this.userId, required this.userName, this.phone = ''});
+  EmployeeDto({
+    required this.profileId,
+    required this.userName,
+    this.phone = '',
+    this.email = '',
+    this.avatarUrl,
+    this.isAlreadyHired = false,
+  });
 
   factory EmployeeDto.fromJson(Map<String, dynamic> json) {
     return EmployeeDto(
-      userId: json['userId'] as String? ?? '',
-      userName: json['userName'] as String? ?? '',
+      profileId: json['profileId'] as String? ?? json['userId'] as String? ?? '',
+      userName:
+          json['userName'] as String? ?? json['fullName'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String?,
+      isAlreadyHired: json['isAlreadyHired'] as bool? ?? false,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'userId': userId, 'userName': userName, 'phone': phone};
+    return {
+      'profileId': profileId,
+      'userName': userName,
+      'phone': phone,
+      'email': email,
+      'avatarUrl': avatarUrl,
+      'isAlreadyHired': isAlreadyHired,
+    };
   }
 }

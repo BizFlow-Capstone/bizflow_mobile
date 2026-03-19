@@ -208,6 +208,17 @@
     "create_or_invite_msg": "Hãy tạo địa điểm kinh doanh hoặc nhận lời mời từ người khác để bắt đầu sử dụng Bizflow.",
     "accept_invite": "Nhận lời mời"
   },
+  "invitation": {
+    "title": "Lời mời làm việc",
+    "empty": "Bạn chưa có lời mời nào",
+    "load_failed": "Không tải được danh sách lời mời",
+    "invited_at": "Thời gian mời",
+    "accept": "Chấp nhận",
+    "reject": "Từ chối",
+    "accept_success": "Đã chấp nhận lời mời",
+    "reject_success": "Đã từ chối lời mời",
+    "unknown_owner": "Chủ cửa hàng"
+  },
   "appbar": {
     "greeting": "Xin chào,"
   },

@@ -38,6 +38,16 @@ class ApiEndpoints {
   static const String workAtLocations = '/api/location/work-at-locations';
   static const String createLocation = '/api/location/create';
   static const String myEmployees = '/api/my-employee/employees';
+    static const String searchEmployees = '/api/my-employee/search';
+    static const String inviteEmployee = '/api/my-employee/invite';
+    static const String employeeInvitations = '/api/my-employee/invitations';
+    static String acceptEmployeeInvitation(int hireId) =>
+            '/api/my-employee/invitations/$hireId/accept';
+    static String rejectEmployeeInvitation(int hireId) =>
+            '/api/my-employee/invitations/$hireId/reject';
+    static String deleteEmployee(String employeeId) => '/api/my-employee/$employeeId';
+    static const String registerDeviceToken = '/api/notifications/register-device-token';
+    static const String unregisterDeviceToken = '/api/notifications/unregister-device-token';
 
   // Location with ID - use with String interpolation
   static String updateLocationStatus(String id) =>

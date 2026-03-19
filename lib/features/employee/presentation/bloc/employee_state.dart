@@ -19,6 +19,7 @@ class EmployeeLoaded extends EmployeeState {
   final int pendingCount;
   final int totalCount;
   final int currentTab; // 0: All, 1: Active, 2: Pending
+  final String searchKeyword;
 
   const EmployeeLoaded({
     required this.allEmployees,
@@ -27,6 +28,7 @@ class EmployeeLoaded extends EmployeeState {
     required this.pendingCount,
     required this.totalCount,
     required this.currentTab,
+    required this.searchKeyword,
   });
 
   EmployeeLoaded copyWith({
@@ -36,6 +38,7 @@ class EmployeeLoaded extends EmployeeState {
     int? pendingCount,
     int? totalCount,
     int? currentTab,
+    String? searchKeyword,
   }) {
     return EmployeeLoaded(
       allEmployees: allEmployees ?? this.allEmployees,
@@ -44,6 +47,7 @@ class EmployeeLoaded extends EmployeeState {
       pendingCount: pendingCount ?? this.pendingCount,
       totalCount: totalCount ?? this.totalCount,
       currentTab: currentTab ?? this.currentTab,
+      searchKeyword: searchKeyword ?? this.searchKeyword,
     );
   }
 
@@ -55,7 +59,17 @@ class EmployeeLoaded extends EmployeeState {
         pendingCount,
         totalCount,
         currentTab,
+        searchKeyword,
       ];
+}
+
+class EmployeeSearchLoaded extends EmployeeState {
+  final List<EmployeeEntity> results;
+
+  const EmployeeSearchLoaded(this.results);
+
+  @override
+  List<Object?> get props => [results];
 }
 
 class EmployeeActionInProgress extends EmployeeState {}

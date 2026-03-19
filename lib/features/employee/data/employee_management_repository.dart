@@ -1,15 +1,112 @@
-import 'package:uuid/uuid.dart';
+
 import '../domain/entities/employee_entity.dart';
+import 'employee_api_service.dart';
+import '../../location/data/location_api_service.dart';
 
 abstract class EmployeeManagementRepository {
   Future<List<EmployeeEntity>> getEmployees(String businessId);
-  Future<EmployeeEntity> addEmployee(String businessId, EmployeeEntity employee);
+  Future<List<EmployeeEntity>> searchEmployees(String query);
+  Future<void> addEmployee(String businessId, String employeeId);
   Future<EmployeeEntity> updateEmployee(String employeeId, EmployeeEntity updateData);
   Future<void> deleteEmployee(String employeeId);
 }
 
+class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
+  final EmployeeApiService _apiService;
+  final LocationApiService _locationApiService;
+
+  EmployeeManagementRepositoryApi({
+    required EmployeeApiService apiService,
+    required LocationApiService locationApiService,
+  })  : _apiService = apiService,
+        _locationApiService = locationApiService;
+
+  @override
+  Future<List<EmployeeEntity>> getEmployees(String businessId) async {
+    final employees = await _apiService.getMyEmployees();
+    return employees
+        .map(
+          (employee) => EmployeeEntity(
+            id: employee.profileId,
+            name: employee.userName,
+            phone: employee.phone,
+            email: employee.email,
+            status: employee.isAlreadyHired
+                ? EmployeeStatus.active
+                : EmployeeStatus.pending,
+            assignedBusinessId: businessId,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<List<EmployeeEntity>> searchEmployees(String query) async {
+    final employees = await _apiService.searchEmployees(query);
+    return employees
+        .map(
+          (employee) => EmployeeEntity(
+            id: employee.profileId,
+            name: employee.userName,
+            phone: employee.phone,
+            email: employee.email,
+            status: employee.isAlreadyHired
+                ? EmployeeStatus.active
+                : EmployeeStatus.pending,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<void> addEmployee(
+    String businessId,
+    String employeeId,
+  ) async {
+    await _apiService.inviteEmployee(employeeId);
+  }
+
+  @override
+  Future<EmployeeEntity> updateEmployee(
+    String employeeId,
+    EmployeeEntity updateData,
+  ) async {
+    final ownedLocations = await _locationApiService.getMyOwnedLocations();
+
+    final currentAssigned = ownedLocations.data
+        .where((location) => location.employeeIds.contains(employeeId))
+        .map((location) => location.id.toString())
+        .toSet();
+
+    final targetAssigned = updateData.assignedLocationIds.toSet();
+
+    final toAssign = targetAssigned.difference(currentAssigned);
+    final toUnassign = currentAssigned.difference(targetAssigned);
+
+    for (final locationId in toAssign) {
+      await _locationApiService.addEmployeesToLocation(
+        locationId: locationId,
+        employeeIds: [employeeId],
+      );
+    }
+
+    for (final locationId in toUnassign) {
+      await _locationApiService.removeEmployeeFromLocation(
+        locationId: locationId,
+        employeeId: employeeId,
+      );
+    }
+
+    return updateData;
+  }
+
+  @override
+  Future<void> deleteEmployee(String employeeId) {
+    return _apiService.deleteEmployee(employeeId);
+  }
+}
+
 class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
-  final _uuid = const Uuid();
   
   final List<EmployeeEntity> _mockEmployees = [
     const EmployeeEntity(
@@ -87,14 +184,21 @@ class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
   }
 
   @override
-  Future<EmployeeEntity> addEmployee(String businessId, EmployeeEntity employee) async {
+  Future<List<EmployeeEntity>> searchEmployees(String query) async {
+    await Future.delayed(const Duration(milliseconds: 400));
+    final keyword = query.trim().toLowerCase();
+    if (keyword.isEmpty) return [];
+
+    return _mockEmployees.where((employee) {
+      return employee.name.toLowerCase().contains(keyword) ||
+          employee.phone.toLowerCase().contains(keyword) ||
+          employee.email.toLowerCase().contains(keyword);
+    }).toList();
+  }
+
+  @override
+  Future<void> addEmployee(String businessId, String employeeId) async {
     await Future.delayed(const Duration(milliseconds: 600));
-    final newEmployee = employee.copyWith(
-      id: _uuid.v4(),
-      assignedBusinessId: businessId,
-    );
-    _mockEmployees.insert(0, newEmployee);
-    return newEmployee;
   }
 
   @override

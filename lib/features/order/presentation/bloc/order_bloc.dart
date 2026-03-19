@@ -29,6 +29,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     on<CancelOrderRequested>(_onCancelOrderRequested);
     on<FilterOrdersRequested>(_onFilterOrdersRequested);
     on<RefreshOrdersRequested>(_onRefreshOrdersRequested);
+    on<ResetOrders>(_onResetOrders);
   }
 
   /// Load all orders
@@ -232,5 +233,12 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     } catch (e) {
       emit(OrderError(message: e.toString()));
     }
+  }
+
+  void _onResetOrders(ResetOrders event, Emitter<OrderState> emit) {
+    _orders = [];
+    _currentStatusFilter = null;
+    _currentLocationFilter = null;
+    emit(const OrderInitial());
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
@@ -8,9 +9,10 @@ import '../../features/auth/presentation/pages/verify_otp_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/set_password_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../core/services/firebase_messaging_service.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_event.dart';
-import '../../features/auth/presentation/bloc/auth_state.dart';
+
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
@@ -32,9 +34,11 @@ import '../../features/invoice_template/presentation/pages/advanced_invoice_temp
 import '../../features/employee/presentation/pages/employee_list_page.dart';
 import '../../features/employee/presentation/pages/add_employee_page.dart';
 import '../../features/employee/presentation/pages/edit_employee_page.dart';
+import '../../features/employee/presentation/pages/employee_invitations_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
+
 import '../../shared/widgets/app_bar_custom.dart';
 import '../../shared/widgets/sidebar_widget.dart';
 import '../../shared/dialogs/app_snackbar.dart';
@@ -76,6 +80,7 @@ class AppRoutes {
   static const String employeeList = '/employee-list';
   static const String addEmployee = '/add-employee';
   static const String editEmployee = '/edit-employee';
+  static const String employeeInvitations = '/employee-invitations';
 }
 
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
@@ -264,6 +269,9 @@ class AppRouter {
           EditEmployeePage(employeeId: args?['employeeId'] ?? ''),
         );
 
+      case AppRoutes.employeeInvitations:
+        return _buildRoute(settings, const EmployeeInvitationsPage());
+
       default:
         return _buildRoute(settings, const _NotFoundPage());
     }
@@ -338,18 +346,28 @@ class _GlobalAppBarShell extends StatefulWidget {
 
 class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  StreamSubscription<String>? _navigationSubscription;
 
   @override
+  void initState() {
+    super.initState();
+    // Listen for immediate navigation from notifications
+    _navigationSubscription = FirebaseMessagingService.navigationStream.listen((route) {
+      debugPrint('_GlobalAppBarShell: Immediate navigation to $route');
+      AppRouter.navigateTo(route);
+    });
+  }
+
+  @override
+  void dispose() {
+    _navigationSubscription?.cancel();
+    super.dispose();
+  }
+  @override
   Widget build(BuildContext context) {
-    return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
-        if (state is LogoutSuccess) {
-          AppRouter.navigateAndClearStack(AppRoutes.login);
-        }
-      },
-      child: ListenableBuilder(
-        listenable: AppRouter.globalAppBarState,
-        builder: (context, _) {
+    return ListenableBuilder(
+      listenable: AppRouter.globalAppBarState,
+      builder: (context, _) {
           return Scaffold(
             key: _scaffoldKey,
             // Global AppBar
@@ -420,7 +438,6 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                       onLogout: () {
                         final authBloc = context.read<AuthBloc>();
                         Navigator.pop(context);
-                        AppRouter.navigateAndClearStack(AppRoutes.login);
                         authBloc.add(const LogoutRequested());
                       },
                       onGuide: () {
@@ -466,8 +483,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
             floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           );
         },
-      ),
-    );
+      );
   }
 }
 

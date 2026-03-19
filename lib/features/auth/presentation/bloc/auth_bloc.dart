@@ -12,6 +12,7 @@ import '../../../../shared/context/business_context.dart';
 import '../../../../shared/context/user_profile_context.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../../core/services/firebase_messaging_service.dart';
 import '../../../location/data/location_repository.dart';
 import '../../data/auth_repository.dart';
 import '../../data/models/auth_response.dart';
@@ -38,6 +39,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final LocationRepository locationRepository;
   final AuthRepository authRepository;
   final SecureStorage secureStorage;
+  final FirebaseMessagingService firebaseMessagingService;
 
   static const _clientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
 
@@ -61,6 +63,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     required this.locationRepository,
     required this.authRepository,
     required this.secureStorage,
+    required this.firebaseMessagingService,
   }) : super(AuthInitial()) {
     on<AppStarted>(_onAppStarted);
     on<SignupRequested>(_onSignupRequested);
@@ -83,16 +86,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<ClearAuthError>(_onClearAuthError);
   }
 
-  Future<void> _prefetchLocations() async {
-    try {
-      final locations = await locationRepository.getMyOwnedLocations();
-      await CacheManager().set('my_owned_locations', {
-        'data': locations.map((e) => e.toMap()).toList(),
-      });
-    } catch (e) {
-      debugPrint('Prefetch locations error: $e');
-    }
-  }
 
   /// Check stored token on app startup → route to home or login
   Future<void> _onAppStarted(AppStarted event, Emitter<AuthState> emit) async {
@@ -158,7 +151,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         name: result.fullName,
         avatarUrl: result.avatarUrl,
       );
-      await _prefetchLocations();
+      await firebaseMessagingService.registerCurrentToken();
       emit(
         LoginSuccess(
           accessToken: result.accessToken!,
@@ -241,7 +234,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         );
       } else {
         await secureStorage.setNeedsSetPassword(false);
-        await _prefetchLocations();
+        await firebaseMessagingService.registerCurrentToken();
         emit(LoginSuccess(accessToken: result.accessToken!, user: const {}));
       }
     } catch (e) {
@@ -264,7 +257,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final result = await authRepository.setPassword(password: event.password);
       if (result.success) {
         await secureStorage.setNeedsSetPassword(false);
-        await _prefetchLocations();
+        await firebaseMessagingService.registerCurrentToken();
         emit(const SetPasswordSuccess());
       } else {
         emit(SetPasswordFailure(message: result.message));
@@ -695,7 +688,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       avatarUrl: result.avatarUrl,
     );
 
-    await _prefetchLocations();
+    await firebaseMessagingService.registerCurrentToken();
     await _firebaseAuth.signOut();
     emit(
       LoginSuccess(
@@ -755,6 +748,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(LogoutInProgress());
     try {
+      await firebaseMessagingService.unregisterCurrentToken();
       await authRepository.logout();
       await _resetGoogleSessionForAccountPicker();
     } catch (e) {

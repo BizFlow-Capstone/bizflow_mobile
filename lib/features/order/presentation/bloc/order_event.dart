@@ -11,20 +11,24 @@ abstract class OrderEvent extends Equatable {
 
 /// Load all orders with optional filters
 class LoadOrdersRequested extends OrderEvent {
-  final int pageNumber;
-  final int pageSize;
-  final String? status; // DRAFT, PENDING, PUBLISHED, CANCELLED
-  final String? locationId;
-
   const LoadOrdersRequested({
     this.pageNumber = 1,
     this.pageSize = 20,
     this.status,
     this.locationId,
   });
+  final int pageNumber;
+  final int pageSize;
+  final String? status; // DRAFT, PENDING, PUBLISHED, CANCELLED
+  final String? locationId;
 
   @override
   List<Object?> get props => [pageNumber, pageSize, status, locationId];
+}
+
+/// Reset orders state (on logout)
+class ResetOrders extends OrderEvent {
+  const ResetOrders();
 }
 
 /// Load draft orders only

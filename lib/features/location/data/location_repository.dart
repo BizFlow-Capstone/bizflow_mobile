@@ -131,7 +131,7 @@ class LocationRepository {
       return dtos
           .map(
             (dto) => EmployeeEntity(
-              id: dto.userId,
+              id: dto.profileId,
               name: dto.userName,
               phone: dto.phone,
             ),

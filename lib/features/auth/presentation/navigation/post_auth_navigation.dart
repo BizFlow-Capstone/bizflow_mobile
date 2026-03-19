@@ -5,6 +5,7 @@ import '../../../../shared/context/business_context.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_event.dart';
 import '../../../location/presentation/bloc/location_state.dart';
+import '../../../../core/services/firebase_messaging_service.dart';
 
 class PostAuthNavigation {
   PostAuthNavigation._();
@@ -60,6 +61,14 @@ class PostAuthNavigation {
     if (!context.mounted) {
       return;
     }
-    AppRouter.navigateAndClearStack(AppRoutes.home);
+
+    // Check for pending notification route
+    final pendingRoute = FirebaseMessagingService.pendingRoute;
+    if (pendingRoute != null) {
+      FirebaseMessagingService.pendingRoute = null; // Clear it
+      AppRouter.navigateAndClearStack(pendingRoute);
+    } else {
+      AppRouter.navigateAndClearStack(AppRoutes.home);
+    }
   }
 }

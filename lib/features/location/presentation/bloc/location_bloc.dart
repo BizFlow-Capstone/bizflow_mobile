@@ -30,6 +30,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     on<RemoveEmployeeFromLocationRequested>(
       _onRemoveEmployeeFromLocationRequested,
     );
+    on<ResetLocations>(_onResetLocations);
   }
 
   // Cache locations in memory
@@ -39,9 +40,38 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   List<String> _currentLocationEmployeeIds = [];
 
   Future<List<LocationEntity>> _refreshLocations() async {
-    final locations = await repository.getMyOwnedLocations();
-    _locations = locations;
-    return locations;
+    // Fetch both owned and hired locations
+    // Use catchError to ensure that if one fails (e.g. 403 on owned for an employee), 
+    // we still get the data from the other.
+    debugPrint('LocationBloc: refreshing locations...');
+    final results = await Future.wait([
+      repository.getMyOwnedLocations().catchError((e) {
+        debugPrint('LocationBloc: getMyOwnedLocations failed: $e');
+        throw e;
+      }),
+      repository.getWorkAtLocations().catchError((e) {
+        debugPrint('LocationBloc: getWorkAtLocations failed: $e');
+        throw e;
+      }),
+    ]);
+
+    final owned = results[0];
+    final hired = results[1];
+    debugPrint('LocationBloc: Owned count: ${owned.length}, Hired count: ${hired.length}');
+
+    // Combine and remove duplicates by ID
+    final Set<String> ids = {};
+    final List<LocationEntity> combined = [];
+
+    for (var loc in [...owned, ...hired]) {
+      if (!ids.contains(loc.id)) {
+        ids.add(loc.id);
+        combined.add(loc);
+      }
+    }
+
+    _locations = combined;
+    return combined;
   }
 
   Future<List<EmployeeEntity>> fetchAvailableEmployees() {
@@ -57,7 +87,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     emit(const LocationLoading());
 
     await CacheManager().fetchWithSWR<List<LocationEntity>>(
-      key: 'my_owned_locations',
+      key: 'my_locations',
       fetcher: _refreshLocations,
       fromJson: (json) {
         final list = json['data'] as List;
@@ -70,6 +100,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       },
       onData: (data, isFromCache) {
         _locations = data;
+        debugPrint('LocationBloc: Emitting LocationsLoaded with ${data.length} locations (isFromCache: $isFromCache)');
         emit(LocationsLoaded(locations: data));
       },
       onError: (error) {
@@ -113,7 +144,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
           );
 
           // Update underlying storage cache
-          await CacheManager().set('my_owned_locations', {
+          await CacheManager().set('my_locations', {
             'data': _locations.map((e) => e.toMap()).toList(),
           });
 
@@ -154,7 +185,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       );
 
       // Save to disk
-      await CacheManager().set('my_owned_locations', {
+      await CacheManager().set('my_locations', {
         'data': refreshed.map((e) => e.toMap()).toList(),
       });
 
@@ -236,7 +267,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       }
 
       // Update persistent CacheManager
-      await CacheManager().set('my_owned_locations', {
+      await CacheManager().set('my_locations', {
         'data': _locations.map((e) => e.toMap()).toList(),
       });
 
@@ -405,5 +436,14 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     } catch (e) {
       emit(LocationFailure(message: e.toString()));
     }
+  }
+
+  Future<void> _onResetLocations(
+    ResetLocations event,
+    Emitter<LocationState> emit,
+  ) async {
+    _locations = [];
+    _currentLocationEmployeeIds = [];
+    emit(const LocationInitial());
   }
 }

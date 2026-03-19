@@ -19,6 +19,11 @@ class LoadProductsByLocationRequested extends ProductEvent {
   List<Object?> get props => [locationId];
 }
 
+/// Reset products state (on logout)
+class ResetProducts extends ProductEvent {
+  const ResetProducts();
+}
+
 /// Refresh products (pull to refresh)
 class RefreshProductsRequested extends ProductEvent {
   final String locationId;

@@ -31,6 +31,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<ImportInventoryRequested>(_onImportInventoryRequested);
     on<LoadProductDetailRequested>(_onLoadProductDetailRequested);
     on<ApplyLocalPriceAdjustmentRequested>(_onApplyLocalPriceAdjustment);
+    on<ResetProducts>(_onResetProducts);
   }
 
   // In-memory cache for products
@@ -879,7 +880,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     );
   }
 
-  /// Helper to update product cache after mutations
+  void _onResetProducts(ResetProducts event, Emitter<ProductState> emit) {
+    _products = [];
+    _searchQuery = null;
+    _filterStatus = null;
+    _filterBusinessTypeId = null;
+    emit(const ProductInitial());
+  }
 
   Future<void> _updateProductCache(String locationId) async {
     final cacheKey = 'cache_products_$locationId';

@@ -26,14 +26,42 @@ class SelectEmployeeTabRequested extends EmployeeEvent {
   List<Object?> get props => [tabIndex];
 }
 
-class AddEmployeeRequested extends EmployeeEvent {
-  final String businessId;
-  final EmployeeEntity employee;
+class SearchEmployeeKeywordChanged extends EmployeeEvent {
+  final String keyword;
 
-  const AddEmployeeRequested({required this.businessId, required this.employee});
+  const SearchEmployeeKeywordChanged(this.keyword);
 
   @override
-  List<Object?> get props => [businessId, employee];
+  List<Object?> get props => [keyword];
+}
+
+class SearchEmployeesRequested extends EmployeeEvent {
+  final String query;
+
+  const SearchEmployeesRequested(this.query);
+
+  @override
+  List<Object?> get props => [query];
+}
+
+class AddEmployeeRequested extends EmployeeEvent {
+  final String businessId;
+  final String employeeId;
+
+  const AddEmployeeRequested({required this.businessId, required this.employeeId});
+
+  @override
+  List<Object?> get props => [businessId, employeeId];
+}
+
+class AddMultipleEmployeesRequested extends EmployeeEvent {
+  final String businessId;
+  final List<String> employeeIds;
+
+  const AddMultipleEmployeesRequested({required this.businessId, required this.employeeIds});
+
+  @override
+  List<Object?> get props => [businessId, employeeIds];
 }
 
 class UpdateEmployeeRequested extends EmployeeEvent {

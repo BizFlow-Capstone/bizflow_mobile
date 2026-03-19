@@ -18,37 +18,41 @@ class CacheManager {
   /// Lấy dữ liệu từ cache theo key
   Future<Map<String, dynamic>?> get(String key) async {
     await init();
-    return _storage?.getObject(key);
+    return _storage?.getObject('cache_$key');
   }
 
   /// Lưu trữ dữ liệu vào cache theo key
   Future<void> set(String key, Map<String, dynamic> data) async {
     await init();
-    await _storage?.setObject(key, data);
+    await _storage?.setObject('cache_$key', data);
   }
 
   /// Xóa cache theo key
   Future<void> remove(String key) async {
     await init();
-    await _storage?.remove(key);
+    await _storage?.remove('cache_$key');
   }
 
   /// Xóa toàn bộ dữ liệu (nên dùng khi Logout)
   Future<void> clearAll() async {
     await init();
-    // Vì clearAll() ở LocalStorage có thể xóa cả token,
-    // ta nên cân nhắc dùng một prefix riêng cho cache (VD: cache_)
-    // và chỉ xóa những key bắt đầu bằng prefix đó.
-    final keys = _storage?.getKeys() ?? {};
-    final cacheKeys = keys.where(
-      (k) => k.startsWith('cache_') || k.startsWith('data_'),
-    );
-    for (final k in cacheKeys) {
-      await _storage?.remove(k);
-    }
+    
+    debugPrint('CacheManager: Aggressive clear all started');
+    
+    // Save essentials (locale)
+    final locale = _storage?.getString(StorageKeys.locale);
+    final theme = _storage?.getString(StorageKeys.themeMode);
+    final isFirstLaunch = _storage?.getBool(StorageKeys.isFirstLaunch);
 
-    // Xóa luôn context
-    await _storage?.remove(StorageKeys.currentBusinessId);
+    // Wipe everything
+    await _storage?.clear();
+    
+    // Restore essentials
+    if (locale != null) await _storage?.setString(StorageKeys.locale, locale);
+    if (theme != null) await _storage?.setString(StorageKeys.themeMode, theme);
+    if (isFirstLaunch != null) await _storage?.setBool(StorageKeys.isFirstLaunch, isFirstLaunch);
+    
+    debugPrint('CacheManager: Aggressive clear all finished');
   }
 
   /// Triển khai SWR logic: Local First + Sync Ngầm

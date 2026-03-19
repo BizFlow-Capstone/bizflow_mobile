@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'core/config/app_config.dart';
 import 'core/localization/app_localizations.dart';
+import 'core/services/firebase_messaging_service.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_endpoints.dart';
 import 'core/providers/localization_provider.dart';
@@ -14,10 +15,16 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/data/auth_api_service.dart';
 import 'features/auth/data/auth_repository.dart';
+import 'features/auth/data/push_token_api_service.dart';
 import 'features/employee/data/employee_api_service.dart';
 import 'features/employee/data/employee_repository.dart';
 import 'features/employee/data/employee_management_repository.dart';
 import 'features/employee/presentation/bloc/employee_bloc.dart';
+import 'features/location/presentation/bloc/location_event.dart';
+import 'features/auth/presentation/bloc/auth_state.dart';
+import 'features/order/presentation/bloc/order_event.dart';
+import 'features/product/presentation/bloc/product_event.dart';
+import 'features/debt/presentation/bloc/debtor_event.dart';
 import 'features/location/data/location_api_service.dart';
 import 'features/invoice_template/data/invoice_template_repository.dart';
 import 'features/invoice_template/presentation/bloc/invoice_template_bloc.dart';
@@ -81,6 +88,8 @@ class _MyAppState extends State<MyApp> {
   late AccountingRepository _accountingRepository;
   late InvoiceTemplateRepository _invoiceTemplateRepository;
   late EmployeeManagementRepository _employeeManagementRepository;
+  late PushTokenApiService _pushTokenApiService;
+  late FirebaseMessagingService _firebaseMessagingService;
 
   @override
   void initState() {
@@ -153,6 +162,7 @@ class _MyAppState extends State<MyApp> {
     _importApiService = ImportApiService(apiClient: _apiClient);
     _debtorApiService = DebtorApiService(apiClient: _apiClient);
     _accountingApiService = AccountingApiService(apiClient: _apiClient);
+    _pushTokenApiService = PushTokenApiService(apiClient: _apiClient);
 
     // Initialize Repositories (calls Services)
     _locationRepository = LocationRepository(service: _locationApiService);
@@ -163,7 +173,15 @@ class _MyAppState extends State<MyApp> {
     _debtorRepository = DebtorRepository(service: _debtorApiService);
     _accountingRepository = AccountingRepository(apiService: _accountingApiService);
     _invoiceTemplateRepository = InvoiceTemplateRepositoryMock();
-    _employeeManagementRepository = EmployeeManagementRepositoryMock();
+    _employeeManagementRepository = EmployeeManagementRepositoryApi(
+      apiService: _employeeApiService,
+      locationApiService: _locationApiService,
+    );
+
+    _firebaseMessagingService = FirebaseMessagingService(
+      pushTokenApiService: _pushTokenApiService,
+    );
+    Future.microtask(() => _firebaseMessagingService.initialize());
 
     final userProfile = UserProfileContext();
     AppRouter.globalAppBarState.updateProfile(
@@ -174,6 +192,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    _firebaseMessagingService.dispose();
     _localizationProvider.dispose();
     _apiClient.close();
     super.dispose();
@@ -190,6 +209,7 @@ class _MyAppState extends State<MyApp> {
             locationRepository: _locationRepository,
             authRepository: _authRepository,
             secureStorage: _secureStorage,
+            firebaseMessagingService: _firebaseMessagingService,
           ),
         ),
         BlocProvider(
@@ -220,6 +240,7 @@ class _MyAppState extends State<MyApp> {
           create: (context) =>
               EmployeeBloc(repository: _employeeManagementRepository),
         ),
+        Provider<EmployeeRepository>.value(value: _employeeRepository),
         Provider<ImportRepository>.value(value: _importRepository),
       ],
       child: Consumer<LocalizationProvider>(
@@ -227,21 +248,35 @@ class _MyAppState extends State<MyApp> {
           return ListenableBuilder(
             listenable: AppRouter.globalAppBarState,
             builder: (context, _) {
-              return MaterialApp(
-                title: 'BizFlow',
-                theme: AppTheme.light,
-                localizationsDelegates: const [
-                  AppLocalizations.delegate,
-                  GlobalMaterialLocalizations.delegate,
-                  GlobalWidgetsLocalizations.delegate,
-                  GlobalCupertinoLocalizations.delegate,
-                ],
-                supportedLocales: AppLocalizations.supportedLocales,
-                locale: localizationProvider.currentLocale,
-                navigatorKey: AppRouter.navigatorKey,
-                onGenerateRoute: AppRouter.generateRoute,
-                initialRoute: AppRoutes.splash,
-              );
+          return BlocListener<AuthBloc, AuthState>(
+            listener: (context, state) {
+              if (state is LogoutSuccess) {
+                // Reset all data-heavy Blocs to clear memory
+                context.read<LocationBloc>().add(const ResetLocations());
+                context.read<OrderBloc>().add(const ResetOrders());
+                context.read<ProductBloc>().add(const ResetProducts());
+                context.read<DebtorBloc>().add(const ResetDebtors());
+                
+                // Navigate to login
+                AppRouter.navigateAndClearStack(AppRoutes.login);
+              }
+            },
+            child: MaterialApp(
+              title: 'BizFlow',
+              theme: AppTheme.light,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
+              locale: localizationProvider.currentLocale,
+              navigatorKey: AppRouter.navigatorKey,
+              onGenerateRoute: AppRouter.generateRoute,
+              initialRoute: AppRoutes.splash,
+            ),
+          );
             },
           );
         },

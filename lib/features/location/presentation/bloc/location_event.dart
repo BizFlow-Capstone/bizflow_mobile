@@ -13,6 +13,11 @@ class LoadLocationsRequested extends LocationEvent {
   const LoadLocationsRequested();
 }
 
+/// Reset locations state (on logout)
+class ResetLocations extends LocationEvent {
+  const ResetLocations();
+}
+
 /// Restore cached locations (no API call - for instant back navigation)
 class RestoreLocationsRequested extends LocationEvent {
   const RestoreLocationsRequested();

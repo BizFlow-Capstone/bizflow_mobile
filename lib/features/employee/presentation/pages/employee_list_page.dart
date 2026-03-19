@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../core/services/firebase_messaging_service.dart';
 
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../core/routing/app_router.dart';
@@ -25,6 +27,8 @@ class EmployeeListPage extends StatefulWidget {
 class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription<Map<String, dynamic>>? _messageSubscription;
+  late BusinessContext _businessContext;
 
   @override
   void initState() {
@@ -41,7 +45,23 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
     });
 
     // Listen to context changes
-    Provider.of<BusinessContext>(context, listen: false).addListener(_onBusinessContextChanged);
+    _businessContext = Provider.of<BusinessContext>(context, listen: false);
+    _businessContext.addListener(_onBusinessContextChanged);
+
+    _messageSubscription = FirebaseMessagingService.messageDataStream.listen((data) {
+      if (!mounted) return;
+
+      final type = data['type']?.toString();
+      if (type == 'employee_removed') {
+        final businessId =
+            Provider.of<BusinessContext>(context, listen: false).currentBusinessId;
+        if (businessId != null) {
+          context.read<EmployeeBloc>().add(
+                LoadEmployeesRequested(businessId: businessId),
+              );
+        }
+      }
+    });
   }
 
   void _onBusinessContextChanged() {
@@ -89,9 +109,10 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
 
   @override
   void dispose() {
+    _messageSubscription?.cancel();
     _tabController.dispose();
     _searchController.dispose();
-    Provider.of<BusinessContext>(context, listen: false).removeListener(_onBusinessContextChanged);
+    _businessContext.removeListener(_onBusinessContextChanged);
     super.dispose();
   }
 
@@ -138,6 +159,11 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
                       controller: _searchController,
                       hintText: t.translate('employee.search_hint'),
                       prefixIcon: const Icon(Icons.search),
+                      onChanged: (value) {
+                        context.read<EmployeeBloc>().add(
+                              SearchEmployeeKeywordChanged(value),
+                            );
+                      },
                     ),
                   ),
 

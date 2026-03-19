@@ -204,6 +204,17 @@
     "create_or_invite_msg": "Please create a business location or accept an invitation from others to start using Bizflow.",
     "accept_invite": "Accept Invitation"
   },
+  "invitation": {
+    "title": "Job Invitations",
+    "empty": "No invitations yet",
+    "load_failed": "Unable to load invitations",
+    "invited_at": "Invited at",
+    "accept": "Accept",
+    "reject": "Reject",
+    "accept_success": "Invitation accepted",
+    "reject_success": "Invitation rejected",
+    "unknown_owner": "Business owner"
+  },
   "appbar": {
     "greeting": "Hello,"
   },

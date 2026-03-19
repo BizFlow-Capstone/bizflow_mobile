@@ -14,7 +14,10 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
         super(EmployeeInitial()) {
     on<LoadEmployeesRequested>(_onLoadEmployees);
     on<SelectEmployeeTabRequested>(_onSelectTab);
+      on<SearchEmployeeKeywordChanged>(_onSearchKeywordChanged);
+      on<SearchEmployeesRequested>(_onSearchEmployees);
     on<AddEmployeeRequested>(_onAddEmployee);
+    on<AddMultipleEmployeesRequested>(_onAddMultipleEmployees);
     on<UpdateEmployeeRequested>(_onUpdateEmployee);
     on<DeleteEmployeeRequested>(_onDeleteEmployee);
   }
@@ -34,7 +37,15 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       fetcher: () => _repository.getEmployees(event.businessId),
       onData: (data, isFromCache) {
         if (!isClosed) {
-          emit(_createLoadedState(data, state is EmployeeLoaded ? (state as EmployeeLoaded).currentTab : 0));
+          emit(
+            _createLoadedState(
+              data,
+              state is EmployeeLoaded ? (state as EmployeeLoaded).currentTab : 0,
+              state is EmployeeLoaded
+                  ? (state as EmployeeLoaded).searchKeyword
+                  : '',
+            ),
+          );
         }
       },
       onError: (error) {
@@ -51,7 +62,51 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
   ) {
     if (state is EmployeeLoaded) {
       final currentState = state as EmployeeLoaded;
-      emit(_createLoadedState(currentState.allEmployees, event.tabIndex));
+      emit(
+        _createLoadedState(
+          currentState.allEmployees,
+          event.tabIndex,
+          currentState.searchKeyword,
+        ),
+      );
+    }
+  }
+
+  void _onSearchKeywordChanged(
+    SearchEmployeeKeywordChanged event,
+    Emitter<EmployeeState> emit,
+  ) {
+    if (state is EmployeeLoaded) {
+      final currentState = state as EmployeeLoaded;
+      emit(
+        _createLoadedState(
+          currentState.allEmployees,
+          currentState.currentTab,
+          event.keyword,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onSearchEmployees(
+    SearchEmployeesRequested event,
+    Emitter<EmployeeState> emit,
+  ) async {
+    final currentState = state;
+    final query = event.query.trim();
+    if (query.isEmpty) {
+      emit(const EmployeeSearchLoaded([]));
+      if (currentState is EmployeeLoaded) emit(currentState);
+      return;
+    }
+
+    try {
+      final results = await _repository.searchEmployees(query);
+      emit(EmployeeSearchLoaded(results));
+      if (currentState is EmployeeLoaded) emit(currentState);
+    } catch (e) {
+      emit(EmployeeFailure(e.toString()));
+      if (currentState is EmployeeLoaded) emit(currentState);
     }
   }
 
@@ -62,26 +117,43 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     final currentState = state;
     if (currentState is! EmployeeLoaded) return;
 
-    final allEmployees = List<EmployeeEntity>.from(currentState.allEmployees);
+    emit(EmployeeActionInProgress());
+
+    try {
+      await _repository.addEmployee(event.businessId, event.employeeId);
+      
+      emit(const EmployeeActionSuccess('Gửi lời mời thành công'));
+      emit(currentState); // Phục hồi state để list page không bị trắng màn
+
+      // Request a reload from network since the employee is pending
+      add(LoadEmployeesRequested(businessId: event.businessId));
+
+    } catch (e) {
+      emit(EmployeeFailure(e.toString()));
+      emit(currentState);
+    }
+  }
+
+  Future<void> _onAddMultipleEmployees(
+    AddMultipleEmployeesRequested event,
+    Emitter<EmployeeState> emit,
+  ) async {
+    final currentState = state;
+    if (currentState is! EmployeeLoaded) return;
 
     emit(EmployeeActionInProgress());
 
     try {
-      final newEmployee = await _repository.addEmployee(event.businessId, event.employee);
+      // Gọi vòng lặp để invite nhiều user
+      for (final id in event.employeeIds) {
+        await _repository.addEmployee(event.businessId, id);
+      }
       
-      // Update local copy and cache
-      allEmployees.insert(0, newEmployee);
-      
-      // CacheManager set expects a map, but we can serialize to a basic map if needed.
-      // Since it's mockup, we can use the simplest approach. CacheManager uses local_storage which requires JSON encodable.
-      // But actually the Entity needs toMap(). Let's define it later if needed, but for mock repo memory list might just be fine, or we can just ignore caching new objects locally without toMap. 
-      // Actually we'll skip caching for the mock write since it's just mock data memory.
-      // Wait, CacheManager.set(key, data) needs `Map<String, dynamic> data`.
-      // Let's just comment it out since it's mock and memory lists are sufficient for this demo.
-      // _cacheManager.setCache(cacheKey, allEmployees);
+      emit(const EmployeeActionSuccess('Gửi lời mời thành công'));
+      emit(currentState); // Phục hồi state để list page không bị trắng màn
 
-      emit(const EmployeeActionSuccess('Thêm nhân viên thành công'));
-      emit(_createLoadedState(allEmployees, currentState.currentTab));
+      // Request a reload from network
+      add(LoadEmployeesRequested(businessId: event.businessId));
     } catch (e) {
       emit(EmployeeFailure(e.toString()));
       emit(currentState);
@@ -109,7 +181,13 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       }
 
       emit(const EmployeeActionSuccess('Cập nhật nhân viên thành công'));
-      emit(_createLoadedState(allEmployees, currentState.currentTab));
+      emit(
+        _createLoadedState(
+          allEmployees,
+          currentState.currentTab,
+          currentState.searchKeyword,
+        ),
+      );
     } catch (e) {
       emit(EmployeeFailure(e.toString()));
       emit(currentState);
@@ -138,14 +216,24 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       // _cacheManager.setCache(cacheKey, allEmployees);
 
       emit(const EmployeeActionSuccess('Xóa nhân viên thành công'));
-      emit(_createLoadedState(allEmployees, currentState.currentTab));
+      emit(
+        _createLoadedState(
+          allEmployees,
+          currentState.currentTab,
+          currentState.searchKeyword,
+        ),
+      );
     } catch (e) {
       emit(EmployeeFailure(e.toString()));
       emit(currentState);
     }
   }
 
-  EmployeeLoaded _createLoadedState(List<EmployeeEntity> employees, int tabIndex) {
+  EmployeeLoaded _createLoadedState(
+    List<EmployeeEntity> employees,
+    int tabIndex,
+    String searchKeyword,
+  ) {
     List<EmployeeEntity> filtered = [];
     
     if (tabIndex == 0) {
@@ -154,6 +242,15 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       filtered = employees.where((e) => e.status == EmployeeStatus.active).toList(); // Active
     } else if (tabIndex == 2) {
       filtered = employees.where((e) => e.status == EmployeeStatus.pending).toList(); // Pending
+    }
+
+    final keyword = searchKeyword.trim().toLowerCase();
+    if (keyword.isNotEmpty) {
+      filtered = filtered.where((employee) {
+        return employee.name.toLowerCase().contains(keyword) ||
+            employee.phone.toLowerCase().contains(keyword) ||
+            employee.email.toLowerCase().contains(keyword);
+      }).toList();
     }
 
     final activeCount = employees.where((e) => e.status == EmployeeStatus.active).length;
@@ -167,6 +264,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       pendingCount: pendingCount,
       totalCount: totalCount,
       currentTab: tabIndex,
+      searchKeyword: searchKeyword,
     );
   }
 }

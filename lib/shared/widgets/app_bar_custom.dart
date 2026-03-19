@@ -114,27 +114,31 @@ class _CustomAppBarState extends State<CustomAppBar> {
                 ),
               ),
               SizedBox(width: AppSpacing.sm),
-              // Greeting + Name (Fixed width to prevent expansion)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    l10n.translate('appbar.greeting'),
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: AppColors.textSecondary,
+              // Greeting + Name
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      l10n.translate('appbar.greeting'),
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Text(
-                    widget.userName ?? 'User',
-                    style: AppTextStyles.titleSmall.copyWith(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.bold,
+                    Text(
+                      widget.userName ?? 'User',
+                      style: AppTextStyles.titleSmall.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

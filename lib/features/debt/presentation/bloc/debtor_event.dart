@@ -36,6 +36,10 @@ class RefreshDebtorsRequested extends DebtorEvent {
   const RefreshDebtorsRequested();
 }
 
+class ResetDebtors extends DebtorEvent {
+  const ResetDebtors();
+}
+
 class ToggleDebtorStatusRequested extends DebtorEvent {
   final int debtorId;
   final bool isActive;

@@ -23,6 +23,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
     on<RecordDebtAdjustmentRequested>(_onRecordDebtAdjustmentRequested);
     on<LoadDebtorDetailRequested>(_onLoadDebtorDetailRequested);
     on<LoadDebtPaymentHistoryRequested>(_onLoadDebtPaymentHistoryRequested);
+    on<ResetDebtors>(_onResetDebtors);
   }
 
   List<DebtorEntity> _debtors = <DebtorEntity>[];
@@ -425,5 +426,10 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
       return text.replaceFirst('Exception: ', '');
     }
     return error?.toString() ?? 'Unknown error';
+  }
+
+  void _onResetDebtors(ResetDebtors event, Emitter<DebtorState> emit) {
+    _debtors = [];
+    emit(const DebtorState());
   }
 }

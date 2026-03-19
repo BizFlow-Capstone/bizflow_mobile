@@ -91,6 +91,11 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
               setState(() => _isLoading = false);
               
               if (state is EmployeeActionSuccess) {
+                if (_employee != null) {
+                  _employee = _employee!.copyWith(
+                    assignedLocationIds: List.from(_selectedLocationIds),
+                  );
+                }
                 Navigator.pop(context);
               } else if (state is EmployeeFailure) {
                 ScaffoldMessenger.of(context).showSnackBar(

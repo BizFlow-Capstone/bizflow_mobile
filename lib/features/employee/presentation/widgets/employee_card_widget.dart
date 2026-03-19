@@ -78,7 +78,7 @@ class EmployeeCardWidget extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withAlpha(26), // 10% opacity
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(

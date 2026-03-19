@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../services/firebase_messaging_service.dart';
 
 /// Notification Service - Quản lý Local Notification
 class NotificationService {
@@ -7,20 +9,43 @@ class NotificationService {
   NotificationService._internal();
 
   bool _isInitialized = false;
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
 
   /// Initialize notification service
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // TODO: Initialize flutter_local_notifications
-    // final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-    // const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    // const iosSettings = DarwinInitializationSettings();
-    // const initSettings = InitializationSettings(
-    //   android: androidSettings,
-    //   iOS: iosSettings,
-    // );
-    // await flutterLocalNotificationsPlugin.initialize(initSettings);
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings();
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _plugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          debugPrint('NotificationService: Tap on notification with payload: $payload');
+          FirebaseMessagingService.setPendingRoute(payload);
+        }
+      },
+    );
+
+    const channel = AndroidNotificationChannel(
+      'bizflow_foreground',
+      'BizFlow Foreground Notifications',
+      description: 'Shows notifications when app is open',
+      importance: Importance.high,
+    );
+
+    final androidPlugin =
+        _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await androidPlugin?.createNotificationChannel(channel);
 
     _isInitialized = true;
     debugPrint('NotificationService: Initialized');
@@ -33,22 +58,20 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
-    // TODO: Implement show notification
-    // final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-    // const androidDetails = AndroidNotificationDetails(
-    //   'default_channel',
-    //   'Default Channel',
-    //   importance: Importance.max,
-    //   priority: Priority.high,
-    // );
-    // const iosDetails = DarwinNotificationDetails();
-    // const details = NotificationDetails(
-    //   android: androidDetails,
-    //   iOS: iosDetails,
-    // );
-    // await flutterLocalNotificationsPlugin.show(id, title, body, details, payload: payload);
+    const androidDetails = AndroidNotificationDetails(
+      'bizflow_foreground',
+      'BizFlow Foreground Notifications',
+      channelDescription: 'Shows notifications when app is open',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const iosDetails = DarwinNotificationDetails();
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
-    debugPrint('NotificationService: Show notification - $title: $body');
+    await _plugin.show(id, title, body, details, payload: payload);
   }
 
   /// Schedule notification
@@ -67,20 +90,28 @@ class NotificationService {
 
   /// Cancel notification
   Future<void> cancelNotification(int id) async {
-    // TODO: Implement cancel notification
-    debugPrint('NotificationService: Cancel notification $id');
+    await _plugin.cancel(id);
   }
 
   /// Cancel all notifications
   Future<void> cancelAllNotifications() async {
-    // TODO: Implement cancel all notifications
-    debugPrint('NotificationService: Cancel all notifications');
+    await _plugin.cancelAll();
   }
 
   /// Request permission
   Future<bool> requestPermission() async {
-    // TODO: Implement request permission
-    debugPrint('NotificationService: Request permission');
+    final androidImplementation =
+        _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await androidImplementation?.requestNotificationsPermission();
+
+    final iosImplementation =
+        _plugin.resolvePlatformSpecificImplementation<
+          IOSFlutterLocalNotificationsPlugin
+        >();
+    await iosImplementation?.requestPermissions(alert: true, badge: true, sound: true);
+
     return true;
   }
 }
