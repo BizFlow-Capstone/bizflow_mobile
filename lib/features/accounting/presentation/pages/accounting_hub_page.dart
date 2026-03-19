@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../bloc/accounting_period_bloc.dart';
 import '../models/accounting_mock_models.dart';
 import '../widgets/accounting_books_reports_tab.dart';
 import '../widgets/accounting_cost_revenue_tab.dart';
@@ -25,14 +29,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  final TextEditingController _periodNameController = TextEditingController();
-  final TextEditingController _openingCashController = TextEditingController(
-    text: '50,000,000',
-  );
-  final TextEditingController _periodNoteController = TextEditingController();
-
-  String _periodType = 'quarterly';
-  String _accountingMethod = 'method_2';
+  // Period BLoC data is managed by AccountingPeriodBloc
+  // Other tabs still use local/mock state for now
   String _glChannelFilter = 'all';
 
   DateTime _reportFromDate = DateTime(2026, 1, 1);
@@ -108,56 +106,26 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
-  String _buildPeriodName(DateTime now, String periodType) {
-    if (periodType == 'yearly') {
-      return now.year.toString();
-    }
-    final quarter = ((now.month - 1) ~/ 3) + 1;
-    return 'Q$quarter/${now.year}';
-  }
-
-  (DateTime, DateTime) _buildPeriodRange(DateTime now, String periodType) {
-    if (periodType == 'yearly') {
-      return (DateTime(now.year, 1, 1), DateTime(now.year, 12, 31));
-    }
-
-    final quarter = ((now.month - 1) ~/ 3) + 1;
-    final startMonth = ((quarter - 1) * 3) + 1;
-    final endMonth = startMonth + 2;
-    return (
-      DateTime(now.year, startMonth, 1),
-      DateTime(now.year, endMonth + 1, 0),
-    );
-  }
-
-  void _applyPeriodPreset(String periodType) {
-    final now = DateTime.now();
-    final range = _buildPeriodRange(now, periodType);
-    _periodNameController.text = _buildPeriodName(now, periodType);
-    _reportFromDate = range.$1;
-    _reportToDate = range.$2;
-  }
-
-  void _onPeriodTypeChanged(String value) {
-    setState(() {
-      _periodType = value;
-      _applyPeriodPreset(value);
-    });
-  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _applyPeriodPreset(_periodType);
+
+    // Trigger load of accounting periods from API
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final locationId = context.read<BusinessContext>().currentBusinessId;
+      if (locationId != null) {
+        context.read<AccountingPeriodBloc>().add(
+              LoadPeriodsRequested(locationId),
+            );
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _periodNameController.dispose();
-    _openingCashController.dispose();
-    _periodNoteController.dispose();
     super.dispose();
   }
 
@@ -188,14 +156,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
   }
 
-  Future<void> _savePeriodSettings() async {
-    final ok = await _confirmAction(
-      title: l10n.translate('accounting.confirm_title'),
-      message: l10n.translate('accounting.confirm_save_period_settings'),
-    );
-    if (!ok) return;
-    _showSuccess(l10n.translate('accounting.saved_success'));
-  }
 
   Future<void> _openManualGlDialog() async {
     final descriptionController = TextEditingController();
@@ -550,16 +510,23 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  AccountingPeriodTab(
-                    periodNameController: _periodNameController,
-                    openingCashController: _openingCashController,
-                    periodNoteController: _periodNoteController,
-                    periodType: _periodType,
-                    accountingMethod: _accountingMethod,
-                    onPeriodTypeChanged: _onPeriodTypeChanged,
-                    onAccountingMethodChanged: (value) =>
-                        setState(() => _accountingMethod = value),
-                    onSave: _savePeriodSettings,
+                  // Tab Period: real API via BLoC
+                  Builder(
+                    builder: (context) {
+                      final locationId = context
+                          .watch<BusinessContext>()
+                          .currentBusinessId;
+                      if (locationId == null) {
+                        return Center(
+                          child: Text(
+                            l10n.translate(
+                              'home.please_select_location',
+                            ),
+                          ),
+                        );
+                      }
+                      return AccountingPeriodTab(locationId: locationId);
+                    },
                   ),
                   AccountingGlTab(
                     channelFilter: _glChannelFilter,

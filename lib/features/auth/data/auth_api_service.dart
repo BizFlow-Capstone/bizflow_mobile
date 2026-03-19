@@ -17,7 +17,11 @@ class AuthApiService {
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
       ApiEndpoints.loginPhone,
-      body: {'phone': phone, 'password': password},
+      body: {
+        'phone': phone,
+        'password': password,
+        'deviceInfo': _getDeviceInfo(),
+      },
       parser: (data) => data as Map<String, dynamic>,
     );
     if (!response.isSuccess || response.data == null) {
@@ -82,7 +86,11 @@ class AuthApiService {
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
       ApiEndpoints.loginEmail,
-      body: {'email': email, 'password': password},
+      body: {
+        'email': email,
+        'password': password,
+        'deviceInfo': _getDeviceInfo(),
+      },
       parser: (data) => data as Map<String, dynamic>,
     );
     if (!response.isSuccess || response.data == null) {

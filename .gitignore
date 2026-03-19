@@ -51,3 +51,7 @@ app.*.map.json
 /config/*.json
 /android/app/google-services.json
 /ios/Runner/GoogleService-Info.plist
+
+# Documentation files (local only)
+bizflow_screen_description.md
+UI_instructions

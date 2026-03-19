@@ -116,4 +116,20 @@ class ApiEndpoints {
       '/api/my-business/debtors/$debtorId/status';
   static String activeDebtorsByLocation(String locationId) =>
       '/api/my-business/debtors/locations/$locationId';
+
+  // Accounting Period
+  static String accountingPeriods(String locationId) =>
+      '/api/locations/$locationId/accounting/periods';
+  static String accountingPeriodsCustom(String locationId) =>
+      '/api/locations/$locationId/accounting/periods/custom';
+  static String accountingPeriodsOpeningBalanceSuggestion(String locationId) =>
+      '/api/locations/$locationId/accounting/periods/opening-balance-suggestion';
+  static String accountingPeriodDetail(String locationId, String periodId) =>
+      '/api/locations/$locationId/accounting/periods/$periodId';
+  static String accountingPeriodFinalize(String locationId, String periodId) =>
+      '/api/locations/$locationId/accounting/periods/$periodId/finalize';
+  static String accountingPeriodReopen(String locationId, String periodId) =>
+      '/api/locations/$locationId/accounting/periods/$periodId/reopen';
+  static String accountingPeriodAuditLogs(String locationId, String periodId) =>
+      '/api/locations/$locationId/accounting/periods/$periodId/audit-logs';
 }

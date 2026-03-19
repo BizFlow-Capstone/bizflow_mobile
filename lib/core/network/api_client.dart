@@ -246,8 +246,7 @@ class ApiClient {
         if (kDebugMode &&
             (host == 'localhost' ||
                 host == '10.0.2.2' ||
-                host == '192.168.1.9' ||
-                host == '192.168.1.197')) {
+                host.startsWith('192.168.'))) {
           return true;
         }
         return false;
