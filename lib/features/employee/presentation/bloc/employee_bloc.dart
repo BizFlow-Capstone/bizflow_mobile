@@ -167,27 +167,13 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     final currentState = state;
     if (currentState is! EmployeeLoaded) return;
 
-    final allEmployees = List<EmployeeEntity>.from(currentState.allEmployees);
-
     emit(EmployeeActionInProgress());
 
     try {
-      final updatedEmployee = await _repository.updateEmployee(event.employee.id, event.employee);
-      
-      final index = allEmployees.indexWhere((e) => e.id == updatedEmployee.id);
-      if (index != -1) {
-        allEmployees[index] = updatedEmployee;
-        // _cacheManager.setCache(cacheKey, allEmployees);
-      }
+      await _repository.updateEmployee(event.employee.id, event.employee);
 
       emit(const EmployeeActionSuccess('Cập nhật nhân viên thành công'));
-      emit(
-        _createLoadedState(
-          allEmployees,
-          currentState.currentTab,
-          currentState.searchKeyword,
-        ),
-      );
+      await _reloadEmployeesFromServer(currentState, emit);
     } catch (e) {
       emit(EmployeeFailure(e.toString()));
       emit(currentState);
@@ -202,8 +188,6 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     if (currentState is! EmployeeLoaded) return;
 
     final allEmployees = List<EmployeeEntity>.from(currentState.allEmployees);
-    
-    // Find businessId of deleted employee for cache key
     final empIdx = allEmployees.indexWhere((e) => e.id == event.employeeId);
     if (empIdx == -1) return;
 
@@ -211,22 +195,67 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
 
     try {
       await _repository.deleteEmployee(event.employeeId);
-      
-      allEmployees.removeAt(empIdx);
-      // _cacheManager.setCache(cacheKey, allEmployees);
 
-      emit(const EmployeeActionSuccess('Xóa nhân viên thành công'));
-      emit(
-        _createLoadedState(
-          allEmployees,
-          currentState.currentTab,
-          currentState.searchKeyword,
-        ),
-      );
+      emit(const EmployeeActionSuccess('Cập nhật trạng thái nhân viên thành công'));
+      await _reloadEmployeesFromServer(currentState, emit);
     } catch (e) {
       emit(EmployeeFailure(e.toString()));
       emit(currentState);
     }
+  }
+
+  Future<void> _reloadEmployeesFromServer(
+    EmployeeLoaded currentState,
+    Emitter<EmployeeState> emit,
+  ) async {
+    final businessId = currentState.allEmployees.firstWhere(
+      (e) => e.assignedBusinessId.trim().isNotEmpty,
+      orElse: () => const EmployeeEntity(id: '', name: ''),
+    ).assignedBusinessId;
+
+    if (businessId.isEmpty) {
+      emit(
+        _createLoadedState(
+          currentState.allEmployees,
+          currentState.currentTab,
+          currentState.searchKeyword,
+        ),
+      );
+      return;
+    }
+
+    final freshEmployees = await _repository.getEmployees(businessId);
+    await _cacheManager.set(
+      'employees_$businessId',
+      {
+        'data': freshEmployees
+            .map(
+              (e) => {
+                'id': e.id,
+                'name': e.name,
+                'phone': e.phone,
+                'email': e.email,
+                'status': e.status.name,
+                'isActive': e.isActive,
+                'employmentStatus': e.employmentStatus,
+                'startedAt': e.startedAt?.toIso8601String(),
+                'endedAt': e.endedAt?.toIso8601String(),
+                'assignedBusinessId': e.assignedBusinessId,
+                'assignedLocationIds': e.assignedLocationIds,
+                'assignedLocationNames': e.assignedLocationNames,
+              },
+            )
+            .toList(),
+      },
+    );
+
+    emit(
+      _createLoadedState(
+        freshEmployees,
+        currentState.currentTab,
+        currentState.searchKeyword,
+      ),
+    );
   }
 
   EmployeeLoaded _createLoadedState(
@@ -235,13 +264,19 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     String searchKeyword,
   ) {
     List<EmployeeEntity> filtered = [];
-    
-    if (tabIndex == 0) {
-      filtered = employees; // All
-    } else if (tabIndex == 1) {
-      filtered = employees.where((e) => e.status == EmployeeStatus.active).toList(); // Active
-    } else if (tabIndex == 2) {
+
+    final safeTabIndex = tabIndex.clamp(0, 3);
+
+    if (safeTabIndex == 0) {
+      filtered = employees.where((e) => e.isActive).toList(); // All (active only)
+    } else if (safeTabIndex == 1) {
+      filtered = employees
+          .where((e) => e.isActive && e.status == EmployeeStatus.active)
+          .toList(); // Active
+    } else if (safeTabIndex == 2) {
       filtered = employees.where((e) => e.status == EmployeeStatus.pending).toList(); // Pending
+    } else if (safeTabIndex == 3) {
+      filtered = employees.where((e) => !e.isActive).toList(); // History
     }
 
     final keyword = searchKeyword.trim().toLowerCase();
@@ -253,8 +288,21 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       }).toList();
     }
 
-    final activeCount = employees.where((e) => e.status == EmployeeStatus.active).length;
+    if (safeTabIndex == 3) {
+      filtered.sort((a, b) {
+        final aTime = a.endedAt ?? a.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+        final bTime = b.endedAt ?? b.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+        final cmp = bTime.compareTo(aTime);
+        if (cmp != 0) return cmp;
+        return b.name.toLowerCase().compareTo(a.name.toLowerCase());
+      });
+    }
+
+    final activeCount = employees
+        .where((e) => e.isActive && e.status == EmployeeStatus.active)
+        .length;
     final pendingCount = employees.where((e) => e.status == EmployeeStatus.pending).length;
+    final historyCount = employees.where((e) => !e.isActive).length;
     final totalCount = employees.length;
 
     return EmployeeLoaded(
@@ -262,8 +310,9 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       filteredEmployees: filtered,
       activeCount: activeCount,
       pendingCount: pendingCount,
+      historyCount: historyCount,
       totalCount: totalCount,
-      currentTab: tabIndex,
+      currentTab: safeTabIndex,
       searchKeyword: searchKeyword,
     );
   }

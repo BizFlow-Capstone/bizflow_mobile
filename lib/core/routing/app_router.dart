@@ -80,6 +80,9 @@ class AppRoutes {
   static const String employeeList = '/employee-list';
   static const String addEmployee = '/add-employee';
   static const String editEmployee = '/edit-employee';
+  static const String employeeDetail = '/employee-detail';
+  static const String employeeAssign = '/employee-assign';
+  static const String employeeUnassign = '/employee-unassign';
   static const String employeeInvitations = '/employee-invitations';
 }
 
@@ -266,7 +269,40 @@ class AppRouter {
         final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(
           settings,
-          EditEmployeePage(employeeId: args?['employeeId'] ?? ''),
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.assign,
+          ),
+        );
+
+      case AppRoutes.employeeDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.detail,
+          ),
+        );
+
+      case AppRoutes.employeeAssign:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.assign,
+          ),
+        );
+
+      case AppRoutes.employeeUnassign:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.unassign,
+          ),
         );
 
       case AppRoutes.employeeInvitations:
@@ -437,7 +473,6 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                       },
                       onLogout: () {
                         final authBloc = context.read<AuthBloc>();
-                        Navigator.pop(context);
                         authBloc.add(const LogoutRequested());
                       },
                       onGuide: () {

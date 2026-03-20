@@ -15,22 +15,30 @@ class EmployeeApiService {
   /// Get employees available for assignment
   ///
   /// API: GET /api/my-employee/employees
-  /// Returns: List<EmployeeDto>
+  /// Returns: `List<EmployeeDto>`
   Future<List<EmployeeDto>> getMyEmployees() async {
-    try {
-      final response = await _apiClient.get(ApiEndpoints.myEmployees);
+    Future<List<EmployeeDto>> loadByEndpoint(String endpoint) async {
+      final response = await _apiClient.get(endpoint);
 
       if (response.isSuccess && response.data != null) {
         final dto = EmployeeResponseDto.fromJson(
           response.data as Map<String, dynamic>,
         );
         return dto.employees;
-      } else {
-        throw Exception(response.message ?? 'Failed to load employees');
+      }
+
+      throw Exception(response.message ?? 'Failed to load employees');
+    }
+
+    try {
+      try {
+        return await loadByEndpoint(ApiEndpoints.myEmployeesDetails);
+      } catch (_) {
+        return await loadByEndpoint(ApiEndpoints.myEmployees);
       }
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
-        throw Exception('🔒 Session expired');
+        throw Exception('Session expired');
       }
       throw Exception('API Error: ${e.message}');
     } catch (e) {
@@ -151,7 +159,7 @@ class EmployeeApiService {
       );
 
       if (!response.isSuccess) {
-        throw Exception(response.message ?? 'Failed to delete employee');
+        throw Exception(response.message ?? 'Failed to update employee status');
       }
     } on ApiException catch (e) {
       throw Exception('API Error: ${e.message}');

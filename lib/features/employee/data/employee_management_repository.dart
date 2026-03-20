@@ -1,7 +1,9 @@
 
 import '../domain/entities/employee_entity.dart';
 import 'employee_api_service.dart';
+import 'models/employee_dto.dart';
 import '../../location/data/location_api_service.dart';
+import '../../../shared/cache/cache_manager.dart';
 
 abstract class EmployeeManagementRepository {
   Future<List<EmployeeEntity>> getEmployees(String businessId);
@@ -12,8 +14,11 @@ abstract class EmployeeManagementRepository {
 }
 
 class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
+  static const String _assignmentCacheKey = 'employee_location_assignments';
+
   final EmployeeApiService _apiService;
   final LocationApiService _locationApiService;
+  _EmployeeAssignmentMap? _assignmentMemoryCache;
 
   EmployeeManagementRepositoryApi({
     required EmployeeApiService apiService,
@@ -24,18 +29,29 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
   @override
   Future<List<EmployeeEntity>> getEmployees(String businessId) async {
     final employees = await _apiService.getMyEmployees();
+    final assignmentMap = await _getEmployeeLocationAssignments();
+
     return employees
         .map(
-          (employee) => EmployeeEntity(
+          (employee) {
+            final employeeId = employee.profileId;
+            return EmployeeEntity(
             id: employee.profileId,
             name: employee.userName,
             phone: employee.phone,
             email: employee.email,
-            status: employee.isAlreadyHired
-                ? EmployeeStatus.active
-                : EmployeeStatus.pending,
+            status: _toEmployeeStatus(employee),
+            isActive: employee.isActive,
+            employmentStatus: employee.status,
+            startedAt: employee.startAt,
+            endedAt: employee.endAt,
             assignedBusinessId: businessId,
-          ),
+            assignedLocationIds:
+                assignmentMap.locationIdsByEmployee[employeeId] ?? const [],
+            assignedLocationNames:
+                assignmentMap.locationNamesByEmployee[employeeId] ?? const [],
+          );
+          },
         )
         .toList();
   }
@@ -50,9 +66,11 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
             name: employee.userName,
             phone: employee.phone,
             email: employee.email,
-            status: employee.isAlreadyHired
-                ? EmployeeStatus.active
-                : EmployeeStatus.pending,
+            status: _toEmployeeStatus(employee),
+            isActive: employee.isActive,
+            employmentStatus: employee.status,
+            startedAt: employee.startAt,
+            endedAt: employee.endAt,
           ),
         )
         .toList();
@@ -71,12 +89,11 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
     String employeeId,
     EmployeeEntity updateData,
   ) async {
-    final ownedLocations = await _locationApiService.getMyOwnedLocations();
+    final assignmentMap = await _getEmployeeLocationAssignments();
 
-    final currentAssigned = ownedLocations.data
-        .where((location) => location.employeeIds.contains(employeeId))
-        .map((location) => location.id.toString())
-        .toSet();
+    final currentAssigned =
+        (assignmentMap.locationIdsByEmployee[employeeId] ?? const <String>[])
+            .toSet();
 
     final targetAssigned = updateData.assignedLocationIds.toSet();
 
@@ -97,12 +114,131 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       );
     }
 
-    return updateData;
+    final refreshedAssignmentMap = await _getEmployeeLocationAssignments(
+      forceRefresh: true,
+    );
+    return updateData.copyWith(
+      assignedLocationIds:
+          refreshedAssignmentMap.locationIdsByEmployee[employeeId] ?? const [],
+      assignedLocationNames:
+          refreshedAssignmentMap.locationNamesByEmployee[employeeId] ?? const [],
+    );
   }
 
   @override
   Future<void> deleteEmployee(String employeeId) {
     return _apiService.deleteEmployee(employeeId);
+  }
+
+  EmployeeStatus _toEmployeeStatus(EmployeeDto employee) {
+    switch (employee.status.toLowerCase()) {
+      case 'pending':
+        return EmployeeStatus.pending;
+      case 'rejected':
+        return EmployeeStatus.rejected;
+      case 'inactive':
+      case 'terminated':
+      case 'deleted':
+        return EmployeeStatus.inactive;
+      case 'accepted':
+      case 'active':
+        return employee.isActive ? EmployeeStatus.active : EmployeeStatus.inactive;
+      default:
+        if (!employee.isActive) return EmployeeStatus.inactive;
+        return employee.isAlreadyHired ? EmployeeStatus.active : EmployeeStatus.pending;
+    }
+  }
+
+  Future<_EmployeeAssignmentMap> _getEmployeeLocationAssignments({
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh && _assignmentMemoryCache != null) {
+      return _assignmentMemoryCache!;
+    }
+
+    if (!forceRefresh) {
+      final cached = await CacheManager().get(_assignmentCacheKey);
+      if (cached != null) {
+        final cachedMap = _EmployeeAssignmentMap.fromCache(cached);
+        _assignmentMemoryCache = cachedMap;
+        return cachedMap;
+      }
+    }
+
+    final freshMap = await _loadEmployeeLocationAssignmentsFromApi();
+    _assignmentMemoryCache = freshMap;
+    await CacheManager().set(_assignmentCacheKey, freshMap.toCache());
+    return freshMap;
+  }
+
+  Future<_EmployeeAssignmentMap> _loadEmployeeLocationAssignmentsFromApi() async {
+    final ownedLocations = await _locationApiService.getMyOwnedLocations();
+    final locationIdsByEmployee = <String, Set<String>>{};
+    final locationNamesByEmployee = <String, Set<String>>{};
+
+    for (final location in ownedLocations.data) {
+      final locationId = location.id.toString();
+      final locationEmployees = await _locationApiService.getLocationEmployees(
+        locationId: locationId,
+      );
+
+      for (final employee in locationEmployees) {
+        final employeeId = employee.profileId;
+        if (employeeId.isEmpty) continue;
+
+        locationIdsByEmployee
+            .putIfAbsent(employeeId, () => <String>{})
+            .add(locationId);
+        locationNamesByEmployee
+            .putIfAbsent(employeeId, () => <String>{})
+            .add(location.name);
+      }
+    }
+
+    return _EmployeeAssignmentMap(
+      locationIdsByEmployee: locationIdsByEmployee.map(
+        (key, value) => MapEntry(key, value.toList()),
+      ),
+      locationNamesByEmployee: locationNamesByEmployee.map(
+        (key, value) => MapEntry(key, value.toList()),
+      ),
+    );
+  }
+}
+
+class _EmployeeAssignmentMap {
+  final Map<String, List<String>> locationIdsByEmployee;
+  final Map<String, List<String>> locationNamesByEmployee;
+
+  const _EmployeeAssignmentMap({
+    required this.locationIdsByEmployee,
+    required this.locationNamesByEmployee,
+  });
+
+  Map<String, dynamic> toCache() {
+    return {
+      'locationIdsByEmployee': locationIdsByEmployee,
+      'locationNamesByEmployee': locationNamesByEmployee,
+    };
+  }
+
+  static _EmployeeAssignmentMap fromCache(Map<String, dynamic> cache) {
+    Map<String, List<String>> parseMap(dynamic raw) {
+      if (raw is! Map) return <String, List<String>>{};
+      return raw.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          (value is List)
+              ? value.map((item) => item.toString()).toList()
+              : <String>[],
+        ),
+      );
+    }
+
+    return _EmployeeAssignmentMap(
+      locationIdsByEmployee: parseMap(cache['locationIdsByEmployee']),
+      locationNamesByEmployee: parseMap(cache['locationNamesByEmployee']),
+    );
   }
 }
 
@@ -133,6 +269,9 @@ class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
       email: 'ha.pt@bizflow.vn',
       phone: '0909 090 090',
       status: EmployeeStatus.pending,
+      isActive: false,
+      employmentStatus: 'pending',
+      startedAt: null,
       assignedBusinessId: 'biz_01',
       assignedLocationIds: [],
     ),
@@ -169,8 +308,25 @@ class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
       email: 'mai.vt@bizflow.vn',
       phone: '0977 888 999',
       status: EmployeeStatus.pending,
+      isActive: false,
+      employmentStatus: 'pending',
+      startedAt: null,
       assignedBusinessId: 'biz_01',
       assignedLocationIds: [],
+    ),
+    EmployeeEntity(
+      id: 'emp_08',
+      name: 'Ngô Khánh Ly',
+      email: 'ly.nk@bizflow.vn',
+      phone: '0922 888 666',
+      status: EmployeeStatus.inactive,
+      isActive: false,
+      employmentStatus: 'inactive',
+      startedAt: DateTime.now().subtract(const Duration(days: 420)),
+      endedAt: DateTime.now().subtract(const Duration(days: 12)),
+      assignedBusinessId: 'biz_01',
+      assignedLocationIds: const ['loc_01'],
+      assignedLocationNames: const ['Kho HCM'],
     ),
   ];
 
@@ -214,6 +370,15 @@ class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
   @override
   Future<void> deleteEmployee(String employeeId) async {
     await Future.delayed(const Duration(milliseconds: 500));
-    _mockEmployees.removeWhere((e) => e.id == employeeId);
+    final index = _mockEmployees.indexWhere((e) => e.id == employeeId);
+    if (index == -1) return;
+
+    final current = _mockEmployees[index];
+    _mockEmployees[index] = current.copyWith(
+      isActive: false,
+      status: EmployeeStatus.inactive,
+      employmentStatus: 'inactive',
+      endedAt: DateTime.now(),
+    );
   }
 }

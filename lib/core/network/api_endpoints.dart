@@ -38,6 +38,7 @@ class ApiEndpoints {
   static const String workAtLocations = '/api/location/work-at-locations';
   static const String createLocation = '/api/location/create';
   static const String myEmployees = '/api/my-employee/employees';
+        static const String myEmployeesDetails = '/api/my-employee/employees/details';
     static const String searchEmployees = '/api/my-employee/search';
     static const String inviteEmployee = '/api/my-employee/invite';
     static const String employeeInvitations = '/api/my-employee/invitations';

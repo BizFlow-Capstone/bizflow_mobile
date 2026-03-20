@@ -17,8 +17,9 @@ class EmployeeLoaded extends EmployeeState {
   final List<EmployeeEntity> filteredEmployees;
   final int activeCount;
   final int pendingCount;
+  final int historyCount;
   final int totalCount;
-  final int currentTab; // 0: All, 1: Active, 2: Pending
+  final int currentTab; // 0: All, 1: Active, 2: Pending, 3: History
   final String searchKeyword;
 
   const EmployeeLoaded({
@@ -26,6 +27,7 @@ class EmployeeLoaded extends EmployeeState {
     required this.filteredEmployees,
     required this.activeCount,
     required this.pendingCount,
+    required this.historyCount,
     required this.totalCount,
     required this.currentTab,
     required this.searchKeyword,
@@ -36,6 +38,7 @@ class EmployeeLoaded extends EmployeeState {
     List<EmployeeEntity>? filteredEmployees,
     int? activeCount,
     int? pendingCount,
+    int? historyCount,
     int? totalCount,
     int? currentTab,
     String? searchKeyword,
@@ -45,6 +48,7 @@ class EmployeeLoaded extends EmployeeState {
       filteredEmployees: filteredEmployees ?? this.filteredEmployees,
       activeCount: activeCount ?? this.activeCount,
       pendingCount: pendingCount ?? this.pendingCount,
+      historyCount: historyCount ?? this.historyCount,
       totalCount: totalCount ?? this.totalCount,
       currentTab: currentTab ?? this.currentTab,
       searchKeyword: searchKeyword ?? this.searchKeyword,
@@ -57,6 +61,7 @@ class EmployeeLoaded extends EmployeeState {
         filteredEmployees,
         activeCount,
         pendingCount,
+        historyCount,
         totalCount,
         currentTab,
         searchKeyword,

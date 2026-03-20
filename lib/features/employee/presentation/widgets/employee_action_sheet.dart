@@ -3,13 +3,23 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 
 class EmployeeActionSheet extends StatelessWidget {
-  final VoidCallback onEdit;
+  final VoidCallback onViewDetail;
+  final VoidCallback onAssign;
+  final VoidCallback onUnassign;
   final VoidCallback onDelete;
+  final bool showAssign;
+  final bool showUnassign;
+  final bool showDelete;
 
   const EmployeeActionSheet({
     super.key,
-    required this.onEdit,
+    required this.onViewDetail,
+    required this.onAssign,
+    required this.onUnassign,
     required this.onDelete,
+    this.showAssign = true,
+    this.showUnassign = true,
+    this.showDelete = true,
   });
 
   @override
@@ -37,29 +47,54 @@ class EmployeeActionSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.edit_outlined, color: AppColors.textPrimary),
+              leading: const Icon(Icons.visibility_outlined, color: AppColors.textPrimary),
               title: Text(
-                t.translate('employee.edit_employee'),
+                t.translate('employee.view_employee_detail'),
                 style: theme.textTheme.titleMedium,
               ),
               onTap: () {
                 Navigator.pop(context);
-                onEdit();
+                onViewDetail();
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, color: AppColors.error),
-              title: Text(
-                t.translate('employee.delete_employee'),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppColors.error,
+            if (showAssign)
+              ListTile(
+                leading: const Icon(Icons.playlist_add_check_circle_outlined, color: AppColors.textPrimary),
+                title: Text(
+                  t.translate('employee.assign_employee'),
+                  style: theme.textTheme.titleMedium,
                 ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onAssign();
+                },
               ),
-              onTap: () {
-                Navigator.pop(context);
-                onDelete();
-              },
-            ),
+            if (showUnassign)
+              ListTile(
+                leading: const Icon(Icons.remove_circle_outline, color: AppColors.textPrimary),
+                title: Text(
+                  t.translate('employee.unassign_employee'),
+                  style: theme.textTheme.titleMedium,
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onUnassign();
+                },
+              ),
+            if (showDelete)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.error),
+                title: Text(
+                  t.translate('employee.delete_employee'),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: AppColors.error,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  onDelete();
+                },
+              ),
           ],
         ),
       ),

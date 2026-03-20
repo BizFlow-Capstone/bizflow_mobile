@@ -20,13 +20,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return BlocListener<AuthBloc, AuthState>(
-      listener: (context, state) {
-        if (state is LogoutSuccess) {
-          AppRouter.navigateAndClearStack(AppRoutes.login);
-        }
-      },
-      child: Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
@@ -240,7 +234,6 @@ class SettingsPage extends StatelessWidget {
             ],
           ),
         ),
-      ),
       ),
     );
   }

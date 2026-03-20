@@ -41,7 +41,7 @@ class ProductApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
-        throw Exception('🔒 Session expired');
+        throw Exception('Session expired');
       }
       throw Exception('API Error: ${e.message}');
     } catch (e) {

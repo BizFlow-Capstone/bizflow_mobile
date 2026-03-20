@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum EmployeeStatus { active, pending }
+enum EmployeeStatus { active, pending, inactive, rejected }
 
 /// Employee Entity - Domain model
 class EmployeeEntity extends Equatable {
@@ -9,27 +9,44 @@ class EmployeeEntity extends Equatable {
   final String phone;
   final String email;
   final EmployeeStatus status;
+  final bool isActive;
+  final String employmentStatus;
+  final DateTime? startedAt;
+  final DateTime? endedAt;
   final String assignedBusinessId;
   final List<String> assignedLocationIds;
+  final List<String> assignedLocationNames;
 
   const EmployeeEntity({
-    required this.id, 
-    required this.name, 
+    required this.id,
+    required this.name,
     this.phone = '',
     this.email = '',
     this.status = EmployeeStatus.active,
+    this.isActive = true,
+    this.employmentStatus = 'accepted',
+    this.startedAt,
+    this.endedAt,
     this.assignedBusinessId = '',
     this.assignedLocationIds = const [],
+    this.assignedLocationNames = const [],
   });
 
   EmployeeEntity copyWith({
-    String? id, 
-    String? name, 
+    String? id,
+    String? name,
     String? phone,
     String? email,
     EmployeeStatus? status,
+    bool? isActive,
+    String? employmentStatus,
+    DateTime? startedAt,
+    bool clearStartedAt = false,
+    DateTime? endedAt,
+    bool clearEndedAt = false,
     String? assignedBusinessId,
     List<String>? assignedLocationIds,
+    List<String>? assignedLocationNames,
   }) {
     return EmployeeEntity(
       id: id ?? this.id,
@@ -37,8 +54,13 @@ class EmployeeEntity extends Equatable {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       status: status ?? this.status,
+      isActive: isActive ?? this.isActive,
+      employmentStatus: employmentStatus ?? this.employmentStatus,
+      startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
+      endedAt: clearEndedAt ? null : (endedAt ?? this.endedAt),
       assignedBusinessId: assignedBusinessId ?? this.assignedBusinessId,
       assignedLocationIds: assignedLocationIds ?? this.assignedLocationIds,
+      assignedLocationNames: assignedLocationNames ?? this.assignedLocationNames,
     );
   }
 
@@ -49,7 +71,12 @@ class EmployeeEntity extends Equatable {
         phone,
         email,
         status,
+        isActive,
+        employmentStatus,
+        startedAt,
+        endedAt,
         assignedBusinessId,
         assignedLocationIds,
+        assignedLocationNames,
       ];
 }

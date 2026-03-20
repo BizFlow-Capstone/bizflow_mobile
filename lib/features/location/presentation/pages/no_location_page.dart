@@ -7,6 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../../../features/auth/presentation/bloc/auth_event.dart';
+import '../../../../features/auth/presentation/bloc/auth_state.dart';
 import '../../../../features/location/presentation/bloc/location_bloc.dart';
 import '../../../../features/location/presentation/bloc/location_state.dart';
 
@@ -34,11 +35,27 @@ class NoLocationPage extends StatelessWidget {
           foregroundColor: AppColors.textPrimary,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           actions: [
-            IconButton(
-              icon: const Icon(Icons.logout, color: AppColors.danger),
-              tooltip: context.l10n.tr('settings_page.logout'),
-              onPressed: () {
-                context.read<AuthBloc>().add(const LogoutRequested());
+            BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, authState) {
+                final isLoggingOut = authState is LogoutInProgress;
+                return IconButton(
+                  icon: isLoggingOut
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.danger,
+                          ),
+                        )
+                      : const Icon(Icons.logout, color: AppColors.danger),
+                  tooltip: context.l10n.tr('settings_page.logout'),
+                  onPressed: isLoggingOut
+                      ? null
+                      : () {
+                          context.read<AuthBloc>().add(const LogoutRequested());
+                        },
+                );
               },
             ),
           ],

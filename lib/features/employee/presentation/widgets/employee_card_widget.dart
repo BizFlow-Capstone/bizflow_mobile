@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../domain/entities/employee_entity.dart';
@@ -24,11 +25,55 @@ class EmployeeCardWidget extends StatelessWidget {
         : employee.phone;
 
     // Màu sắc trạng thái
-    final isPending = employee.status == EmployeeStatus.pending;
-    final statusColor = isPending ? Colors.orange : AppColors.success;
-    final statusText = isPending 
-        ? t.translate('employee.tab_pending') 
-        : t.translate('employee.tab_active');
+    final (Color statusColor, String statusText) = switch (employee.status) {
+      EmployeeStatus.pending => (Colors.orange, t.translate('employee.tab_pending')),
+      EmployeeStatus.rejected => (AppColors.error, t.translate('employee.status_rejected')),
+      EmployeeStatus.inactive => (AppColors.textSecondary, t.translate('employee.status_inactive')),
+      EmployeeStatus.active => (AppColors.success, t.translate('employee.tab_active')),
+    };
+
+    String assignmentLabel;
+    if (employee.assignedLocationNames.isEmpty) {
+      assignmentLabel = t.translate('employee.assignment_unassigned');
+    } else if (employee.assignedLocationNames.length == 1) {
+      assignmentLabel = t.translate(
+        'employee.assignment_single',
+        params: {'location': employee.assignedLocationNames.first},
+      );
+    } else {
+      assignmentLabel = t.translate(
+        'employee.assignment_count',
+        params: {'count': employee.assignedLocationNames.length.toString()},
+      );
+    }
+
+    final dateFormatter = DateFormat('dd/MM/yyyy');
+    final startAtText = employee.startedAt != null
+        ? dateFormatter.format(employee.startedAt!.toLocal())
+        : '--';
+    final endAtText = employee.endedAt != null
+        ? dateFormatter.format(employee.endedAt!.toLocal())
+        : '--';
+
+    final effectiveEnd = employee.endedAt ?? DateTime.now().toUtc();
+    String durationText = '--';
+    final shouldShowWorkedTimeline = employee.startedAt != null;
+    if (employee.startedAt != null && effectiveEnd.isAfter(employee.startedAt!)) {
+      final duration = effectiveEnd.difference(employee.startedAt!);
+      final months = duration.inDays ~/ 30;
+      final days = duration.inDays % 30;
+      if (months > 0) {
+        durationText = t.translate(
+          'employee.duration_month_day',
+          params: {'months': months.toString(), 'days': days.toString()},
+        );
+      } else {
+        durationText = t.translate(
+          'employee.duration_day',
+          params: {'days': duration.inDays.toString()},
+        );
+      }
+    }
 
     return Card(
       elevation: 0,
@@ -74,6 +119,13 @@ class EmployeeCardWidget extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  Text(
+                    assignmentLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   // Status Badge
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -89,6 +141,24 @@ class EmployeeCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (shouldShowWorkedTimeline) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      t.translate('employee.worked_from_to', params: {
+                        'start': startAtText,
+                        'end': endAtText,
+                      }),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      t.translate('employee.worked_duration', params: {'duration': durationText}),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

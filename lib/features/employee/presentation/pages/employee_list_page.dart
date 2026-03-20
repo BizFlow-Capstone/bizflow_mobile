@@ -13,6 +13,7 @@ import '../../../../core/routing/app_router.dart';
 import '../bloc/employee_bloc.dart';
 import '../bloc/employee_event.dart';
 import '../bloc/employee_state.dart';
+import '../../domain/entities/employee_entity.dart';
 import '../widgets/employee_card_widget.dart';
 import '../widgets/employee_action_sheet.dart';
 import '../widgets/delete_employee_dialog.dart';
@@ -33,7 +34,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(_onTabChanged);
 
     // Initial load based on business context
@@ -77,29 +78,53 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
     }
   }
 
-  void _showActionSheet(BuildContext context, String employeeId, String employeeName) {
+  void _showActionSheet(
+    BuildContext context,
+    EmployeeEntity employee,
+    int currentTab,
+  ) {
+    final canManageAssignments =
+        employee.isActive && employee.status == EmployeeStatus.active;
+    final isHistoryTab = currentTab == 3;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (BuildContext bottomSheetContext) {
         return EmployeeActionSheet(
-          onEdit: () {
-            // Navigate to edit page
+          showAssign: !isHistoryTab && canManageAssignments,
+          showUnassign: !isHistoryTab && canManageAssignments,
+          showDelete: !isHistoryTab && canManageAssignments,
+          onViewDetail: () {
             Navigator.pushNamed(
-              context, 
-              AppRoutes.editEmployee, 
-              arguments: {'employeeId': employeeId},
+              context,
+              AppRoutes.employeeDetail,
+              arguments: {'employeeId': employee.id},
+            );
+          },
+          onAssign: () {
+            Navigator.pushNamed(
+              context,
+              AppRoutes.employeeAssign,
+              arguments: {'employeeId': employee.id},
+            );
+          },
+          onUnassign: () {
+            Navigator.pushNamed(
+              context,
+              AppRoutes.employeeUnassign,
+              arguments: {'employeeId': employee.id},
             );
           },
           onDelete: () async {
             // Show confirmation dialog
             final confirm = await showDialog<bool>(
               context: context,
-              builder: (dialogContext) => DeleteEmployeeDialog(employeeName: employeeName),
+              builder: (dialogContext) => DeleteEmployeeDialog(employeeName: employee.name),
             );
 
             if (confirm == true && context.mounted) {
-              context.read<EmployeeBloc>().add(DeleteEmployeeRequested(employeeId));
+              context.read<EmployeeBloc>().add(DeleteEmployeeRequested(employee.id));
             }
           },
         );
@@ -134,6 +159,10 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
       body: SafeArea(
         child: BlocConsumer<EmployeeBloc, EmployeeState>(
           listener: (context, state) {
+            if (!(ModalRoute.of(context)?.isCurrent ?? true)) {
+              return;
+            }
+
             if (state is EmployeeFailure) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
@@ -180,38 +209,53 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
                         Tab(text: t.translate('employee.tab_all')),
                         Tab(text: t.translate('employee.tab_active')),
                         Tab(text: t.translate('employee.tab_pending')),
+                        Tab(text: t.translate('employee.tab_history')),
                       ],
                     ),
                   ),
 
                   // Summary Info
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-                    color: AppColors.background,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildSummaryItem(
-                          t.translate('employee.total_count'), 
-                          state.totalCount.toString(), 
-                          theme
-                        ),
-                        _buildSummaryItem(
-                          t.translate('employee.active_count'), 
-                          state.activeCount.toString(), 
-                          theme, 
-                          color: AppColors.success
-                        ),
-                        _buildSummaryItem(
-                          t.translate('employee.pending_count'), 
-                          state.pendingCount.toString(), 
-                          theme, 
-                          color: Colors.orange
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Container(
+                  //   width: double.infinity,
+                  //   padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  //   color: AppColors.background,
+                  //   child: Row(
+                  //     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  //     children: [
+                  //       Expanded(
+                  //         child: _buildSummaryItem(
+                  //           t.translate('employee.total_count'),
+                  //           state.totalCount.toString(),
+                  //           theme,
+                  //         ),
+                  //       ),
+                  //       Expanded(
+                  //         child: _buildSummaryItem(
+                  //           t.translate('employee.active_count'),
+                  //           state.activeCount.toString(),
+                  //           theme,
+                  //           color: AppColors.success,
+                  //         ),
+                  //       ),
+                  //       Expanded(
+                  //         child: _buildSummaryItem(
+                  //           t.translate('employee.pending_count'),
+                  //           state.pendingCount.toString(),
+                  //           theme,
+                  //           color: Colors.orange,
+                  //         ),
+                  //       ),
+                  //       Expanded(
+                  //         child: _buildSummaryItem(
+                  //           t.translate('employee.history_count'),
+                  //           state.historyCount.toString(),
+                  //           theme,
+                  //           color: AppColors.textSecondary,
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
 
                   // List
                   Expanded(
@@ -235,7 +279,11 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
                               final employee = state.filteredEmployees[index];
                               return EmployeeCardWidget(
                                 employee: employee,
-                                onActionTap: () => _showActionSheet(context, employee.id, employee.name),
+                                onActionTap: () => _showActionSheet(
+                                  context,
+                                  employee,
+                                  state.currentTab,
+                                ),
                               );
                             },
                           ),
@@ -263,23 +311,4 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, ThemeData theme, {Color? color}) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: color ?? AppColors.textPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
 }
