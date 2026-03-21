@@ -1,3 +1,5 @@
+import '../../../../shared/utils/date_formatter.dart';
+
 /// Product Entity - Domain model
 class ProductEntity {
   final String id;
@@ -97,7 +99,9 @@ class ProductEntity {
       'salePrice': salePrice,
       'unit': unit,
       'isActive': isActive,
-      'createdAt': createdAt?.toIso8601String(),
+        'createdAt': createdAt != null
+          ? DateFormatter.toApiUtcIsoString(createdAt!)
+          : null,
       'locationId': locationId,
       'businessTypeId': businessTypeId,
       'manufacturer': manufacturer,
@@ -158,9 +162,7 @@ class ProductEntity {
       salePrice: salePriceValue ?? priceValue,
       unit: map['unit'] as String?,
       isActive: map['isActive'] as bool? ?? true,
-      createdAt: map['createdAt'] != null
-          ? DateTime.tryParse(map['createdAt'] as String)
-          : null,
+        createdAt: DateFormatter.parseApiDateTime(map['createdAt'] as String?),
       locationId: map['locationId'] as int?,
       businessTypeId: map['businessTypeId'] as String?,
       manufacturer: map['manufacturer'] as String?,

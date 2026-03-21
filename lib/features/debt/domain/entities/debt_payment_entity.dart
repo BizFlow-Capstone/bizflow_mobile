@@ -1,3 +1,5 @@
+import '../../../../shared/utils/date_formatter.dart';
+
 class DebtPaymentEntity {
   final int paymentId;
   final double amount;
@@ -27,7 +29,7 @@ class DebtPaymentEntity {
     DateTime? toDate(dynamic value) {
       if (value == null) return null;
       if (value is String && value.isNotEmpty) {
-        return DateTime.tryParse(value);
+        return DateFormatter.parseApiDateTime(value);
       }
       return null;
     }

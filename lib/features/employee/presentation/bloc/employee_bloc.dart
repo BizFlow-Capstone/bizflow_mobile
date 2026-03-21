@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../shared/cache/cache_manager.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../data/employee_management_repository.dart';
 import 'employee_event.dart';
@@ -238,8 +239,12 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
                 'status': e.status.name,
                 'isActive': e.isActive,
                 'employmentStatus': e.employmentStatus,
-                'startedAt': e.startedAt?.toIso8601String(),
-                'endedAt': e.endedAt?.toIso8601String(),
+                'startedAt': e.startedAt != null
+                  ? DateFormatter.toApiUtcIsoString(e.startedAt!)
+                  : null,
+                'endedAt': e.endedAt != null
+                  ? DateFormatter.toApiUtcIsoString(e.endedAt!)
+                  : null,
                 'assignedBusinessId': e.assignedBusinessId,
                 'assignedLocationIds': e.assignedLocationIds,
                 'assignedLocationNames': e.assignedLocationNames,

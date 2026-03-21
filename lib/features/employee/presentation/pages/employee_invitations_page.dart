@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../auth/presentation/navigation/post_auth_navigation.dart';
 import '../../data/employee_repository.dart';
 import '../../data/models/employee_invitation_dto.dart';
@@ -71,8 +72,7 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
   }
 
   String _formatDate(BuildContext context, DateTime value) {
-    final local = value.toLocal();
-    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return DateFormatter.formatDateTime(value);
   }
 
   @override

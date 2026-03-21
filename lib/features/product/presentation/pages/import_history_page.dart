@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/import_repository.dart';
@@ -279,7 +280,6 @@ class _ImportHistoryCard extends StatelessWidget {
     }
 
     final formatCurrency = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
-    final formatDate = DateFormat('dd/MM/yyyy HH:mm');
 
     return Card(
       elevation: 0,
@@ -356,7 +356,7 @@ class _ImportHistoryCard extends StatelessWidget {
                   ),
                   SizedBox(width: AppSpacing.xs),
                   Text(
-                    formatDate.format(item.createdAt),
+                    DateFormatter.formatDateTime(item.createdAt),
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textSecondary,
                     ),

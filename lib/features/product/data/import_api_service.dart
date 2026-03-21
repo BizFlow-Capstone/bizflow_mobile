@@ -5,6 +5,7 @@ import 'package:dio/io.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/storage/secure_storage.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import 'models/import_model.dart';
 
 class ImportApiService {
@@ -91,8 +92,12 @@ class ImportApiService {
     if (businessLocationId != null) {
       queryParams['BusinessLocationId'] = businessLocationId;
     }
-    if (fromDate != null) queryParams['FromDate'] = fromDate.toIso8601String();
-    if (toDate != null) queryParams['ToDate'] = toDate.toIso8601String();
+    if (fromDate != null) {
+      queryParams['FromDate'] = DateFormatter.toApiUtcIsoString(fromDate);
+    }
+    if (toDate != null) {
+      queryParams['ToDate'] = DateFormatter.toApiUtcIsoString(toDate);
+    }
     if (pageNumber != null) queryParams['PageNumber'] = pageNumber;
     if (pageSize != null) queryParams['PageSize'] = pageSize;
 
@@ -121,7 +126,7 @@ class ImportApiService {
         'Note': request.note,
         'SaveAsDraft': request.saveAsDraft,
         if (request.receivedAt != null)
-          'ReceivedAt': request.receivedAt!.toIso8601String(),
+          'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
         'Items': jsonEncode(request.items.map((e) => e.toJson()).toList()),
       };
 
@@ -152,7 +157,7 @@ class ImportApiService {
       'Note': request.note,
       'RemoveImage': request.removeImage,
       if (request.receivedAt != null)
-        'ReceivedAt': request.receivedAt!.toIso8601String(),
+        'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
       'Items': jsonEncode(request.items.map((e) => e.toJson()).toList()),
     };
 

@@ -1,3 +1,5 @@
+import '../../../../shared/utils/date_formatter.dart';
+
 class AccountingPeriod {
   final int periodId;
   final int businessLocationId;
@@ -41,14 +43,13 @@ class AccountingPeriod {
       openingCashBalance: (json['openingCashBalance'] as num?)?.toDouble(),
       openingBankBalance: (json['openingBankBalance'] as num?)?.toDouble(),
       status: json['status'] as String? ?? 'open',
-      finalizedAt: json['finalizedAt'] != null
-          ? DateTime.tryParse(json['finalizedAt'] as String)
-          : null,
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-          DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.tryParse(json['updatedAt'] as String)
-          : null,
+        finalizedAt: DateFormatter.parseApiDateTime(json['finalizedAt'] as String?),
+        createdAt: DateFormatter.parseApiDateTime(
+          json['createdAt'] as String?,
+          fallback: DateTime.now().toUtc(),
+          ) ??
+          DateTime.now().toUtc(),
+        updatedAt: DateFormatter.parseApiDateTime(json['updatedAt'] as String?),
     );
   }
 
@@ -63,9 +64,13 @@ class AccountingPeriod {
         'openingCashBalance': openingCashBalance,
         'openingBankBalance': openingBankBalance,
         'status': status,
-        'finalizedAt': finalizedAt?.toIso8601String(),
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt?.toIso8601String(),
+        'finalizedAt': finalizedAt != null
+          ? DateFormatter.toApiUtcIsoString(finalizedAt!)
+          : null,
+        'createdAt': DateFormatter.toApiUtcIsoString(createdAt),
+        'updatedAt': updatedAt != null
+          ? DateFormatter.toApiUtcIsoString(updatedAt!)
+          : null,
       };
 
   /// Display label: Q1/2026 hoặc 2026 hoặc 01/01 - 28/02/2026
@@ -112,8 +117,11 @@ class AccountingPeriodAuditLog {
       oldValue: json['oldValue'],
       newValue: json['newValue'],
       reason: json['reason'] as String?,
-      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt: DateFormatter.parseApiDateTime(
+            json['createdAt'] as String?,
+            fallback: DateTime.now().toUtc(),
+          ) ??
+          DateTime.now().toUtc(),
     );
   }
 }

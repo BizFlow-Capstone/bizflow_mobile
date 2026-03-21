@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/entities/order_entity.dart';
 
 /// Order Card Widget - Displays a single order in list format
@@ -102,7 +103,7 @@ class OrderCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    DateFormat('dd/MM/yyyy').format(order.createdAt),
+                    DateFormatter.formatDate(order.createdAt),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],

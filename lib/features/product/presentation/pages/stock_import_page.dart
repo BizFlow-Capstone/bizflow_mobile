@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -270,8 +271,8 @@ class _StockImportViewState extends State<_StockImportView> {
   void _showReceiptDialog(dynamic detail) {
     final formatCurrency = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
     final dateStr = detail.receivedAt != null
-        ? DateFormat('dd/MM/yyyy HH:mm').format(detail.receivedAt!)
-        : DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+        ? DateFormatter.formatDateTime(detail.receivedAt)
+        : DateFormatter.formatDateTime(DateTime.now());
 
     showDialog(
       context: context,

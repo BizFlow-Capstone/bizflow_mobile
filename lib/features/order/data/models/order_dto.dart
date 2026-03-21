@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import 'order_item_dto.dart';
 
 /// Order Status enum
@@ -81,16 +82,18 @@ class OrderDto extends Equatable {
       taxAmount: (json['taxAmount'] as num?)?.toDouble() ?? 0.0,
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
       note: json['note'] as String?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : DateTime.now(),
+        createdAt: DateFormatter.parseApiDateTime(
+          json['createdAt'] as String?,
+          fallback: DateTime.now().toUtc(),
+          ) ??
+          DateTime.now().toUtc(),
+        updatedAt: DateFormatter.parseApiDateTime(
+          json['updatedAt'] as String?,
+          fallback: DateTime.now().toUtc(),
+          ) ??
+          DateTime.now().toUtc(),
       invoiceNumber: json['invoiceNumber'] as String?,
-      invoicedAt: json['invoicedAt'] != null
-          ? DateTime.parse(json['invoicedAt'] as String)
-          : null,
+        invoicedAt: DateFormatter.parseApiDateTime(json['invoicedAt'] as String?),
     );
   }
 
@@ -106,10 +109,12 @@ class OrderDto extends Equatable {
       'taxAmount': taxAmount,
       'totalAmount': totalAmount,
       'note': note,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+      'createdAt': DateFormatter.toApiUtcIsoString(createdAt),
+      'updatedAt': DateFormatter.toApiUtcIsoString(updatedAt),
       'invoiceNumber': invoiceNumber,
-      'invoicedAt': invoicedAt?.toIso8601String(),
+      'invoicedAt': invoicedAt != null
+          ? DateFormatter.toApiUtcIsoString(invoicedAt!)
+          : null,
     };
   }
 

@@ -1,4 +1,5 @@
 // Import Models - Manual JSON serialization (no code generation required)
+import '../../../../shared/utils/date_formatter.dart';
 
 class ImportItemModel {
   final int productId;
@@ -78,7 +79,8 @@ class ImportHistoryItemModel {
   factory ImportHistoryItemModel.fromJson(Map<String, dynamic> json) {
     DateTime parseDateTime(dynamic value, DateTime fallback) {
       if (value is String) {
-        return DateTime.tryParse(value) ?? fallback;
+        return DateFormatter.parseApiDateTime(value, fallback: fallback) ??
+            fallback;
       }
       return fallback;
     }
@@ -96,21 +98,17 @@ class ImportHistoryItemModel {
               .toString(),
       supplier: json['supplier'] as String?,
       note: json['note'] as String?,
-      receivedAt: (json['receivedAt'] ?? json['ReceivedAt']) != null
-          ? DateTime.tryParse(
-              (json['receivedAt'] ?? json['ReceivedAt']) as String,
-            )
-          : null,
+      receivedAt: DateFormatter.parseApiDateTime(
+        (json['receivedAt'] ?? json['ReceivedAt']) as String?,
+      ),
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
       createdAt: parseDateTime(
         json['createdAt'] ?? json['CreatedAt'],
-        DateTime.now(),
+        DateTime.now().toUtc(),
       ),
-      updatedAt: (json['updatedAt'] ?? json['UpdatedAt']) != null
-          ? DateTime.tryParse(
-              (json['updatedAt'] ?? json['UpdatedAt']) as String,
-            )
-          : null,
+      updatedAt: DateFormatter.parseApiDateTime(
+        (json['updatedAt'] ?? json['UpdatedAt']) as String?,
+      ),
       imageUrl: (json['imageUrl'] ?? json['ImageUrl']) as String?,
     );
   }
@@ -125,10 +123,12 @@ class ImportHistoryItemModel {
       'businessLocationName': businessLocationName,
       if (supplier != null) 'supplier': supplier,
       if (note != null) 'note': note,
-      if (receivedAt != null) 'receivedAt': receivedAt!.toIso8601String(),
+      if (receivedAt != null)
+        'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt!),
       'totalAmount': totalAmount,
-      'createdAt': createdAt.toIso8601String(),
-      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+      'createdAt': DateFormatter.toApiUtcIsoString(createdAt),
+      if (updatedAt != null)
+        'updatedAt': DateFormatter.toApiUtcIsoString(updatedAt!),
       if (imageUrl != null) 'imageUrl': imageUrl,
     };
   }
@@ -164,14 +164,14 @@ class ImportDetailModel extends ImportHistoryItemModel {
       businessLocationName: json['businessLocationName'] as String,
       supplier: json['supplier'] as String?,
       note: json['note'] as String?,
-      receivedAt: json['receivedAt'] != null
-          ? DateTime.tryParse(json['receivedAt'] as String)
-          : null,
+        receivedAt: DateFormatter.parseApiDateTime(json['receivedAt'] as String?),
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.tryParse(json['updatedAt'] as String)
-          : null,
+        createdAt: DateFormatter.parseApiDateTime(
+          json['createdAt'] as String?,
+          fallback: DateTime.now().toUtc(),
+          ) ??
+          DateTime.now().toUtc(),
+        updatedAt: DateFormatter.parseApiDateTime(json['updatedAt'] as String?),
       items: itemsRaw
           .map((e) => ImportItemModel.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -211,7 +211,8 @@ class CreateImportRequest {
       'businessLocationId': businessLocationId,
       'supplier': supplier,
       'note': note,
-      if (receivedAt != null) 'receivedAt': receivedAt!.toIso8601String(),
+      if (receivedAt != null)
+        'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt!),
       'saveAsDraft': saveAsDraft,
       if (imagePath != null) 'imagePath': imagePath,
       'items': items.map((e) => e.toJson()).toList(),
@@ -243,7 +244,8 @@ class UpdateImportRequest {
       'importType': importType,
       'supplier': supplier,
       'note': note,
-      if (receivedAt != null) 'receivedAt': receivedAt!.toIso8601String(),
+      if (receivedAt != null)
+        'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt!),
       'items': items.map((e) => e.toJson()).toList(),
       'removeImage': removeImage,
       if (imagePath != null) 'imagePath': imagePath,
@@ -257,6 +259,6 @@ class ConfirmImportRequest {
   ConfirmImportRequest({required this.receivedAt});
 
   Map<String, dynamic> toJson() {
-    return {'receivedAt': receivedAt.toIso8601String()};
+    return {'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt)};
   }
 }

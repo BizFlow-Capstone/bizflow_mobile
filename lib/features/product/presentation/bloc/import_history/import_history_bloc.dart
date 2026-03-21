@@ -4,6 +4,7 @@ import '../../../data/import_repository.dart';
 import '../../../data/models/import_model.dart';
 import '../../../../../shared/cache/cache_manager.dart';
 import '../../../../../shared/context/business_context.dart';
+import '../../../../../shared/utils/date_formatter.dart';
 import 'import_history_event.dart';
 import 'import_history_state.dart';
 
@@ -39,8 +40,12 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
     final businessId = BusinessContext().currentBusinessId ?? 'all';
     final status = state.statusFilter ?? 'all';
     final type = state.typeFilter ?? 'all';
-    final from = state.fromDate?.toIso8601String() ?? 'none';
-    final to = state.toDate?.toIso8601String() ?? 'none';
+    final from = state.fromDate != null
+        ? DateFormatter.toApiUtcIsoString(state.fromDate!)
+        : 'none';
+    final to = state.toDate != null
+        ? DateFormatter.toApiUtcIsoString(state.toDate!)
+        : 'none';
     final location = locationId?.toString() ?? 'all';
     return 'cache_import_history_${businessId}_${location}_${status}_${type}_${from}_${to}';
   }

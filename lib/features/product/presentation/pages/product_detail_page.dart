@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/entities/product_entity.dart';
 import '../../data/product_repository.dart';
@@ -117,7 +117,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
     DateTime? parseDate(dynamic value) {
       if (value is String && value.isNotEmpty) {
-        return DateTime.tryParse(value);
+        return DateFormatter.parseApiDateTime(value);
       }
       return null;
     }
@@ -978,7 +978,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   ) {
     String formatDate(DateTime? value) {
       if (value == null) return '--';
-      return DateFormat('dd/MM/yyyy HH:mm').format(value.toLocal());
+      return DateFormatter.formatDateTime(value);
     }
 
     final title =

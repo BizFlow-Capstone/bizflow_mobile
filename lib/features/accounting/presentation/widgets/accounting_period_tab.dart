@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_period.dart';
 import '../bloc/accounting_period_bloc.dart';
@@ -592,7 +593,7 @@ class _AuditLogItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = DateFormat('dd/MM/yyyy HH:mm').format(log.createdAt);
+    final dateStr = DateFormatter.formatDateTime(log.createdAt);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
@@ -864,7 +865,7 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
             year: _periodType != 'custom' ? _year : null,
             quarter: _periodType == 'quarter' ? _quarter : null,
             startDate: _periodType == 'custom'
-                ? DateFormat('yyyy-MM-dd').format(_startDate)
+                ? DateFormatter.formatIso(_startDate)
                 : null,
           ),
         );
@@ -927,8 +928,8 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
     if (_periodType == 'custom') {
       bloc.add(CreateCustomPeriodRequested(
         locationId: widget.locationId,
-        startDate: DateFormat('yyyy-MM-dd').format(_startDate),
-        endDate: DateFormat('yyyy-MM-dd').format(_endDate),
+        startDate: DateFormatter.formatIso(_startDate),
+        endDate: DateFormatter.formatIso(_endDate),
         openingCashBalance: cash,
         openingBankBalance: bank,
         useSuggestedOpeningBalances: _useSuggestion,
@@ -1358,7 +1359,7 @@ class _DatePickerField extends StatelessWidget {
           suffixIcon: const Icon(Icons.calendar_today, size: 16),
         ),
         child: Text(
-          DateFormat('dd/MM/yyyy').format(date),
+          DateFormatter.formatDate(date),
           style: const TextStyle(fontSize: 14),
         ),
       ),

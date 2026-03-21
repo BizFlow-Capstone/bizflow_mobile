@@ -1,3 +1,5 @@
+import '../../../../shared/utils/date_formatter.dart';
+
 class EmployeeInvitationDto {
   final int hireId;
   final String ownerId;
@@ -16,8 +18,11 @@ class EmployeeInvitationDto {
       hireId: json['hireId'] as int? ?? 0,
       ownerId: json['ownerId'] as String? ?? '',
       ownerName: json['ownerName'] as String? ?? '',
-      invitedAt:
-          DateTime.tryParse(json['invitedAt'] as String? ?? '') ?? DateTime.now(),
+      invitedAt: DateFormatter.parseApiDateTime(
+            json['invitedAt'] as String?,
+            fallback: DateTime.now().toUtc(),
+          ) ??
+          DateTime.now().toUtc(),
     );
   }
 }

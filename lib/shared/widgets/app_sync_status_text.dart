@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../cache/sync_status_controller.dart';
+import '../utils/date_formatter.dart';
 
 class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
   final EdgeInsetsGeometry? padding;
@@ -28,7 +28,7 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
         if (state.isSyncing) {
           text = l10n.translate('sync.syncing');
         } else if (state.lastUpdatedAt != null) {
-          final time = DateFormat('HH:mm').format(state.lastUpdatedAt!);
+          final time = DateFormatter.formatTime(state.lastUpdatedAt!);
           text = l10n.translate('sync.updated_at', params: {'time': time});
         } else {
           text = l10n.translate('sync.idle');

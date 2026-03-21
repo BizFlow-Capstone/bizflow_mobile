@@ -1,3 +1,5 @@
+import '../../../../shared/utils/date_formatter.dart';
+
 class DebtorEntity {
   final int debtorId;
   final int businessLocationId;
@@ -67,7 +69,7 @@ class DebtorEntity {
     DateTime? toDate(dynamic value) {
       if (value == null) return null;
       if (value is String && value.isNotEmpty) {
-        return DateTime.tryParse(value);
+        return DateFormatter.parseApiDateTime(value);
       }
       return null;
     }
@@ -138,8 +140,12 @@ class DebtorEntity {
       'creditLimit': creditLimit,
       'currentBalance': currentBalance,
       'isActive': isActive,
-      'createdAt': createdAt?.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      'createdAt': createdAt != null
+          ? DateFormatter.toApiUtcIsoString(createdAt!)
+          : null,
+      'updatedAt': updatedAt != null
+          ? DateFormatter.toApiUtcIsoString(updatedAt!)
+          : null,
     };
   }
 }

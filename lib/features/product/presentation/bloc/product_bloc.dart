@@ -6,6 +6,7 @@ import '../../domain/entities/product_entity.dart';
 import '../../data/models/business_type_model.dart';
 import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import 'product_event.dart';
 import 'product_state.dart';
 
@@ -316,8 +317,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
                           true)
                       as bool,
             createdAt: (item['createdAt'] ?? item['CreatedAt']) != null
-                ? DateTime.tryParse(
-                    (item['createdAt'] ?? item['CreatedAt']) as String,
+                ? DateFormatter.parseApiDateTime(
+                    (item['createdAt'] ?? item['CreatedAt']) as String?,
                   )
                 : null,
             locationId:

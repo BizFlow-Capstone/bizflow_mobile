@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/entities/employee_entity.dart';
 
 class EmployeeCardWidget extends StatelessWidget {
@@ -47,15 +47,14 @@ class EmployeeCardWidget extends StatelessWidget {
       );
     }
 
-    final dateFormatter = DateFormat('dd/MM/yyyy');
     final startAtText = employee.startedAt != null
-        ? dateFormatter.format(employee.startedAt!.toLocal())
+      ? DateFormatter.formatDate(employee.startedAt)
         : '--';
     final endAtText = employee.endedAt != null
-        ? dateFormatter.format(employee.endedAt!.toLocal())
+      ? DateFormatter.formatDate(employee.endedAt)
         : '--';
 
-    final effectiveEnd = employee.endedAt ?? DateTime.now().toUtc();
+    final effectiveEnd = employee.endedAt ?? DateTime.now();
     String durationText = '--';
     final shouldShowWorkedTimeline = employee.startedAt != null;
     if (employee.startedAt != null && effectiveEnd.isAfter(employee.startedAt!)) {

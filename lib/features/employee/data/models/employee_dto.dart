@@ -1,6 +1,8 @@
 /// Employee DTO - Data Transfer Object
 library;
 
+import '../../../../shared/utils/date_formatter.dart';
+
 /// Employee Response from API
 class EmployeeResponseDto {
   final List<EmployeeDto> employees;
@@ -68,7 +70,7 @@ class EmployeeDto {
       if (raw == null) return null;
       final value = raw.toString().trim();
       if (value.isEmpty) return null;
-      return DateTime.tryParse(value);
+      return DateFormatter.parseApiDateTime(value);
     }
 
     final rawStatus = (json['status'] ?? json['Status'] ?? '').toString().trim();
@@ -106,8 +108,8 @@ class EmployeeDto {
       'isAlreadyHired': isAlreadyHired,
       'isActive': isActive,
       'status': status,
-      'startAt': startAt?.toIso8601String(),
-      'endAt': endAt?.toIso8601String(),
+      'startAt': startAt != null ? DateFormatter.toApiUtcIsoString(startAt!) : null,
+      'endAt': endAt != null ? DateFormatter.toApiUtcIsoString(endAt!) : null,
     };
   }
 }

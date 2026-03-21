@@ -6,6 +6,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/entities/debtor_entity.dart';
 import '../../presentation/bloc/debtor_bloc.dart';
@@ -248,11 +249,6 @@ class _DebtDetailPageState extends State<DebtDetailPage> {
   }
 
   String _formatDateTime(DateTime value) {
-    final local = value.toLocal();
-    final month = local.month.toString().padLeft(2, '0');
-    final day = local.day.toString().padLeft(2, '0');
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-    return '$day/$month/${local.year} $hour:$minute';
+    return DateFormatter.formatDateTime(value);
   }
 }
