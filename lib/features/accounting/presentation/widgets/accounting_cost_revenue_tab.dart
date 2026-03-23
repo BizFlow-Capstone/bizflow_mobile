@@ -5,18 +5,23 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../revenue/domain/entities/revenue_entity.dart';
 import '../models/accounting_mock_models.dart';
 
 class AccountingCostRevenueTab extends StatelessWidget {
-  final List<AccountingItemModel> revenues;
+  final List<RevenueEntity> revenues;
   final List<AccountingItemModel> costs;
-  final ValueChanged<AccountingItemModel> onEditRevenue;
+  final VoidCallback onAddRevenue;
+  final VoidCallback onAddCost;
+  final ValueChanged<RevenueEntity> onEditRevenue;
   final ValueChanged<AccountingItemModel> onEditCost;
 
   const AccountingCostRevenueTab({
     super.key,
     required this.revenues,
     required this.costs,
+    required this.onAddRevenue,
+    required this.onAddCost,
     required this.onEditRevenue,
     required this.onEditCost,
   });
@@ -29,6 +34,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
       children: [
         _card(
           title: l10n.translate('accounting.revenue_list'),
+          onAdd: onAddRevenue,
           child: Column(
             children: revenues
                 .map(
@@ -45,6 +51,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         _card(
           title: l10n.translate('accounting.cost_list'),
+          onAdd: onAddCost,
           child: Column(
             children: costs
                 .map(
@@ -64,19 +71,33 @@ class AccountingCostRevenueTab extends StatelessWidget {
 
   Widget _itemTile(
     BuildContext context, {
-    required AccountingItemModel item,
+    required dynamic item,
     required bool isRevenue,
     required VoidCallback onEdit,
   }) {
+    String title = '';
+    String subtitle = '';
+    double amount = 0;
+
+    if (item is RevenueEntity) {
+      title = 'REV-${item.id}';
+      subtitle = item.description;
+      amount = item.amount;
+    } else if (item is AccountingItemModel) {
+      title = item.code;
+      subtitle = item.description;
+      amount = item.amount;
+    }
+
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(item.code, style: AppTextStyles.bodyMedium),
-      subtitle: Text(item.description, style: AppTextStyles.bodySmall),
+      title: Text(title, style: AppTextStyles.bodyMedium),
+      subtitle: Text(subtitle, style: AppTextStyles.bodySmall),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            CurrencyFormatter.formatVND(item.amount),
+            CurrencyFormatter.formatVND(amount),
             style: AppTextStyles.labelSmall.copyWith(
               color: isRevenue ? AppColors.success : AppColors.error,
             ),
@@ -91,7 +112,11 @@ class AccountingCostRevenueTab extends StatelessWidget {
     );
   }
 
-  Widget _card({required String title, required Widget child}) {
+  Widget _card({
+    required String title,
+    required Widget child,
+    VoidCallback? onAdd,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -103,9 +128,24 @@ class AccountingCostRevenueTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: AppTextStyles.titleSmall.copyWith(fontWeight: FontWeight.bold),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.titleSmall.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (onAdd != null)
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+                  onPressed: onAdd,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  iconSize: 20,
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.sm),
           child,

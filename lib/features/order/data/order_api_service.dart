@@ -94,36 +94,7 @@ class OrderApiService {
     }
   }
 
-  /// Get draft orders for the current user
-  ///
-  /// API: GET /api/order/drafts
-  /// Returns: OrderResponseDto
-  Future<OrderResponseDto> getDraftOrders({
-    int pageNumber = 1,
-    int pageSize = 20,
-  }) async {
-    try {
-      final queryParams = {'pageNumber': pageNumber, 'pageSize': pageSize};
 
-      final response = await _apiClient.get(
-        ApiEndpoints.draftOrders,
-        queryParams: queryParams,
-      );
-
-      if (response.isSuccess && response.data != null) {
-        if (response.data is! Map<String, dynamic>) {
-          throw Exception('Invalid response format');
-        }
-
-        return OrderResponseDto.fromJson(response.data as Map<String, dynamic>);
-      } else {
-        throw Exception(response.message ?? 'Failed to load draft orders');
-      }
-    } catch (e) {
-      debugPrint('OrderApiService.getDraftOrders error: $e');
-      rethrow;
-    }
-  }
 
   /// Get single order by ID
   ///
@@ -149,18 +120,12 @@ class OrderApiService {
     }
   }
 
-  /// Create a new order (draft)
+  /// Create a new order (pending)
   ///
-  /// API: POST /api/order/create
+  /// API: POST /api/my-business/accounting/orders
   /// Returns: OrderDto
-  Future<OrderDto> createOrder({
-    required String locationId,
-    required List<Map<String, dynamic>> items,
-    String? note,
-  }) async {
+  Future<OrderDto> createOrder(Map<String, dynamic> body) async {
     try {
-      final body = {'locationId': locationId, 'items': items, 'note': note};
-
       final response = await _apiClient.post(
         ApiEndpoints.createOrder,
         body: body,
@@ -182,21 +147,15 @@ class OrderApiService {
     }
   }
 
-  /// Update an existing order (draft)
+  /// Update an existing order (pending)
   ///
-  /// API: PUT /api/order/{id}
+  /// API: PUT /api/my-business/accounting/orders/{id}
   /// Returns: OrderDto
   Future<OrderDto> updateOrder({
     required String orderId,
-    String? note,
-    List<Map<String, dynamic>>? items,
+    required Map<String, dynamic> body,
   }) async {
     try {
-      final body = {
-        if (note != null) 'note': note,
-        if (items != null) 'items': items,
-      };
-
       final response = await _apiClient.put(
         ApiEndpoints.updateOrder(orderId),
         body: body,
@@ -218,14 +177,15 @@ class OrderApiService {
     }
   }
 
-  /// Publish an order (convert draft to invoice)
+  /// Complete an order (convert pending to completed)
   ///
-  /// API: POST /api/order/{id}/publish
+  /// API: POST /api/my-business/accounting/orders/{id}/complete
   /// Returns: OrderDto
-  Future<OrderDto> publishOrder(String orderId) async {
+  Future<OrderDto> completeOrder(String orderId, {bool confirmLowStock = false}) async {
     try {
       final response = await _apiClient.post(
-        ApiEndpoints.publishOrder(orderId),
+        ApiEndpoints.completeOrder(orderId),
+        body: {'confirmLowStock': confirmLowStock},
       );
 
       if (response.isSuccess && response.data != null) {
@@ -236,10 +196,10 @@ class OrderApiService {
         final data = response.data as Map<String, dynamic>;
         return OrderDto.fromJson(data['data'] ?? data);
       } else {
-        throw Exception(response.message ?? 'Failed to publish order');
+        throw Exception(response.message ?? 'Failed to complete order');
       }
     } catch (e) {
-      debugPrint('OrderApiService.publishOrder error: $e');
+      debugPrint('OrderApiService.completeOrder error: $e');
       rethrow;
     }
   }

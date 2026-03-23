@@ -35,11 +35,16 @@ class ResetOrders extends OrderEvent {
 class LoadDraftOrdersRequested extends OrderEvent {
   final int pageNumber;
   final int pageSize;
+  final String? locationId;
 
-  const LoadDraftOrdersRequested({this.pageNumber = 1, this.pageSize = 20});
+  const LoadDraftOrdersRequested({
+    this.pageNumber = 1,
+    this.pageSize = 20,
+    this.locationId,
+  });
 
   @override
-  List<Object?> get props => [pageNumber, pageSize];
+  List<Object?> get props => [pageNumber, pageSize, locationId];
 }
 
 /// Load single order details
@@ -120,5 +125,9 @@ class FilterOrdersRequested extends OrderEvent {
 
 /// Refresh orders
 class RefreshOrdersRequested extends OrderEvent {
-  const RefreshOrdersRequested();
+  final String? locationId;
+  const RefreshOrdersRequested({this.locationId});
+
+  @override
+  List<Object?> get props => [locationId];
 }

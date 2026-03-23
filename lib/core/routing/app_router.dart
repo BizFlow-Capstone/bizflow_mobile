@@ -29,6 +29,7 @@ import '../../features/notification/presentation/pages/notification_list_page.da
 import '../../features/notification/presentation/pages/notification_detail_page.dart';
 import '../../features/debt/presentation/pages/debt_list_page.dart';
 import '../../features/accounting/presentation/pages/accounting_hub_page.dart';
+import '../../features/accounting/presentation/pages/general_ledger_page.dart';
 import '../../features/invoice_template/presentation/pages/invoice_template_page.dart';
 import '../../features/invoice_template/presentation/pages/advanced_invoice_template_page.dart';
 import '../../features/employee/presentation/pages/employee_list_page.dart';
@@ -75,6 +76,7 @@ class AppRoutes {
   static const String notificationDetail = '/notification-detail';
   static const String debtList = '/debt-list';
   static const String accounting = '/accounting';
+  static const String generalLedger = '/general-ledger';
   static const String invoiceTemplate = '/invoice-template';
   static const String advancedInvoiceTemplate = '/advanced-invoice-template';
   static const String employeeList = '/employee-list';
@@ -249,6 +251,9 @@ class AppRouter {
 
       case AppRoutes.accounting:
         return _buildRoute(settings, const AccountingHubPage());
+
+      case AppRoutes.generalLedger:
+        return _buildRoute(settings, const GeneralLedgerPage());
 
       case AppRoutes.importHistory:
         return _buildRoute(settings, const ImportHistoryPage());

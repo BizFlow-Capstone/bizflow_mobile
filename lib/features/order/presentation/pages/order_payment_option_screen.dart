@@ -7,6 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../domain/entities/order_item_entity.dart';
 import 'order_debt_screen.dart';
 import 'order_pay_now_screen.dart';
 
@@ -18,6 +19,7 @@ class OrderPaymentOptionScreen extends StatelessWidget {
   final String customerPhone;
   final int? locationId;
   final String? locationName;
+  final List<OrderItemEntity> items;
 
   const OrderPaymentOptionScreen({
     super.key,
@@ -28,6 +30,7 @@ class OrderPaymentOptionScreen extends StatelessWidget {
     required this.customerPhone,
     this.locationId,
     this.locationName,
+    required this.items,
   });
 
   @override
@@ -98,6 +101,7 @@ class OrderPaymentOptionScreen extends StatelessWidget {
                         customerPhone: customerPhone,
                         locationId: locationId,
                         locationName: locationName,
+                        items: items,
                       ),
                     ),
                   );
@@ -114,7 +118,11 @@ class OrderPaymentOptionScreen extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) =>
-                          OrderPayNowScreen(totalAmount: totalAmount),
+                          OrderPayNowScreen(
+                            totalAmount: totalAmount,
+                            items: items,
+                            locationId: locationId?.toString(),
+                          ),
                     ),
                   );
                 },

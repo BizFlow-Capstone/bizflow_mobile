@@ -4,6 +4,9 @@ import '../../domain/entities/order_entity.dart';
 import 'order_event.dart';
 import 'order_state.dart';
 
+export 'order_event.dart';
+export 'order_state.dart';
+
 /// Order BLoC - Manages state and business logic for orders
 ///
 /// Responsibilities:
@@ -39,24 +42,27 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   ) async {
     emit(const OrdersLoading());
     try {
-      final orders = await repository.getOrders(
+      await repository.getOrdersSWR(
         pageNumber: event.pageNumber,
         pageSize: event.pageSize,
         status: event.status,
         locationId: event.locationId,
-      );
-
-      _orders = orders;
-      _currentStatusFilter = event.status;
-      _currentLocationFilter = event.locationId;
-
-      emit(
-        OrdersLoaded(
-          orders: orders,
-          total: orders.length,
-          pageNumber: event.pageNumber,
-          pageSize: event.pageSize,
-        ),
+        onData: (orders, totalCount, isFromCache) {
+          _orders = orders;
+          _currentStatusFilter = event.status;
+          _currentLocationFilter = event.locationId;
+          emit(
+            OrdersLoaded(
+              orders: orders,
+              total: totalCount,
+              pageNumber: event.pageNumber,
+              pageSize: event.pageSize,
+            ),
+          );
+        },
+        onError: (e) {
+          emit(OrderError(message: e.toString()));
+        },
       );
     } catch (e) {
       emit(OrderError(message: e.toString()));
@@ -70,14 +76,19 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   ) async {
     emit(const OrdersLoading());
     try {
-      final orders = await repository.getDraftOrders(
+      await repository.getOrdersSWR(
         pageNumber: event.pageNumber,
         pageSize: event.pageSize,
+        status: 'DRAFT',
+        locationId: event.locationId,
+        onData: (orders, totalCount, isFromCache) {
+          _orders = orders;
+          emit(DraftOrdersLoaded(orders: orders));
+        },
+        onError: (e) {
+          emit(OrderError(message: e.toString()));
+        },
       );
-
-      _orders = orders;
-
-      emit(DraftOrdersLoaded(orders: orders));
     } catch (e) {
       emit(OrderError(message: e.toString()));
     }
@@ -104,11 +115,19 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   ) async {
     emit(const OrdersLoading());
     try {
-      final order = await repository.createOrder(
-        locationId: event.locationId,
-        items: event.items,
-        note: event.note,
-      );
+      final body = {
+        'locationId': event.locationId,
+        'items': event.items.map((e) => {
+          'productId': e.productId, // This actually should map to SaleItemId if backend says saleItemId, but the DTO accepts saleItemId / productId. I will use what's available.
+          // Wait, backend CreateOrderRequest uses SaleItemId
+          'saleItemId': int.tryParse(e.productId) ?? 0,
+          'quantity': e.quantity,
+          'discount': e.discount,
+        }).toList(),
+        'note': event.note,
+      };
+
+      final order = await repository.createOrder(body);
 
       _orders.insert(0, order);
 
@@ -124,10 +143,18 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     Emitter<OrderState> emit,
   ) async {
     try {
+      final body = {
+        if (event.note != null) 'note': event.note,
+        if (event.items != null) 'items': event.items!.map((e) => {
+          'saleItemId': int.tryParse(e.productId) ?? 0,
+          'quantity': e.quantity,
+          'discount': e.discount,
+        }).toList(),
+      };
+
       final order = await repository.updateOrder(
         orderId: event.orderId,
-        note: event.note,
-        items: event.items,
+        requestBody: body,
       );
 
       final index = _orders.indexWhere((o) => o.id == event.orderId);
@@ -141,13 +168,13 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     }
   }
 
-  /// Publish order
+  /// Publish order (now Complete order)
   Future<void> _onPublishOrderRequested(
     PublishOrderRequested event,
     Emitter<OrderState> emit,
   ) async {
     try {
-      final order = await repository.publishOrder(event.orderId);
+      final order = await repository.completeOrder(event.orderId);
 
       final index = _orders.indexWhere((o) => o.id == event.orderId);
       if (index != -1) {
@@ -183,23 +210,26 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   ) async {
     emit(const OrdersLoading());
     try {
-      final orders = await repository.getOrders(
+      await repository.getOrdersSWR(
         pageNumber: event.pageNumber,
         pageSize: event.pageSize,
         status: event.status,
         locationId: event.locationId,
-      );
-
-      _orders = orders;
-      _currentStatusFilter = event.status;
-      _currentLocationFilter = event.locationId;
-
-      emit(
-        OrdersFiltered(
-          orders: orders,
-          statusFilter: event.status,
-          locationFilter: event.locationId,
-        ),
+        onData: (orders, totalCount, isFromCache) {
+          _orders = orders;
+          _currentStatusFilter = event.status;
+          _currentLocationFilter = event.locationId;
+          emit(
+            OrdersFiltered(
+              orders: orders,
+              statusFilter: event.status,
+              locationFilter: event.locationId,
+            ),
+          );
+        },
+        onError: (e) {
+          emit(OrderError(message: e.toString()));
+        },
       );
     } catch (e) {
       emit(OrderError(message: e.toString()));
@@ -215,20 +245,25 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     try {
       repository.clearCache();
 
-      final orders = await repository.getOrders(
+      await repository.getOrdersSWR(
+        pageNumber: 1,
+        pageSize: 20,
         status: _currentStatusFilter,
-        locationId: _currentLocationFilter,
-      );
-
-      _orders = orders;
-
-      emit(
-        OrdersLoaded(
-          orders: orders,
-          total: orders.length,
-          pageNumber: 1,
-          pageSize: 20,
-        ),
+        locationId: event.locationId ?? _currentLocationFilter,
+        onData: (orders, totalCount, isFromCache) {
+          _orders = orders;
+          emit(
+            OrdersLoaded(
+              orders: orders,
+              total: totalCount,
+              pageNumber: 1,
+              pageSize: 20,
+            ),
+          );
+        },
+        onError: (e) {
+          emit(OrderError(message: e.toString()));
+        },
       );
     } catch (e) {
       emit(OrderError(message: e.toString()));

@@ -8,6 +8,8 @@ import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../debt/presentation/bloc/debtor_bloc.dart';
+import '../../domain/entities/order_item_entity.dart';
+import '../bloc/order_bloc.dart';
 import 'order_debt_confirmation_screen.dart';
 
 class OrderDebtScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class OrderDebtScreen extends StatefulWidget {
   final String customerPhone;
   final int? locationId;
   final String? locationName;
+  final List<OrderItemEntity> items;
 
   const OrderDebtScreen({
     super.key,
@@ -28,6 +31,7 @@ class OrderDebtScreen extends StatefulWidget {
     required this.customerPhone,
     this.locationId,
     this.locationName,
+    required this.items,
   });
 
   @override
@@ -81,8 +85,23 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
         ),
         bottom: const AppSyncStatusText(),
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
+      body: BlocListener<OrderBloc, OrderState>(
+        listener: (context, state) {
+          if (state is OrderCreated) {
+            // After order is created, we can proceed to confirmation or just show success
+            // In the original flow, it went to OrderDebtConfirmationScreen.
+            // I'll keep that.
+          } else if (state is OrderError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        },
+        child: SafeArea(
+          child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
@@ -297,8 +316,9 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
           },
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Future<void> _submitDebt({
     required double amountPaid,
@@ -382,6 +402,18 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
         debtorId = createdDebtor.debtorId;
       }
 
+      // 1. Create Order via OrderBloc
+      context.read<OrderBloc>().add(
+            CreateOrderRequested(
+              locationId: widget.locationId!.toString(),
+              items: widget.items,
+              note: _notesController.text.trim().isEmpty
+                  ? null
+                  : _notesController.text.trim(),
+            ),
+          );
+
+      // 2. Record Debt Adjustment (already existing logic)
       await repository.recordDebtAdjustment(
         debtorId: debtorId,
         amount: debtAmount,

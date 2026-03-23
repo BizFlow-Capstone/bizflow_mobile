@@ -6,11 +6,23 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../domain/entities/order_item_entity.dart';
+import '../bloc/order_bloc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class OrderPayNowScreen extends StatefulWidget {
   final double totalAmount;
+  final List<OrderItemEntity> items;
+  final String? locationId;
+  final String? note;
 
-  const OrderPayNowScreen({super.key, required this.totalAmount});
+  const OrderPayNowScreen({
+    super.key,
+    required this.totalAmount,
+    required this.items,
+    this.locationId,
+    this.note,
+  });
 
   @override
   State<OrderPayNowScreen> createState() => _OrderPayNowScreenState();
@@ -38,8 +50,41 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
         ),
         bottom: const AppSyncStatusText(),
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
+      body: BlocListener<OrderBloc, OrderState>(
+        listener: (context, state) {
+          if (state is OrderCreated) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(l10n.translate('common.success')),
+                content: Text(
+                  l10n.translate('order_create.payment_success'),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context); // Dialog
+                      Navigator.popUntil(
+                        context,
+                        ModalRoute.withName('/home'),
+                      );
+                    },
+                    child: Text(l10n.translate('common.ok')),
+                  ),
+                ],
+              ),
+            );
+          } else if (state is OrderError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppColors.error,
+              ),
+            );
+          }
+        },
+        child: SafeArea(
+          child: LayoutBuilder(
           builder: (context, constraints) {
             return SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
@@ -166,27 +211,22 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
                           foregroundColor: AppColors.white,
                         ),
                         onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text(l10n.translate('common.success')),
-                              content: Text(
-                                l10n.translate('order_create.payment_success'),
+                          if (widget.locationId == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Location ID is required'),
                               ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    Navigator.popUntil(
-                                      context,
-                                      ModalRoute.withName('/home'),
-                                    );
-                                  },
-                                  child: Text(l10n.translate('common.ok')),
+                            );
+                            return;
+                          }
+
+                          context.read<OrderBloc>().add(
+                                CreateOrderRequested(
+                                  locationId: widget.locationId!,
+                                  items: widget.items,
+                                  note: widget.note,
                                 ),
-                              ],
-                            ),
-                          );
+                              );
                         },
                         child: Text(
                           l10n.translate('order_create.proceed_payment'),
@@ -204,8 +244,9 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
           },
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildMethodButton({
     required IconData icon,

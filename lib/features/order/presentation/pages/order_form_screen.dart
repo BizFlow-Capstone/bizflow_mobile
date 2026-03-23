@@ -10,6 +10,7 @@ import '../../../debt/presentation/bloc/debtor_bloc.dart';
 import '../../../debt/presentation/bloc/debtor_event.dart';
 import '../../../debt/presentation/bloc/debtor_state.dart';
 import '../../../debt/domain/entities/debtor_entity.dart';
+import '../../domain/entities/order_item_entity.dart';
 import 'order_payment_option_screen.dart';
 
 class OrderFormScreen extends StatefulWidget {
@@ -31,10 +32,22 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
 
   static const int _phoneLength = 10;
 
-  // Example dummy products obtained from voice/audio processing
-  final List<Map<String, dynamic>> _mockProducts = [
-    {"name": "iPhone 15 Pro Max", "price": 30000000.0, "quantity": 1},
-    {"name": "Ốp lưng iPhone", "price": 150000.0, "quantity": 1},
+  // Example products obtained from voice/audio processing
+  final List<OrderItemEntity> _items = [
+    const OrderItemEntity(
+      productId: '11',
+      productName: "iPhone 15 Pro Max",
+      price: 30000000.0,
+      quantity: 1,
+      discount: 0,
+    ),
+    const OrderItemEntity(
+      productId: '12',
+      productName: "Ốp lưng iPhone",
+      price: 150000.0,
+      quantity: 1,
+      discount: 0,
+    ),
   ];
 
   @override
@@ -62,9 +75,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         BusinessContext().currentBusinessName ??
         l10n.translate('common.no_data');
 
-    double subTotal = _mockProducts.fold(
+    double subTotal = _items.fold(
       0,
-      (sum, item) => sum + (item['price'] * item['quantity']),
+      (sum, item) => sum + (item.price * item.quantity),
     );
     double tax = subTotal * 0.1;
     double total = subTotal + tax;
@@ -317,17 +330,16 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                ..._mockProducts.map(
+                ..._items.map(
                   (p) => ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(p['name']),
+                    title: Text(p.productName),
                     subtitle: Text(
-                      '${CurrencyFormatter.formatVND((p['price'] as num).toDouble())} x ${p['quantity']}',
+                      '${CurrencyFormatter.formatVND(p.price)} x ${p.quantity}',
                     ),
                     trailing: Text(
                       CurrencyFormatter.formatVND(
-                        ((p['price'] as num).toDouble()) *
-                            ((p['quantity'] as num).toDouble()),
+                        p.price * p.quantity,
                       ),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -429,6 +441,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                     customerPhone: customerPhone,
                     locationId: locationId,
                     locationName: BusinessContext().currentBusinessName,
+                    items: _items,
                   ),
                 ),
               );

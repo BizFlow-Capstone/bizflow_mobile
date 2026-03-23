@@ -65,15 +65,19 @@ class ApiEndpoints {
   ) => '/api/location/$locationId/employees/$employeeId';
 
   // Order/Invoice
-  static const String orders = '/api/order/my-orders';
-  static const String draftOrders = '/api/order/drafts';
-  static const String createOrder = '/api/order/create';
+  static const String orders = '/api/my-business/accounting/orders';
+  static const String createOrder = '/api/my-business/accounting/orders';
 
   // Order with ID - use with String interpolation
-  static String getOrder(String id) => '/api/order/$id';
-  static String updateOrder(String id) => '/api/order/$id';
-  static String publishOrder(String id) => '/api/order/$id/publish';
-  static String cancelOrder(String id) => '/api/order/$id/cancel';
+  static String getOrder(String id) => '/api/my-business/accounting/orders/$id';
+  static String updateOrder(String id) => '/api/my-business/accounting/orders/$id';
+  static String completeOrder(String id) => '/api/my-business/accounting/orders/$id/complete';
+  static String cancelOrder(String id) => '/api/my-business/accounting/orders/$id/cancel';
+
+  // Revenue
+  static const String revenues = '/api/my-business/accounting/revenues';
+  static const String createManualRevenue = '/api/my-business/accounting/revenues/manual';
+  static String deleteManualRevenue(String id) => '/api/my-business/accounting/revenues/$id';
 
   // Product
   static const String products = '/api/my-business/products';

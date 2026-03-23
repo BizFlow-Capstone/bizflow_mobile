@@ -106,7 +106,6 @@
     "logout_success": "Đăng xuất thành công",
     "checking_auth": "Đang kiểm tra...",
     "welcome_new_user": "Chào mừng! Vui lòng thiết lập mật khẩu",
-    "confirm_password": "Xác nhận mật khẩu",
     "passwords_not_match": "Mật khẩu không khớp",
     "password_min_length_8": "Mật khẩu phải có ít nhất 8 ký tự"
   },
@@ -866,6 +865,12 @@
     "entry_type": "Kiểu bút toán",
     "debit": "Nợ",
     "credit": "Có",
+    "add_revenue": "Thêm doanh thu",
+    "revenue_amount": "Số tiền doanh thu",
+    "revenue_description": "Mô tả doanh thu",
+    "revenue_date": "Ngày ghi nhận",
+    "revenue_created_success": "Đã thêm doanh thu mới",
+    "revenue_deleted_success": "Đã xóa doanh thu",
     "revenue_list": "Danh sách doanh thu",
     "cost_list": "Danh sách chi phí",
     "edit_revenue": "Cập nhật doanh thu",
@@ -938,6 +943,15 @@
     "action_reopen": "Mở lại",
     "action_view_audit": "Xem lịch sử",
     "first_period_opening_balance_required": "Kỳ đầu tiên bắt buộc nhập số dư đầu kỳ tiền mặt và ngân hàng",
-    "custom_end_date_must_be_after_start": "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu"
+    "custom_end_date_must_be_after_start": "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu",
+    "gl_empty": "Không có giao dịch nào được tìm thấy",
+    "gl_empty_sub": "Vui lòng thay đổi bộ lọc hoặc thử lại sau",
+    "gl_view_mode": "Chế độ xem",
+    "gl_view_audit": "Theo chứng từ (Audit)",
+    "gl_view_effective": "Theo bảng cân đối (Effective)",
+    "gl_filter_transaction": "Loại giao dịch",
+    "gl_filter_reference": "Tham chiếu",
+    "gl_filter_channel": "Kênh tiền",
+    "general_ledger": "Sổ nhật ký chung"
   }
 }

@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../bloc/order_bloc.dart';
-import '../bloc/order_event.dart';
-import '../bloc/order_state.dart';
+import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
+import 'package:bizflow_mobile/features/order/domain/entities/order_entity.dart';
+import 'package:bizflow_mobile/shared/context/business_context.dart';
+import 'package:bizflow_mobile/shared/widgets/app_sync_status_text.dart';
+import 'package:bizflow_mobile/shared/dialogs/app_snackbar.dart';
 import '../widgets/order_card.dart';
 import '../widgets/order_filter.dart';
 import 'order_creation_selection_screen.dart';
-import '../../../../shared/dialogs/app_snackbar.dart';
-import '../../../../shared/widgets/app_sync_status_text.dart';
 
 /// Order List Screen (SC-ORD-02) - Displays list of draft invoices/orders
 class OrderListScreen extends StatefulWidget {
@@ -31,7 +31,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   void _loadDraftOrders() {
-    context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+    final locationId = context.read<BusinessContext>().currentBusinessId;
+    context.read<OrderBloc>().add(LoadDraftOrdersRequested(locationId: locationId));
   }
 
   void _applyFilter(Map<String, dynamic> filters) {
@@ -47,7 +48,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   void _refreshOrders() {
-    context.read<OrderBloc>().add(const RefreshOrdersRequested());
+    final locationId = context.read<BusinessContext>().currentBusinessId;
+    context.read<OrderBloc>().add(RefreshOrdersRequested(locationId: locationId));
   }
 
   @override
@@ -105,7 +107,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             return Center(child: CircularProgressIndicator());
           }
 
-          List<dynamic> orders = [];
+          List<OrderEntity> orders = [];
           if (state is DraftOrdersLoaded) {
             orders = state.orders;
           } else if (state is OrdersLoaded) {

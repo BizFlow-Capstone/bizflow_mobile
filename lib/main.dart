@@ -45,6 +45,17 @@ import 'features/debt/presentation/bloc/debtor_bloc.dart';
 import 'features/accounting/data/services/accounting_api_service.dart';
 import 'features/accounting/data/repositories/accounting_repository.dart';
 import 'features/accounting/presentation/bloc/accounting_period_bloc.dart';
+import 'features/accounting/data/services/gl_api_service.dart';
+import 'features/accounting/data/repositories/gl_repository.dart';
+import 'features/accounting/presentation/bloc/gl_bloc/gl_bloc.dart';
+import 'core/reference/data/reference_api_service.dart';
+import 'core/reference/data/reference_repository.dart';
+import 'core/reference/presentation/bloc/reference_bloc.dart';
+import 'core/reference/presentation/bloc/reference_event.dart';
+import 'features/revenue/data/revenue_api_service.dart';
+import 'features/revenue/data/revenue_repository.dart';
+import 'features/revenue/presentation/bloc/revenue_bloc.dart';
+import 'features/revenue/presentation/bloc/revenue_event.dart';
 
 import 'shared/context/business_context.dart';
 import 'shared/context/user_profile_context.dart';
@@ -90,6 +101,12 @@ class _MyAppState extends State<MyApp> {
   late EmployeeManagementRepository _employeeManagementRepository;
   late PushTokenApiService _pushTokenApiService;
   late FirebaseMessagingService _firebaseMessagingService;
+  late ReferenceApiService _referenceApiService;
+  late ReferenceRepository _referenceRepository;
+  late GLApiService _glApiService;
+  late GLRepository _glRepository;
+  late RevenueApiService _revenueApiService;
+  late RevenueRepository _revenueRepository;
 
   @override
   void initState() {
@@ -162,7 +179,10 @@ class _MyAppState extends State<MyApp> {
     _importApiService = ImportApiService(apiClient: _apiClient);
     _debtorApiService = DebtorApiService(apiClient: _apiClient);
     _accountingApiService = AccountingApiService(apiClient: _apiClient);
+    _glApiService = GLApiService(apiClient: _apiClient);
     _pushTokenApiService = PushTokenApiService(apiClient: _apiClient);
+    _referenceApiService = ReferenceApiService(apiClient: _apiClient);
+    _revenueApiService = RevenueApiService(apiClient: _apiClient);
 
     // Initialize Repositories (calls Services)
     _locationRepository = LocationRepository(service: _locationApiService);
@@ -177,6 +197,9 @@ class _MyAppState extends State<MyApp> {
       apiService: _employeeApiService,
       locationApiService: _locationApiService,
     );
+    _referenceRepository = ReferenceRepository(apiService: _referenceApiService);
+    _glRepository = GLRepository(apiService: _glApiService);
+    _revenueRepository = RevenueRepository(apiService: _revenueApiService);
 
     _firebaseMessagingService = FirebaseMessagingService(
       pushTokenApiService: _pushTokenApiService,
@@ -232,6 +255,12 @@ class _MyAppState extends State<MyApp> {
               AccountingPeriodBloc(repository: _accountingRepository),
         ),
         BlocProvider(
+          create: (context) => ReferenceBloc(repository: _referenceRepository),
+        ),
+        BlocProvider(
+          create: (context) => GLBloc(repository: _glRepository),
+        ),
+        BlocProvider(
           create: (context) =>
               InvoiceTemplateBloc(repository: _invoiceTemplateRepository)
                 ..add(const LoadInvoiceTemplateRequested()),
@@ -239,6 +268,9 @@ class _MyAppState extends State<MyApp> {
         BlocProvider(
           create: (context) =>
               EmployeeBloc(repository: _employeeManagementRepository),
+        ),
+        BlocProvider(
+          create: (context) => RevenueBloc(repository: _revenueRepository),
         ),
         Provider<EmployeeRepository>.value(value: _employeeRepository),
         Provider<ImportRepository>.value(value: _importRepository),
@@ -250,12 +282,16 @@ class _MyAppState extends State<MyApp> {
             builder: (context, _) {
           return BlocListener<AuthBloc, AuthState>(
             listener: (context, state) {
+              if (state is AuthAuthenticated) {
+                context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+              }
               if (state is LogoutSuccess) {
                 // Reset all data-heavy Blocs to clear memory
                 context.read<LocationBloc>().add(const ResetLocations());
                 context.read<OrderBloc>().add(const ResetOrders());
                 context.read<ProductBloc>().add(const ResetProducts());
                 context.read<DebtorBloc>().add(const ResetDebtors());
+                context.read<RevenueBloc>().add(const ResetRevenues());
                 
                 // Navigate to login
                 AppRouter.navigateAndClearStack(AppRoutes.login);
