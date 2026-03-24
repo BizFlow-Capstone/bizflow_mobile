@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_audio_upload_screen.dart';
+import 'order_form_screen.dart';
 import 'order_voice_record_screen.dart';
-import 'order_manual_input_screen.dart';
 
 /// Screen SC-ORD-01: User selects method to create an order
 class OrderCreationSelectionScreen extends StatelessWidget {
@@ -80,7 +80,7 @@ class OrderCreationSelectionScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const OrderManualInputScreen(),
+                      builder: (_) => const OrderFormScreen(inputType: 'manual'),
                     ),
                   );
                 },

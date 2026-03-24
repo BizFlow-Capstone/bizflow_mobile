@@ -91,6 +91,8 @@ class ProductDto {
         json['salePrice'] ??
         json['SalePrice'] ??
         json['sale_price'] ??
+        json['currentSalePrice'] ??
+        json['CurrentSalePrice'] ??
         json['price'] ??
         json['Price'] ??
         json['unitPrice'] ??
@@ -101,6 +103,8 @@ class ProductDto {
         json['costPrice'] ??
         json['CostPrice'] ??
         json['cost_price'] ??
+        json['currentCostPrice'] ??
+        json['CurrentCostPrice'] ??
         json['purchasePrice'] ??
         json['PurchasePrice'] ??
         json['purchase_price'] ??

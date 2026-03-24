@@ -24,190 +24,155 @@ class ProductFabMenuWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Stack(
-      alignment: Alignment.bottomRight,
-      children: [
-        // Overlay when menu is open
-        if (isOpen)
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: onToggle,
-              child: Container(color: Colors.transparent),
-            ),
-          ),
-
-        // Menu items container
-        if (isOpen)
-          Positioned(
-            bottom: 70,
-            right: 16,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: isOpen ? 1 : 0),
-              duration: const Duration(milliseconds: 300),
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (isOpen)
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 220),
               builder: (context, value, child) {
-                return SafeArea(
-                  child: Transform.scale(
-                    scale: value,
-                    alignment: Alignment.bottomRight,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Add Product Option
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                onAddProduct();
-                              },
-                              borderRadius: const BorderRadius.only(
-                                topLeft: Radius.circular(16),
-                                topRight: Radius.circular(16),
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.lg,
-                                  vertical: AppSpacing.md,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.add,
-                                      color: AppColors.secondary,
-                                      size: 24,
-                                    ),
-                                    SizedBox(width: AppSpacing.lg),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          l10n.translate('product.add_product'),
-                                          style: AppTextStyles.bodyMedium
-                                              .copyWith(
-                                                color: AppColors.textPrimary,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                        ),
-                                        SizedBox(height: AppSpacing.xs),
-                                        Text(
-                                          l10n.translate(
-                                            'product.create_product_option',
-                                          ),
-                                          style: AppTextStyles.bodySmall.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(width: AppSpacing.md),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // Divider
-                          Divider(
-                            color: AppColors.divider,
-                            height: 1,
-                            indent: AppSpacing.lg,
-                            endIndent: AppSpacing.lg,
-                          ),
-
-                          // Import Inventory Option
-                          Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                onImportInventory();
-                              },
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(16),
-                                bottomRight: Radius.circular(16),
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.lg,
-                                  vertical: AppSpacing.md,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.file_download_outlined,
-                                      color: AppColors.secondary,
-                                      size: 24,
-                                    ),
-                                    SizedBox(width: AppSpacing.lg),
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          l10n.translate(
-                                            'product.import_inventory',
-                                          ),
-                                          style: AppTextStyles.bodyMedium
-                                              .copyWith(
-                                                color: AppColors.textPrimary,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                        ),
-                                        SizedBox(height: AppSpacing.xs),
-                                        Text(
-                                          l10n.translate('stock_import.title'),
-                                          style: AppTextStyles.bodySmall.copyWith(
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    SizedBox(width: AppSpacing.md),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                return Transform.scale(
+                  scale: value,
+                  alignment: Alignment.bottomRight,
+                  child: child,
                 );
               },
-            ),
-          ),
-
-        // Main FAB Button
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: SafeArea(
-            child: FloatingActionButton(
-              onPressed: onToggle,
-              backgroundColor: AppColors.secondary,
-              elevation: 6,
-              child: Icon(
-                isOpen ? Icons.close : Icons.add,
-                color: AppColors.white,
-                size: 28,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                constraints: const BoxConstraints(maxWidth: 250),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onAddProduct,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(16),
+                          topRight: Radius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add,
+                                color: AppColors.secondary,
+                                size: 20,
+                              ),
+                              SizedBox(width: AppSpacing.md),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.translate('product.add_product'),
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    l10n.translate(
+                                      'product.create_product_option',
+                                    ),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Divider(
+                      color: AppColors.divider,
+                      height: 1,
+                      indent: AppSpacing.lg,
+                      endIndent: AppSpacing.lg,
+                    ),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: onImportInventory,
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(16),
+                          bottomRight: Radius.circular(16),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.file_download_outlined,
+                                color: AppColors.secondary,
+                                size: 20,
+                              ),
+                              SizedBox(width: AppSpacing.md),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l10n.translate('product.import_inventory'),
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(height: AppSpacing.xs),
+                                  Text(
+                                    l10n.translate('stock_import.title'),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+          FloatingActionButton(
+            onPressed: onToggle,
+            backgroundColor: AppColors.secondary,
+            elevation: 6,
+            child: Icon(
+              isOpen ? Icons.close : Icons.add,
+              color: AppColors.white,
+              size: 28,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

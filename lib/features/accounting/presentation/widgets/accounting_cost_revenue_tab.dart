@@ -14,6 +14,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
   final VoidCallback onAddRevenue;
   final VoidCallback onAddCost;
   final ValueChanged<RevenueEntity> onEditRevenue;
+  final ValueChanged<RevenueEntity> onTapRevenue;
   final ValueChanged<AccountingItemModel> onEditCost;
 
   const AccountingCostRevenueTab({
@@ -23,6 +24,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     required this.onAddRevenue,
     required this.onAddCost,
     required this.onEditRevenue,
+    required this.onTapRevenue,
     required this.onEditCost,
   });
 
@@ -42,6 +44,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
                     context,
                     item: item,
                     isRevenue: true,
+                    onTap: () => onTapRevenue(item),
                     onEdit: () => onEditRevenue(item),
                   ),
                 )
@@ -59,6 +62,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
                     context,
                     item: item,
                     isRevenue: false,
+                    onTap: null,
                     onEdit: () => onEditCost(item),
                   ),
                 )
@@ -73,6 +77,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     BuildContext context, {
     required dynamic item,
     required bool isRevenue,
+    VoidCallback? onTap,
     required VoidCallback onEdit,
   }) {
     String title = '';
@@ -90,6 +95,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     }
 
     return ListTile(
+      onTap: onTap,
       contentPadding: EdgeInsets.zero,
       title: Text(title, style: AppTextStyles.bodyMedium),
       subtitle: Text(subtitle, style: AppTextStyles.bodySmall),

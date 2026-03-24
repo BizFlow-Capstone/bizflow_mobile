@@ -33,6 +33,19 @@ class CacheManager {
     await _storage?.remove('cache_$key');
   }
 
+  /// Xóa cache theo prefix key (vd: orders_)
+  Future<void> removeByPrefix(String prefix) async {
+    await init();
+    final keys = _storage?.getKeys() ?? <String>{};
+    final targetPrefix = 'cache_$prefix';
+
+    for (final key in keys) {
+      if (key.startsWith(targetPrefix)) {
+        await _storage?.remove(key);
+      }
+    }
+  }
+
   /// Xóa toàn bộ dữ liệu (nên dùng khi Logout)
   Future<void> clearAll() async {
     await init();

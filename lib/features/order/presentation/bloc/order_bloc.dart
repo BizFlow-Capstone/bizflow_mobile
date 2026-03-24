@@ -1,6 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/storage/local_storage.dart';
 import '../../data/order_repository.dart';
 import '../../domain/entities/order_entity.dart';
+import '../../domain/entities/order_item_entity.dart';
 import 'order_event.dart';
 import 'order_state.dart';
 
@@ -61,11 +66,11 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
           );
         },
         onError: (e) {
-          emit(OrderError(message: e.toString()));
+          emit(OrderError(message: ApiErrorMessageParser.parse(e)));
         },
       );
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -76,21 +81,11 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   ) async {
     emit(const OrdersLoading());
     try {
-      await repository.getOrdersSWR(
-        pageNumber: event.pageNumber,
-        pageSize: event.pageSize,
-        status: 'DRAFT',
-        locationId: event.locationId,
-        onData: (orders, totalCount, isFromCache) {
-          _orders = orders;
-          emit(DraftOrdersLoaded(orders: orders));
-        },
-        onError: (e) {
-          emit(OrderError(message: e.toString()));
-        },
-      );
+      final drafts = await _loadLocalDraftOrders(locationId: event.locationId);
+      _orders = drafts;
+      emit(DraftOrdersLoaded(orders: drafts));
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -104,7 +99,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       final order = await repository.getOrder(event.orderId);
       emit(OrderDetailsLoaded(order: order));
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -115,15 +110,33 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   ) async {
     emit(const OrdersLoading());
     try {
+      final businessLocationId = int.tryParse(event.locationId);
+      if (businessLocationId == null || businessLocationId <= 0) {
+        throw Exception('Business location is required');
+      }
+
+      final hasInvalidSaleItem = event.items.any(
+        (item) => (item.saleItemId ?? 0) <= 0,
+      );
+      if (hasInvalidSaleItem) {
+        throw Exception('Sale item is required for all order items');
+      }
+
       final body = {
-        'locationId': event.locationId,
-        'items': event.items.map((e) => {
-          'productId': e.productId, // This actually should map to SaleItemId if backend says saleItemId, but the DTO accepts saleItemId / productId. I will use what's available.
-          // Wait, backend CreateOrderRequest uses SaleItemId
-          'saleItemId': int.tryParse(e.productId) ?? 0,
-          'quantity': e.quantity,
-          'discount': e.discount,
-        }).toList(),
+        'businessLocationId': businessLocationId,
+        'items': event.items
+            .map(
+              (e) => {
+                'productId': e.productId,
+                'saleItemId': e.saleItemId,
+                'quantity': e.quantity,
+                'discount': e.discount,
+              },
+            )
+            .toList(),
+        'cashAmount': event.cashAmount,
+        'bankAmount': event.bankAmount,
+        'debtAmount': event.debtAmount,
         'note': event.note,
       };
 
@@ -133,7 +146,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
 
       emit(OrderCreated(order: order));
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -143,18 +156,41 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     Emitter<OrderState> emit,
   ) async {
     try {
+      final hasInvalidSaleItem = event.items?.any(
+        (item) => (item.saleItemId ?? 0) <= 0,
+      );
+      if (hasInvalidSaleItem == true) {
+        throw Exception('Sale item is required for all order items');
+      }
+
       final body = {
         if (event.note != null) 'note': event.note,
-        if (event.items != null) 'items': event.items!.map((e) => {
-          'saleItemId': int.tryParse(e.productId) ?? 0,
-          'quantity': e.quantity,
-          'discount': e.discount,
-        }).toList(),
+        if (event.status != null) 'status': event.status,
+        if (event.businessLocationId != null)
+          'businessLocationId': int.tryParse(event.businessLocationId!),
+        if (event.cashAmount != null) 'cashAmount': event.cashAmount,
+        if (event.bankAmount != null) 'bankAmount': event.bankAmount,
+        if (event.debtAmount != null) 'debtAmount': event.debtAmount,
+        if (event.debtorId != null) 'debtorId': event.debtorId,
+        if (event.customerName != null) 'customerName': event.customerName,
+        if (event.customerPhone != null) 'customerPhone': event.customerPhone,
+        if (event.billMetadata != null) 'billMetadata': event.billMetadata,
+        if (event.items != null)
+          'items': event.items!
+              .map(
+                (e) => {
+                  'saleItemId': e.saleItemId,
+                  'quantity': e.quantity,
+                  'discount': e.discount,
+                },
+              )
+              .toList(),
       };
 
       final order = await repository.updateOrder(
         orderId: event.orderId,
         requestBody: body,
+        idempotencyKey: event.idempotencyKey,
       );
 
       final index = _orders.indexWhere((o) => o.id == event.orderId);
@@ -164,7 +200,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
 
       emit(OrderUpdated(order: order));
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -183,7 +219,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
 
       emit(OrderPublished(order: order));
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -193,13 +229,16 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     Emitter<OrderState> emit,
   ) async {
     try {
-      await repository.cancelOrder(event.orderId);
+      await repository.cancelOrder(
+        event.orderId,
+        cancelReason: event.cancelReason,
+      );
 
       _orders.removeWhere((o) => o.id == event.orderId);
 
       emit(OrderCancelled(orderId: event.orderId));
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -228,11 +267,11 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
           );
         },
         onError: (e) {
-          emit(OrderError(message: e.toString()));
+          emit(OrderError(message: ApiErrorMessageParser.parse(e)));
         },
       );
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -243,7 +282,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   ) async {
     emit(const OrdersLoading());
     try {
-      repository.clearCache();
+      await repository.clearCache();
 
       await repository.getOrdersSWR(
         pageNumber: 1,
@@ -262,11 +301,11 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
           );
         },
         onError: (e) {
-          emit(OrderError(message: e.toString()));
+          emit(OrderError(message: ApiErrorMessageParser.parse(e)));
         },
       );
     } catch (e) {
-      emit(OrderError(message: e.toString()));
+      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -275,5 +314,110 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     _currentStatusFilter = null;
     _currentLocationFilter = null;
     emit(const OrderInitial());
+  }
+
+  Future<List<OrderEntity>> _loadLocalDraftOrders({String? locationId}) async {
+    final storage = await LocalStorage.getInstance();
+    final rawDrafts = storage.getString(StorageKeys.orderLocalDrafts);
+    if (rawDrafts == null || rawDrafts.trim().isEmpty) {
+      return [];
+    }
+
+    final decoded = jsonDecode(rawDrafts);
+    if (decoded is! List) {
+      return [];
+    }
+
+    final drafts = decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .where((item) {
+          if (locationId == null || locationId.trim().isEmpty) return true;
+          final draftLocationId = (item['locationId'] ?? '').toString();
+          return draftLocationId == locationId;
+        })
+        .map(_mapLocalDraftToOrder)
+        .toList();
+
+    drafts.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return drafts;
+  }
+
+  OrderEntity _mapLocalDraftToOrder(Map<String, dynamic> json) {
+    double asDouble(dynamic value, {double fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    int asInt(dynamic value, {int fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    String asString(dynamic value, {String fallback = ''}) {
+      if (value == null) return fallback;
+      return value.toString();
+    }
+
+    DateTime parseDate(dynamic value) {
+      if (value is String) {
+        return DateTime.tryParse(value)?.toUtc() ?? DateTime.now().toUtc();
+      }
+      return DateTime.now().toUtc();
+    }
+
+    final itemsNode = json['items'];
+    final items = itemsNode is List
+        ? itemsNode
+            .whereType<Map>()
+            .map((item) {
+              final map = Map<String, dynamic>.from(item);
+              final saleItemRaw = map['saleItemId'];
+              int? saleItemId;
+              if (saleItemRaw is num) {
+                saleItemId = saleItemRaw.toInt();
+              } else if (saleItemRaw is String) {
+                saleItemId = int.tryParse(saleItemRaw);
+              }
+
+              return OrderItemEntity(
+                id: asString(map['id'], fallback: ''),
+                productId: asString(map['productId']),
+                saleItemId: saleItemId,
+                unitName: asString(map['unitName'], fallback: ''),
+                productName: asString(map['productName']),
+                price: asDouble(map['price']),
+                quantity: asInt(map['quantity'], fallback: 1),
+                discount: asDouble(map['discount']),
+                note: asString(map['note'], fallback: ''),
+              );
+            })
+            .toList()
+        : <OrderItemEntity>[];
+
+    return OrderEntity(
+      id: asString(
+        json['id'],
+        fallback: 'draft_${DateTime.now().millisecondsSinceEpoch}',
+      ),
+      locationId: asString(json['locationId']),
+      locationName: asString(json['locationName']),
+      status: 'draft',
+      items: items,
+      subtotal: asDouble(json['subtotal']),
+      discountAmount: asDouble(json['discountAmount']),
+      taxAmount: asDouble(json['taxAmount']),
+      totalAmount: asDouble(json['totalAmount']),
+      note: asString(json['note'], fallback: ''),
+      createdAt: parseDate(json['createdAt']),
+      updatedAt: parseDate(json['updatedAt']),
+      invoiceNumber: null,
+      invoicedAt: null,
+    );
   }
 }

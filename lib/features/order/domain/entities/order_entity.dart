@@ -4,22 +4,35 @@ import 'order_item_entity.dart';
 /// Order Entity - Domain model for orders
 class OrderEntity extends Equatable {
   final String id;
+  final String orderCode;
+  final String? customerName;
+  final String? customerPhone;
   final String locationId;
   final String locationName;
-  final String status; // DRAFT, PENDING, PUBLISHED, CANCELLED
+  final String status; // backend: pending, completed, cancelled
   final List<OrderItemEntity> items;
   final double subtotal;
   final double discountAmount;
   final double taxAmount;
   final double totalAmount;
+  final double cashAmount;
+  final double bankAmount;
+  final double debtAmount;
+  final int? debtorId;
   final String? note;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? completedAt;
+  final DateTime? cancelledAt;
+  final String? cancelReason;
   final String? invoiceNumber;
   final DateTime? invoicedAt;
 
   const OrderEntity({
     required this.id,
+    this.orderCode = '',
+    this.customerName,
+    this.customerPhone,
     required this.locationId,
     required this.locationName,
     required this.status,
@@ -28,20 +41,31 @@ class OrderEntity extends Equatable {
     required this.discountAmount,
     required this.taxAmount,
     required this.totalAmount,
+    this.cashAmount = 0,
+    this.bankAmount = 0,
+    this.debtAmount = 0,
+    this.debtorId,
     this.note,
     required this.createdAt,
     required this.updatedAt,
+    this.completedAt,
+    this.cancelledAt,
+    this.cancelReason,
     this.invoiceNumber,
     this.invoicedAt,
   });
 
-  bool get isDraft => status == 'DRAFT';
-  bool get isPending => status == 'PENDING';
-  bool get isPublished => status == 'PUBLISHED';
-  bool get isCancelled => status == 'CANCELLED';
+  bool get isDraft => status.toLowerCase() == 'draft';
+  bool get isPending => status.toLowerCase() == 'pending';
+  bool get isPublished =>
+      status.toLowerCase() == 'published' || status.toLowerCase() == 'completed';
+  bool get isCancelled => status.toLowerCase() == 'cancelled';
 
   OrderEntity copyWith({
     String? id,
+    String? orderCode,
+    String? customerName,
+    String? customerPhone,
     String? locationId,
     String? locationName,
     String? status,
@@ -50,14 +74,24 @@ class OrderEntity extends Equatable {
     double? discountAmount,
     double? taxAmount,
     double? totalAmount,
+    double? cashAmount,
+    double? bankAmount,
+    double? debtAmount,
+    int? debtorId,
     String? note,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? completedAt,
+    DateTime? cancelledAt,
+    String? cancelReason,
     String? invoiceNumber,
     DateTime? invoicedAt,
   }) {
     return OrderEntity(
       id: id ?? this.id,
+      orderCode: orderCode ?? this.orderCode,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
       locationId: locationId ?? this.locationId,
       locationName: locationName ?? this.locationName,
       status: status ?? this.status,
@@ -66,9 +100,16 @@ class OrderEntity extends Equatable {
       discountAmount: discountAmount ?? this.discountAmount,
       taxAmount: taxAmount ?? this.taxAmount,
       totalAmount: totalAmount ?? this.totalAmount,
+      cashAmount: cashAmount ?? this.cashAmount,
+      bankAmount: bankAmount ?? this.bankAmount,
+      debtAmount: debtAmount ?? this.debtAmount,
+      debtorId: debtorId ?? this.debtorId,
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      completedAt: completedAt ?? this.completedAt,
+      cancelledAt: cancelledAt ?? this.cancelledAt,
+      cancelReason: cancelReason ?? this.cancelReason,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       invoicedAt: invoicedAt ?? this.invoicedAt,
     );
@@ -77,6 +118,9 @@ class OrderEntity extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    orderCode,
+    customerName,
+    customerPhone,
     locationId,
     locationName,
     status,
@@ -85,9 +129,16 @@ class OrderEntity extends Equatable {
     discountAmount,
     taxAmount,
     totalAmount,
+    cashAmount,
+    bankAmount,
+    debtAmount,
+    debtorId,
     note,
     createdAt,
     updatedAt,
+    completedAt,
+    cancelledAt,
+    cancelReason,
     invoiceNumber,
     invoicedAt,
   ];

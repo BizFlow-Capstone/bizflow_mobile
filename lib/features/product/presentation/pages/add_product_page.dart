@@ -44,6 +44,12 @@ class _AddProductPageState extends State<AddProductPage> {
   bool _isActive = true;
   String? _selectedBusinessTypeId;
   List<BusinessTypeDto> _businessTypes = [];
+  String? _productNameError;
+  String? _unitError;
+  String? _businessTypeError;
+  String? _costPriceError;
+  String? _salePriceError;
+  String? _quantityError;
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -255,78 +261,62 @@ class _AddProductPageState extends State<AddProductPage> {
   // }
 
   void _submitForm() {
-    if (_productNameController.text.isEmpty) {
-      AppSnackBar.show(
-        context,
-        message:
-            l10n?.translate('common.required_field') ??
-            'Vui lòng nhập tên sản phẩm',
-        type: AppSnackBarType.warning,
-      );
+    final requiredMessage =
+        l10n?.translate('common.required_field') ?? 'Trường này là bắt buộc';
+    final invalidCostPriceMessage =
+        l10n?.translate('product.invalid_cost_price') ??
+        'Giá vốn không hợp lệ';
+    final invalidSalePriceMessage =
+        l10n?.translate('product.invalid_sale_price') ??
+        'Giá bán không hợp lệ';
+    final invalidStockMessage =
+        l10n?.translate('product.invalid_stock') ?? 'Tồn kho không hợp lệ';
+
+    double? parseMoney(String value) {
+      return double.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
+    }
+
+    int? parseQuantity(String value) {
+      return int.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
+    }
+
+    final costPriceText = _costPriceController.text.trim();
+    final salePriceText = _salePriceController.text.trim();
+    final quantityText = _quantityController.text.trim();
+
+    final costPrice = costPriceText.isEmpty ? null : parseMoney(costPriceText);
+    final salePrice = salePriceText.isEmpty ? null : parseMoney(salePriceText);
+    final quantity = quantityText.isEmpty ? null : parseQuantity(quantityText);
+
+    setState(() {
+      _productNameError = _productNameController.text.trim().isEmpty
+          ? requiredMessage
+          : null;
+      _unitError = _unitController.text.trim().isEmpty ? requiredMessage : null;
+      _businessTypeError = _selectedBusinessTypeId == null
+          ? requiredMessage
+          : null;
+      _costPriceError =
+          (costPriceText.isNotEmpty && (costPrice == null || costPrice < 0))
+          ? invalidCostPriceMessage
+          : null;
+      _salePriceError =
+          (salePriceText.isNotEmpty && (salePrice == null || salePrice < 0))
+          ? invalidSalePriceMessage
+          : null;
+      _quantityError =
+          (quantityText.isNotEmpty && (quantity == null || quantity < 0))
+          ? invalidStockMessage
+          : null;
+    });
+
+    if (_productNameError != null ||
+        _unitError != null ||
+        _businessTypeError != null ||
+        _costPriceError != null ||
+        _salePriceError != null ||
+        _quantityError != null) {
       return;
-    }
-
-    if (_unitController.text.isEmpty) {
-      AppSnackBar.show(
-        context,
-        message:
-            l10n?.translate('common.required_field') ?? 'Vui lòng chọn đơn vị',
-        type: AppSnackBarType.warning,
-      );
-      return;
-    }
-
-    if (_selectedBusinessTypeId == null) {
-      AppSnackBar.show(
-        context,
-        message:
-            l10n?.translate('common.required_field') ??
-            'Vui lòng chọn loại hình kinh doanh',
-        type: AppSnackBarType.warning,
-      );
-      return;
-    }
-
-    // Validate prices and stock
-    if (_costPriceController.text.isNotEmpty) {
-      final costPrice = double.tryParse(_costPriceController.text.replaceAll(RegExp(r'[,.]'), ''));
-      if (costPrice == null || costPrice < 0) {
-        AppSnackBar.show(
-          context,
-          message:
-              l10n?.translate('product.invalid_cost_price') ??
-              'Giá vốn không hợp lệ',
-          type: AppSnackBarType.error,
-        );
-        return;
-      }
-    }
-
-    if (_salePriceController.text.isNotEmpty) {
-      final salePrice = double.tryParse(_salePriceController.text.replaceAll(RegExp(r'[,.]'), ''));
-      if (salePrice == null || salePrice < 0) {
-        AppSnackBar.show(
-          context,
-          message:
-              l10n?.translate('product.invalid_sale_price') ??
-              'Giá bán không hợp lệ',
-          type: AppSnackBarType.error,
-        );
-        return;
-      }
-    }
-
-    if (_quantityController.text.isNotEmpty) {
-      final quantity = int.tryParse(_quantityController.text.replaceAll(RegExp(r'[,.]'), ''));
-      if (quantity == null || quantity < 0) {
-        AppSnackBar.show(
-          context,
-          message:
-              l10n?.translate('product.invalid_stock') ?? 'Tồn kho không hợp lệ',
-          type: AppSnackBarType.error,
-        );
-        return;
-      }
     }
 
     context.read<ProductBloc>().add(
@@ -337,17 +327,13 @@ class _AddProductPageState extends State<AddProductPage> {
             ? _barcodeController.text
             : null,
         costPrice: _costPriceController.text.isNotEmpty
-            ? double.tryParse(
-                _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-              )
+            ? costPrice
             : null,
         salePrice: _salePriceController.text.isNotEmpty
-            ? double.tryParse(
-                _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-              )
+            ? salePrice
             : null,
         quantity: _quantityController.text.isNotEmpty
-            ? int.tryParse(_quantityController.text.replaceAll(RegExp(r'[,.]'), ''))
+            ? quantity
             : null,
         unit: _unitController.text.isNotEmpty ? _unitController.text : null,
         isActive: _isActive,
@@ -513,6 +499,11 @@ class _AddProductPageState extends State<AddProductPage> {
                   controller: _productNameController,
                   hint: l10n.translate('product.name_hint'),
                   isRequired: true,
+                  errorText: _productNameError,
+                  onChanged: (_) {
+                    if (_productNameError == null) return;
+                    setState(() => _productNameError = null);
+                  },
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -552,6 +543,11 @@ class _AddProductPageState extends State<AddProductPage> {
                         label: l10n.translate('product.cost_price'),
                         controller: _costPriceController,
                         hint: '0',
+                        errorText: _costPriceError,
+                        onChanged: (_) {
+                          if (_costPriceError == null) return;
+                          setState(() => _costPriceError = null);
+                        },
                         keyboardType: TextInputType.number,
                         inputFormatters: [CurrencyInputFormatter()],
                       ),
@@ -562,6 +558,11 @@ class _AddProductPageState extends State<AddProductPage> {
                         label: l10n.translate('product.sale_price'),
                         controller: _salePriceController,
                         hint: '0',
+                        errorText: _salePriceError,
+                        onChanged: (_) {
+                          if (_salePriceError == null) return;
+                          setState(() => _salePriceError = null);
+                        },
                         keyboardType: TextInputType.number,
                         inputFormatters: [CurrencyInputFormatter()],
                       ),
@@ -577,6 +578,11 @@ class _AddProductPageState extends State<AddProductPage> {
                         label: l10n.translate('product.stock'),
                         controller: _quantityController,
                         hint: '0',
+                        errorText: _quantityError,
+                        onChanged: (_) {
+                          if (_quantityError == null) return;
+                          setState(() => _quantityError = null);
+                        },
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -586,6 +592,12 @@ class _AddProductPageState extends State<AddProductPage> {
                         label: l10n.translate('product.unit'),
                         controller: _unitController,
                         hint: 'cái',
+                        isRequired: true,
+                        errorText: _unitError,
+                        onChanged: (_) {
+                          if (_unitError == null) return;
+                          setState(() => _unitError = null);
+                        },
                       ),
                     ),
                   ],
@@ -802,6 +814,8 @@ class _AddProductPageState extends State<AddProductPage> {
     required TextEditingController controller,
     required String hint,
     bool isRequired = false,
+    String? errorText,
+    ValueChanged<String>? onChanged,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
@@ -829,22 +843,36 @@ class _AddProductPageState extends State<AddProductPage> {
         SizedBox(height: AppSpacing.sm),
         TextField(
           controller: controller,
+          onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,
           inputFormatters: inputFormatters,
           decoration: InputDecoration(
             hintText: hint,
+            errorText: errorText,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.divider),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.divider),
+              borderSide: BorderSide(
+                color: errorText != null ? AppColors.error : AppColors.divider,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.secondary),
+              borderSide: BorderSide(
+                color: errorText != null ? AppColors.error : AppColors.secondary,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.error),
             ),
             contentPadding: EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
@@ -941,7 +969,12 @@ class _AddProductPageState extends State<AddProductPage> {
             SizedBox(height: AppSpacing.sm),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
+                border: Border.all(
+                  color:
+                      _businessTypeError != null
+                          ? AppColors.error
+                          : AppColors.divider,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Padding(
@@ -960,12 +993,24 @@ class _AddProductPageState extends State<AddProductPage> {
                     onChanged: (value) {
                       setState(() {
                         _selectedBusinessTypeId = value;
+                        if (value != null) {
+                          _businessTypeError = null;
+                        }
                       });
                     },
                   ),
                 ),
               ),
             ),
+            if (_businessTypeError != null) ...[
+              SizedBox(height: AppSpacing.xs),
+              Text(
+                _businessTypeError!,
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
+            ],
           ],
         );
       },

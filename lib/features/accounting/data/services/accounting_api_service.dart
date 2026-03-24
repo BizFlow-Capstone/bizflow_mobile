@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../domain/models/accounting_period.dart';
 
 class AccountingApiService {
   final ApiClient _apiClient;
+  static const String _genericError = ApiErrorMessageParser.genericMessage;
 
   AccountingApiService({required ApiClient apiClient})
       : _apiClient = apiClient;
@@ -30,12 +32,12 @@ class AccountingApiService {
             .map((e) => AccountingPeriod.fromJson(e as Map<String, dynamic>))
             .toList();
       }
-      throw Exception(response.message ?? 'Failed to load periods');
+      throw Exception(_genericError);
     } on ApiException catch (e) {
-      throw Exception('API Error ${e.statusCode}: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('AccountingApiService.listPeriods error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 
@@ -55,14 +57,12 @@ class AccountingApiService {
           data['data'] as Map<String, dynamic>? ?? data,
         );
       }
-      throw Exception(response.message ?? 'Failed to create period');
+      throw Exception(_genericError);
     } on ApiException catch (e) {
-      if (e.statusCode == 409) throw Exception('period_already_exists');
-      if (e.statusCode == 400) throw Exception('period_validation_error: ${e.message}');
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('AccountingApiService.createPeriod error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 
@@ -82,13 +82,12 @@ class AccountingApiService {
           data['data'] as Map<String, dynamic>? ?? data,
         );
       }
-      throw Exception(response.message ?? 'Failed to create custom period');
+      throw Exception(_genericError);
     } on ApiException catch (e) {
-      if (e.statusCode == 400) throw Exception('period_validation_error: ${e.message}');
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('AccountingApiService.createCustomPeriod error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 
@@ -108,12 +107,12 @@ class AccountingApiService {
           data['data'] as Map<String, dynamic>? ?? data,
         );
       }
-      throw Exception(response.message ?? 'Failed to get suggestion');
+      throw Exception(_genericError);
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('AccountingApiService.getOpeningBalanceSuggestion error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 
@@ -132,13 +131,12 @@ class AccountingApiService {
           data['data'] as Map<String, dynamic>? ?? data,
         );
       }
-      throw Exception(response.message ?? 'Period not found');
+      throw Exception(_genericError);
     } on ApiException catch (e) {
-      if (e.statusCode == 404) throw Exception('period_not_found');
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('AccountingApiService.getPeriodDetail error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 
@@ -163,32 +161,13 @@ class AccountingApiService {
         // Return a placeholder to trigger refresh
         throw Exception('__refresh_required__');
       }
-      throw Exception(response.message ?? 'Failed to finalize');
+      throw Exception(_genericError);
     } on ApiException catch (e) {
-      final data = e.data;
-      final messageCode = data is Map<String, dynamic>
-          ? data['messageCode']?.toString()
-          : null;
-
-      if (e.statusCode == 400) {
-        if (messageCode == 'PERIOD_NO_ACTIVE_BOOK' ||
-            messageCode == 'PERIOD_NO_BOOKS' ||
-            e.message.toLowerCase().contains('active accounting book') ||
-            e.message.toLowerCase().contains('ít nhất 1 sổ')) {
-          throw Exception('period_no_books');
-        }
-
-        if (messageCode == 'PERIOD_ALREADY_FINALIZED' ||
-            messageCode == 'PERIOD_CANNOT_FINALIZE') {
-          throw Exception('period_already_finalized');
-        }
-      }
-
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       if (e.toString().contains('__refresh_required__')) rethrow;
       debugPrint('AccountingApiService.finalizePeriod error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 
@@ -204,14 +183,13 @@ class AccountingApiService {
         body: {'reason': reason},
       );
       if (!response.isSuccess) {
-        throw Exception(response.message ?? 'Failed to reopen period');
+        throw Exception(_genericError);
       }
     } on ApiException catch (e) {
-      if (e.statusCode == 400) throw Exception('reopen_reason_required');
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('AccountingApiService.reopenPeriod error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 
@@ -243,12 +221,12 @@ class AccountingApiService {
             )
             .toList();
       }
-      throw Exception(response.message ?? 'Failed to load audit logs');
+      throw Exception(_genericError);
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('AccountingApiService.getAuditLogs error: $e');
-      rethrow;
+      throw Exception(_genericError);
     }
   }
 }

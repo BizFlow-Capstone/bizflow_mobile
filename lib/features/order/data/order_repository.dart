@@ -19,6 +19,9 @@ class OrderRepository {
   OrderEntity _mapToEntity(OrderDto dto) {
     return OrderEntity(
       id: dto.id,
+      orderCode: dto.orderCode,
+      customerName: dto.customerName,
+      customerPhone: dto.customerPhone,
       locationId: dto.locationId,
       locationName: dto.locationName,
       status: dto.status,
@@ -27,6 +30,8 @@ class OrderRepository {
             (item) => OrderItemEntity(
               id: item.id,
               productId: item.productId,
+              saleItemId: item.saleItemId,
+              unitName: item.unitName,
               productName: item.productName,
               price: item.price,
               quantity: item.quantity,
@@ -38,9 +43,15 @@ class OrderRepository {
       discountAmount: dto.discountAmount,
       taxAmount: dto.taxAmount,
       totalAmount: dto.totalAmount,
+      cashAmount: dto.cashAmount,
+      bankAmount: dto.bankAmount,
+      debtAmount: dto.debtAmount,
       note: dto.note,
       createdAt: dto.createdAt,
       updatedAt: dto.updatedAt,
+      completedAt: dto.completedAt,
+      cancelledAt: dto.cancelledAt,
+      cancelReason: dto.cancelReason,
       invoiceNumber: dto.invoiceNumber,
       invoicedAt: dto.invoicedAt,
     );
@@ -107,10 +118,12 @@ class OrderRepository {
   Future<OrderEntity> updateOrder({
     required String orderId,
     required Map<String, dynamic> requestBody,
+    String? idempotencyKey,
   }) async {
     final dto = await _apiService.updateOrder(
       orderId: orderId,
       body: requestBody,
+      idempotencyKey: idempotencyKey,
     );
     return _mapToEntity(dto);
   }
@@ -128,12 +141,12 @@ class OrderRepository {
   }
 
   /// Cancel an order
-  Future<bool> cancelOrder(String orderId) async {
-    return await _apiService.cancelOrder(orderId);
+  Future<bool> cancelOrder(String orderId, {required String cancelReason}) async {
+    return await _apiService.cancelOrder(orderId, cancelReason: cancelReason);
   }
 
   /// Clear all cache keys related to orders
-  void clearCache() {
-    // Optionally implement specific cache invalidation here
+  Future<void> clearCache() async {
+    await _cache.removeByPrefix('orders_');
   }
 }

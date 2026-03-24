@@ -67,10 +67,9 @@ class _OrderFilterBottomSheetState extends State<OrderFilterBottomSheet> {
             Wrap(
               spacing: 8,
               children: [
-                _buildStatusChip(context, 'DRAFT', 'order.status_draft'),
-                _buildStatusChip(context, 'PENDING', 'order.status_pending'),
-                _buildStatusChip(context, 'PUBLISHED', 'order.status_published'),
-                _buildStatusChip(context, 'CANCELLED', 'order.status_cancelled'),
+                _buildStatusChip(context, 'pending', 'order.status_pending'),
+                _buildStatusChip(context, 'completed', 'order.status_published'),
+                _buildStatusChip(context, 'cancelled', 'order.status_cancelled'),
               ],
             ),
             const SizedBox(height: 24),

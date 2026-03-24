@@ -4,6 +4,8 @@ import 'package:equatable/equatable.dart';
 class OrderItemDto extends Equatable {
   final String? id;
   final String productId;
+  final int? saleItemId;
+  final String? unitName;
   final String productName;
   final double price;
   final int quantity;
@@ -13,6 +15,8 @@ class OrderItemDto extends Equatable {
   const OrderItemDto({
     this.id,
     required this.productId,
+    this.saleItemId,
+    this.unitName,
     required this.productName,
     required this.price,
     required this.quantity,
@@ -25,14 +29,39 @@ class OrderItemDto extends Equatable {
   double get total => subtotal - discountAmount;
 
   factory OrderItemDto.fromJson(Map<String, dynamic> json) {
+    String asString(dynamic value, {String fallback = ''}) {
+      if (value == null) return fallback;
+      if (value is String) return value;
+      return value.toString();
+    }
+
+    int asInt(dynamic value, {int fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    double asDouble(dynamic value, {double fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
     return OrderItemDto(
-      id: json['id'] as String?,
-      productId: json['productId'] as String? ?? '',
-      productName: json['productName'] as String? ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      quantity: json['quantity'] as int? ?? 0,
-      discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
-      note: json['note'] as String?,
+      id: json['id']?.toString(),
+      productId: asString(json['productId'] ?? json['saleItemId']),
+      saleItemId: asInt(json['saleItemId'], fallback: 0) > 0
+          ? asInt(json['saleItemId'])
+          : null,
+      unitName: json['unitName']?.toString(),
+      productName: asString(json['productName'] ?? json['saleItemName']),
+      price: asDouble(json['price'] ?? json['unitPrice']),
+      quantity: asInt(json['quantity']),
+      discount: asDouble(json['discount']),
+      note: json['note']?.toString(),
     );
   }
 
@@ -40,6 +69,8 @@ class OrderItemDto extends Equatable {
     return {
       'id': id,
       'productId': productId,
+      'saleItemId': saleItemId,
+      'unitName': unitName,
       'productName': productName,
       'price': price,
       'quantity': quantity,
@@ -51,6 +82,8 @@ class OrderItemDto extends Equatable {
   OrderItemDto copyWith({
     String? id,
     String? productId,
+    int? saleItemId,
+    String? unitName,
     String? productName,
     double? price,
     int? quantity,
@@ -60,6 +93,8 @@ class OrderItemDto extends Equatable {
     return OrderItemDto(
       id: id ?? this.id,
       productId: productId ?? this.productId,
+      saleItemId: saleItemId ?? this.saleItemId,
+      unitName: unitName ?? this.unitName,
       productName: productName ?? this.productName,
       price: price ?? this.price,
       quantity: quantity ?? this.quantity,
@@ -72,6 +107,8 @@ class OrderItemDto extends Equatable {
   List<Object?> get props => [
     id,
     productId,
+    saleItemId,
+    unitName,
     productName,
     price,
     quantity,

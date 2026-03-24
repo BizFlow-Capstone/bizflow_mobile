@@ -41,19 +41,10 @@ class _SplashPageState extends State<SplashPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // App Logo
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF23C4C1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.business,
-                  color: Colors.white,
-                  size: 44,
-                ),
+              Image.asset(
+                'assets/images/logos/Bizflow.png',
+                width: 120,
+                fit: BoxFit.contain,
               ),
               const SizedBox(height: 24),
               const Text(

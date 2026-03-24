@@ -75,6 +75,12 @@ class _EditProductPageState extends State<EditProductPage> {
   late bool _isActive;
   String? _selectedBusinessTypeId;
   List<BusinessTypeDto> _businessTypes = [];
+  String? _productNameError;
+  String? _unitError;
+  String? _businessTypeError;
+  String? _costPriceError;
+  String? _salePriceError;
+  String? _quantityError;
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -113,6 +119,9 @@ class _EditProductPageState extends State<EditProductPage> {
 
     // Load sale items (price tiers) from API
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProductBloc>().add(
+        LoadProductDetailRequested(productId: widget.productId),
+      );
       context.read<ProductBloc>().add(
         LoadProductSaleItemsRequested(productId: widget.productId),
       );
@@ -354,56 +363,56 @@ class _EditProductPageState extends State<EditProductPage> {
 
   /// Submit form to update product
   void _submitForm() {
-    if (_productNameController.text.isEmpty) {
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('common.required_field'),
-        type: AppSnackBarType.warning,
-      );
+    final requiredMessage = l10n.translate('common.required_field');
+    final invalidCostPriceMessage = l10n.translate('product.invalid_cost_price');
+    final invalidSalePriceMessage = l10n.translate('product.invalid_sale_price');
+    final invalidStockMessage = l10n.translate('product.invalid_stock');
+
+    double? parseMoney(String value) {
+      return double.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
+    }
+
+    int? parseQuantity(String value) {
+      return int.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
+    }
+
+    final costPriceText = _costPriceController.text.trim();
+    final salePriceText = _salePriceController.text.trim();
+    final quantityText = _quantityController.text.trim();
+
+    final costPrice = costPriceText.isEmpty ? null : parseMoney(costPriceText);
+    final salePrice = salePriceText.isEmpty ? null : parseMoney(salePriceText);
+    final quantity = quantityText.isEmpty ? null : parseQuantity(quantityText);
+
+    setState(() {
+      _productNameError = _productNameController.text.trim().isEmpty
+          ? requiredMessage
+          : null;
+      _unitError = _unitController.text.trim().isEmpty ? requiredMessage : null;
+      _businessTypeError = _selectedBusinessTypeId == null
+          ? requiredMessage
+          : null;
+      _costPriceError =
+          (costPriceText.isNotEmpty && (costPrice == null || costPrice < 0))
+          ? invalidCostPriceMessage
+          : null;
+      _salePriceError =
+          (salePriceText.isNotEmpty && (salePrice == null || salePrice < 0))
+          ? invalidSalePriceMessage
+          : null;
+      _quantityError =
+          (quantityText.isNotEmpty && (quantity == null || quantity < 0))
+          ? invalidStockMessage
+          : null;
+    });
+
+    if (_productNameError != null ||
+        _unitError != null ||
+        _businessTypeError != null ||
+        _costPriceError != null ||
+        _salePriceError != null ||
+        _quantityError != null) {
       return;
-    }
-
-    // Validate prices and stock
-    if (_costPriceController.text.isNotEmpty) {
-      final costPrice = double.tryParse(
-        _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-      );
-      if (costPrice == null || costPrice < 0) {
-        AppSnackBar.show(
-          context,
-          message: l10n.translate('product.invalid_cost_price'),
-          type: AppSnackBarType.error,
-        );
-        return;
-      }
-    }
-
-    if (_salePriceController.text.isNotEmpty) {
-      final salePrice = double.tryParse(
-        _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-      );
-      if (salePrice == null || salePrice < 0) {
-        AppSnackBar.show(
-          context,
-          message: l10n.translate('product.invalid_sale_price'),
-          type: AppSnackBarType.error,
-        );
-        return;
-      }
-    }
-
-    if (_quantityController.text.isNotEmpty) {
-      final quantity = int.tryParse(
-        _quantityController.text.replaceAll(RegExp(r'[,.]'), ''),
-      );
-      if (quantity == null || quantity < 0) {
-        AppSnackBar.show(
-          context,
-          message: l10n.translate('product.invalid_stock'),
-          type: AppSnackBarType.error,
-        );
-        return;
-      }
     }
 
     if (widget.productId.isEmpty) {
@@ -414,15 +423,6 @@ class _EditProductPageState extends State<EditProductPage> {
       );
       return;
     }
-    if (_selectedBusinessTypeId == null) {
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('common.required_field'),
-        type: AppSnackBarType.warning,
-      );
-      return;
-    }
-
     debugPrint(
       'EditProductPage: Updating product with ID: ${widget.productId}',
     );
@@ -436,17 +436,13 @@ class _EditProductPageState extends State<EditProductPage> {
             ? _barcodeController.text
             : null,
         costPrice: _costPriceController.text.isNotEmpty
-            ? double.tryParse(
-                _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-              )
+            ? costPrice
             : null,
         salePrice: _salePriceController.text.isNotEmpty
-            ? double.tryParse(
-                _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-              )
+            ? salePrice
             : null,
         quantity: _quantityController.text.isNotEmpty
-            ? int.tryParse(_quantityController.text)
+            ? quantity
             : null,
         unit: _unitController.text.isNotEmpty ? _unitController.text : null,
         isActive: _isActive,
@@ -524,6 +520,25 @@ class _EditProductPageState extends State<EditProductPage> {
               } else {
                 _priceTiers = [];
               }
+            });
+          } else if (state is ProductDetailLoaded &&
+              state.product.id == widget.productId) {
+            final detail = state.product;
+            setState(() {
+              _productNameController.text = detail.name;
+              _barcodeController.text = detail.barcode ?? '';
+              _costPriceController.text = detail.costPrice != null
+                  ? CurrencyFormatter.formatNumber(detail.costPrice!)
+                  : '';
+              _salePriceController.text = detail.salePrice != null
+                  ? CurrencyFormatter.formatNumber(detail.salePrice!)
+                  : '';
+              _quantityController.text = detail.quantity.toString();
+              _unitController.text = detail.unit ?? '';
+              _descriptionController.text = detail.description ?? '';
+              _manufacturerController.text = detail.manufacturer ?? '';
+              _selectedBusinessTypeId = detail.businessTypeId;
+              _isActive = detail.isActive;
             });
           } else if (state is BusinessTypesLoaded) {
             setState(() {
@@ -672,6 +687,11 @@ class _EditProductPageState extends State<EditProductPage> {
                   controller: _productNameController,
                   hint: l10n.translate('product.name_hint'),
                   isRequired: true,
+                  errorText: _productNameError,
+                  onChanged: (_) {
+                    if (_productNameError == null) return;
+                    setState(() => _productNameError = null);
+                  },
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -711,6 +731,11 @@ class _EditProductPageState extends State<EditProductPage> {
                         label: l10n.translate('product.cost_price'),
                         controller: _costPriceController,
                         hint: '0',
+                        errorText: _costPriceError,
+                        onChanged: (_) {
+                          if (_costPriceError == null) return;
+                          setState(() => _costPriceError = null);
+                        },
                         keyboardType: TextInputType.number,
                         inputFormatters: [CurrencyInputFormatter()],
                       ),
@@ -721,6 +746,11 @@ class _EditProductPageState extends State<EditProductPage> {
                         label: l10n.translate('product.sale_price'),
                         controller: _salePriceController,
                         hint: '0',
+                        errorText: _salePriceError,
+                        onChanged: (_) {
+                          if (_salePriceError == null) return;
+                          setState(() => _salePriceError = null);
+                        },
                         keyboardType: TextInputType.number,
                         inputFormatters: [CurrencyInputFormatter()],
                       ),
@@ -736,6 +766,11 @@ class _EditProductPageState extends State<EditProductPage> {
                         label: l10n.translate('product.stock'),
                         controller: _quantityController,
                         hint: '0',
+                        errorText: _quantityError,
+                        onChanged: (_) {
+                          if (_quantityError == null) return;
+                          setState(() => _quantityError = null);
+                        },
                         keyboardType: TextInputType.number,
                       ),
                     ),
@@ -745,6 +780,12 @@ class _EditProductPageState extends State<EditProductPage> {
                         label: l10n.translate('product.unit'),
                         controller: _unitController,
                         hint: 'cái',
+                        isRequired: true,
+                        errorText: _unitError,
+                        onChanged: (_) {
+                          if (_unitError == null) return;
+                          setState(() => _unitError = null);
+                        },
                       ),
                     ),
                   ],
@@ -951,6 +992,8 @@ class _EditProductPageState extends State<EditProductPage> {
     required TextEditingController controller,
     required String hint,
     bool isRequired = false,
+    String? errorText,
+    ValueChanged<String>? onChanged,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
@@ -978,22 +1021,36 @@ class _EditProductPageState extends State<EditProductPage> {
         SizedBox(height: AppSpacing.sm),
         TextField(
           controller: controller,
+          onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,
           inputFormatters: inputFormatters,
           decoration: InputDecoration(
             hintText: hint,
+            errorText: errorText,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.divider),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.divider),
+              borderSide: BorderSide(
+                color: errorText != null ? AppColors.error : AppColors.divider,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.secondary),
+              borderSide: BorderSide(
+                color: errorText != null ? AppColors.error : AppColors.secondary,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.error),
             ),
             contentPadding: EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
@@ -1089,7 +1146,12 @@ class _EditProductPageState extends State<EditProductPage> {
             SizedBox(height: AppSpacing.sm),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
+                border: Border.all(
+                  color:
+                      _businessTypeError != null
+                          ? AppColors.error
+                          : AppColors.divider,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Padding(
@@ -1108,12 +1170,22 @@ class _EditProductPageState extends State<EditProductPage> {
                     onChanged: (value) {
                       setState(() {
                         _selectedBusinessTypeId = value;
+                        _businessTypeError = null;
                       });
                     },
                   ),
                 ),
               ),
             ),
+            if (_businessTypeError != null) ...[
+              SizedBox(height: AppSpacing.xs),
+              Text(
+                _businessTypeError!,
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
+            ],
           ],
         );
       },

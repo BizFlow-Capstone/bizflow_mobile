@@ -11,6 +11,8 @@ class OrderCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onPublish;
   final VoidCallback? onCancel;
+  final VoidCallback? onDeleteDraft;
+  final bool isPublishing;
 
   const OrderCard({
     super.key,
@@ -19,6 +21,8 @@ class OrderCard extends StatelessWidget {
     this.onEdit,
     this.onPublish,
     this.onCancel,
+    this.onDeleteDraft,
+    this.isPublishing = false,
   });
 
   @override
@@ -109,8 +113,8 @@ class OrderCard extends StatelessWidget {
                 ],
               ),
 
-              // Action buttons (if draft)
-              if (order.isDraft) ...[
+              // Action buttons
+              if (order.isDraft || order.isPending) ...[
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -121,13 +125,41 @@ class OrderCard extends StatelessWidget {
                         child: Text(l10n.translate('order.action_edit')),
                       ),
                     const SizedBox(width: 8),
-                    if (onPublish != null)
+                    if (order.isDraft && onDeleteDraft != null)
                       TextButton(
-                        onPressed: onPublish,
+                        onPressed: onDeleteDraft,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: Text(l10n.translate('common.delete')),
+                      ),
+                    if (order.isDraft && onDeleteDraft != null)
+                      const SizedBox(width: 8),
+                    if (order.isPending && onCancel != null)
+                      TextButton(
+                        onPressed: onCancel,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: Text(l10n.translate('order.action_cancel')),
+                      ),
+                    const SizedBox(width: 8),
+                    if (!order.isDraft && onPublish != null)
+                      TextButton(
+                        onPressed: isPublishing ? null : onPublish,
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.green,
                         ),
-                        child: Text(l10n.translate('order.action_publish')),
+                        child: isPublishing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.green,
+                                ),
+                              )
+                            : Text(l10n.translate('order.action_publish')),
                       ),
                   ],
                 ),
@@ -147,7 +179,7 @@ class OrderCard extends StatelessWidget {
 
     if (order.isDraft) {
       bgColor = Colors.orange;
-      label = l10n.translate('order.status_draft');
+      label = 'Nháp';
     } else if (order.isPending) {
       bgColor = Colors.blue;
       label = l10n.translate('order.status_pending');

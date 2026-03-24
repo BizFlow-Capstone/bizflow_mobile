@@ -104,7 +104,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           status: _filterStatus,
         );
         debugPrint('ProductBloc: Response received');
-        return _parseProductsFromResponse(response);
+        final parsedProducts = _parseProductsFromResponse(response);
+        return await _enrichProductsWithSaleItems(parsedProducts);
       },
       fromJson: (json) {
         final list = json['data'] as List;
@@ -152,7 +153,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         status: _filterStatus,
       );
 
-      final products = _parseProductsFromResponse(response);
+      final products = await _enrichProductsWithSaleItems(
+        _parseProductsFromResponse(response),
+      );
 
       _products = products;
       emit(
@@ -194,7 +197,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         pageNumber: nextPage,
       );
 
-      final newProducts = _parseProductsFromResponse(response);
+      final newProducts = await _enrichProductsWithSaleItems(
+        _parseProductsFromResponse(response),
+      );
 
       if (newProducts.isEmpty) {
         emit(state.copyWith(hasReachedMax: true));
@@ -234,6 +239,37 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     return productsList
         .map((item) {
           if (item is! Map<String, dynamic>) return null;
+
+          String? parseString(dynamic value) {
+            if (value == null) return null;
+            final text = value.toString().trim();
+            return text.isEmpty ? null : text;
+          }
+
+          int parseInt(dynamic value, {int fallback = 0}) {
+            if (value == null) return fallback;
+            if (value is int) return value;
+            if (value is num) return value.toInt();
+            if (value is String) return int.tryParse(value.trim()) ?? fallback;
+            return fallback;
+          }
+
+          bool parseBool(dynamic value, {bool fallback = true}) {
+            if (value == null) return fallback;
+            if (value is bool) return value;
+            if (value is num) return value != 0;
+            if (value is String) {
+              final normalized = value.trim().toLowerCase();
+              if (normalized == 'true' || normalized == 'active' || normalized == '1') {
+                return true;
+              }
+              if (normalized == 'false' || normalized == 'inactive' || normalized == '0') {
+                return false;
+              }
+            }
+            return fallback;
+          }
+
           final dynamic idValue =
               item['id'] ??
               item['Id'] ??
@@ -244,9 +280,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
           // API may return 'price' as the selling price and 'stock' as inventory
           final dynamic rawSalePrice =
+              item['sellingPrice'] ??
+              item['SellingPrice'] ??
               item['salePrice'] ??
               item['SalePrice'] ??
               item['sale_price'] ??
+              item['currentSalePrice'] ??
+              item['CurrentSalePrice'] ??
               item['price'] ??
               item['Price'] ??
               item['unitPrice'] ??
@@ -265,6 +305,8 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['costPrice'] ??
               item['CostPrice'] ??
               item['cost_price'] ??
+              item['currentCostPrice'] ??
+              item['CurrentCostPrice'] ??
               item['purchasePrice'] ??
               item['PurchasePrice'] ??
               item['purchase_price'] ??
@@ -283,7 +325,32 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['Quantity'] ??
               item['currentStock'] ??
               item['stock_quantity'];
-          final int resolvedQty = (rawQty as num?)?.toInt() ?? 0;
+          final int resolvedQty = parseInt(rawQty);
+
+          final String? resolvedBarcode = parseString(
+            item['barcode'] ?? item['Barcode'] ?? item['sku'] ?? item['Sku'],
+          );
+
+          final String? resolvedStatus = parseString(item['status'] ?? item['Status']);
+          final bool resolvedIsActive = resolvedStatus != null
+              ? parseBool(resolvedStatus, fallback: true)
+              : parseBool(
+                  item['isActive'] ??
+                      item['IsActive'] ??
+                      item['active'] ??
+                      item['Active'] ??
+                      true,
+                  fallback: true,
+                );
+
+          final int? resolvedLocationId = (() {
+            final dynamic rawLocationId = item['locationId'] ?? item['LocationId'];
+            if (rawLocationId == null) return null;
+            return parseInt(rawLocationId, fallback: 0);
+          })();
+
+          final String? resolvedBusinessTypeId =
+              parseString(item['businessTypeId'] ?? item['BusinessTypeId']);
 
           return ProductEntity(
             id: idValue?.toString() ?? '',
@@ -298,37 +365,78 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
                         item['image'] ??
                         item['Image'])
                     as String?,
-            barcode:
-                (item['barcode'] ??
-                        item['Barcode'] ??
-                        item['sku'] ??
-                        item['Sku'])
-                    as String?,
+            barcode: resolvedBarcode,
             category: (item['category'] ?? item['Category']) as String?,
             costPrice: resolvedCostPrice,
             salePrice: resolvedSalePrice,
             unit: (item['unit'] ?? item['Unit']) as String?,
-            isActive: (item['status'] ?? item['Status']) != null
-                ? ((item['status'] ?? item['Status']) == 'active')
-                : (item['isActive'] ??
-                          item['IsActive'] ??
-                          item['active'] ??
-                          item['Active'] ??
-                          true)
-                      as bool,
+            isActive: resolvedIsActive,
             createdAt: (item['createdAt'] ?? item['CreatedAt']) != null
                 ? DateFormatter.parseApiDateTime(
                     (item['createdAt'] ?? item['CreatedAt']) as String?,
                   )
                 : null,
-            locationId:
-                item['locationId'] as int? ?? item['LocationId'] as int?,
-            businessTypeId:
-                (item['businessTypeId'] ?? item['BusinessTypeId']) as String?,
+            locationId: resolvedLocationId,
+            businessTypeId: resolvedBusinessTypeId,
           );
         })
         .whereType<ProductEntity>()
         .toList();
+  }
+
+  Future<List<ProductEntity>> _enrichProductsWithSaleItems(
+    List<ProductEntity> products,
+  ) async {
+    if (products.isEmpty) return products;
+
+    final enriched = await Future.wait(
+      products.map((product) async {
+        if (product.saleItems.isNotEmpty) {
+          return product;
+        }
+
+        try {
+          final raw = await repository.getProductSaleItems(product.id);
+          final saleItems = _extractSaleItems(raw);
+          if (saleItems.isEmpty) return product;
+          return product.copyWith(saleItems: saleItems);
+        } catch (e) {
+          debugPrint(
+            'ProductBloc: Failed to load sale items for product ${product.id}: $e',
+          );
+          return product;
+        }
+      }),
+    );
+
+    return enriched;
+  }
+
+  List<Map<String, dynamic>> _extractSaleItems(dynamic response) {
+    if (response is Map<String, dynamic>) {
+      final data = response['data'];
+      if (data is List) {
+        return data
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+      if (data is Map<String, dynamic> && data['saleItems'] is List) {
+        return (data['saleItems'] as List)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+    }
+
+    if (response is List) {
+      return response
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+
+    return <Map<String, dynamic>>[];
   }
 
   Future<void> _onSearchProductsRequested(
@@ -743,42 +851,6 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     );
   }
 
-  List<Map<String, dynamic>> _extractSaleItems(dynamic response) {
-    List<Map<String, dynamic>> saleItems = [];
-    if (response is List<dynamic>) {
-      saleItems = response
-          .whereType<Map<String, dynamic>>()
-          .map((item) => {
-                'Unit': item['unit'] as String? ?? '',
-                'Quantity': item['quantity'] as int? ?? 0,
-                'Price': item['price'] as num? ?? 0,
-              })
-          .toList();
-    } else if (response is Map<String, dynamic>) {
-      final data = response['data'];
-      List<dynamic> itemsList = [];
-
-      if (data is List<dynamic>) {
-        itemsList = data;
-      } else if (data is Map<String, dynamic> &&
-          data['saleItems'] is List<dynamic>) {
-        itemsList = data['saleItems'] as List<dynamic>;
-      }
-
-      if (itemsList.isNotEmpty) {
-        saleItems = itemsList
-            .whereType<Map<String, dynamic>>()
-            .map((item) => {
-                  'Unit': item['unit'] as String? ?? '',
-                  'Quantity': item['quantity'] as int? ?? 0,
-                  'Price': item['price'] as num? ?? 0,
-                })
-            .toList();
-      }
-    }
-    return saleItems;
-  }
-
   Future<void> _onImportInventoryRequested(
     ImportInventoryRequested event,
     Emitter<ProductState> emit,
@@ -859,10 +931,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       final baseSalePrice = product.salePrice ?? product.price;
       final nextSalePrice = clampNonNegative(baseSalePrice + event.deltaAmount);
 
-      return product.copyWith(
-        salePrice: nextSalePrice,
-        price: nextSalePrice,
-      );
+      return product.copyWith(salePrice: nextSalePrice, price: nextSalePrice);
     }).toList();
 
     await _updateProductCache(event.locationId);

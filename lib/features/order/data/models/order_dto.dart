@@ -4,10 +4,9 @@ import 'order_item_dto.dart';
 
 /// Order Status enum
 enum OrderStatus {
-  draft('DRAFT', 'Tạm tính'),
-  pending('PENDING', 'Chờ xuất'),
-  published('PUBLISHED', 'Đã xuất'),
-  cancelled('CANCELLED', 'Đã hủy');
+  pending('pending', 'Chờ thanh toán'),
+  completed('completed', 'Đã hoàn thành'),
+  cancelled('cancelled', 'Đã hủy');
 
   final String code;
   final String displayName;
@@ -17,7 +16,7 @@ enum OrderStatus {
   factory OrderStatus.fromCode(String code) {
     return OrderStatus.values.firstWhere(
       (status) => status.code == code,
-      orElse: () => OrderStatus.draft,
+      orElse: () => OrderStatus.pending,
     );
   }
 }
@@ -25,22 +24,35 @@ enum OrderStatus {
 /// Order DTO - Represents the data transfer object for order
 class OrderDto extends Equatable {
   final String id;
+  final String orderCode;
+  final String? customerName;
+  final String? customerPhone;
   final String locationId;
   final String locationName;
-  final String status; // DRAFT, PENDING, PUBLISHED, CANCELLED
+  final String status; // pending, completed, cancelled
   final List<OrderItemDto> items;
   final double subtotal;
   final double discountAmount;
   final double taxAmount;
   final double totalAmount;
+  final double cashAmount;
+  final double bankAmount;
+  final double debtAmount;
+  final int? debtorId;
   final String? note;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? completedAt;
+  final DateTime? cancelledAt;
+  final String? cancelReason;
   final String? invoiceNumber;
   final DateTime? invoicedAt;
 
   const OrderDto({
     required this.id,
+    this.orderCode = '',
+    this.customerName,
+    this.customerPhone,
     required this.locationId,
     required this.locationName,
     required this.status,
@@ -49,27 +61,57 @@ class OrderDto extends Equatable {
     required this.discountAmount,
     required this.taxAmount,
     required this.totalAmount,
+    this.cashAmount = 0,
+    this.bankAmount = 0,
+    this.debtAmount = 0,
+    this.debtorId,
     this.note,
     required this.createdAt,
     required this.updatedAt,
+    this.completedAt,
+    this.cancelledAt,
+    this.cancelReason,
     this.invoiceNumber,
     this.invoicedAt,
   });
 
-  bool get isDraft => status == 'DRAFT' || status == OrderStatus.draft.code;
-  bool get isPending =>
-      status == 'PENDING' || status == OrderStatus.pending.code;
-  bool get isPublished =>
-      status == 'PUBLISHED' || status == OrderStatus.published.code;
-  bool get isCancelled =>
-      status == 'CANCELLED' || status == OrderStatus.cancelled.code;
+    bool get isDraft => status.toLowerCase() == 'draft';
+    bool get isPending =>
+      status.toLowerCase() == OrderStatus.pending.code;
+    bool get isPublished =>
+      status.toLowerCase() == 'published' ||
+      status.toLowerCase() == OrderStatus.completed.code;
+    bool get isCancelled =>
+      status.toLowerCase() == OrderStatus.cancelled.code;
 
   factory OrderDto.fromJson(Map<String, dynamic> json) {
+    String asString(dynamic value, {String fallback = ''}) {
+      if (value == null) return fallback;
+      if (value is String) return value;
+      return value.toString();
+    }
+
+    double asDouble(dynamic value, {double fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    DateTime? parseDate(dynamic value) {
+      return DateFormatter.parseApiDateTime(value?.toString());
+    }
+
     return OrderDto(
-      id: json['id'] as String? ?? '',
-      locationId: json['locationId'] as String? ?? '',
-      locationName: json['locationName'] as String? ?? '',
-      status: json['status'] as String? ?? 'DRAFT',
+      id: asString(json['id'] ?? json['orderId']),
+      orderCode: asString(json['orderCode']),
+      customerName: json['customerName']?.toString(),
+      customerPhone: json['customerPhone']?.toString(),
+      locationId: asString(
+        json['locationId'] ?? json['businessLocationId'],
+      ),
+      locationName: asString(json['locationName'] ?? json['businessLocationName']),
+      status: asString(json['status'], fallback: 'pending').toLowerCase(),
       items:
           (json['items'] as List<dynamic>?)
               ?.map(
@@ -77,29 +119,33 @@ class OrderDto extends Equatable {
               )
               .toList() ??
           [],
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
-      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
-      taxAmount: (json['taxAmount'] as num?)?.toDouble() ?? 0.0,
-      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
-      note: json['note'] as String?,
-        createdAt: DateFormatter.parseApiDateTime(
-          json['createdAt'] as String?,
-          fallback: DateTime.now().toUtc(),
-          ) ??
-          DateTime.now().toUtc(),
-        updatedAt: DateFormatter.parseApiDateTime(
-          json['updatedAt'] as String?,
-          fallback: DateTime.now().toUtc(),
-          ) ??
-          DateTime.now().toUtc(),
-      invoiceNumber: json['invoiceNumber'] as String?,
-        invoicedAt: DateFormatter.parseApiDateTime(json['invoicedAt'] as String?),
+      subtotal: asDouble(json['subtotal'] ?? json['subTotal']),
+      discountAmount: asDouble(json['discountAmount'] ?? json['discount']),
+      taxAmount: asDouble(json['taxAmount'] ?? json['tax']),
+      totalAmount: asDouble(json['totalAmount'] ?? json['total']),
+      cashAmount: asDouble(json['cashAmount']),
+      bankAmount: asDouble(json['bankAmount']),
+      debtAmount: asDouble(json['debtAmount']),
+      debtorId: json['debtorId'] as int?,
+      note: json['note']?.toString(),
+      createdAt:
+          parseDate(json['createdAt']) ?? DateTime.now().toUtc(),
+      updatedAt:
+          parseDate(json['updatedAt']) ?? DateTime.now().toUtc(),
+      completedAt: parseDate(json['completedAt']),
+      cancelledAt: parseDate(json['cancelledAt']),
+      cancelReason: json['cancelReason']?.toString(),
+      invoiceNumber: json['invoiceNumber']?.toString(),
+      invoicedAt: parseDate(json['invoicedAt']),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+        'orderCode': orderCode,
+        'customerName': customerName,
+        'customerPhone': customerPhone,
       'locationId': locationId,
       'locationName': locationName,
       'status': status,
@@ -108,9 +154,20 @@ class OrderDto extends Equatable {
       'discountAmount': discountAmount,
       'taxAmount': taxAmount,
       'totalAmount': totalAmount,
+        'cashAmount': cashAmount,
+        'bankAmount': bankAmount,
+        'debtAmount': debtAmount,
+        'debtorId': debtorId,
       'note': note,
       'createdAt': DateFormatter.toApiUtcIsoString(createdAt),
       'updatedAt': DateFormatter.toApiUtcIsoString(updatedAt),
+        'completedAt': completedAt != null
+          ? DateFormatter.toApiUtcIsoString(completedAt!)
+          : null,
+        'cancelledAt': cancelledAt != null
+          ? DateFormatter.toApiUtcIsoString(cancelledAt!)
+          : null,
+        'cancelReason': cancelReason,
       'invoiceNumber': invoiceNumber,
       'invoicedAt': invoicedAt != null
           ? DateFormatter.toApiUtcIsoString(invoicedAt!)
@@ -120,6 +177,9 @@ class OrderDto extends Equatable {
 
   OrderDto copyWith({
     String? id,
+    String? orderCode,
+    String? customerName,
+    String? customerPhone,
     String? locationId,
     String? locationName,
     String? status,
@@ -128,14 +188,24 @@ class OrderDto extends Equatable {
     double? discountAmount,
     double? taxAmount,
     double? totalAmount,
+    double? cashAmount,
+    double? bankAmount,
+    double? debtAmount,
+    int? debtorId,
     String? note,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? completedAt,
+    DateTime? cancelledAt,
+    String? cancelReason,
     String? invoiceNumber,
     DateTime? invoicedAt,
   }) {
     return OrderDto(
       id: id ?? this.id,
+      orderCode: orderCode ?? this.orderCode,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
       locationId: locationId ?? this.locationId,
       locationName: locationName ?? this.locationName,
       status: status ?? this.status,
@@ -144,9 +214,16 @@ class OrderDto extends Equatable {
       discountAmount: discountAmount ?? this.discountAmount,
       taxAmount: taxAmount ?? this.taxAmount,
       totalAmount: totalAmount ?? this.totalAmount,
+      cashAmount: cashAmount ?? this.cashAmount,
+      bankAmount: bankAmount ?? this.bankAmount,
+      debtAmount: debtAmount ?? this.debtAmount,
+      debtorId: debtorId ?? this.debtorId,
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      completedAt: completedAt ?? this.completedAt,
+      cancelledAt: cancelledAt ?? this.cancelledAt,
+      cancelReason: cancelReason ?? this.cancelReason,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       invoicedAt: invoicedAt ?? this.invoicedAt,
     );
@@ -155,6 +232,9 @@ class OrderDto extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    orderCode,
+    customerName,
+    customerPhone,
     locationId,
     locationName,
     status,
@@ -163,9 +243,16 @@ class OrderDto extends Equatable {
     discountAmount,
     taxAmount,
     totalAmount,
+    cashAmount,
+    bankAmount,
+    debtAmount,
+    debtorId,
     note,
     createdAt,
     updatedAt,
+    completedAt,
+    cancelledAt,
+    cancelReason,
     invoiceNumber,
     invoicedAt,
   ];
@@ -186,15 +273,38 @@ class OrderResponseDto extends Equatable {
   });
 
   factory OrderResponseDto.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic value, {int fallback = 0}) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    final dynamic dataNode = json['data'];
+    final List<dynamic> rawItems = dataNode is Map<String, dynamic>
+      ? (dataNode['items'] as List<dynamic>? ?? const [])
+      : (dataNode as List<dynamic>? ?? const []);
+
+    final total = dataNode is Map<String, dynamic>
+      ? parseInt(dataNode['totalCount'] ?? dataNode['total'])
+      : parseInt(json['totalCount'] ?? json['total']);
+
+    final pageNumber = dataNode is Map<String, dynamic>
+      ? parseInt(dataNode['pageNumber'], fallback: 1)
+      : parseInt(json['pageNumber'], fallback: 1);
+
+    final pageSize = dataNode is Map<String, dynamic>
+      ? parseInt(dataNode['pageSize'], fallback: 20)
+      : parseInt(json['pageSize'], fallback: 20);
+
     return OrderResponseDto(
-      orders:
-          (json['data'] as List<dynamic>?)
-              ?.map((order) => OrderDto.fromJson(order as Map<String, dynamic>))
-              .toList() ??
-          [],
-      total: json['total'] as int? ?? 0,
-      pageNumber: json['pageNumber'] as int? ?? 1,
-      pageSize: json['pageSize'] as int? ?? 20,
+      orders: rawItems
+        .whereType<Map<String, dynamic>>()
+        .map(OrderDto.fromJson)
+        .toList(),
+      total: total,
+      pageNumber: pageNumber,
+      pageSize: pageSize,
     );
   }
 

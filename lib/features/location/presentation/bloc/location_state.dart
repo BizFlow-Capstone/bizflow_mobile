@@ -125,7 +125,15 @@ class LocationEmployeesLoaded extends LocationState {
   /// Employees not yet assigned to this location
   List<EmployeeEntity> get unassignedEmployees {
     final assignedIds = locationEmployees.map((e) => e.id).toSet();
-    return allEmployees.where((e) => !assignedIds.contains(e.id)).toList();
+    return allEmployees
+        .where(
+          (e) =>
+              !assignedIds.contains(e.id) &&
+              e.isActive &&
+              e.status == EmployeeStatus.active &&
+              e.endedAt == null,
+        )
+        .toList();
   }
 
   @override

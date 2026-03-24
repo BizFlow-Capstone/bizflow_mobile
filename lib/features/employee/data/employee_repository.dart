@@ -15,14 +15,45 @@ class EmployeeRepository {
   /// Get list of employees available for assignment
   Future<List<EmployeeEntity>> getAvailableEmployees() async {
     try {
-      final dtos = await _service.getMyEmployees();
+      final dtos = await _service.getAssignableEmployees();
+      EmployeeStatus toEmployeeStatus(String rawStatus, bool isActive) {
+        final status = rawStatus.toLowerCase();
+        switch (status) {
+          case 'active':
+          case 'accepted':
+            return isActive ? EmployeeStatus.active : EmployeeStatus.inactive;
+          case 'pending':
+            return EmployeeStatus.pending;
+          case 'inactive':
+          case 'terminated':
+          case 'deleted':
+            return EmployeeStatus.inactive;
+          case 'rejected':
+            return EmployeeStatus.rejected;
+          default:
+            return isActive ? EmployeeStatus.active : EmployeeStatus.inactive;
+        }
+      }
+
       return dtos
           .map(
             (dto) => EmployeeEntity(
               id: dto.profileId,
               name: dto.userName,
               phone: dto.phone,
+              email: dto.email,
+              status: toEmployeeStatus(dto.status, dto.isActive),
+              isActive: dto.isActive,
+              employmentStatus: dto.status,
+              startedAt: dto.startAt,
+              endedAt: dto.endAt,
             ),
+          )
+          .where(
+            (employee) =>
+                employee.isActive &&
+                employee.status == EmployeeStatus.active &&
+                employee.endedAt == null,
           )
           .toList();
     } catch (e) {

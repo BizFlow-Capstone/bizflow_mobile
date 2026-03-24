@@ -122,6 +122,7 @@ class StorageKeys {
 
   // Cache
   static const String lastSyncTime = 'last_sync_time';
+  static const String orderLocalDrafts = 'order_local_drafts';
 
   // Add more keys here...
 }

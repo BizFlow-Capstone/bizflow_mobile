@@ -4,6 +4,8 @@ import 'package:equatable/equatable.dart';
 class OrderItemEntity extends Equatable {
   final String? id;
   final String productId;
+  final int? saleItemId;
+  final String? unitName;
   final String productName;
   final double price;
   final int quantity;
@@ -13,6 +15,8 @@ class OrderItemEntity extends Equatable {
   const OrderItemEntity({
     this.id,
     required this.productId,
+    this.saleItemId,
+    this.unitName,
     required this.productName,
     required this.price,
     required this.quantity,
@@ -28,6 +32,8 @@ class OrderItemEntity extends Equatable {
   List<Object?> get props => [
     id,
     productId,
+    saleItemId,
+    unitName,
     productName,
     price,
     quantity,

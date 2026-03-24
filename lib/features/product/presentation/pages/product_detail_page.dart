@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -857,7 +859,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildBarcodeSection(BuildContext context, AppLocalizations? l10n) {
-    if (_currentProduct.barcode == null) return SizedBox.shrink();
+    final barcodeValue = (_currentProduct.barcode ?? '').trim();
+    if (barcodeValue.isEmpty) return SizedBox.shrink();
 
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -878,44 +881,95 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
           ),
           SizedBox(height: AppSpacing.md),
-
-          // Barcode Display (placeholder for actual barcode image)
           Center(
-            child: Container(
-              padding: EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  // Barcode placeholder
-                  Container(
-                    height: 80,
-                    width: 150,
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _currentProduct.barcode ?? '',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+            child: _buildBarcodeCard(barcodeValue),
+          ),
+          SizedBox(height: AppSpacing.sm),
+        ],
+      ),
+    );
+  }
+
+  // Widget _buildQrCodeCard(String value) {
+  //   return Container(
+  //     width: 180,
+  //     padding: EdgeInsets.all(AppSpacing.sm),
+  //     decoration: BoxDecoration(
+  //       border: Border.all(color: AppColors.divider),
+  //       borderRadius: BorderRadius.circular(8),
+  //       color: AppColors.white,
+  //     ),
+  //     child: Column(
+  //       children: [
+  //         QrImageView(
+  //           data: value,
+  //           size: 140,
+  //           backgroundColor: AppColors.white,
+  //           eyeStyle: const QrEyeStyle(
+  //             eyeShape: QrEyeShape.square,
+  //             color: Colors.black,
+  //           ),
+  //           dataModuleStyle: const QrDataModuleStyle(
+  //             dataModuleShape: QrDataModuleShape.square,
+  //             color: Colors.black,
+  //           ),
+  //         ),
+  //         SizedBox(height: AppSpacing.xs),
+  //         Text(
+  //           'QR',
+  //           style: AppTextStyles.bodySmall.copyWith(
+  //             color: AppColors.textSecondary,
+  //             fontWeight: FontWeight.w600,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  Widget _buildBarcodeCard(String value) {
+    return Container(
+      width: 240,
+      padding: EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(8),
+        color: AppColors.white,
+      ),
+      child: Column(
+        children: [
+          BarcodeWidget(
+            barcode: Barcode.code128(),
+            data: value,
+            width: 220,
+            height: 80,
+            color: Colors.black,
+            backgroundColor: AppColors.white,
+            drawText: false,
+            errorBuilder: (context, error) {
+              return Container(
+                width: 220,
+                height: 80,
+                alignment: Alignment.center,
+                color: AppColors.background,
+                child: Text(
+                  'Barcode không hợp lệ',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                  SizedBox(height: AppSpacing.sm),
-                  Text(
-                    _currentProduct.barcode ?? '',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              );
+            },
+          ),
+          SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

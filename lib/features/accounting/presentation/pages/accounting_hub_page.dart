@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_bloc.dart';
+import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_event.dart';
+import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_state.dart';
+import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
 import 'package:bizflow_mobile/features/revenue/presentation/bloc/revenue_bloc.dart';
 import 'package:bizflow_mobile/features/revenue/domain/entities/revenue_entity.dart';
 import '../../../../core/localization/app_localizations.dart';
@@ -13,6 +18,7 @@ import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../order/domain/entities/order_entity.dart';
 import '../bloc/accounting_period_bloc.dart';
 import '../models/accounting_mock_models.dart';
 import '../widgets/accounting_books_reports_tab.dart';
@@ -88,6 +94,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         context.read<RevenueBloc>().add(
               LoadRevenuesRequested(businessLocationId: locationId),
             );
+      }
+      final refState = context.read<ReferenceBloc>().state;
+      if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+        context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
       }
     });
   }
@@ -393,6 +403,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         onEditRevenue: (item) {
                           // Handle edit revenue entity
                         },
+                        onTapRevenue: _showRevenueDetailDialog,
                         onEditCost: (item) =>
                             _editAccountingItem(item: item, isRevenue: false),
                       );
@@ -424,13 +435,28 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   );
 }
 
-  void _showAddRevenueDialog() {
+  Future<void> _showAddRevenueDialog() async {
     final l10n = AppLocalizations.of(context);
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
+
     final amountController = TextEditingController();
     final descriptionController = TextEditingController();
+    final referenceOrderIdController = TextEditingController();
     DateTime selectedDate = DateTime.now();
+    String? selectedMoneyChannel;
 
-    showDialog(
+    List<String> getMoneyChannels() {
+      final state = context.read<ReferenceBloc>().state;
+      if (state is ReferenceLoaded) {
+        return state.references['moneyChannelTypes'] ?? const <String>[];
+      }
+      return const <String>[];
+    }
+
+    await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -451,6 +477,35 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   controller: descriptionController,
                   decoration: InputDecoration(
                     labelText: l10n.translate('accounting.revenue_description'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  value: selectedMoneyChannel,
+                  decoration: const InputDecoration(
+                    labelText: 'Kênh tiền',
+                  ),
+                  items: getMoneyChannels()
+                      .map(
+                        (channel) => DropdownMenuItem<String>(
+                          value: channel,
+                          child: Text(channel),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedMoneyChannel = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: referenceOrderIdController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Order ID (optional)',
+                    hintText: 'Ví dụ: 123',
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -487,16 +542,29 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 final amount = double.tryParse(amountString) ?? 0;
                 if (amount <= 0) return;
 
+                if ((selectedMoneyChannel ?? '').trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Vui lòng chọn kênh tiền')),
+                  );
+                  return;
+                }
+
                 final locationId =
                     context.read<BusinessContext>().currentBusinessId;
+                final referenceOrderId = int.tryParse(
+                  referenceOrderIdController.text.trim(),
+                );
 
                 context.read<RevenueBloc>().add(
                   CreateManualRevenueRequested(
                     body: {
+                      'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
                       'amount': amount,
+                      'revenueDate': DateFormat('yyyy-MM-dd').format(selectedDate),
                       'description': descriptionController.text,
-                      'recognitionDate': selectedDate.toIso8601String(),
-                      'businessLocationId': int.tryParse(locationId ?? ''),
+                      'moneyChannel': selectedMoneyChannel,
+                      if (referenceOrderId != null) 'referenceType': 'order',
+                      if (referenceOrderId != null) 'referenceId': referenceOrderId,
                     },
                   ),
                 );
@@ -506,6 +574,104 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             ),
           ],
         ),
+      ),
+    );
+
+    amountController.dispose();
+    descriptionController.dispose();
+    referenceOrderIdController.dispose();
+  }
+
+  Future<OrderEntity?> _loadLinkedOrder(RevenueEntity revenue) async {
+    final refType = revenue.referenceType?.trim().toLowerCase();
+    final refId = revenue.referenceId;
+    if (refType != 'order' || refId == null || refId <= 0) return null;
+
+    try {
+      return await context.read<OrderBloc>().repository.getOrder(refId.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _showRevenueDetailDialog(RevenueEntity revenue) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('REV-${revenue.id}'),
+        content: SizedBox(
+          width: 420,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Số tiền: ${CurrencyFormatter.formatVND(revenue.amount)}'),
+                const SizedBox(height: 6),
+                Text('Mô tả: ${revenue.description}'),
+                const SizedBox(height: 6),
+                Text('Kênh tiền: ${revenue.moneyChannel ?? '-'}'),
+                const SizedBox(height: 6),
+                Text('Loại tham chiếu: ${revenue.referenceType ?? '-'}'),
+                const SizedBox(height: 6),
+                Text('Mã tham chiếu: ${revenue.referenceCode ?? revenue.referenceId?.toString() ?? '-'}'),
+                const SizedBox(height: 12),
+                if ((revenue.referenceType ?? '').toLowerCase() == 'order' &&
+                    (revenue.referenceId ?? 0) > 0) ...[
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Order detail',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  FutureBuilder<OrderEntity?>(
+                    future: _loadLinkedOrder(revenue),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+
+                      final order = snapshot.data;
+                      if (order == null) {
+                        return const Text('Không tải được chi tiết đơn hàng');
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Order ID: ${order.id}'),
+                          const SizedBox(height: 4),
+                          Text('Trạng thái: ${order.status}'),
+                          const SizedBox(height: 4),
+                          Text('Tổng: ${CurrencyFormatter.formatVND(order.totalAmount)}'),
+                          const SizedBox(height: 8),
+                          ...order.items.map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                '• ${item.productName} x${item.quantity} - ${CurrencyFormatter.formatVND(item.price)}',
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(l10n.translate('common.close')),
+          ),
+        ],
       ),
     );
   }

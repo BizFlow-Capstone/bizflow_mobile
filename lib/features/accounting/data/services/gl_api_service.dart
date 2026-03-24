@@ -1,4 +1,5 @@
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import 'package:intl/intl.dart';
 
 class GLApiService {
@@ -56,7 +57,9 @@ class GLApiService {
     );
 
     final responseData = response.data;
-    if (responseData == null) throw Exception('No data returned.');
+    if (responseData == null) {
+      throw Exception(ApiErrorMessageParser.genericMessage);
+    }
     return responseData['data'] as Map<String, dynamic>;
   }
 }

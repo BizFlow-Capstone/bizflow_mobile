@@ -1,7 +1,28 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_error_message_parser.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import 'models/order_dto.dart';
+
+class OrderConfirmationRequiredException implements Exception {
+  final List<String> warnings;
+  final bool requiresLowStockConfirmation;
+  final bool requiresCreditLimitConfirmation;
+
+  const OrderConfirmationRequiredException({
+    required this.warnings,
+    required this.requiresLowStockConfirmation,
+    required this.requiresCreditLimitConfirmation,
+  });
+
+  @override
+  String toString() {
+    if (warnings.isNotEmpty) {
+      return warnings.join('\n');
+    }
+    return 'Confirmation is required before continuing.';
+  }
+}
 
 /// Order API Service - Handles direct API communication for orders
 ///
@@ -12,8 +33,49 @@ import 'models/order_dto.dart';
 /// 4. Return DTOs to Repository
 class OrderApiService {
   final ApiClient _apiClient;
+  static const String _genericError = ApiErrorMessageParser.genericMessage;
 
   OrderApiService({required ApiClient apiClient}) : _apiClient = apiClient;
+
+  Map<String, dynamic> _extractOrderPayload(Map<String, dynamic> responseData) {
+    final dynamic dataNode = responseData['data'];
+    if (dataNode is Map<String, dynamic>) {
+      final dynamic orderNode = dataNode['order'];
+      if (orderNode is Map<String, dynamic>) {
+        return orderNode;
+      }
+      return dataNode;
+    }
+    return responseData;
+  }
+
+  void _throwIfConfirmationRequired(Map<String, dynamic> responseData) {
+    final dynamic dataNode = responseData['data'];
+    if (dataNode is! Map<String, dynamic>) return;
+
+    final requiresConfirmation = dataNode['requiresConfirmation'] == true;
+    if (!requiresConfirmation) return;
+
+    final warnings = <String>[];
+    final warningNode = dataNode['warnings'];
+    if (warningNode is List) {
+      for (final item in warningNode) {
+        final text = item?.toString().trim() ?? '';
+        if (text.isNotEmpty) warnings.add(text);
+      }
+    }
+
+    final joinedWarnings = warnings.join(' ').toUpperCase();
+    final requiresLowStock = joinedWarnings.contains('LOW_STOCK_CONFIRM_REQUIRED');
+    final requiresCreditLimit =
+        joinedWarnings.contains('DEBTOR_CREDIT_LIMIT_EXCEEDED_CONFIRM_REQUIRED');
+
+    throw OrderConfirmationRequiredException(
+      warnings: warnings,
+      requiresLowStockConfirmation: requiresLowStock,
+      requiresCreditLimitConfirmation: requiresCreditLimit,
+    );
+  }
 
   /// Get all orders for the current user
   ///
@@ -31,7 +93,8 @@ class OrderApiService {
         'pageNumber': pageNumber,
         'pageSize': pageSize,
         if (status != null) 'status': status,
-        if (locationId != null) 'locationId': locationId,
+        if (locationId != null && locationId.trim().isNotEmpty)
+          'BusinessLocationId': locationId,
       };
 
       final response = await _apiClient.get(
@@ -56,41 +119,13 @@ class OrderApiService {
         // Parse raw JSON to DTO
         return OrderResponseDto.fromJson(response.data as Map<String, dynamic>);
       } else {
-        throw Exception(response.message ?? 'Failed to load orders');
+        throw Exception(response.message ?? _genericError);
       }
     } on ApiException catch (e) {
-      // Transform ApiException to domain exception with user-friendly messages
-      if (e.statusCode == -1) {
-        throw Exception(
-          'No network connection\n\n'
-          'Check:\n'
-          '• Is backend running?\n'
-          '• Port: 7270\n'
-          '• URL: http://192.168.1.9:7270',
-        );
-      } else if (e.statusCode == -2) {
-        throw Exception(
-          'Connection timeout\n\n'
-          'Backend did not respond within 30 seconds',
-        );
-      } else if (e.statusCode == -3) {
-        throw Exception(
-          'Backend connection error\n\n'
-          '${e.message}\n\n'
-          'Solutions:\n'
-          '1. Check backend is running: dotnet run\n'
-          '2. Ensure port 7270 is not blocked\n'
-          '3. Hot restart app (press R)',
-        );
-      } else if (e.statusCode == 401) {
-        throw Exception('Session expired\n\nPlease login again');
-      } else if (e.statusCode == 404) {
-        throw Exception('Orders not found');
-      }
-      throw Exception('API Error: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('OrderApiService.getOrders error: $e');
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 
@@ -106,17 +141,19 @@ class OrderApiService {
 
       if (response.isSuccess && response.data != null) {
         if (response.data is! Map<String, dynamic>) {
-          throw Exception('Invalid response format');
+          throw Exception(_genericError);
         }
 
         final data = response.data as Map<String, dynamic>;
-        return OrderDto.fromJson(data['data'] ?? data);
+        return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
-        throw Exception(response.message ?? 'Failed to load order');
+        throw Exception(response.message ?? _genericError);
       }
+    } on ApiException catch (e) {
+      rethrow;
     } catch (e) {
       debugPrint('OrderApiService.getOrder error: $e');
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 
@@ -133,17 +170,22 @@ class OrderApiService {
 
       if (response.isSuccess && response.data != null) {
         if (response.data is! Map<String, dynamic>) {
-          throw Exception('Invalid response format');
+          throw Exception(_genericError);
         }
 
         final data = response.data as Map<String, dynamic>;
-        return OrderDto.fromJson(data['data'] ?? data);
+        _throwIfConfirmationRequired(data);
+        return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
-        throw Exception(response.message ?? 'Failed to create order');
+        throw Exception(response.message ?? _genericError);
       }
+    } on OrderConfirmationRequiredException {
+      rethrow;
+    } on ApiException catch (e) {
+      rethrow;
     } catch (e) {
       debugPrint('OrderApiService.createOrder error: $e');
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 
@@ -154,26 +196,41 @@ class OrderApiService {
   Future<OrderDto> updateOrder({
     required String orderId,
     required Map<String, dynamic> body,
+    String? idempotencyKey,
   }) async {
     try {
+      final updatedBody = <String, dynamic>{...body};
+      if (idempotencyKey != null && idempotencyKey.trim().isNotEmpty) {
+        updatedBody['idempotencyKey'] = idempotencyKey.trim();
+      }
+
       final response = await _apiClient.put(
         ApiEndpoints.updateOrder(orderId),
-        body: body,
+        body: updatedBody,
+        headers: {
+          if (idempotencyKey != null && idempotencyKey.trim().isNotEmpty)
+            'Idempotency-Key': idempotencyKey.trim(),
+        },
       );
 
       if (response.isSuccess && response.data != null) {
         if (response.data is! Map<String, dynamic>) {
-          throw Exception('Invalid response format');
+          throw Exception(_genericError);
         }
 
         final data = response.data as Map<String, dynamic>;
-        return OrderDto.fromJson(data['data'] ?? data);
+        _throwIfConfirmationRequired(data);
+        return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
-        throw Exception(response.message ?? 'Failed to update order');
+        throw Exception(response.message ?? _genericError);
       }
+    } on OrderConfirmationRequiredException {
+      rethrow;
+    } on ApiException catch (e) {
+      rethrow;
     } catch (e) {
       debugPrint('OrderApiService.updateOrder error: $e');
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 
@@ -190,17 +247,22 @@ class OrderApiService {
 
       if (response.isSuccess && response.data != null) {
         if (response.data is! Map<String, dynamic>) {
-          throw Exception('Invalid response format');
+          throw Exception(_genericError);
         }
 
         final data = response.data as Map<String, dynamic>;
-        return OrderDto.fromJson(data['data'] ?? data);
+        _throwIfConfirmationRequired(data);
+        return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
-        throw Exception(response.message ?? 'Failed to complete order');
+        throw Exception(response.message ?? _genericError);
       }
+    } on OrderConfirmationRequiredException {
+      rethrow;
+    } on ApiException catch (e) {
+      rethrow;
     } catch (e) {
       debugPrint('OrderApiService.completeOrder error: $e');
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 
@@ -208,18 +270,28 @@ class OrderApiService {
   ///
   /// API: POST /api/order/{id}/cancel
   /// Returns: bool (success/failure)
-  Future<bool> cancelOrder(String orderId) async {
+  Future<bool> cancelOrder(String orderId, {required String cancelReason}) async {
     try {
-      final response = await _apiClient.post(ApiEndpoints.cancelOrder(orderId));
+      final normalizedReason = cancelReason.trim();
+      if (normalizedReason.isEmpty) {
+        throw Exception('Cancel reason is required');
+      }
+
+      final response = await _apiClient.post(
+        ApiEndpoints.cancelOrder(orderId),
+        body: {'cancelReason': normalizedReason},
+      );
 
       if (response.isSuccess) {
         return true;
       } else {
-        throw Exception(response.message ?? 'Failed to cancel order');
+        throw Exception(response.message ?? _genericError);
       }
+    } on ApiException catch (e) {
+      rethrow;
     } catch (e) {
       debugPrint('OrderApiService.cancelOrder error: $e');
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 }

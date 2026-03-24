@@ -99,7 +99,7 @@ class ProductEntity {
       'salePrice': salePrice,
       'unit': unit,
       'isActive': isActive,
-        'createdAt': createdAt != null
+      'createdAt': createdAt != null
           ? DateFormatter.toApiUtcIsoString(createdAt!)
           : null,
       'locationId': locationId,
@@ -129,12 +129,16 @@ class ProductEntity {
     final double priceValue = parseDouble(
       map['sellingPrice'] ??
           map['SellingPrice'] ??
+          map['sellingPrice'] ??
+          map['SellingPrice'] ??
           map['price'] ??
           map['Price'],
     );
     final double? salePriceValue = parseDoubleNullable(
       map['sellingPrice'] ??
           map['SellingPrice'] ??
+          map['currentSalePrice'] ??
+          map['CurrentSalePrice'] ??
           map['salePrice'] ??
           map['SalePrice'],
     );
@@ -152,6 +156,8 @@ class ProductEntity {
         map['costPrice'] ??
             map['CostPrice'] ??
             map['cost_price'] ??
+            map['currentCostPrice'] ??
+            map['CurrentCostPrice'] ??
             map['purchasePrice'] ??
             map['PurchasePrice'] ??
             map['purchase_price'] ??
@@ -162,7 +168,7 @@ class ProductEntity {
       salePrice: salePriceValue ?? priceValue,
       unit: map['unit'] as String?,
       isActive: map['isActive'] as bool? ?? true,
-        createdAt: DateFormatter.parseApiDateTime(map['createdAt'] as String?),
+      createdAt: DateFormatter.parseApiDateTime(map['createdAt'] as String?),
       locationId: map['locationId'] as int?,
       businessTypeId: map['businessTypeId'] as String?,
       manufacturer: map['manufacturer'] as String?,

@@ -61,16 +61,29 @@ class LoadOrderDetailsRequested extends OrderEvent {
 class CreateOrderRequested extends OrderEvent {
   final String locationId;
   final List<OrderItemEntity> items;
+  final double cashAmount;
+  final double bankAmount;
+  final double debtAmount;
   final String? note;
 
   const CreateOrderRequested({
     required this.locationId,
     required this.items,
+    this.cashAmount = 0,
+    this.bankAmount = 0,
+    this.debtAmount = 0,
     this.note,
   });
 
   @override
-  List<Object?> get props => [locationId, items, note];
+  List<Object?> get props => [
+    locationId,
+    items,
+    cashAmount,
+    bankAmount,
+    debtAmount,
+    note,
+  ];
 }
 
 /// Update existing order
@@ -78,11 +91,49 @@ class UpdateOrderRequested extends OrderEvent {
   final String orderId;
   final String? note;
   final List<OrderItemEntity>? items;
+  final String? status;
+  final String? idempotencyKey;
+  final String? businessLocationId;
+  final double? cashAmount;
+  final double? bankAmount;
+  final double? debtAmount;
+  final int? debtorId;
+  final String? customerName;
+  final String? customerPhone;
+  final String? billMetadata;
 
-  const UpdateOrderRequested({required this.orderId, this.note, this.items});
+  const UpdateOrderRequested({
+    required this.orderId,
+    this.note,
+    this.items,
+    this.status,
+    this.idempotencyKey,
+    this.businessLocationId,
+    this.cashAmount,
+    this.bankAmount,
+    this.debtAmount,
+    this.debtorId,
+    this.customerName,
+    this.customerPhone,
+    this.billMetadata,
+  });
 
   @override
-  List<Object?> get props => [orderId, note, items];
+  List<Object?> get props => [
+        orderId,
+        note,
+        items,
+        status,
+        idempotencyKey,
+        businessLocationId,
+        cashAmount,
+        bankAmount,
+        debtAmount,
+        debtorId,
+        customerName,
+        customerPhone,
+        billMetadata,
+      ];
 }
 
 /// Publish order (convert draft to invoice)
@@ -98,11 +149,15 @@ class PublishOrderRequested extends OrderEvent {
 /// Cancel order
 class CancelOrderRequested extends OrderEvent {
   final String orderId;
+  final String cancelReason;
 
-  const CancelOrderRequested({required this.orderId});
+  const CancelOrderRequested({
+    required this.orderId,
+    required this.cancelReason,
+  });
 
   @override
-  List<Object?> get props => [orderId];
+  List<Object?> get props => [orderId, cancelReason];
 }
 
 /// Filter orders by status or location

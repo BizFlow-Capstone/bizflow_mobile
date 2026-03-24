@@ -2,24 +2,22 @@ import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import '../../../core/network/api_error_message_parser.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/multipart_auth_helper.dart';
 import 'models/product_dto.dart';
 import 'models/business_type_model.dart';
-import '../../../core/storage/secure_storage.dart';
 
 /// Product API Service - Handles product-related API calls
 ///
 /// Architecture: BLoC → Repository → Service → ApiClient → Backend
 class ProductApiService {
   final ApiClient _apiClient;
+  late final MultipartAuthHelper _multipartAuth;
 
-  ProductApiService({required ApiClient apiClient}) : _apiClient = apiClient;
-
-  /// Helper to get auth token from SecureStorage
-  Future<String?> _getAuthToken() async {
-    return await SecureStorage().read(key: SecureStorageKeys.accessToken);
+  ProductApiService({required ApiClient apiClient}) : _apiClient = apiClient {
+    _multipartAuth = MultipartAuthHelper(apiClient: _apiClient);
   }
 
   /// Get products for a location (Legacy endpoint)
@@ -428,39 +426,34 @@ class ProductApiService {
 
       debugPrint('DataMap: $dataMap');
 
-      if (imagePath != null && imagePath.isNotEmpty) {
-        final imageFile = File(imagePath);
-        if (imageFile.existsSync()) {
-          final imageBytes = await imageFile.readAsBytes();
-          dataMap['image'] = MultipartFile.fromBytes(
+      final baseUrl = _apiClient.baseUrl;
+      final imageFile = (imagePath != null && imagePath.isNotEmpty)
+          ? File(imagePath)
+          : null;
+      final imageBytes = (imageFile != null && imageFile.existsSync())
+          ? await imageFile.readAsBytes()
+          : null;
+
+      Future<FormData> buildFormData() async {
+        final requestMap = Map<String, dynamic>.from(dataMap);
+        if (imageBytes != null) {
+          requestMap['image'] = MultipartFile.fromBytes(
             imageBytes,
             filename: '${DateTime.now().millisecondsSinceEpoch}.jpg',
           );
         }
+        return FormData.fromMap(requestMap);
       }
 
-      final formData = FormData.fromMap(dataMap);
+      Future<Response<dynamic>> sendCreate(Dio dio) async {
+        final formData = await buildFormData();
+        return dio.post(
+          '$baseUrl${ApiEndpoints.createProduct}',
+          data: formData,
+        );
+      }
 
-      final dio = Dio();
-      final baseUrl = _apiClient.baseUrl;
-      final token = await _getAuthToken();
-
-      dio.options.headers = {
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
-
-      // SSL Bypass
-      (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
-          (HttpClient client) {
-            client.badCertificateCallback = (cert, host, port) => true;
-            return client;
-          };
-
-      final response = await dio.post(
-        '$baseUrl${ApiEndpoints.createProduct}',
-        data: formData,
-      );
+      final response = await _multipartAuth.executeWithRefresh(send: sendCreate);
 
       if (response.statusCode != null &&
           response.statusCode! >= 200 &&
@@ -475,13 +468,7 @@ class ProductApiService {
       debugPrint(
         'DioException [${e.response?.statusCode}]: ${e.response?.data}',
       );
-      if (e.response?.statusCode == 403) {
-        throw Exception('🔒 Permission denied (403)');
-      }
-      if (e.response?.statusCode == 415) {
-        throw Exception('🖼️ Invalid image type (415)');
-      }
-      throw Exception(e.message ?? 'Network error');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('ProductApiService._createProductWithImage error: $e');
       rethrow;
@@ -597,38 +584,34 @@ class ProductApiService {
 
       debugPrint('DataMap: $dataMap');
 
-      if (imagePath != null && imagePath.isNotEmpty) {
-        final imageFile = File(imagePath);
-        if (imageFile.existsSync()) {
-          final imageBytes = await imageFile.readAsBytes();
-          dataMap['image'] = MultipartFile.fromBytes(
+      final baseUrl = _apiClient.baseUrl;
+      final imageFile = (imagePath != null && imagePath.isNotEmpty)
+          ? File(imagePath)
+          : null;
+      final imageBytes = (imageFile != null && imageFile.existsSync())
+          ? await imageFile.readAsBytes()
+          : null;
+
+      Future<FormData> buildFormData() async {
+        final requestMap = Map<String, dynamic>.from(dataMap);
+        if (imageBytes != null) {
+          requestMap['image'] = MultipartFile.fromBytes(
             imageBytes,
             filename: '${DateTime.now().millisecondsSinceEpoch}.jpg',
           );
         }
+        return FormData.fromMap(requestMap);
       }
 
-      final formData = FormData.fromMap(dataMap);
+      Future<Response<dynamic>> sendUpdate(Dio dio) async {
+        final formData = await buildFormData();
+        return dio.put(
+          '$baseUrl${ApiEndpoints.updateProduct(productId)}',
+          data: formData,
+        );
+      }
 
-      final dio = Dio();
-      final baseUrl = _apiClient.baseUrl;
-      final token = await _getAuthToken();
-
-      dio.options.headers = {
-        'Accept': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
-      };
-
-      (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
-          (HttpClient client) {
-            client.badCertificateCallback = (cert, host, port) => true;
-            return client;
-          };
-
-      final response = await dio.put(
-        '$baseUrl${ApiEndpoints.updateProduct(productId)}',
-        data: formData,
-      );
+      final response = await _multipartAuth.executeWithRefresh(send: sendUpdate);
 
       debugPrint('Response status: ${response.statusCode}');
       debugPrint('Response data: ${response.data}');
@@ -640,7 +623,7 @@ class ProductApiService {
       }
     } on DioException catch (e) {
       debugPrint('DioException: ${e.response?.data}');
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('ProductApiService._updateProductWithImage error: $e');
       rethrow;

@@ -8,6 +8,9 @@ class RevenueEntity extends Equatable {
   final DateTime date;
   final String description;
   final String? moneyChannel;
+  final String? referenceType;
+  final int? referenceId;
+  final String? referenceCode;
   final DateTime createdAt;
 
   const RevenueEntity({
@@ -18,6 +21,9 @@ class RevenueEntity extends Equatable {
     required this.date,
     required this.description,
     this.moneyChannel,
+    this.referenceType,
+    this.referenceId,
+    this.referenceCode,
     required this.createdAt,
   });
 
@@ -30,6 +36,9 @@ class RevenueEntity extends Equatable {
         date,
         description,
         moneyChannel,
+        referenceType,
+        referenceId,
+        referenceCode,
         createdAt,
       ];
 }

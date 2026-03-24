@@ -22,6 +22,9 @@ class RevenueRepository {
       date: dto.revenueDate,
       description: dto.description,
       moneyChannel: dto.moneyChannel,
+      referenceType: dto.referenceType,
+      referenceId: dto.referenceId,
+      referenceCode: dto.referenceCode,
       createdAt: dto.createdAt,
     );
   }

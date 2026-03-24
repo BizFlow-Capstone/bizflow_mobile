@@ -1,12 +1,18 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/storage/local_storage.dart';
+import '../../domain/entities/order_entity.dart';
 import '../bloc/order_bloc.dart';
 import '../bloc/order_event.dart';
 import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import 'order_detail_screen.dart';
+import 'order_form_screen.dart';
 
 /// Order Status Screen (SC-ORD-02.2)
 /// Displays unpublished invoices and draft orders with tabs
@@ -38,6 +44,124 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
 
   void _refreshOrders() {
     context.read<OrderBloc>().add(const RefreshOrdersRequested());
+  }
+
+  Future<void> _openDraftForEditing(OrderEntity order) async {
+    if (!order.isDraft) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderFormScreen(
+          inputType: 'manual',
+          draftId: order.id,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+  }
+
+  Future<void> _openPendingForEditing(OrderEntity order) async {
+    if (!order.isPending) return;
+
+    final storage = await LocalStorage.getInstance();
+    final raw = storage.getString(StorageKeys.orderLocalDrafts);
+
+    List<Map<String, dynamic>> drafts = [];
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        drafts = decoded
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    }
+
+    final draftId = 'edit_${order.id}';
+    final payload = {
+      'id': draftId,
+      'locationId': order.locationId,
+      'locationName': order.locationName,
+      'status': 'draft',
+      'customerType': 'walkin',
+      'customerName': order.customerName ?? '',
+      'customerPhone': order.customerPhone ?? '',
+      'subtotal': order.subtotal,
+      'discountAmount': order.discountAmount,
+      'taxAmount': order.taxAmount,
+      'totalAmount': order.totalAmount,
+      'items': order.items
+          .map(
+            (item) => {
+              'id': item.id,
+              'productId': item.productId,
+              'saleItemId': item.saleItemId ?? int.tryParse(item.productId),
+              'unitName': item.unitName,
+              'productName': item.productName,
+              'price': item.price,
+              'quantity': item.quantity,
+              'discount': item.discount,
+              'note': item.note,
+            },
+          )
+          .toList(),
+      'createdAt': order.createdAt.toUtc().toIso8601String(),
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+
+    final index = drafts.indexWhere((item) => item['id'] == draftId);
+    if (index >= 0) {
+      drafts[index] = payload;
+    } else {
+      drafts.insert(0, payload);
+    }
+
+    await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderFormScreen(
+          inputType: 'manual',
+          draftId: draftId,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    await _removeTempDraftById(draftId);
+    if (!mounted) return;
+    _refreshOrders();
+  }
+
+  Future<void> _removeTempDraftById(String draftId) async {
+    final storage = await LocalStorage.getInstance();
+    final raw = storage.getString(StorageKeys.orderLocalDrafts);
+    if (raw == null || raw.trim().isEmpty) return;
+
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return;
+
+    final drafts = decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    final before = drafts.length;
+    drafts.removeWhere((item) => item['id']?.toString() == draftId);
+    if (drafts.length == before) return;
+
+    await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
+  }
+
+  void _openOrderDetail(OrderEntity order) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OrderDetailScreen(orderId: order.id),
+      ),
+    );
   }
 
   @override
@@ -115,7 +239,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
 
   Widget _buildDraftOrdersTab(BuildContext context, OrderState state) {
     final l10n = AppLocalizations.of(context);
-    List<dynamic> draftOrders = [];
+    List<OrderEntity> draftOrders = [];
 
     if (state is DraftOrdersLoaded) {
       draftOrders = state.orders;
@@ -144,10 +268,10 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           return OrderCard(
             order: order,
             onTap: () {
-              // TODO: Navigate to order details
+              _openDraftForEditing(order);
             },
             onEdit: () {
-              // TODO: Navigate to edit order
+              _openDraftForEditing(order);
             },
             onPublish: () {
               context.read<OrderBloc>().add(
@@ -165,7 +289,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
 
   Widget _buildPendingOrdersTab(BuildContext context, OrderState state) {
     final l10n = AppLocalizations.of(context);
-    List<dynamic> pendingOrders = [];
+    List<OrderEntity> pendingOrders = [];
 
     if (state is OrdersLoaded) {
       pendingOrders = state.orders.where((o) => o.isPending).toList();
@@ -192,7 +316,10 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           return OrderCard(
             order: order,
             onTap: () {
-              // TODO: Navigate to order details
+              _openPendingForEditing(order);
+            },
+            onEdit: () {
+              _openPendingForEditing(order);
             },
           );
         },
@@ -227,11 +354,27 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
 
   void _showCancelConfirmDialog(BuildContext context, String orderId) {
     final l10n = AppLocalizations.of(context);
+    final reasonController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.translate('order.cancel_confirm_title')),
-        content: Text(l10n.translate('order.cancel_confirm_message')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(l10n.translate('order.cancel_confirm_message')),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: l10n.translate('order.detail_cancel_reason'),
+                hintText: l10n.translate('order.detail_cancel_reason'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -239,8 +382,17 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           ),
           TextButton(
             onPressed: () {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                AppSnackBar.show(
+                  context,
+                  message: l10n.translate('order.cancel_reason_required'),
+                  type: AppSnackBarType.warning,
+                );
+                return;
+              }
               context.read<OrderBloc>().add(
-                CancelOrderRequested(orderId: orderId),
+                CancelOrderRequested(orderId: orderId, cancelReason: reason),
               );
               Navigator.pop(context);
             },

@@ -1,49 +1,46 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
-import '../../../../core/storage/secure_storage.dart';
+import '../../../../core/network/multipart_auth_helper.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import 'models/import_model.dart';
 
 class ImportApiService {
   final ApiClient _apiClient;
+  late final MultipartAuthHelper _multipartAuth;
 
-  ImportApiService({required ApiClient apiClient}) : _apiClient = apiClient;
+  ImportApiService({required ApiClient apiClient}) : _apiClient = apiClient {
+    _multipartAuth = MultipartAuthHelper(apiClient: _apiClient);
+  }
 
-  Future<String?> _getAuthToken() async {
-    return SecureStorage().read(key: SecureStorageKeys.accessToken);
+  Map<String, dynamic> _buildImportItemPayload(ImportItemModel item) {
+    return {
+      'productId': item.productId,
+      'quantity': item.quantity,
+      'costPrice': item.costPrice,
+    };
   }
 
   Future<Map<String, dynamic>> _postMultipart(
     String endpoint,
     Map<String, dynamic> dataMap,
   ) async {
-    final formData = FormData.fromMap(dataMap);
+    final response = await _multipartAuth.executeWithRefresh(
+      send: (dio) {
+        final formData = FormData.fromMap(dataMap);
+        return dio.post('${_apiClient.baseUrl}$endpoint', data: formData);
+      },
+    );
 
-    final dio = Dio();
-    final baseUrl = _apiClient.baseUrl;
-    final token = await _getAuthToken();
-
-    dio.options.headers = {
-      'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-
-    (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      final client = HttpClient();
-      client.badCertificateCallback = (cert, host, port) => true;
-      return client;
-    };
-
-    final response = await dio.post('$baseUrl$endpoint', data: formData);
     if (response.statusCode != null &&
         response.statusCode! >= 200 &&
         response.statusCode! < 300) {
       return (response.data as Map<String, dynamic>?) ?? {};
     }
+
     throw Exception(response.statusMessage ?? 'Multipart request failed');
   }
 
@@ -51,29 +48,19 @@ class ImportApiService {
     String endpoint,
     Map<String, dynamic> dataMap,
   ) async {
-    final formData = FormData.fromMap(dataMap);
+    final response = await _multipartAuth.executeWithRefresh(
+      send: (dio) {
+        final formData = FormData.fromMap(dataMap);
+        return dio.put('${_apiClient.baseUrl}$endpoint', data: formData);
+      },
+    );
 
-    final dio = Dio();
-    final baseUrl = _apiClient.baseUrl;
-    final token = await _getAuthToken();
-
-    dio.options.headers = {
-      'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-
-    (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
-      final client = HttpClient();
-      client.badCertificateCallback = (cert, host, port) => true;
-      return client;
-    };
-
-    final response = await dio.put('$baseUrl$endpoint', data: formData);
     if (response.statusCode != null &&
         response.statusCode! >= 200 &&
         response.statusCode! < 300) {
       return (response.data as Map<String, dynamic>?) ?? {};
     }
+
     throw Exception(response.statusMessage ?? 'Multipart request failed');
   }
 
@@ -127,7 +114,9 @@ class ImportApiService {
         'SaveAsDraft': request.saveAsDraft,
         if (request.receivedAt != null)
           'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
-        'Items': jsonEncode(request.items.map((e) => e.toJson()).toList()),
+        'Items': jsonEncode(
+          request.items.map(_buildImportItemPayload).toList(),
+        ),
       };
 
       if (request.imagePath != null && request.imagePath!.isNotEmpty) {
@@ -143,7 +132,7 @@ class ImportApiService {
 
       return await _postMultipart(ApiEndpoints.createImport, dataMap);
     } catch (e) {
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 
@@ -151,31 +140,37 @@ class ImportApiService {
     int importId,
     UpdateImportRequest request,
   ) async {
-    final Map<String, dynamic> dataMap = {
-      'ImportType': request.importType,
-      'Supplier': request.supplier,
-      'Note': request.note,
-      'RemoveImage': request.removeImage,
-      if (request.receivedAt != null)
-        'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
-      'Items': jsonEncode(request.items.map((e) => e.toJson()).toList()),
-    };
+    try {
+      final Map<String, dynamic> dataMap = {
+        'ImportType': request.importType,
+        'Supplier': request.supplier,
+        'Note': request.note,
+        'RemoveImage': request.removeImage,
+        if (request.receivedAt != null)
+          'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
+        'Items': jsonEncode(
+          request.items.map(_buildImportItemPayload).toList(),
+        ),
+      };
 
-    if (request.imagePath != null && request.imagePath!.isNotEmpty) {
-      final imageFile = File(request.imagePath!);
-      if (imageFile.existsSync()) {
-        final imageBytes = await imageFile.readAsBytes();
-        dataMap['image'] = MultipartFile.fromBytes(
-          imageBytes,
-          filename: '${DateTime.now().millisecondsSinceEpoch}.jpg',
-        );
+      if (request.imagePath != null && request.imagePath!.isNotEmpty) {
+        final imageFile = File(request.imagePath!);
+        if (imageFile.existsSync()) {
+          final imageBytes = await imageFile.readAsBytes();
+          dataMap['image'] = MultipartFile.fromBytes(
+            imageBytes,
+            filename: '${DateTime.now().millisecondsSinceEpoch}.jpg',
+          );
+        }
       }
-    }
 
-    return await _putMultipart(
-      ApiEndpoints.updateImport(importId.toString()),
-      dataMap,
-    );
+      return await _putMultipart(
+        ApiEndpoints.updateImport(importId.toString()),
+        dataMap,
+      );
+    } catch (e) {
+      throw Exception(ApiErrorMessageParser.parse(e));
+    }
   }
 
   Future<Map<String, dynamic>> confirmImport(

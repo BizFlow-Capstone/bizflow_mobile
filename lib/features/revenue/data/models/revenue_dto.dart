@@ -9,6 +9,9 @@ class RevenueDto extends Equatable {
   final DateTime revenueDate;
   final String description;
   final String? moneyChannel;
+  final String? referenceType;
+  final int? referenceId;
+  final String? referenceCode;
   final String createdBy;
   final DateTime createdAt;
 
@@ -20,19 +23,54 @@ class RevenueDto extends Equatable {
     required this.revenueDate,
     required this.description,
     this.moneyChannel,
+    this.referenceType,
+    this.referenceId,
+    this.referenceCode,
     required this.createdBy,
     required this.createdAt,
   });
 
   factory RevenueDto.fromJson(Map<String, dynamic> json) {
+    int asInt(dynamic value, {int fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    double asDouble(dynamic value, {double fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    int? asNullableInt(dynamic value) {
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value);
+      return null;
+    }
+
+    String? asNullableString(dynamic value) {
+      final normalized = value?.toString().trim();
+      if (normalized == null || normalized.isEmpty) return null;
+      return normalized;
+    }
+
     return RevenueDto(
-      revenueId: json['revenueId'] as int? ?? 0,
-      businessLocationId: json['businessLocationId'] as int? ?? 0,
+      revenueId: asInt(json['revenueId'] ?? json['id']),
+      businessLocationId: asInt(json['businessLocationId']),
       revenueType: json['revenueType'] as String? ?? '',
-      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      amount: asDouble(json['amount']),
       revenueDate: DateFormatter.parseApiDateTime(json['revenueDate'] as String?) ?? DateTime.now(),
       description: json['description'] as String? ?? '',
-      moneyChannel: json['moneyChannel'] as String?,
+      moneyChannel: asNullableString(json['moneyChannel']),
+      referenceType: asNullableString(json['referenceType']),
+      referenceId: asNullableInt(json['referenceId']),
+      referenceCode: asNullableString(json['referenceCode']),
       createdBy: json['createdBy'] as String? ?? '',
       createdAt: DateFormatter.parseApiDateTime(json['createdAt'] as String?) ?? DateTime.now(),
     );
@@ -47,6 +85,9 @@ class RevenueDto extends Equatable {
       'revenueDate': revenueDate.toIso8601String(),
       'description': description,
       'moneyChannel': moneyChannel,
+      'referenceType': referenceType,
+      'referenceId': referenceId,
+      'referenceCode': referenceCode,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
     };
@@ -61,6 +102,9 @@ class RevenueDto extends Equatable {
         revenueDate,
         description,
         moneyChannel,
+        referenceType,
+        referenceId,
+        referenceCode,
         createdBy,
         createdAt,
       ];
