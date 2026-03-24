@@ -148,6 +148,18 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
             orderId: widget.pendingOrderId!,
             requestBody: body
         );
+        
+        // Record debt adjustment if needed
+        if (_debtAmount > 0 && _selectedDebtor != null) {
+          final debtorRepo = context.read<DebtorBloc>().repository;
+          await debtorRepo.recordDebtAdjustment(
+            debtorId: _selectedDebtor!.debtorId,
+            amount: _debtAmount,
+            paymentMethod: _cashAmount > 0 ? 'cash' : (_bankAmount > 0 ? 'bank' : 'cash'),
+            notes: widget.note,
+          );
+        }
+
         if (mounted) {
           AppSnackBar.show(
             context,
@@ -158,6 +170,18 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         }
       } else {
         await repository.createOrder(body);
+
+        // Record debt adjustment if needed
+        if (_debtAmount > 0 && _selectedDebtor != null) {
+          final debtorRepo = context.read<DebtorBloc>().repository;
+          await debtorRepo.recordDebtAdjustment(
+            debtorId: _selectedDebtor!.debtorId,
+            amount: _debtAmount,
+            paymentMethod: _cashAmount > 0 ? 'cash' : (_bankAmount > 0 ? 'bank' : 'cash'),
+            notes: widget.note,
+          );
+        }
+
         if (mounted) {
           AppSnackBar.show(
             context,

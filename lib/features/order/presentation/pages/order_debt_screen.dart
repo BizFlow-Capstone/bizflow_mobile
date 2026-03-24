@@ -229,7 +229,7 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
 
                     if (_selectedDebtType == 'partial') ...[
                       DropdownButtonFormField<String>(
-                        initialValue: _selectedPaymentMethod,
+                        value: _selectedPaymentMethod,
                         decoration: InputDecoration(
                           labelText: l10n.translate('debt.payment_method'),
                           border: const OutlineInputBorder(),
