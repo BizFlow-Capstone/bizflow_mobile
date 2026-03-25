@@ -165,7 +165,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
 
     final targetRoute = _resolveRouteFromNotification(notification);
     if (targetRoute != null) {
-      AppRouter.navigateTo(targetRoute);
+      await AppRouter.navigateFromNotificationTarget(targetRoute);
       return;
     }
 

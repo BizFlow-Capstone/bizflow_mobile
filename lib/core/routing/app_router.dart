@@ -45,6 +45,7 @@ import '../../shared/widgets/sidebar_widget.dart';
 import '../../shared/dialogs/app_snackbar.dart';
 import '../../shared/context/business_context.dart';
 import '../../shared/context/notification_context.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Route names - Tập trung khai báo tất cả route
 class AppRoutes {
@@ -375,6 +376,34 @@ class AppRouter {
   static bool canPop() {
     return navigatorKey.currentState!.canPop();
   }
+
+  static bool isExternalUrl(String target) {
+    final uri = Uri.tryParse(target.trim());
+    if (uri == null) {
+      return false;
+    }
+
+    return uri.hasScheme &&
+        (uri.scheme.toLowerCase() == 'http' || uri.scheme.toLowerCase() == 'https');
+  }
+
+  static Future<bool> openExternalUrl(String target) async {
+    final uri = Uri.tryParse(target.trim());
+    if (uri == null) {
+      return false;
+    }
+
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  static Future<void> navigateFromNotificationTarget(String target) async {
+    if (isExternalUrl(target)) {
+      await openExternalUrl(target);
+      return;
+    }
+
+    await navigateTo(target);
+  }
 }
 
 /// Global AppBar Shell - Wraps pages để cung cấp AppBar global
@@ -404,7 +433,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
       route,
     ) {
       debugPrint('_GlobalAppBarShell: Immediate navigation to $route');
-      AppRouter.navigateTo(route);
+      unawaited(AppRouter.navigateFromNotificationTarget(route));
     });
     NotificationContext().refreshUnreadCount();
   }

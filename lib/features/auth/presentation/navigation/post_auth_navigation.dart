@@ -63,12 +63,15 @@ class PostAuthNavigation {
       return;
     }
 
-    // Check for pending notification route (in-memory or secure storage)
+    // Keep Home as root route to avoid empty stack/black screen when users press back
+    // after opening app from a notification deep-link.
     final pendingRoute = await FirebaseMessagingService.consumePendingRoute();
-    if (pendingRoute != null) {
-      AppRouter.navigateAndClearStack(pendingRoute);
-    } else {
-      AppRouter.navigateAndClearStack(AppRoutes.home);
+    AppRouter.navigateAndClearStack(AppRoutes.home);
+
+    if (pendingRoute != null && pendingRoute != AppRoutes.home) {
+      Future<void>.delayed(Duration.zero, () {
+        AppRouter.navigateFromNotificationTarget(pendingRoute);
+      });
     }
   }
 }

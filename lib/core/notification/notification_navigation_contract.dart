@@ -36,6 +36,11 @@ class NotificationNavigationContract {
     }
 
     if (actionPayloadJson != null && actionPayloadJson.isNotEmpty) {
+      final rawPayload = actionPayloadJson.trim();
+      if (rawPayload.startsWith('http://') || rawPayload.startsWith('https://')) {
+        return rawPayload;
+      }
+
       try {
         final decoded = jsonDecode(actionPayloadJson);
         if (decoded is Map<String, dynamic>) {
