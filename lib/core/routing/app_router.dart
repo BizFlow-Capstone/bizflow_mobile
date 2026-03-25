@@ -44,6 +44,7 @@ import '../../shared/widgets/app_bar_custom.dart';
 import '../../shared/widgets/sidebar_widget.dart';
 import '../../shared/dialogs/app_snackbar.dart';
 import '../../shared/context/business_context.dart';
+import '../../shared/context/notification_context.dart';
 
 /// Route names - Tập trung khai báo tất cả route
 class AppRoutes {
@@ -311,7 +312,13 @@ class AppRouter {
         );
 
       case AppRoutes.employeeInvitations:
-        return _buildRoute(settings, const EmployeeInvitationsPage());
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EmployeeInvitationsPage(
+            allowBack: args?['allowBack'] as bool? ?? true,
+          ),
+        );
 
       default:
         return _buildRoute(settings, const _NotFoundPage());
@@ -393,10 +400,13 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
   void initState() {
     super.initState();
     // Listen for immediate navigation from notifications
-    _navigationSubscription = FirebaseMessagingService.navigationStream.listen((route) {
+    _navigationSubscription = FirebaseMessagingService.navigationStream.listen((
+      route,
+    ) {
       debugPrint('_GlobalAppBarShell: Immediate navigation to $route');
       AppRouter.navigateTo(route);
     });
+    NotificationContext().refreshUnreadCount();
   }
 
   @override
@@ -404,112 +414,72 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
     _navigationSubscription?.cancel();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
+    final unreadCount = context.watch<NotificationContext>().unreadCount;
     return ListenableBuilder(
       listenable: AppRouter.globalAppBarState,
       builder: (context, _) {
-          return Scaffold(
-            key: _scaffoldKey,
-            // Global AppBar
-            appBar: CustomAppBar(
-              userName: AppRouter.globalAppBarState.userName,
-              avatarUrl: AppRouter.globalAppBarState.avatarUrl,
-              scaffoldKey: _scaffoldKey,
-              notificationCount: 2, // Mock: 2 unread notifications
-              onLocaleChange: (locale) {
-                AppRouter.globalAppBarState.setLocale(locale);
-              },
-              onNotificationTap: () {
-                AppRouter.navigateTo(AppRoutes.notifications);
-              },
-              onSettingsTap: () {
-                AppRouter.navigateTo(AppRoutes.settings);
-              },
-            ),
-            // Drawer
-            drawer: Consumer<BusinessContext>(
-              builder: (context, businessContext, _) {
-                return BlocBuilder<LocationBloc, LocationState>(
-                  builder: (context, state) {
-                    // Get locations for sidebar
-                    final l10n = AppLocalizations.of(context);
-                    List<LocationItem> locations = [];
-                    LocationItem? selectedLocation;
+        return Scaffold(
+          key: _scaffoldKey,
+          // Global AppBar
+          appBar: CustomAppBar(
+            userName: AppRouter.globalAppBarState.userName,
+            avatarUrl: AppRouter.globalAppBarState.avatarUrl,
+            scaffoldKey: _scaffoldKey,
+            notificationCount: unreadCount,
+            onLocaleChange: (locale) {
+              AppRouter.globalAppBarState.setLocale(locale);
+            },
+            onNotificationTap: () {
+              AppRouter.navigateTo(AppRoutes.notifications);
+            },
+            onSettingsTap: () {
+              AppRouter.navigateTo(AppRoutes.settings);
+            },
+          ),
+          // Drawer
+          drawer: Consumer<BusinessContext>(
+            builder: (context, businessContext, _) {
+              return BlocBuilder<LocationBloc, LocationState>(
+                builder: (context, state) {
+                  // Get locations for sidebar
+                  final l10n = AppLocalizations.of(context);
+                  List<LocationItem> locations = [];
+                  LocationItem? selectedLocation;
 
-                    if (state is LocationsLoaded) {
-                      locations = state.locations
-                          .map(
-                            (loc) => LocationItem(
-                              id: loc.id,
-                              name: loc.name,
-                              isActive: loc.isActive,
-                            ),
-                          )
-                          .toList();
-
-                      // Resolve selectedLocation from businessContext
-                      if (businessContext.currentBusinessId != null) {
-                        try {
-                          selectedLocation = locations.firstWhere(
-                            (loc) =>
-                                loc.id == businessContext.currentBusinessId,
-                          );
-                        } catch (_) {
-                          // Safe fallback
-                        }
-                      } else if (locations.isNotEmpty) {
-                        // Fallback if no context selected
-                        selectedLocation = locations.first;
-                      }
-                    }
-
-                    return SidebarWidget(
-                      locations: locations,
-                      selectedLocation: selectedLocation,
-                      onAddLocation: () {
-                        Navigator.pop(context);
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AddEditLocationPage(),
+                  if (state is LocationsLoaded) {
+                    locations = state.locations
+                        .map(
+                          (loc) => LocationItem(
+                            id: loc.id,
+                            name: loc.name,
+                            isActive: loc.isActive,
                           ),
+                        )
+                        .toList();
+
+                    // Resolve selectedLocation from businessContext
+                    if (businessContext.currentBusinessId != null) {
+                      try {
+                        selectedLocation = locations.firstWhere(
+                          (loc) => loc.id == businessContext.currentBusinessId,
                         );
-                      },
-                      onLogout: () {
-                        final authBloc = context.read<AuthBloc>();
-                        authBloc.add(const LogoutRequested());
-                      },
-                      onGuide: () {
-                        AppSnackBar.show(
-                          context,
-                          message: l10n.translate('sidebar.guide'),
-                          type: AppSnackBarType.info,
-                        );
-                      },
-                      onAccountSettings: () {
-                        AppRouter.navigateTo(AppRoutes.profile);
-                      },
-                      onLocationSelected: (location) {
-                        businessContext.switchBusinessLocation(
-                          location.id,
-                          location.name,
-                        );
-                        // Go back to Home
-                        AppRouter.navigateAndClearStack(AppRoutes.home);
-                      },
-                    );
-                  },
-                );
-              },
-            ),
-            // Body
-            body: widget.child,
-            // FAB - positioned at bottom-right
-            floatingActionButton: widget.showAddLocationFab
-                ? FloatingActionButton(
-                    backgroundColor: const Color(0xFF23C4C1),
-                    onPressed: () {
+                      } catch (_) {
+                        // Safe fallback
+                      }
+                    } else if (locations.isNotEmpty) {
+                      // Fallback if no context selected
+                      selectedLocation = locations.first;
+                    }
+                  }
+
+                  return SidebarWidget(
+                    locations: locations,
+                    selectedLocation: selectedLocation,
+                    onAddLocation: () {
+                      Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -517,13 +487,54 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                         ),
                       );
                     },
-                    child: const Icon(Icons.add, color: Colors.white),
-                  )
-                : null,
-            floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-          );
-        },
-      );
+                    onLogout: () {
+                      final authBloc = context.read<AuthBloc>();
+                      authBloc.add(const LogoutRequested());
+                    },
+                    onGuide: () {
+                      AppSnackBar.show(
+                        context,
+                        message: l10n.translate('sidebar.guide'),
+                        type: AppSnackBarType.info,
+                      );
+                    },
+                    onAccountSettings: () {
+                      AppRouter.navigateTo(AppRoutes.profile);
+                    },
+                    onLocationSelected: (location) {
+                      businessContext.switchBusinessLocation(
+                        location.id,
+                        location.name,
+                      );
+                      // Go back to Home
+                      AppRouter.navigateAndClearStack(AppRoutes.home);
+                    },
+                  );
+                },
+              );
+            },
+          ),
+          // Body
+          body: widget.child,
+          // FAB - positioned at bottom-right
+          floatingActionButton: widget.showAddLocationFab
+              ? FloatingActionButton(
+                  backgroundColor: const Color(0xFF23C4C1),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddEditLocationPage(),
+                      ),
+                    );
+                  },
+                  child: const Icon(Icons.add, color: Colors.white),
+                )
+              : null,
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+        );
+      },
+    );
   }
 }
 

@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'core/config/app_config.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/services/firebase_messaging_service.dart';
+import 'core/services/notification_realtime_service.dart';
 import 'core/network/api_client.dart';
 import 'core/network/api_endpoints.dart';
 import 'core/providers/localization_provider.dart';
@@ -16,13 +18,14 @@ import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/data/auth_api_service.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/data/push_token_api_service.dart';
+import 'features/notification/data/notification_api_service.dart';
+import 'features/notification/data/notification_repository.dart';
 import 'features/employee/data/employee_api_service.dart';
 import 'features/employee/data/employee_repository.dart';
 import 'features/employee/data/employee_management_repository.dart';
 import 'features/employee/presentation/bloc/employee_bloc.dart';
 import 'features/location/presentation/bloc/location_event.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
-import 'features/order/presentation/bloc/order_event.dart';
 import 'features/product/presentation/bloc/product_event.dart';
 import 'features/debt/presentation/bloc/debtor_event.dart';
 import 'features/location/data/location_api_service.dart';
@@ -55,14 +58,15 @@ import 'core/reference/presentation/bloc/reference_event.dart';
 import 'features/revenue/data/revenue_api_service.dart';
 import 'features/revenue/data/revenue_repository.dart';
 import 'features/revenue/presentation/bloc/revenue_bloc.dart';
-import 'features/revenue/presentation/bloc/revenue_event.dart';
 
 import 'shared/context/business_context.dart';
+import 'shared/context/notification_context.dart';
 import 'shared/context/user_profile_context.dart';
 import 'shared/cache/cache_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await Firebase.initializeApp();
   await CacheManager().init();
   await BusinessContext().init();
@@ -101,12 +105,15 @@ class _MyAppState extends State<MyApp> {
   late EmployeeManagementRepository _employeeManagementRepository;
   late PushTokenApiService _pushTokenApiService;
   late FirebaseMessagingService _firebaseMessagingService;
+  late NotificationRealtimeService _notificationRealtimeService;
   late ReferenceApiService _referenceApiService;
   late ReferenceRepository _referenceRepository;
   late GLApiService _glApiService;
   late GLRepository _glRepository;
   late RevenueApiService _revenueApiService;
   late RevenueRepository _revenueRepository;
+  late NotificationApiService _notificationApiService;
+  late NotificationRepository _notificationRepository;
 
   @override
   void initState() {
@@ -181,6 +188,7 @@ class _MyAppState extends State<MyApp> {
     _accountingApiService = AccountingApiService(apiClient: _apiClient);
     _glApiService = GLApiService(apiClient: _apiClient);
     _pushTokenApiService = PushTokenApiService(apiClient: _apiClient);
+    _notificationApiService = NotificationApiService(apiClient: _apiClient);
     _referenceApiService = ReferenceApiService(apiClient: _apiClient);
     _revenueApiService = RevenueApiService(apiClient: _apiClient);
 
@@ -191,13 +199,25 @@ class _MyAppState extends State<MyApp> {
     _productRepository = ProductRepository(service: _productApiService);
     _importRepository = ImportRepository(_importApiService);
     _debtorRepository = DebtorRepository(service: _debtorApiService);
-    _accountingRepository = AccountingRepository(apiService: _accountingApiService);
+    _accountingRepository = AccountingRepository(
+      apiService: _accountingApiService,
+    );
     _invoiceTemplateRepository = InvoiceTemplateRepositoryMock();
     _employeeManagementRepository = EmployeeManagementRepositoryApi(
       apiService: _employeeApiService,
       locationApiService: _locationApiService,
     );
-    _referenceRepository = ReferenceRepository(apiService: _referenceApiService);
+    _notificationRepository = NotificationRepository(
+      apiService: _notificationApiService,
+    );
+    NotificationContext().configure(_notificationRepository);
+    _notificationRealtimeService = NotificationRealtimeService();
+    NotificationRealtimeService.notificationStream.listen((_) {
+      NotificationContext().refreshUnreadCount();
+    });
+    _referenceRepository = ReferenceRepository(
+      apiService: _referenceApiService,
+    );
     _glRepository = GLRepository(apiService: _glApiService);
     _revenueRepository = RevenueRepository(apiService: _revenueApiService);
 
@@ -205,6 +225,11 @@ class _MyAppState extends State<MyApp> {
       pushTokenApiService: _pushTokenApiService,
     );
     Future.microtask(() => _firebaseMessagingService.initialize());
+    Future.microtask(() async {
+      if (await _secureStorage.hasAccessToken()) {
+        await _notificationRealtimeService.connect();
+      }
+    });
 
     final userProfile = UserProfileContext();
     AppRouter.globalAppBarState.updateProfile(
@@ -216,6 +241,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _firebaseMessagingService.dispose();
+    _notificationRealtimeService.dispose();
     _localizationProvider.dispose();
     _apiClient.close();
     super.dispose();
@@ -227,6 +253,7 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider.value(value: _localizationProvider),
         ChangeNotifierProvider.value(value: BusinessContext()),
+        ChangeNotifierProvider.value(value: NotificationContext()),
         BlocProvider(
           create: (context) => AuthBloc(
             locationRepository: _locationRepository,
@@ -257,9 +284,7 @@ class _MyAppState extends State<MyApp> {
         BlocProvider(
           create: (context) => ReferenceBloc(repository: _referenceRepository),
         ),
-        BlocProvider(
-          create: (context) => GLBloc(repository: _glRepository),
-        ),
+        BlocProvider(create: (context) => GLBloc(repository: _glRepository)),
         BlocProvider(
           create: (context) =>
               InvoiceTemplateBloc(repository: _invoiceTemplateRepository)
@@ -274,45 +299,52 @@ class _MyAppState extends State<MyApp> {
         ),
         Provider<EmployeeRepository>.value(value: _employeeRepository),
         Provider<ImportRepository>.value(value: _importRepository),
+        Provider<NotificationRepository>.value(value: _notificationRepository),
       ],
       child: Consumer<LocalizationProvider>(
         builder: (context, localizationProvider, _) {
           return ListenableBuilder(
             listenable: AppRouter.globalAppBarState,
             builder: (context, _) {
-          return BlocListener<AuthBloc, AuthState>(
-            listener: (context, state) {
-              if (state is AuthAuthenticated) {
-                context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
-              }
-              if (state is LogoutSuccess) {
-                // Reset all data-heavy Blocs to clear memory
-                context.read<LocationBloc>().add(const ResetLocations());
-                context.read<OrderBloc>().add(const ResetOrders());
-                context.read<ProductBloc>().add(const ResetProducts());
-                context.read<DebtorBloc>().add(const ResetDebtors());
-                context.read<RevenueBloc>().add(const ResetRevenues());
-                
-                // Navigate to login
-                AppRouter.navigateAndClearStack(AppRoutes.login);
-              }
-            },
-            child: MaterialApp(
-              title: 'BizFlow',
-              theme: AppTheme.light,
-              localizationsDelegates: const [
-                AppLocalizations.delegate,
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: AppLocalizations.supportedLocales,
-              locale: localizationProvider.currentLocale,
-              navigatorKey: AppRouter.navigatorKey,
-              onGenerateRoute: AppRouter.generateRoute,
-              initialRoute: AppRoutes.splash,
-            ),
-          );
+              return BlocListener<AuthBloc, AuthState>(
+                listener: (context, state) {
+                  if (state is AuthAuthenticated) {
+                    context.read<ReferenceBloc>().add(
+                      LoadAllReferencesRequested(),
+                    );
+                    NotificationContext().refreshUnreadCount();
+                    _notificationRealtimeService.connect();
+                  }
+                  if (state is LogoutSuccess) {
+                    // Reset all data-heavy Blocs to clear memory
+                    context.read<LocationBloc>().add(const ResetLocations());
+                    context.read<OrderBloc>().add(const ResetOrders());
+                    context.read<ProductBloc>().add(const ResetProducts());
+                    context.read<DebtorBloc>().add(const ResetDebtors());
+                    context.read<RevenueBloc>().add(const ResetRevenues());
+                    NotificationContext().clear();
+                    _notificationRealtimeService.disconnect();
+
+                    // Navigate to login
+                    AppRouter.navigateAndClearStack(AppRoutes.login);
+                  }
+                },
+                child: MaterialApp(
+                  title: 'BizFlow',
+                  theme: AppTheme.light,
+                  localizationsDelegates: const [
+                    AppLocalizations.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  locale: localizationProvider.currentLocale,
+                  navigatorKey: AppRouter.navigatorKey,
+                  onGenerateRoute: AppRouter.generateRoute,
+                  initialRoute: AppRoutes.splash,
+                ),
+              );
             },
           );
         },

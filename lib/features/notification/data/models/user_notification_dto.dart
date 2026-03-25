@@ -1,0 +1,110 @@
+class UserNotificationDto {
+  final int userNotificationId;
+  final String notificationType;
+  final String priority;
+  final String title;
+  final String content;
+  final String? actionType;
+  final String? targetScreen;
+  final String? actionPayloadJson;
+  final String deliveryStatus;
+  final DateTime createdAt;
+  final DateTime? sentAt;
+  final DateTime? readAt;
+
+  const UserNotificationDto({
+    required this.userNotificationId,
+    required this.notificationType,
+    required this.priority,
+    required this.title,
+    required this.content,
+    this.actionType,
+    this.targetScreen,
+    this.actionPayloadJson,
+    required this.deliveryStatus,
+    required this.createdAt,
+    this.sentAt,
+    this.readAt,
+  });
+
+  bool get isRead => readAt != null;
+
+  UserNotificationDto copyWith({DateTime? readAt, DateTime? sentAt}) {
+    return UserNotificationDto(
+      userNotificationId: userNotificationId,
+      notificationType: notificationType,
+      priority: priority,
+      title: title,
+      content: content,
+      actionType: actionType,
+      targetScreen: targetScreen,
+      actionPayloadJson: actionPayloadJson,
+      deliveryStatus: deliveryStatus,
+      createdAt: createdAt,
+      sentAt: sentAt ?? this.sentAt,
+      readAt: readAt ?? this.readAt,
+    );
+  }
+
+  factory UserNotificationDto.fromJson(Map<String, dynamic> json) {
+    DateTime? parseDate(dynamic value) {
+      if (value == null) return null;
+      if (value is String && value.trim().isNotEmpty) {
+        return DateTime.tryParse(value)?.toLocal();
+      }
+      return null;
+    }
+
+    return UserNotificationDto(
+      userNotificationId: (json['userNotificationId'] as num?)?.toInt() ?? 0,
+      notificationType: (json['notificationType'] ?? '').toString(),
+      priority: (json['priority'] ?? 'NORMAL').toString(),
+      title: (json['title'] ?? '').toString(),
+      content: (json['content'] ?? '').toString(),
+      actionType: json['actionType']?.toString(),
+      targetScreen: json['targetScreen']?.toString(),
+      actionPayloadJson: json['actionPayloadJson']?.toString(),
+      deliveryStatus: (json['deliveryStatus'] ?? '').toString(),
+      createdAt: parseDate(json['createdAt']) ?? DateTime.now(),
+      sentAt: parseDate(json['sentAt']),
+      readAt: parseDate(json['readAt']),
+    );
+  }
+}
+
+class PaginatedNotificationsDto {
+  final List<UserNotificationDto> items;
+  final int pageNumber;
+  final int pageSize;
+  final int totalPages;
+  final int totalCount;
+  final bool hasNextPage;
+
+  const PaginatedNotificationsDto({
+    required this.items,
+    required this.pageNumber,
+    required this.pageSize,
+    required this.totalPages,
+    required this.totalCount,
+    required this.hasNextPage,
+  });
+
+  factory PaginatedNotificationsDto.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'];
+    final items = rawItems is List
+        ? rawItems
+              .whereType<Map<String, dynamic>>()
+              .map(UserNotificationDto.fromJson)
+              .toList()
+        : <UserNotificationDto>[];
+
+    return PaginatedNotificationsDto(
+      items: items,
+      pageNumber: (json['pageNumber'] as num?)?.toInt() ?? 1,
+      pageSize: (json['pageSize'] as num?)?.toInt() ?? items.length,
+      totalPages: (json['totalPages'] as num?)?.toInt() ?? 1,
+      totalCount: (json['totalCount'] as num?)?.toInt() ?? items.length,
+      hasNextPage: json['hasNextPage'] == true,
+    );
+  }
+}

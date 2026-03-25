@@ -1,34 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'dart:convert';
+import 'dart:async';
+
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/notification/notification_navigation_contract.dart';
 import '../../../../core/routing/app_router.dart';
+import '../../../../core/services/notification_realtime_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/context/notification_context.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../data/models/user_notification_dto.dart';
+import '../../data/notification_repository.dart';
 
-/// Mock notification data
-class _MockNotification {
-  final String id;
-  final String titleKey;
-  final String body;
-  final DateTime time;
-  final bool isRead;
-  final IconData icon;
-  final Color iconColor;
-
-  const _MockNotification({
-    required this.id,
-    required this.titleKey,
-    required this.body,
-    required this.time,
-    this.isRead = false,
-    required this.icon,
-    required this.iconColor,
-  });
-}
-
-/// Notification List Page
 class NotificationListPage extends StatefulWidget {
   const NotificationListPage({super.key});
 
@@ -37,90 +24,240 @@ class NotificationListPage extends StatefulWidget {
 }
 
 class _NotificationListPageState extends State<NotificationListPage> {
-  late List<_MockNotification> _notifications;
+  static const int _pageSize = 20;
+
+  final ScrollController _scrollController = ScrollController();
+  final List<UserNotificationDto> _notifications = [];
+
+  bool _isInitialLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasNextPage = false;
+  String? _errorMessage;
+  int _currentPage = 1;
+  StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
+
+  NotificationRepository get _repository =>
+      context.read<NotificationRepository>();
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _notifications = [
-      _MockNotification(
-        id: '1',
-        titleKey: 'notification.order_confirmed',
-        body: 'Đơn hàng DH-2024-001 đã được xác nhận thành công.',
-        time: now.subtract(const Duration(minutes: 5)),
-        isRead: false,
-        icon: Icons.check_circle_outline,
-        iconColor: AppColors.success,
-      ),
-      _MockNotification(
-        id: '2',
-        titleKey: 'notification.payment_received',
-        body: 'Nhận thanh toán 2,000,000đ từ Nguyễn Văn An.',
-        time: now.subtract(const Duration(hours: 1)),
-        isRead: false,
-        icon: Icons.payment,
-        iconColor: AppColors.primary,
-      ),
-      _MockNotification(
-        id: '3',
-        titleKey: 'notification.stock_low',
-        body: 'Sản phẩm "iPhone 15 Pro Max" sắp hết hàng (còn 2 chiếc).',
-        time: now.subtract(const Duration(hours: 3)),
-        isRead: true,
-        icon: Icons.warning_amber_outlined,
-        iconColor: AppColors.warning,
-      ),
-      _MockNotification(
-        id: '4',
-        titleKey: 'notification.new_order',
-        body: 'Đơn hàng mới DH-2024-008 từ Trần Thị Bình.',
-        time: now.subtract(const Duration(hours: 6)),
-        isRead: true,
-        icon: Icons.shopping_cart_outlined,
-        iconColor: AppColors.secondary,
-      ),
-      _MockNotification(
-        id: '5',
-        titleKey: 'notification.import_completed',
-        body: 'Phiếu nhập kho PNK-2026-009 đã được xác nhận.',
-        time: now.subtract(const Duration(days: 1)),
-        isRead: true,
-        icon: Icons.inventory_2_outlined,
-        iconColor: AppColors.info,
-      ),
-      _MockNotification(
-        id: '6',
-        titleKey: 'notification.payment_received',
-        body: 'Nhận thanh toán 1,500,000đ từ Lê Hoàng Cường.',
-        time: now.subtract(const Duration(days: 2)),
-        isRead: true,
-        icon: Icons.payment,
-        iconColor: AppColors.primary,
-      ),
-    ];
+    _scrollController.addListener(_onScroll);
+    NotificationRealtimeService().connect();
+    _realtimeSubscription = NotificationRealtimeService.notificationStream
+        .listen((_) {
+          _loadInitial();
+        });
+    _loadInitial();
+  }
+
+  @override
+  void dispose() {
+    _realtimeSubscription?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitial() async {
+    setState(() {
+      _isInitialLoading = true;
+      _errorMessage = null;
+      _currentPage = 1;
+    });
+
+    try {
+      final page = await _repository.getMyNotifications(
+        pageNumber: _currentPage,
+        pageSize: _pageSize,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _notifications
+          ..clear()
+          ..addAll(page.items);
+        _hasNextPage = page.hasNextPage;
+        _isInitialLoading = false;
+      });
+
+      NotificationContext().refreshUnreadCount();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isInitialLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasNextPage) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final nextPage = _currentPage + 1;
+      final page = await _repository.getMyNotifications(
+        pageNumber: nextPage,
+        pageSize: _pageSize,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _currentPage = nextPage;
+        _notifications.addAll(page.items);
+        _hasNextPage = page.hasNextPage;
+      });
+    } catch (_) {
+      // Keep current list on load-more failure.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    await _repository.markAllAsRead();
+
+    if (!mounted) return;
+    setState(() {
+      for (var index = 0; index < _notifications.length; index++) {
+        if (!_notifications[index].isRead) {
+          _notifications[index] = _notifications[index].copyWith(
+            readAt: DateTime.now(),
+          );
+        }
+      }
+    });
+    NotificationContext().resetUnread();
+  }
+
+  Future<void> _handleNotificationTap(UserNotificationDto notification) async {
+    if (!notification.isRead) {
+      try {
+        await _repository.markAsRead(notification.userNotificationId);
+        if (!mounted) return;
+
+        final index = _notifications.indexWhere(
+          (item) => item.userNotificationId == notification.userNotificationId,
+        );
+        if (index >= 0) {
+          setState(() {
+            _notifications[index] = _notifications[index].copyWith(
+              readAt: DateTime.now(),
+            );
+          });
+        }
+        NotificationContext().decrementUnreadIfPossible();
+      } catch (_) {
+        // Keep UX smooth if mark-read API fails.
+      }
+    }
+
+    if (!mounted) return;
+
+    final targetRoute = _resolveRouteFromNotification(notification);
+    if (targetRoute != null) {
+      AppRouter.navigateTo(targetRoute);
+      return;
+    }
+
+    AppRouter.navigateTo(
+      AppRoutes.notificationDetail,
+      arguments: {
+        'title': notification.title,
+        'body': notification.content,
+        'time': _formatTime(context, notification.createdAt),
+        'icon': _resolveIcon(notification.notificationType),
+        'iconColor': _resolveIconColor(notification.notificationType),
+      },
+    );
+  }
+
+  String? _resolveRouteFromNotification(UserNotificationDto notification) {
+    return NotificationNavigationContract.resolve(
+      actionType: notification.actionType,
+      targetScreen: notification.targetScreen,
+      actionPayloadJson: notification.actionPayloadJson,
+      type: notification.notificationType,
+    );
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final threshold = _scrollController.position.maxScrollExtent - 200;
+    if (_scrollController.position.pixels >= threshold) {
+      _loadMore();
+    }
   }
 
   String _formatTime(BuildContext context, DateTime time) {
     final l10n = AppLocalizations.of(context);
     final diff = DateTime.now().difference(time);
+
     if (diff.inMinutes < 1) {
       return l10n.translate('notification.just_now');
-    } else if (diff.inHours < 1) {
+    }
+
+    if (diff.inHours < 1) {
       return l10n.translate(
         'notification.minutes_ago',
         params: {'count': diff.inMinutes.toString()},
       );
-    } else if (diff.inDays < 1) {
+    }
+
+    if (diff.inDays < 1) {
       return l10n.translate(
         'notification.hours_ago',
         params: {'count': diff.inHours.toString()},
       );
-    } else {
-      return l10n.translate(
-        'notification.days_ago',
-        params: {'count': diff.inDays.toString()},
-      );
+    }
+
+    return l10n.translate(
+      'notification.days_ago',
+      params: {'count': diff.inDays.toString()},
+    );
+  }
+
+  IconData _resolveIcon(String notificationType) {
+    switch (notificationType.toUpperCase()) {
+      case 'ORDER_CREATED':
+        return Icons.shopping_cart_outlined;
+      case 'INVITE_EMPLOYEE':
+      case 'EMPLOYEE_INVITE':
+        return Icons.group_add_outlined;
+      case 'PROMOTION':
+        return Icons.local_offer_outlined;
+      case 'SYSTEM_UPDATE':
+        return Icons.system_update_alt_outlined;
+      default:
+        return Icons.notifications_outlined;
+    }
+  }
+
+  Color _resolveIconColor(String notificationType) {
+    switch (notificationType.toUpperCase()) {
+      case 'ORDER_CREATED':
+        return AppColors.secondary;
+      case 'INVITE_EMPLOYEE':
+      case 'EMPLOYEE_INVITE':
+        return AppColors.primary;
+      case 'PROMOTION':
+        return AppColors.warning;
+      case 'SYSTEM_UPDATE':
+        return AppColors.info;
+      default:
+        return AppColors.textSecondary;
     }
   }
 
@@ -147,38 +284,15 @@ class _NotificationListPageState extends State<NotificationListPage> {
         bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
-        child: _notifications.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.notifications_off_outlined,
-                      size: 64,
-                      color: AppColors.textHint,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      l10n.translate('notification.empty'),
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      l10n.translate('notification.empty_sub'),
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: AppColors.textHint,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              )
+        child: _isInitialLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _errorMessage != null
+            ? _ErrorState(onRetry: _loadInitial)
+            : _notifications.isEmpty
+            ? _EmptyState()
             : Column(
                 children: [
-                  // Mark all read row
-                  if (_notifications.any((n) => !n.isRead))
+                  if (_notifications.any((item) => !item.isRead))
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
@@ -187,23 +301,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _notifications = _notifications
-                                  .map(
-                                    (n) => _MockNotification(
-                                      id: n.id,
-                                      titleKey: n.titleKey,
-                                      body: n.body,
-                                      time: n.time,
-                                      isRead: true,
-                                      icon: n.icon,
-                                      iconColor: n.iconColor,
-                                    ),
-                                  )
-                                  .toList();
-                            });
-                          },
+                          onPressed: _markAllAsRead,
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
@@ -221,22 +319,50 @@ class _NotificationListPageState extends State<NotificationListPage> {
                         ),
                       ),
                     ),
-                  // Notification list
                   Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: AppSpacing.sm,
-                        bottom: 40,
+                    child: RefreshIndicator(
+                      onRefresh: _loadInitial,
+                      child: ListView.separated(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.only(
+                          left: AppSpacing.md,
+                          right: AppSpacing.md,
+                          top: AppSpacing.sm,
+                          bottom: 40,
+                        ),
+                        itemCount:
+                            _notifications.length + (_isLoadingMore ? 1 : 0),
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: AppSpacing.sm),
+                        itemBuilder: (context, index) {
+                          if (index >= _notifications.length) {
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(
+                                vertical: AppSpacing.sm,
+                              ),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
+                          }
+
+                          final notification = _notifications[index];
+                          return _NotificationTile(
+                            notification: notification,
+                            icon: _resolveIcon(notification.notificationType),
+                            iconColor: _resolveIconColor(
+                              notification.notificationType,
+                            ),
+                            timeText: _formatTime(
+                              context,
+                              notification.createdAt,
+                            ),
+                            onTap: () => _handleNotificationTap(notification),
+                          );
+                        },
                       ),
-                      itemCount: _notifications.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (context, index) {
-                        final notification = _notifications[index];
-                        return _buildNotificationTile(context, notification);
-                      },
                     ),
                   ),
                 ],
@@ -244,68 +370,48 @@ class _NotificationListPageState extends State<NotificationListPage> {
       ),
     );
   }
+}
 
-  Widget _buildNotificationTile(
-    BuildContext context,
-    _MockNotification notification,
-  ) {
-    final l10n = AppLocalizations.of(context);
+class _NotificationTile extends StatelessWidget {
+  final UserNotificationDto notification;
+  final IconData icon;
+  final Color iconColor;
+  final String timeText;
+  final VoidCallback onTap;
 
+  const _NotificationTile({
+    required this.notification,
+    required this.icon,
+    required this.iconColor,
+    required this.timeText,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Material(
       color: notification.isRead
           ? AppColors.white
           : AppColors.primary.withValues(alpha: 0.04),
       borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       child: InkWell(
-        onTap: () {
-          AppRouter.navigateTo(
-            AppRoutes.notificationDetail,
-            arguments: {
-              'title': l10n.translate(notification.titleKey),
-              'body': notification.body,
-              'time': _formatTime(context, notification.time),
-              'icon': notification.icon,
-              'iconColor': notification.iconColor,
-            },
-          );
-          // Mark as read
-          setState(() {
-            final idx = _notifications.indexOf(notification);
-            _notifications[idx] = _MockNotification(
-              id: notification.id,
-              titleKey: notification.titleKey,
-              body: notification.body,
-              time: notification.time,
-              isRead: true,
-              icon: notification.icon,
-              iconColor: notification.iconColor,
-            );
-          });
-        },
+        onTap: onTap,
         borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon
               Container(
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: notification.iconColor.withValues(alpha: 0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
-                child: Center(
-                  child: Icon(
-                    notification.icon,
-                    color: notification.iconColor,
-                    size: 22,
-                  ),
-                ),
+                child: Center(child: Icon(icon, color: iconColor, size: 22)),
               ),
               const SizedBox(width: AppSpacing.md),
-              // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,7 +420,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
                       children: [
                         Expanded(
                           child: Text(
-                            l10n.translate(notification.titleKey),
+                            notification.title,
                             style: AppTextStyles.titleSmall.copyWith(
                               fontWeight: notification.isRead
                                   ? FontWeight.w500
@@ -335,7 +441,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      notification.body,
+                      notification.content,
                       style: AppTextStyles.labelSmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -344,7 +450,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _formatTime(context, notification.time),
+                      timeText,
                       style: AppTextStyles.labelSmall.copyWith(
                         color: AppColors.textHint,
                         fontSize: 11,
@@ -356,6 +462,73 @@ class _NotificationListPageState extends State<NotificationListPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.notifications_off_outlined,
+            size: 64,
+            color: AppColors.textHint,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.translate('notification.empty'),
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            l10n.translate('notification.empty_sub'),
+            style: AppTextStyles.labelSmall.copyWith(color: AppColors.textHint),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final Future<void> Function() onRetry;
+
+  const _ErrorState({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: AppColors.error),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.translate('common.error_occurred'),
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextButton(
+            onPressed: () {
+              onRetry();
+            },
+            child: Text(l10n.translate('common.retry')),
+          ),
+        ],
       ),
     );
   }

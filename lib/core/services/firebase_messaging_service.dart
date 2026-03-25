@@ -1,12 +1,24 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import '../notification/notification_navigation_contract.dart';
 import '../../features/auth/data/push_token_api_service.dart';
 import '../notification/notification_service.dart';
 import '../routing/app_router.dart';
+import '../storage/secure_storage.dart';
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint(
+    'FirebaseMessagingService: background message received ${message.messageId}',
+  );
+}
 
 class FirebaseMessagingService {
   static final StreamController<Map<String, dynamic>> _messageDataController =
@@ -22,6 +34,23 @@ class FirebaseMessagingService {
 
   /// Route pending for navigation after auth
   static String? pendingRoute;
+
+  static Future<String?> consumePendingRoute() async {
+    if (pendingRoute != null && pendingRoute!.isNotEmpty) {
+      final route = pendingRoute;
+      pendingRoute = null;
+      await SecureStorage().clearPendingNotificationAction();
+      return route;
+    }
+
+    final storedRoute = await SecureStorage().getPendingNotificationAction();
+    if (storedRoute != null && storedRoute.isNotEmpty) {
+      await SecureStorage().clearPendingNotificationAction();
+      return storedRoute;
+    }
+
+    return null;
+  }
 
   final PushTokenApiService _pushTokenApiService;
   final NotificationService _notificationService;
@@ -84,10 +113,7 @@ class FirebaseMessagingService {
       }
 
       // Pass route in payload for local notification tap handling
-      String? payload;
-      if (message.data['type'] == 'employee_invite') {
-        payload = AppRoutes.employeeInvitations;
-      }
+      final payload = _resolveRouteFromData(message.data);
 
       await _notificationService.showNotification(
         id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -100,31 +126,50 @@ class FirebaseMessagingService {
     // Handle notification click when app is in background
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('FirebaseMessagingService: onMessageOpenedApp tap');
-      _handleMessageTap(message);
+      unawaited(_handleMessageTap(message));
     });
 
     // Check if app was opened from a terminated state via notification
     final initialMessage = await messaging.getInitialMessage();
     if (initialMessage != null) {
       debugPrint('FirebaseMessagingService: getInitialMessage tap');
-      _handleMessageTap(initialMessage);
+      await _handleMessageTap(initialMessage);
     }
 
     _initialized = true;
   }
 
-  static void setPendingRoute(String route) {
+  static Future<void> setPendingRoute(
+    String route, {
+    bool persist = true,
+  }) async {
     pendingRoute = route;
     _navigationController.add(route);
+    if (persist) {
+      await SecureStorage().savePendingNotificationAction(route);
+    }
     debugPrint(
       'FirebaseMessagingService: Pending route set and emitted: $route',
     );
   }
 
-  static void _handleMessageTap(RemoteMessage message) {
-    if (message.data['type'] == 'employee_invite') {
-      setPendingRoute(AppRoutes.employeeInvitations);
+  static Future<void> _handleMessageTap(RemoteMessage message) async {
+    final route = _resolveRouteFromData(message.data);
+    if (route == null) {
+      return;
     }
+
+    final hasAccessToken = await SecureStorage().hasAccessToken();
+    if (hasAccessToken) {
+      await setPendingRoute(route, persist: false);
+    } else {
+      pendingRoute = route;
+      await SecureStorage().savePendingNotificationAction(route);
+    }
+  }
+
+  static String? _resolveRouteFromData(Map<String, dynamic> data) {
+    return NotificationNavigationContract.resolveFromPushData(data);
   }
 
   Future<void> registerCurrentToken({int maxRetries = 3}) async {

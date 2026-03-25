@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+                           import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
@@ -75,9 +75,9 @@ class NoLocationPage extends StatelessWidget {
                   const SizedBox(height: AppSpacing.lg),
                   Text(
                     context.l10n.tr('location.no_locations_yet'),
-                    style: Theme.of(
-                      context,
-                    ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -120,7 +120,10 @@ class NoLocationPage extends StatelessWidget {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () {
-                        AppRouter.navigateTo(AppRoutes.employeeInvitations);
+                        AppRouter.navigateTo(
+                          AppRoutes.employeeInvitations,
+                          arguments: {'allowBack': false},
+                        );
                       },
                       icon: const Icon(Icons.mail_outline),
                       label: Text(context.l10n.tr('location.accept_invite')),

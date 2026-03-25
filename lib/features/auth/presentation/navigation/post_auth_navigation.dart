@@ -47,7 +47,8 @@ class PostAuthNavigation {
     }
 
     final selectedId = businessContext.currentBusinessId;
-    final isSelectedValid = selectedId != null &&
+    final isSelectedValid =
+        selectedId != null &&
         locations.any((location) => location.id == selectedId);
 
     if (!isSelectedValid) {
@@ -62,10 +63,9 @@ class PostAuthNavigation {
       return;
     }
 
-    // Check for pending notification route
-    final pendingRoute = FirebaseMessagingService.pendingRoute;
+    // Check for pending notification route (in-memory or secure storage)
+    final pendingRoute = await FirebaseMessagingService.consumePendingRoute();
     if (pendingRoute != null) {
-      FirebaseMessagingService.pendingRoute = null; // Clear it
       AppRouter.navigateAndClearStack(pendingRoute);
     } else {
       AppRouter.navigateAndClearStack(AppRoutes.home);

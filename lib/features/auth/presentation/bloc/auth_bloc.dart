@@ -86,7 +86,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<ClearAuthError>(_onClearAuthError);
   }
 
-
   /// Check stored token on app startup → route to home or login
   Future<void> _onAppStarted(AppStarted event, Emitter<AuthState> emit) async {
     emit(const AuthCheckingStatus());
@@ -98,6 +97,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(const NeedsSetPasswordOnResume());
           return;
         }
+        await firebaseMessagingService.registerCurrentToken();
         final token = await authRepository.getStoredAccessToken();
         emit(AuthAuthenticated(accessToken: token ?? ''));
       } else {

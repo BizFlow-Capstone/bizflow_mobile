@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:async';
 import '../services/firebase_messaging_service.dart';
 
 /// Notification Service - Quản lý Local Notification
@@ -16,7 +17,9 @@ class NotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings(
+      '@mipmap/ic_launcher',
+    );
     const iosSettings = DarwinInitializationSettings();
     const initSettings = InitializationSettings(
       android: androidSettings,
@@ -28,8 +31,10 @@ class NotificationService {
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         final payload = response.payload;
         if (payload != null && payload.isNotEmpty) {
-          debugPrint('NotificationService: Tap on notification with payload: $payload');
-          FirebaseMessagingService.setPendingRoute(payload);
+          debugPrint(
+            'NotificationService: Tap on notification with payload: $payload',
+          );
+          unawaited(FirebaseMessagingService.setPendingRoute(payload));
         }
       },
     );
@@ -41,8 +46,8 @@ class NotificationService {
       importance: Importance.high,
     );
 
-    final androidPlugin =
-        _plugin.resolvePlatformSpecificImplementation<
+    final androidPlugin = _plugin
+        .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlugin?.createNotificationChannel(channel);
@@ -100,17 +105,21 @@ class NotificationService {
 
   /// Request permission
   Future<bool> requestPermission() async {
-    final androidImplementation =
-        _plugin.resolvePlatformSpecificImplementation<
+    final androidImplementation = _plugin
+        .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidImplementation?.requestNotificationsPermission();
 
-    final iosImplementation =
-        _plugin.resolvePlatformSpecificImplementation<
+    final iosImplementation = _plugin
+        .resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin
         >();
-    await iosImplementation?.requestPermissions(alert: true, badge: true, sound: true);
+    await iosImplementation?.requestPermissions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
     return true;
   }

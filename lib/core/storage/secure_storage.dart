@@ -59,6 +59,7 @@ class SecureStorageKeys {
   static const String biometricKey = 'biometric_key';
   static const String registerTaxCode = 'register_tax_code';
   static const String credentialTypes = 'secure_credential_types';
+  static const String pendingNotificationAction = 'pending_notification_action';
 }
 
 /// Token management helpers
@@ -155,5 +156,17 @@ extension SecureStorageTokenExtension on SecureStorage {
 
   Future<void> clearCredentialTypes() async {
     await delete(key: SecureStorageKeys.credentialTypes);
+  }
+
+  Future<void> savePendingNotificationAction(String route) async {
+    await write(key: SecureStorageKeys.pendingNotificationAction, value: route);
+  }
+
+  Future<String?> getPendingNotificationAction() async {
+    return read(key: SecureStorageKeys.pendingNotificationAction);
+  }
+
+  Future<void> clearPendingNotificationAction() async {
+    await delete(key: SecureStorageKeys.pendingNotificationAction);
   }
 }
