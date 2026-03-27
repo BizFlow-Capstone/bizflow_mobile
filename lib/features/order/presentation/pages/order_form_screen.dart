@@ -58,8 +58,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   @override
   void initState() {
     super.initState();
-    _draftId =
-        widget.draftId ?? 'draft_${DateTime.now().millisecondsSinceEpoch}';
+    final timestampStr = DateTime.now().millisecondsSinceEpoch.toString();
+    _draftId = widget.draftId ?? 'draft_${timestampStr.substring(timestampStr.length - 6)}';
 
     if (widget.initialOrder != null) {
       final order = widget.initialOrder!;

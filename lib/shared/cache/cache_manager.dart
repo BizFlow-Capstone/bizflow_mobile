@@ -101,7 +101,7 @@ class CacheManager {
     // 2. Sync-Implicit: Gọi API server ngầm ở Background
     SyncStatusController().startSync();
     try {
-      final serverData = await fetcher();
+      final serverData = await fetcher().timeout(const Duration(seconds: 5));
 
       // Update callback ngay khi có data từ server
       onData(serverData, false);

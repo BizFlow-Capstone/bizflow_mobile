@@ -60,17 +60,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   void _loadDraftOrders() {
-    final locationId = _resolveLocationId();
-    if (locationId == null) {
-      final l10n = AppLocalizations.of(context);
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('debt.location_required'),
-        type: AppSnackBarType.warning,
-      );
-      return;
-    }
-    context.read<OrderBloc>().add(LoadDraftOrdersRequested(locationId: locationId));
+    // Re-use logic to refresh all orders (which now includes drafts)
+    // so we don't accidentally overwrite the main list with ONLY drafts.
+    _refreshOrders();
   }
 
   void _applyFilter(Map<String, dynamic> filters) {

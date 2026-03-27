@@ -24,6 +24,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
 
   // Cache variables
   List<OrderEntity> _orders = [];
+  List<OrderEntity> _localDrafts = [];
   String? _currentStatusFilter;
   String? _currentLocationFilter;
 
@@ -45,20 +46,26 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     LoadOrdersRequested event,
     Emitter<OrderState> emit,
   ) async {
-    emit(const OrdersLoading());
+    if (state is! OrdersLoaded) {
+      emit(const OrdersLoading());
+    }
     try {
+      // Load local drafts first, before calling getOrdersSWR
+      _localDrafts = await _loadLocalDraftOrders(locationId: event.locationId);
+
       await repository.getOrdersSWR(
         pageNumber: event.pageNumber,
         pageSize: event.pageSize,
         status: event.status,
         locationId: event.locationId,
         onData: (orders, totalCount, isFromCache) {
-          _orders = orders;
+          final mergedOrders = _mergeOrdersWithDrafts(orders, event.status);
+          _orders = mergedOrders;
           _currentStatusFilter = event.status;
           _currentLocationFilter = event.locationId;
           emit(
             OrdersLoaded(
-              orders: orders,
+              orders: mergedOrders,
               total: totalCount,
               pageNumber: event.pageNumber,
               pageSize: event.pageSize,
@@ -79,7 +86,9 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     LoadDraftOrdersRequested event,
     Emitter<OrderState> emit,
   ) async {
-    emit(const OrdersLoading());
+    if (state is! DraftOrdersLoaded) {
+      emit(const OrdersLoading());
+    }
     try {
       final drafts = await _loadLocalDraftOrders(locationId: event.locationId);
       _orders = drafts;
@@ -250,20 +259,26 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     FilterOrdersRequested event,
     Emitter<OrderState> emit,
   ) async {
-    emit(const OrdersLoading());
+    if (state is! OrdersLoaded && state is! OrdersFiltered) {
+      emit(const OrdersLoading());
+    }
     try {
+      // Load local drafts first, respecting locationId filter
+      _localDrafts = await _loadLocalDraftOrders(locationId: event.locationId);
+
       await repository.getOrdersSWR(
         pageNumber: event.pageNumber,
         pageSize: event.pageSize,
         status: event.status,
         locationId: event.locationId,
         onData: (orders, totalCount, isFromCache) {
-          _orders = orders;
+          final mergedOrders = _mergeOrdersWithDrafts(orders, event.status);
+          _orders = mergedOrders;
           _currentStatusFilter = event.status;
           _currentLocationFilter = event.locationId;
           emit(
             OrdersFiltered(
-              orders: orders,
+              orders: mergedOrders,
               statusFilter: event.status,
               locationFilter: event.locationId,
             ),
@@ -283,9 +298,17 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     RefreshOrdersRequested event,
     Emitter<OrderState> emit,
   ) async {
-    emit(const OrdersLoading());
+    if (state is! OrdersLoaded && state is! OrdersFiltered) {
+      emit(const OrdersLoading());
+    }
     try {
-      await repository.clearCache();
+      // Bỏ repository.clearCache() ở đây vì SWR sẽ tự động ghi đè cache mới khi API thành công.
+      // Nếu xoá cache trước khi gọi API, khi offline bị rớt mạng sẽ mất luôn danh sách đang lưu tạm.
+
+      // Load local drafts first
+      _localDrafts = await _loadLocalDraftOrders(
+        locationId: event.locationId ?? _currentLocationFilter,
+      );
 
       await repository.getOrdersSWR(
         pageNumber: 1,
@@ -293,10 +316,11 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
         status: _currentStatusFilter,
         locationId: event.locationId ?? _currentLocationFilter,
         onData: (orders, totalCount, isFromCache) {
-          _orders = orders;
+          final mergedOrders = _mergeOrdersWithDrafts(orders, _currentStatusFilter);
+          _orders = mergedOrders;
           emit(
             OrdersLoaded(
-              orders: orders,
+              orders: mergedOrders,
               total: totalCount,
               pageNumber: 1,
               pageSize: 20,
@@ -317,6 +341,27 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     _currentStatusFilter = null;
     _currentLocationFilter = null;
     emit(const OrderInitial());
+  }
+
+  /// Merge local drafts with backend orders, respecting status filters
+  List<OrderEntity> _mergeOrdersWithDrafts(
+    List<OrderEntity> backendOrders,
+    String? statusFilter,
+  ) {
+    // Only include drafts if filtering for drafts OR no status filter (showing all)
+    final shouldIncludeDrafts =
+        statusFilter == null || statusFilter.toLowerCase() == 'draft';
+
+    final merged = <OrderEntity>[..._localDrafts, ...backendOrders];
+    
+    // Filter if statusFilter is specified and not 'draft'
+    if (!shouldIncludeDrafts) {
+      return merged.where((o) => o.status != 'draft').toList();
+    }
+
+    // Sort by updatedAt descending (most recent first)
+    merged.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return merged;
   }
 
   Future<List<OrderEntity>> _loadLocalDraftOrders({String? locationId}) async {

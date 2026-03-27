@@ -36,6 +36,54 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     await _cacheManager.fetchWithSWR<List<EmployeeEntity>>(
       key: cacheKey,
       fetcher: () => _repository.getEmployees(event.businessId),
+      fromJson: (json) {
+        final dataList = json['data'] as List? ?? [];
+        return dataList.map((item) {
+          return EmployeeEntity(
+            id: item['id'] ?? '',
+            name: item['name'] ?? '',
+            phone: item['phone'] ?? '',
+            email: item['email'] ?? '',
+            status: EmployeeStatus.values.firstWhere(
+              (e) => e.name == (item['status'] ?? 'active'),
+              orElse: () => EmployeeStatus.active,
+            ),
+            isActive: item['isActive'] ?? true,
+            employmentStatus: item['employmentStatus'] ?? '',
+            startedAt: item['startedAt'] != null ? DateTime.parse(item['startedAt']) : null,
+            endedAt: item['endedAt'] != null ? DateTime.parse(item['endedAt']) : null,
+            assignedBusinessId: item['assignedBusinessId'] ?? '',
+            assignedLocationIds: List<String>.from(item['assignedLocationIds'] ?? []),
+            assignedLocationNames: List<String>.from(item['assignedLocationNames'] ?? []),
+          );
+        }).toList();
+      },
+      toJson: (data) {
+        return {
+          'data': data
+              .map(
+                (e) => {
+                  'id': e.id,
+                  'name': e.name,
+                  'phone': e.phone,
+                  'email': e.email,
+                  'status': e.status.name,
+                  'isActive': e.isActive,
+                  'employmentStatus': e.employmentStatus,
+                  'startedAt': e.startedAt != null
+                    ? DateFormatter.toApiUtcIsoString(e.startedAt!)
+                    : null,
+                  'endedAt': e.endedAt != null
+                    ? DateFormatter.toApiUtcIsoString(e.endedAt!)
+                    : null,
+                  'assignedBusinessId': e.assignedBusinessId,
+                  'assignedLocationIds': e.assignedLocationIds,
+                  'assignedLocationNames': e.assignedLocationNames,
+                },
+              )
+              .toList(),
+        };
+      },
       onData: (data, isFromCache) {
         if (!isClosed) {
           emit(

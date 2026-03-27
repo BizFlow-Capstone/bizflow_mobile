@@ -49,9 +49,11 @@ class OrderCard extends StatelessWidget {
                           l10n.translate(
                             'order.order_number',
                             params: {
-                              'number': order.id.length > 8
-                                  ? order.id.substring(0, 8)
-                                  : order.id,
+                              'number': order.isDraft
+                                  ? order.id
+                                  : (order.id.length > 8
+                                      ? order.id.substring(order.id.length - 8)
+                                      : order.id),
                             },
                           ),
                           style: const TextStyle(
