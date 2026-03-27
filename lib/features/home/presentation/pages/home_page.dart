@@ -61,6 +61,7 @@ class _HomePageState extends State<HomePage> {
               businessContext.switchBusinessLocation(
                 firstLocation.id,
                 firstLocation.name,
+                isOwner: firstLocation.isOwner,
               );
             }
           }
@@ -202,6 +203,15 @@ class _HomePageState extends State<HomePage> {
                           context,
                           listen: false,
                         );
+                        if (!contextData.isOwner) {
+                          // Employees don't have access to employee management
+                          AppSnackBar.show(
+                            context,
+                            message: l10n.translate('common.permission_denied'),
+                            type: AppSnackBarType.warning,
+                          );
+                          return;
+                        }
                         if (contextData.currentBusinessId != null) {
                           AppRouter.navigateTo(AppRoutes.employeeList);
                         } else {

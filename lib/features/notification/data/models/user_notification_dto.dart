@@ -1,4 +1,19 @@
 class UserNotificationDto {
+  Map<String, dynamic> toJson() => {
+    'userNotificationId': userNotificationId,
+    'notificationType': notificationType,
+    'priority': priority,
+    'title': title,
+    'content': content,
+    'actionType': actionType,
+    'targetScreen': targetScreen,
+    'actionPayloadJson': actionPayloadJson,
+    'deliveryStatus': deliveryStatus,
+    'createdAt': createdAt.toIso8601String(),
+    'sentAt': sentAt?.toIso8601String(),
+    'readAt': readAt?.toIso8601String(),
+  };
+
   final int userNotificationId;
   final String notificationType;
   final String priority;
@@ -73,6 +88,15 @@ class UserNotificationDto {
 }
 
 class PaginatedNotificationsDto {
+  Map<String, dynamic> toJson() => {
+    'items': items.map((e) => e.toJson()).toList(),
+    'pageNumber': pageNumber,
+    'pageSize': pageSize,
+    'totalPages': totalPages,
+    'totalCount': totalCount,
+    'hasNextPage': hasNextPage,
+  };
+
   final List<UserNotificationDto> items;
   final int pageNumber;
   final int pageSize;

@@ -13,6 +13,7 @@ class LocationEntity {
   final String ownerName;
   final String? taxCode; // Optional
   final List<String> employeeIds; // Employee IDs assigned to this location
+  final bool isOwner; // true = current user owns this location
 
   LocationEntity({
     required this.id,
@@ -25,6 +26,7 @@ class LocationEntity {
     required this.ownerName,
     this.taxCode,
     this.employeeIds = const [],
+    this.isOwner = false,
   });
 
   /// Full address (combined)
@@ -41,6 +43,7 @@ class LocationEntity {
     String? ownerName,
     String? taxCode,
     List<String>? employeeIds,
+    bool? isOwner,
   }) {
     return LocationEntity(
       id: id ?? this.id,
@@ -53,6 +56,7 @@ class LocationEntity {
       ownerName: ownerName ?? this.ownerName,
       taxCode: taxCode ?? this.taxCode,
       employeeIds: employeeIds ?? this.employeeIds,
+      isOwner: isOwner ?? this.isOwner,
     );
   }
 
@@ -68,6 +72,7 @@ class LocationEntity {
       'ownerName': ownerName,
       'taxCode': taxCode,
       'employeeIds': employeeIds,
+      'isOwner': isOwner,
     };
   }
 
@@ -83,6 +88,7 @@ class LocationEntity {
       ownerName: map['ownerName'] ?? '',
       taxCode: map['taxCode'],
       employeeIds: List<String>.from(map['employeeIds'] ?? []),
+      isOwner: map['isOwner'] ?? false,
     );
   }
 }

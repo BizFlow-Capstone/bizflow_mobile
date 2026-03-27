@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../../../shared/services/permission_service.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
@@ -223,41 +226,58 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         ),
         centerTitle: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.price_change_outlined),
-            tooltip: l10n.translate('product.bulk_adjust.title'),
-            color: AppColors.textPrimary,
-            onPressed: () {
-              Navigator.push<bool>(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      BulkAdjustSellingPricePage(locationId: widget.locationId),
-                ),
-              ).then((updated) {
-                if (updated == true && mounted) {
-                  context.read<ProductBloc>().add(
-                    RefreshProductsRequested(locationId: widget.locationId),
-                  );
-                }
-              });
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Lịch sử nhập kho',
-            color: AppColors.textPrimary,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ImportHistoryPage(),
-                ),
-              ).then((result) {
-                if (result == true && mounted) {
-                  _loadProducts();
-                }
-              });
+          Consumer<BusinessContext>(
+            builder: (context, bCtx, _) {
+              final isOwner = PermissionService.canEditProduct(bCtx.isOwner);
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isOwner) ...
+                    [
+                      IconButton(
+                        icon: const Icon(Icons.price_change_outlined),
+                        tooltip: l10n.translate('product.bulk_adjust.title'),
+                        color: AppColors.textPrimary,
+                        onPressed: () {
+                          Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  BulkAdjustSellingPricePage(
+                                    locationId: widget.locationId,
+                                  ),
+                            ),
+                          ).then((updated) {
+                            if (updated == true && mounted) {
+                              context.read<ProductBloc>().add(
+                                RefreshProductsRequested(
+                                  locationId: widget.locationId,
+                                ),
+                              );
+                            }
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.history),
+                        tooltip: 'Lịch sử nhập kho',
+                        color: AppColors.textPrimary,
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ImportHistoryPage(),
+                            ),
+                          ).then((result) {
+                            if (result == true && mounted) {
+                              _loadProducts();
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                ],
+              );
             },
           ),
         ],
@@ -568,20 +588,29 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           ),
         ],
       ),
-      floatingActionButton: ProductFabMenuWidget(
-        isOpen: _showFabMenu,
-        onToggle: _toggleFabMenu,
-        onAddProduct: _openAddProductPage,
-        onImportInventory: () {
-          _toggleFabMenu();
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
-          ).then((result) {
-            if (result == true && mounted) {
-              _loadProducts();
-            }
-          });
+      floatingActionButton: Consumer<BusinessContext>(
+        builder: (context, bCtx, _) {
+          if (!PermissionService.canCreateProduct(bCtx.isOwner)) {
+            return const SizedBox.shrink();
+          }
+          return ProductFabMenuWidget(
+            isOpen: _showFabMenu,
+            onToggle: _toggleFabMenu,
+            onAddProduct: _openAddProductPage,
+            onImportInventory: () {
+              _toggleFabMenu();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ImportHistoryPage(),
+                ),
+              ).then((result) {
+                if (result == true && mounted) {
+                  _loadProducts();
+                }
+              });
+            },
+          );
         },
       ),
     );

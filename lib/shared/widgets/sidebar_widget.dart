@@ -11,12 +11,14 @@ class LocationItem {
   final String name;
   final String? logoUrl;
   final bool isActive;
+  final bool isOwner; // true = current user owns this location
 
   LocationItem({
     required this.id,
     required this.name,
     this.logoUrl,
     this.isActive = true,
+    this.isOwner = false,
   });
 }
 
@@ -33,6 +35,7 @@ class SidebarWidget extends StatefulWidget {
   final VoidCallback? onPackage;
   final Function(LocationItem)? onLocationSelected;
   final String? userLogo;
+  final bool isOwner; // gates the Add Location (+) button
 
   const SidebarWidget({
     super.key,
@@ -45,6 +48,7 @@ class SidebarWidget extends StatefulWidget {
     this.onLocationSelected,
     this.onPackage,
     this.userLogo,
+    this.isOwner = false,
   });
 
   @override
@@ -162,23 +166,24 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                       ),
                     ),
 
-                    // Add Location Button
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: InkWell(
-                        onTap: widget.onAddLocation,
-                        borderRadius: BorderRadius.circular(30),
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            shape: BoxShape.circle,
+                    // Add Location Button — visible only for owners
+                    if (widget.isOwner)
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: InkWell(
+                          onTap: widget.onAddLocation,
+                          borderRadius: BorderRadius.circular(30),
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.add, color: AppColors.white),
                           ),
-                          child: Icon(Icons.add, color: AppColors.white),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),

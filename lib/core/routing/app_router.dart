@@ -485,6 +485,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                             id: loc.id,
                             name: loc.name,
                             isActive: loc.isActive,
+                            isOwner: loc.isOwner,
                           ),
                         )
                         .toList();
@@ -507,6 +508,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                   return SidebarWidget(
                     locations: locations,
                     selectedLocation: selectedLocation,
+                    isOwner: businessContext.isOwner,
                     onAddLocation: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -534,6 +536,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                       businessContext.switchBusinessLocation(
                         location.id,
                         location.name,
+                        isOwner: location.isOwner,
                       );
                       // Go back to Home
                       AppRouter.navigateAndClearStack(AppRoutes.home);
@@ -545,8 +548,9 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           ),
           // Body
           body: widget.child,
-          // FAB - positioned at bottom-right
-          floatingActionButton: widget.showAddLocationFab
+          // FAB - positioned at bottom-right; only visible for owners
+          floatingActionButton: (widget.showAddLocationFab &&
+                  context.watch<BusinessContext>().isOwner)
               ? FloatingActionButton(
                   backgroundColor: const Color(0xFF23C4C1),
                   onPressed: () {

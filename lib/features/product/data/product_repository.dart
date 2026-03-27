@@ -171,10 +171,12 @@ class ProductRepository {
     required double deltaAmount,
   }) async {
     try {
-      return await _service.bulkAdjustSellingPrice(
+      final result = await _service.bulkAdjustSellingPrice(
         saleItemIds: saleItemIds,
         deltaAmount: deltaAmount,
       );
+      await clearCache();
+      return result;
     } catch (e) {
       debugPrint('ProductRepository.bulkAdjustSellingPrice error: $e');
       rethrow;
@@ -189,12 +191,14 @@ class ProductRepository {
     double? costPrice,
   }) async {
     try {
-      return await _service.adjustProductStock(
+      final result = await _service.adjustProductStock(
         productId: productId,
         stock: stock,
         memo: memo,
         costPrice: costPrice,
       );
+      await clearCache();
+      return result;
     } catch (e) {
       debugPrint('ProductRepository.adjustProductStock error: $e');
       rethrow;
@@ -217,7 +221,7 @@ class ProductRepository {
     String? imagePath,
   }) async {
     try {
-      return await _service.createProduct(
+      final result = await _service.createProduct(
         productName: productName,
         unit: unit,
         businessTypeId: businessTypeId,
@@ -231,6 +235,8 @@ class ProductRepository {
         priceTiers: priceTiers,
         imagePath: imagePath,
       );
+      await clearCache();
+      return result;
     } catch (e) {
       debugPrint('ProductRepository.createProduct error: $e');
       rethrow;
@@ -255,7 +261,7 @@ class ProductRepository {
     bool removeImage = false,
   }) async {
     try {
-      return await _service.updateProduct(
+      final result = await _service.updateProduct(
         productId,
         productName: productName,
         unit: unit,
@@ -271,6 +277,8 @@ class ProductRepository {
         imagePath: imagePath,
         removeImage: removeImage,
       );
+      await clearCache();
+      return result;
     } catch (e) {
       debugPrint('ProductRepository.updateProduct error: $e');
       rethrow;
@@ -283,7 +291,9 @@ class ProductRepository {
     required bool status,
   }) async {
     try {
-      return await _service.updateProductStatus(productId, status: status);
+      final result = await _service.updateProductStatus(productId, status: status);
+      await clearCache();
+      return result;
     } catch (e) {
       debugPrint('ProductRepository.updateProductStatus error: $e');
       rethrow;
@@ -293,7 +303,8 @@ class ProductRepository {
   /// Delete product (soft delete)
   Future<void> deleteProduct(String productId) async {
     try {
-      return await _service.deleteProduct(productId);
+      await _service.deleteProduct(productId);
+      await clearCache();
     } catch (e) {
       debugPrint('ProductRepository.deleteProduct error: $e');
       rethrow;
@@ -308,5 +319,11 @@ class ProductRepository {
       debugPrint('ProductRepository.getBusinessTypes error: $e');
       rethrow;
     }
+  }
+
+  Future<void> clearCache() async {
+    await CacheManager().removeByPrefix("cache_products_");
+    await CacheManager().removeByPrefix("cache_sale_items_");
+    await CacheManager().removeByPrefix("cache_product_detail_");
   }
 }

@@ -75,16 +75,21 @@ class RevenueRepository {
     );
   }
 
+  Future<void> clearCache() async {
+    await _cache.removeByPrefix('revenues_');
+  }
+
   Future<RevenueEntity> createManualRevenue(Map<String, dynamic> body) async {
     final dto = await _apiService.createManualRevenue(body);
+    await clearCache();
     return _mapToEntity(dto);
   }
 
   Future<bool> deleteManualRevenue(int revenueId) async {
-    return await _apiService.deleteManualRevenue(revenueId);
-  }
-
-  void clearCache() {
-    // Optionally clear specific revenue keys
+    final result = await _apiService.deleteManualRevenue(revenueId);
+    if (result) {
+      await clearCache();
+    }
+    return result;
   }
 }

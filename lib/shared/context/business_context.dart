@@ -9,25 +9,40 @@ class BusinessContext extends ChangeNotifier {
 
   String? _currentBusinessId;
   String? _currentBusinessName;
+  bool _isOwnerOfCurrentLocation = false;
   LocalStorage? _storage;
 
   String? get currentBusinessId => _currentBusinessId;
   String? get currentBusinessName => _currentBusinessName;
+
+  /// true nếu user là owner của location hiện tại
+  bool get isOwner => _isOwnerOfCurrentLocation;
 
   /// Khởi tạo và đọc giá trị lưu trước đó từ ổ cứng (Local Storage)
   Future<void> init() async {
     _storage ??= await LocalStorage.getInstance();
     _currentBusinessId = _storage?.getString(StorageKeys.currentBusinessId);
     _currentBusinessName = _storage?.getString(StorageKeys.currentBusinessName);
+    _isOwnerOfCurrentLocation =
+        _storage?.getBool(StorageKeys.isOwnerOfCurrentLocation) ?? false;
   }
 
   /// Thay đổi địa điểm kinh doanh, cập nhật bộ nhớ tạm, Notify listeners (UI rebuild)
-  Future<void> switchBusinessLocation(String id, String name) async {
+  Future<void> switchBusinessLocation(
+    String id,
+    String name, {
+    bool isOwner = false,
+  }) async {
     _currentBusinessId = id;
     _currentBusinessName = name;
+    _isOwnerOfCurrentLocation = isOwner;
 
     await _storage?.setString(StorageKeys.currentBusinessId, id);
     await _storage?.setString(StorageKeys.currentBusinessName, name);
+    await _storage?.setBool(
+      StorageKeys.isOwnerOfCurrentLocation,
+      isOwner,
+    );
 
     // Kích hoạt tất cả UI widget phụ thuộc đang build với BusinessContext
     notifyListeners();
@@ -37,8 +52,10 @@ class BusinessContext extends ChangeNotifier {
   Future<void> clear() async {
     _currentBusinessId = null;
     _currentBusinessName = null;
+    _isOwnerOfCurrentLocation = false;
     await _storage?.remove(StorageKeys.currentBusinessId);
     await _storage?.remove(StorageKeys.currentBusinessName);
+    await _storage?.remove(StorageKeys.isOwnerOfCurrentLocation);
     notifyListeners();
   }
 }

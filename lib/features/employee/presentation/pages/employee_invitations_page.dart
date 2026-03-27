@@ -59,7 +59,7 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await context.read<EmployeeRepository>().acceptInvitation(
-        invitation.hireId,
+        invitation,
       );
       if (!mounted) return;
       messenger.showSnackBar(
@@ -81,7 +81,7 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await context.read<EmployeeRepository>().rejectInvitation(
-        invitation.hireId,
+        invitation,
       );
       if (!mounted) return;
       messenger.showSnackBar(

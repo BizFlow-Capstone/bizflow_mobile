@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../../core/network/api_error_message_parser.dart';
 import '../../../data/repositories/gl_repository.dart';
 import '../../../data/models/general_ledger_entry_model.dart';
 import 'gl_event.dart';
@@ -67,13 +68,13 @@ class GLBloc extends Bloc<GLEvent, GLState> {
         onError: (e) {
           if (!isClosed) {
             final prevEntries = currentState is GLLoaded ? currentState.entries : null;
-            emit(GLError(e.toString(), previousEntries: prevEntries));
+            emit(GLError(ApiErrorMessageParser.parse(e), previousEntries: prevEntries));
           }
         },
       );
     } catch (error) {
        final prevEntries = currentState is GLLoaded ? currentState.entries : null;
-       emit(GLError(error.toString(), previousEntries: prevEntries));
+       emit(GLError(ApiErrorMessageParser.parse(error), previousEntries: prevEntries));
     }
   }
 

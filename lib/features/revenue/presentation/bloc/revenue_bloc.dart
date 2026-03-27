@@ -63,9 +63,10 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
     try {
       final revenue = await repository.createManualRevenue(event.body);
       emit(RevenueCreated(revenue: revenue));
-      
-      // Optionally reload list
-      // add(LoadRevenuesRequested(businessLocationId: event.body['businessLocationId']));
+
+      if (event.body['businessLocationId'] != null) {
+        add(LoadRevenuesRequested(businessLocationId: event.body['businessLocationId'].toString()));
+      }
     } catch (e) {
       emit(RevenueError(message: e.toString()));
     }
@@ -78,6 +79,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
     try {
       await repository.deleteManualRevenue(event.revenueId);
       emit(RevenueDeleted(revenueId: event.revenueId));
+      add(const LoadRevenuesRequested());
     } catch (e) {
       emit(RevenueError(message: e.toString()));
     }

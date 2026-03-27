@@ -56,6 +56,7 @@ class PostAuthNavigation {
       await businessContext.switchBusinessLocation(
         firstLocation.id,
         firstLocation.name,
+        isOwner: firstLocation.isOwner,
       );
     }
 

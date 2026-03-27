@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_bloc.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_event.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_state.dart';
 import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
 import 'package:bizflow_mobile/features/revenue/presentation/bloc/revenue_bloc.dart';
+import 'package:bizflow_mobile/features/cost/presentation/bloc/cost_bloc.dart';
 import 'package:bizflow_mobile/features/revenue/domain/entities/revenue_entity.dart';
+import 'package:bizflow_mobile/features/cost/domain/entities/cost_entity.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -43,16 +44,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   DateTime _reportToDate = DateTime(2026, 3, 31);
   String _reportFormat = 'pdf';
 
-  final List<AccountingItemModel> _costs = [
-    AccountingItemModel(
-      code: 'COST-2026-019',
-      date: DateTime(2026, 2, 24),
-      description: 'Electricity bill',
-      amount: 1500000,
-      type: 'utilities',
-    ),
-  ];
-
   final List<BookItemModel> _books = const [
     BookItemModel(code: 'S1a', name: 'Sổ chi tiết bán hàng', group: 'Nhóm 1'),
     BookItemModel(
@@ -78,7 +69,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
-
   @override
   void initState() {
     super.initState();
@@ -89,11 +79,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       final locationId = context.read<BusinessContext>().currentBusinessId;
       if (locationId != null) {
         context.read<AccountingPeriodBloc>().add(
-              LoadPeriodsRequested(locationId),
-            );
+          LoadPeriodsRequested(locationId),
+        );
         context.read<RevenueBloc>().add(
-              LoadRevenuesRequested(businessLocationId: locationId),
-            );
+          LoadRevenuesRequested(businessLocationId: locationId),
+        );
+        context.read<CostBloc>().add(
+          LoadCostsRequested(businessLocationId: locationId),
+        );
       }
       final refState = context.read<ReferenceBloc>().state;
       if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
@@ -107,8 +100,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     _tabController.dispose();
     super.dispose();
   }
-
-
 
   Future<bool> _confirmAction({
     required String title,
@@ -124,90 +115,34 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     return confirmed == true;
   }
 
+  Future<void> _onDeleteRevenue(RevenueEntity item) async {
+    final ok = await _confirmAction(
+      title: l10n.translate('accounting.confirm_title'),
+      message: l10n.translate('accounting.confirm_delete_revenue'),
+    );
+    if (!ok) return;
+
+    if (!mounted) return;
+    context.read<RevenueBloc>().add(
+      DeleteManualRevenueRequested(revenueId: item.id),
+    );
+  }
+
+  Future<void> _onDeleteCost(CostEntity item) async {
+    final ok = await _confirmAction(
+      title: l10n.translate('accounting.confirm_title'),
+      message: l10n.translate('accounting.confirm_delete_cost'),
+    );
+    if (!ok) return;
+
+    if (!mounted) return;
+    context.read<CostBloc>().add(DeleteManualCostRequested(item.id));
+  }
+
   void _showSuccess(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: AppColors.success),
     );
-  }
-
-
-
-
-  Future<void> _editAccountingItem({
-    required AccountingItemModel item,
-    required bool isRevenue,
-  }) async {
-    final descriptionController = TextEditingController(text: item.description);
-    final amountController = TextEditingController(
-      text: CurrencyFormatter.formatNumber(item.amount),
-    );
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          isRevenue
-              ? l10n.translate('accounting.edit_revenue')
-              : l10n.translate('accounting.edit_cost'),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: descriptionController,
-              decoration: InputDecoration(
-                labelText: l10n.translate('accounting.description'),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyInputFormatter()],
-              decoration: InputDecoration(
-                labelText: l10n.translate('accounting.amount'),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.translate('common.cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount =
-                  (CurrencyFormatter.parse(amountController.text) ?? 0)
-                      .toDouble();
-              if (descriptionController.text.trim().isEmpty || amount <= 0) {
-                return;
-              }
-
-              final ok = await _confirmAction(
-                title: l10n.translate('accounting.confirm_title'),
-                message: l10n.translate('accounting.confirm_update_item'),
-              );
-              if (!ok) return;
-
-              setState(() {
-                item.description = descriptionController.text.trim();
-                item.amount = amount;
-              });
-
-              if (context.mounted) {
-                Navigator.pop(ctx);
-                _showSuccess(l10n.translate('accounting.updated_success'));
-              }
-            },
-            child: Text(l10n.translate('common.save')),
-          ),
-        ],
-      ),
-    );
-
-    descriptionController.dispose();
-    amountController.dispose();
   }
 
   Future<void> _editTaxPayment(TaxPaymentItemModel item) async {
@@ -261,7 +196,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               if (!ok) return;
 
               setState(() {
-                item.amount = amount;
+                // // item.amount = amount;
                 item.reference = refController.text.trim();
               });
 
@@ -301,139 +236,168 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<RevenueBloc, RevenueState>(
-      listener: (context, state) {
-        if (state is RevenueCreated) {
-          _showSuccess(l10n.translate('accounting.revenue_created_success'));
-          final locationId = context.read<BusinessContext>().currentBusinessId;
-          if (locationId != null) {
-            context.read<RevenueBloc>().add(
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<RevenueBloc, RevenueState>(
+          listener: (context, state) {
+            if (state is RevenueCreated) {
+              _showSuccess(
+                l10n.translate('accounting.revenue_created_success'),
+              );
+              final locationId = context
+                  .read<BusinessContext>()
+                  .currentBusinessId;
+              if (locationId != null) {
+                context.read<RevenueBloc>().add(
                   LoadRevenuesRequested(businessLocationId: locationId),
                 );
-          }
-        } else if (state is RevenueError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppColors.error,
-            ),
-          );
-        }
-      },
+              }
+            } else if (state is RevenueError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          },
+        ),
+        BlocListener<CostBloc, CostState>(
+          listener: (context, state) {
+            if (state is CostOperationSuccess) {
+              _showSuccess(l10n.translate('accounting.updated_success'));
+              final locationId = context
+                  .read<BusinessContext>()
+                  .currentBusinessId;
+              if (locationId != null) {
+                context.read<CostBloc>().add(
+                  LoadCostsRequested(businessLocationId: locationId),
+                );
+              }
+            } else if (state is CostOperationFailure) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          },
+        ),
+      ],
       child: Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.textPrimary,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-          color: AppColors.textPrimary,
-        ),
-        title: Text(
-          l10n.translate('accounting.title'),
-          style: AppTextStyles.titleLarge.copyWith(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: AppColors.white,
+          foregroundColor: AppColors.textPrimary,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
             color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
           ),
-        ),
-        bottom: const AppSyncStatusText(),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              labelColor: AppColors.secondary,
-              unselectedLabelColor: AppColors.textSecondary,
-              indicatorColor: AppColors.secondary,
-              tabs: [
-                Tab(text: l10n.translate('accounting.tab_period')),
-                Tab(text: l10n.translate('accounting.tab_gl')),
-                Tab(text: l10n.translate('accounting.tab_cost_revenue')),
-                Tab(text: l10n.translate('accounting.tab_books_reports')),
-              ],
+          title: Text(
+            l10n.translate('accounting.title'),
+            style: AppTextStyles.titleLarge.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
             ),
-            Expanded(
-              child: TabBarView(
+          ),
+          bottom: const AppSyncStatusText(),
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
+              TabBar(
                 controller: _tabController,
-                children: [
-                  // Tab Period: real API via BLoC
-                  Builder(
-                    builder: (context) {
-                      final locationId = context
-                          .watch<BusinessContext>()
-                          .currentBusinessId;
-                      if (locationId == null) {
-                        return Center(
-                          child: Text(
-                            l10n.translate(
-                              'home.please_select_location',
-                            ),
-                          ),
-                        );
-                      }
-                      return AccountingPeriodTab(locationId: locationId);
-                    },
-                  ),
-                  const AccountingGlTab(),
-                  BlocBuilder<RevenueBloc, RevenueState>(
-                    builder: (context, state) {
-                      List<RevenueEntity> revenueEntities = [];
-                      if (state is RevenuesLoaded) {
-                        revenueEntities = state.revenues;
-                      }
-
-                      return AccountingCostRevenueTab(
-                        revenues: revenueEntities,
-                        costs: _costs,
-                        onAddRevenue: _showAddRevenueDialog,
-                        onAddCost: () {
-                          // Placeholder for cost
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Add Cost feature coming soon'),
-                            ),
-                          );
-                        },
-                        onEditRevenue: (item) {
-                          // Handle edit revenue entity
-                        },
-                        onTapRevenue: _showRevenueDetailDialog,
-                        onEditCost: (item) =>
-                            _editAccountingItem(item: item, isRevenue: false),
-                      );
-                    },
-                  ),
-                  AccountingBooksReportsTab(
-                    books: _books,
-                    taxPayments: _taxPayments,
-                    fromDate: _reportFromDate,
-                    toDate: _reportToDate,
-                    reportFormat: _reportFormat,
-                    onExportBook: _exportBook,
-                    onEditTaxPayment: _editTaxPayment,
-                    onFromDateChanged: (value) =>
-                        setState(() => _reportFromDate = value),
-                    onToDateChanged: (value) =>
-                        setState(() => _reportToDate = value),
-                    onReportFormatChanged: (value) =>
-                        setState(() => _reportFormat = value),
-                    onGenerateReport: _generateReport,
-                  ),
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: AppColors.secondary,
+                unselectedLabelColor: AppColors.textSecondary,
+                indicatorColor: AppColors.secondary,
+                tabs: [
+                  Tab(text: l10n.translate('accounting.tab_period')),
+                  Tab(text: l10n.translate('accounting.tab_gl')),
+                  Tab(text: l10n.translate('accounting.tab_cost_revenue')),
+                  Tab(text: l10n.translate('accounting.tab_books_reports')),
                 ],
               ),
-            ),
-          ],
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Tab Period: real API via BLoC
+                    Builder(
+                      builder: (context) {
+                        final locationId = context
+                            .watch<BusinessContext>()
+                            .currentBusinessId;
+                        if (locationId == null) {
+                          return Center(
+                            child: Text(
+                              l10n.translate('home.please_select_location'),
+                            ),
+                          );
+                        }
+                        return AccountingPeriodTab(locationId: locationId);
+                      },
+                    ),
+                    const AccountingGlTab(),
+                    BlocBuilder<RevenueBloc, RevenueState>(
+                      builder: (context, revenueState) {
+                        List<RevenueEntity> revenueEntities = [];
+                        if (revenueState is RevenuesLoaded) {
+                          revenueEntities = revenueState.revenues;
+                        }
+
+                        return BlocBuilder<CostBloc, CostState>(
+                          builder: (context, costState) {
+                            List<CostEntity> costEntities = [];
+                            if (costState is CostsLoaded) {
+                              costEntities = costState.costs;
+                            }
+
+                            return AccountingCostRevenueTab(
+                              revenues: revenueEntities,
+                              costs: costEntities,
+                              onAddRevenue: _showAddRevenueDialog,
+                              onAddCost: _showAddCostDialog,
+                              onEditRevenue: _showEditRevenueDialog,
+                              onTapRevenue: _showRevenueDetailDialog,
+                              onDeleteRevenue: _onDeleteRevenue,
+                              onEditCost: _showEditCostDialog,
+                              onDeleteCost: _onDeleteCost,
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    AccountingBooksReportsTab(
+                      books: _books,
+                      taxPayments: _taxPayments,
+                      fromDate: _reportFromDate,
+                      toDate: _reportToDate,
+                      reportFormat: _reportFormat,
+                      onExportBook: _exportBook,
+                      onEditTaxPayment: _editTaxPayment,
+                      onFromDateChanged: (value) =>
+                          setState(() => _reportFromDate = value),
+                      onToDateChanged: (value) =>
+                          setState(() => _reportToDate = value),
+                      onReportFormatChanged: (value) =>
+                          setState(() => _reportFormat = value),
+                      onGenerateReport: _generateReport,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Future<void> _showAddRevenueDialog() async {
     final l10n = AppLocalizations.of(context);
@@ -458,8 +422,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
           title: Text(l10n.translate('accounting.add_revenue')),
           content: SingleChildScrollView(
             child: Column(
@@ -482,9 +446,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
                   value: selectedMoneyChannel,
-                  decoration: const InputDecoration(
-                    labelText: 'Kênh tiền',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Kênh tiền'),
                   items: getMoneyChannels()
                       .map(
                         (channel) => DropdownMenuItem<String>(
@@ -518,7 +480,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () async {
                     final picked = await showDatePicker(
-                      context: context,
+                      context: dialogCtx,
                       initialDate: selectedDate,
                       firstDate: DateTime(2000),
                       lastDate: DateTime(2100),
@@ -533,7 +495,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogCtx),
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
@@ -543,14 +505,16 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 if (amount <= 0) return;
 
                 if ((selectedMoneyChannel ?? '').trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  ScaffoldMessenger.of(dialogCtx).showSnackBar(
                     const SnackBar(content: Text('Vui lòng chọn kênh tiền')),
                   );
                   return;
                 }
 
-                final locationId =
-                    context.read<BusinessContext>().currentBusinessId;
+                // Use outer page context — dialog ctx has no Providers
+                final locationId = context
+                    .read<BusinessContext>()
+                    .currentBusinessId;
                 final referenceOrderId = int.tryParse(
                   referenceOrderIdController.text.trim(),
                 );
@@ -560,15 +524,18 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     body: {
                       'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
                       'amount': amount,
-                      'revenueDate': DateFormat('yyyy-MM-dd').format(selectedDate),
+                      'revenueDate': DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(selectedDate),
                       'description': descriptionController.text,
                       'moneyChannel': selectedMoneyChannel,
                       if (referenceOrderId != null) 'referenceType': 'order',
-                      if (referenceOrderId != null) 'referenceId': referenceOrderId,
+                      if (referenceOrderId != null)
+                        'referenceId': referenceOrderId,
                     },
                   ),
                 );
-                Navigator.pop(context);
+                Navigator.pop(dialogCtx);
               },
               child: Text(l10n.translate('common.save')),
             ),
@@ -588,16 +555,342 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     if (refType != 'order' || refId == null || refId <= 0) return null;
 
     try {
-      return await context.read<OrderBloc>().repository.getOrder(refId.toString());
+      return await context.read<OrderBloc>().repository.getOrder(
+        refId.toString(),
+      );
     } catch (_) {
       return null;
     }
   }
 
+  Future<void> _showAddCostDialog() async {
+    final l10n = AppLocalizations.of(context);
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
+
+    final amountController = TextEditingController();
+    final descriptionController = TextEditingController();
+    DateTime selectedDate = DateTime.now();
+    String? selectedCostType;
+    String? selectedPaymentMethod;
+
+    List<String> getCostTypes() {
+      final state = context.read<ReferenceBloc>().state;
+      if (state is ReferenceLoaded) {
+        return (state.references['costTypes'] ?? const <String>[])
+            .toSet()
+            .toList();
+      }
+      return const <String>[];
+    }
+
+    List<String> getPaymentMethods() {
+      final state = context.read<ReferenceBloc>().state;
+      if (state is ReferenceLoaded) {
+        return (state.references['paymentMethods'] ?? const <String>[])
+            .toSet()
+            .toList();
+      }
+      return const <String>[];
+    }
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: Text(l10n.translate('accounting.add_cost')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.description'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.amount'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  value: selectedCostType,
+                  decoration: const InputDecoration(labelText: 'Loại chi phí'),
+                  items: getCostTypes()
+                      .where(
+                        (c) => c.toLowerCase() != 'import',
+                      ) // Backend excludes 'import'
+                      .map(
+                        (val) => DropdownMenuItem<String>(
+                          value: val,
+                          child: Text(val),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => selectedCostType = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  value: selectedPaymentMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'Phương thức thanh toán',
+                  ),
+                  items: getPaymentMethods()
+                      .map(
+                        (val) => DropdownMenuItem<String>(
+                          value: val,
+                          child: Text(val),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => selectedPaymentMethod = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ngày chi'),
+                  subtitle: Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogCtx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedDate = picked);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount =
+                    (CurrencyFormatter.parse(amountController.text) ?? 0)
+                        .toDouble();
+                if (descriptionController.text.trim().isEmpty ||
+                    amount <= 0 ||
+                    selectedCostType == null ||
+                    selectedPaymentMethod == null) {
+                  return;
+                }
+
+                final locationId = context
+                    .read<BusinessContext>()
+                    .currentBusinessId;
+                context.read<CostBloc>().add(
+                  CreateManualCostRequested(
+                    body: {
+                      'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
+                      'amount': amount,
+                      'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
+                      'description': descriptionController.text,
+                      'costType': selectedCostType,
+                      'paymentMethod': selectedPaymentMethod,
+                    },
+                  ),
+                );
+                Navigator.pop(dialogCtx);
+              },
+              child: Text(l10n.translate('common.save')),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    amountController.dispose();
+    descriptionController.dispose();
+  }
+
+  Future<void> _showEditCostDialog(CostEntity item) async {
+    final l10n = AppLocalizations.of(context);
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
+
+    final amountController = TextEditingController(
+      text: CurrencyFormatter.formatNumber(item.amount),
+    );
+    final descriptionController = TextEditingController(text: item.description);
+    DateTime selectedDate = item.date;
+    String? selectedCostType;
+    String? selectedPaymentMethod;
+
+    List<String> getCostTypes() {
+      final state = context.read<ReferenceBloc>().state;
+      if (state is ReferenceLoaded) {
+        return (state.references['costTypes'] ?? const <String>[])
+            .toSet()
+            .toList();
+      }
+      return const <String>[];
+    }
+
+    List<String> getPaymentMethods() {
+      final state = context.read<ReferenceBloc>().state;
+      if (state is ReferenceLoaded) {
+        return (state.references['paymentMethods'] ?? const <String>[])
+            .toSet()
+            .toList();
+      }
+      return const <String>[];
+    }
+
+    await showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: Text(l10n.translate('accounting.edit_cost')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.description'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.amount'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  value: selectedCostType,
+                  decoration: const InputDecoration(labelText: 'Loại chi phí'),
+                  items: getCostTypes()
+                      .where((c) => c.toLowerCase() != 'import')
+                      .map(
+                        (val) => DropdownMenuItem<String>(
+                          value: val,
+                          child: Text(val),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => selectedCostType = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  value: selectedPaymentMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'Phương thức thanh toán',
+                  ),
+                  items: getPaymentMethods()
+                      .map(
+                        (val) => DropdownMenuItem<String>(
+                          value: val,
+                          child: Text(val),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) =>
+                      setDialogState(() => selectedPaymentMethod = value),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ngày chi'),
+                  subtitle: Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogCtx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedDate = picked);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount =
+                    (CurrencyFormatter.parse(amountController.text) ?? 0)
+                        .toDouble();
+                if (descriptionController.text.trim().isEmpty ||
+                    amount <= 0 ||
+                    selectedCostType == null ||
+                    selectedPaymentMethod == null) {
+                  return;
+                }
+
+                final ok = await _confirmAction(
+                  title: l10n.translate('accounting.confirm_title'),
+                  message: l10n.translate('accounting.confirm_update_item'),
+                );
+                if (!ok) return;
+
+                if (!dialogCtx.mounted) return;
+
+                // Use outer context to read BLoC safely
+                context.read<CostBloc>().add(
+                  UpdateManualCostRequested(
+                    costId: item.id,
+                    body: {
+                      'amount': amount,
+                      'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
+                      'description': descriptionController.text.trim(),
+                      'costType': selectedCostType ?? item.type,
+                      'paymentMethod':
+                          selectedPaymentMethod ?? item.paymentMethod,
+                      'removeDocument': false,
+                    },
+                  ),
+                );
+                Navigator.pop(dialogCtx);
+              },
+              child: Text(l10n.translate('common.save')),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    amountController.dispose();
+    descriptionController.dispose();
+  }
+
   void _showRevenueDetailDialog(RevenueEntity revenue) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: Text('REV-${revenue.id}'),
         content: SizedBox(
           width: 420,
@@ -614,7 +907,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 const SizedBox(height: 6),
                 Text('Loại tham chiếu: ${revenue.referenceType ?? '-'}'),
                 const SizedBox(height: 6),
-                Text('Mã tham chiếu: ${revenue.referenceCode ?? revenue.referenceId?.toString() ?? '-'}'),
+                Text(
+                  'Mã tham chiếu: ${revenue.referenceCode ?? revenue.referenceId?.toString() ?? '-'}',
+                ),
                 const SizedBox(height: 12),
                 if ((revenue.referenceType ?? '').toLowerCase() == 'order' &&
                     (revenue.referenceId ?? 0) > 0) ...[
@@ -647,7 +942,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           const SizedBox(height: 4),
                           Text('Trạng thái: ${order.status}'),
                           const SizedBox(height: 4),
-                          Text('Tổng: ${CurrencyFormatter.formatVND(order.totalAmount)}'),
+                          Text(
+                            'Tổng: ${CurrencyFormatter.formatVND(order.totalAmount)}',
+                          ),
                           const SizedBox(height: 8),
                           ...order.items.map(
                             (item) => Padding(
@@ -668,10 +965,136 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogCtx),
             child: Text(l10n.translate('common.close')),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEditRevenueDialog(RevenueEntity item) {
+    final l10n = AppLocalizations.of(context);
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
+
+    final amountController = TextEditingController(
+      text: CurrencyFormatter.formatNumber(item.amount),
+    );
+    final descriptionController = TextEditingController(text: item.description);
+    DateTime selectedDate = item.date;
+    String? selectedMoneyChannel = item.moneyChannel;
+
+    List<String> getMoneyChannels() {
+      final state = context.read<ReferenceBloc>().state;
+      if (state is ReferenceLoaded) {
+        return state.references['moneyChannelTypes'] ?? const <String>[];
+      }
+      return const <String>[];
+    }
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDialogState) => AlertDialog(
+          title: Text(l10n.translate('accounting.edit_revenue')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.revenue_amount'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: descriptionController,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.revenue_description'),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  value: selectedMoneyChannel,
+                  decoration: const InputDecoration(labelText: 'Kênh tiền'),
+                  items: getMoneyChannels()
+                      .map(
+                        (channel) => DropdownMenuItem<String>(
+                          value: channel,
+                          child: Text(channel),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedMoneyChannel = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l10n.translate('accounting.revenue_date')),
+                  subtitle: Text(
+                    DateFormat('yyyy-MM-dd').format(selectedDate),
+                  ),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogCtx,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedDate = picked);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount =
+                    (CurrencyFormatter.parse(amountController.text) ?? 0)
+                        .toDouble();
+                if (amount <= 0 || (selectedMoneyChannel ?? '').isEmpty) return;
+
+                final ok = await _confirmAction(
+                  title: l10n.translate('accounting.confirm_title'),
+                  message: l10n.translate('accounting.confirm_update_revenue'),
+                );
+                if (!ok) return;
+
+                if (!dialogCtx.mounted) return;
+
+                // Backend currently doesn't have a specific Update Revenue endpoint!
+                // Inform user or TODO for backend team.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Tính năng sửa doanh thu chưa được backend hỗ trợ (No PUT endpoint)',
+                    ),
+                  ),
+                );
+                Navigator.pop(dialogCtx);
+              },
+              child: Text(l10n.translate('common.save')),
+            ),
+          ],
+        ),
       ),
     );
   }

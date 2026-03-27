@@ -1,3 +1,5 @@
+import "../../../../shared/cache/cache_manager.dart";
+import "../../../../shared/cache/cache_manager.dart";
 import 'package:flutter/foundation.dart';
 
 import '../domain/entities/debt_payment_entity.dart';
@@ -63,6 +65,7 @@ class DebtorRepository {
         notes: notes,
         creditLimit: creditLimit,
       );
+      await clearCache();
 
       final payload = _extractDataMap(response);
       if (payload == null) return null;
@@ -90,6 +93,7 @@ class DebtorRepository {
         notes: notes,
         creditLimit: creditLimit,
       );
+      await clearCache();
 
       final payload = _extractDataMap(response);
       if (payload == null) return null;
@@ -113,6 +117,7 @@ class DebtorRepository {
         paymentMethod: paymentMethod,
         notes: notes,
       );
+      await clearCache();
     } catch (e) {
       debugPrint('DebtorRepository.recordDebtAdjustment error: $e');
       rethrow;
@@ -170,6 +175,7 @@ class DebtorRepository {
   }) async {
     try {
       await _service.updateDebtorStatus(debtorId: debtorId, isActive: isActive);
+      await clearCache();
     } catch (e) {
       debugPrint('DebtorRepository.updateDebtorStatus error: $e');
       rethrow;
@@ -179,6 +185,8 @@ class DebtorRepository {
   Future<void> deleteDebtor({required int debtorId, bool force = false}) async {
     try {
       await _service.deleteDebtor(debtorId: debtorId, force: force);
+      await clearCache();
+      await clearCache();
     } catch (e) {
       debugPrint('DebtorRepository.deleteDebtor error: $e');
       rethrow;
@@ -194,5 +202,10 @@ class DebtorRepository {
       return root;
     }
     return null;
+  }
+
+  Future<void> clearCache() async {
+    await CacheManager().removeByPrefix("cache_debtors_");
+    await CacheManager().removeByPrefix("cache_debtor_detail_");
   }
 }

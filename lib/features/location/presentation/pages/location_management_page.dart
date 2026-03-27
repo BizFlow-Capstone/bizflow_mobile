@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/sidebar_widget.dart';
 import '../bloc/location_bloc.dart';
@@ -153,6 +155,12 @@ class _LocationPageContent extends StatelessWidget {
             message: l10n.translate('location.location_deleted'),
             type: AppSnackBarType.success,
           );
+          final businessContext =
+              Provider.of<BusinessContext>(context, listen: false);
+          if (businessContext.currentBusinessId == state.locationId) {
+            businessContext.clear();
+            // In the next frame, LocationsLoaded will trigger and auto-select a new location.
+          }
         } else if (state is LocationFailure || state is LocationError) {
           final message = state is LocationFailure
               ? state.message
@@ -258,6 +266,8 @@ class _LocationPageContent extends StatelessWidget {
                     itemCount: locations.length,
                     itemBuilder: (context, index) {
                       final location = locations[index];
+                      final isOwner =
+                          Provider.of<BusinessContext>(context, listen: false).isOwner;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: LocationCard(
@@ -274,10 +284,12 @@ class _LocationPageContent extends StatelessWidget {
                               ),
                             );
                           },
-                          onToggleStatus: (isActive) =>
-                              onToggleStatus(location.id, isActive),
-                          onEdit: () => onEdit(location),
-                          onDelete: () => onDelete(location),
+                          // Owner-only actions
+                          onToggleStatus: isOwner
+                              ? (isActive) => onToggleStatus(location.id, isActive)
+                              : null,
+                          onEdit: isOwner ? () => onEdit(location) : null,
+                          onDelete: isOwner ? () => onDelete(location) : null,
                           onAddManager: () {
                             AppSnackBar.show(
                               context,

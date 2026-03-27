@@ -59,20 +59,23 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     final hired = results[1];
     debugPrint('LocationBloc: Owned count: ${owned.length}, Hired count: ${hired.length}');
 
-    // Combine and remove duplicates by ID
-    final Set<String> ids = {};
-    final List<LocationEntity> combined = [];
+    // Tag owned locations with isOwner: true
+    final ownedTagged = owned.map((loc) => loc.copyWith(isOwner: true)).toList();
+    // Work-at locations: isOwner defaults to false; only override if not already owned
+    final ownedIds = ownedTagged.map((l) => l.id).toSet();
 
-    for (var loc in [...owned, ...hired]) {
-      if (!ids.contains(loc.id)) {
-        ids.add(loc.id);
-        combined.add(loc);
+    // Combine and remove duplicates — owned takes priority
+    final List<LocationEntity> combined = [...ownedTagged];
+    for (var loc in hired) {
+      if (!ownedIds.contains(loc.id)) {
+        combined.add(loc.copyWith(isOwner: false));
       }
     }
 
     _locations = combined;
     return combined;
   }
+
 
   Future<List<EmployeeEntity>> fetchAvailableEmployees() {
     return employeeRepository.getAvailableEmployees();

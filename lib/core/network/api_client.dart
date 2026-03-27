@@ -339,6 +339,170 @@ class ApiClient {
     );
   }
 
+  /// POST Multipart request (supports files)
+  Future<ApiResponse<T>> postMultipart<T>(
+    String path, {
+    required Map<String, String> fields,
+    Map<String, File>? files,
+    Map<String, String>? headers,
+    T Function(dynamic)? parser,
+  }) async {
+    const boundary = '----BizFlowBoundary';
+    final uri = Uri.parse('$baseUrl$path');
+
+    try {
+      final request = await _client.postUrl(uri);
+      
+      var requestHeaders = <String, String>{
+        'Content-Type': 'multipart/form-data; boundary=$boundary',
+        'Accept': 'application/json',
+        ...?headers,
+      };
+
+      for (final interceptor in requestInterceptors) {
+        requestHeaders = await interceptor.onRequest(requestHeaders);
+      }
+      requestHeaders.forEach((key, value) => request.headers.set(key, value));
+
+      // Build body
+      final sink = request;
+      
+      // Fields
+      fields.forEach((key, value) {
+        sink.write('--$boundary\r\n');
+        sink.write('Content-Disposition: form-data; name="$key"\r\n\r\n');
+        sink.write('$value\r\n');
+      });
+
+      // Files
+      if (files != null) {
+        for (final entry in files.entries) {
+          final file = entry.value;
+          final filename = file.path.split(Platform.pathSeparator).last;
+          sink.write('--$boundary\r\n');
+          sink.write(
+            'Content-Disposition: form-data; name="${entry.key}"; filename="$filename"\r\n',
+          );
+          sink.write('Content-Type: application/octet-stream\r\n\r\n');
+          await sink.addStream(file.openRead());
+          sink.write('\r\n');
+        }
+      }
+
+      sink.write('--$boundary--\r\n');
+
+      final response = await request.close().timeout(timeout);
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      dynamic jsonResponse;
+      try {
+        jsonResponse = json.decode(responseBody);
+      } catch (_) {
+        jsonResponse = responseBody;
+      }
+
+      for (final interceptor in responseInterceptors) {
+        await interceptor.onResponse(response.statusCode, jsonResponse);
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = parser != null ? parser(jsonResponse) : jsonResponse as T?;
+        return ApiResponse.success(data as T, statusCode: response.statusCode);
+      } else {
+        throw ApiException(
+          statusCode: response.statusCode,
+          message: _getErrorMessage(response.statusCode, jsonResponse),
+          data: jsonResponse,
+        );
+      }
+    } on Exception catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(statusCode: -3, message: e.toString());
+    }
+  }
+
+  /// PUT Multipart request (supports files)
+  Future<ApiResponse<T>> putMultipart<T>(
+    String path, {
+    required Map<String, String> fields,
+    Map<String, File>? files,
+    Map<String, String>? headers,
+    T Function(dynamic)? parser,
+  }) async {
+    const boundary = '----BizFlowBoundary';
+    final uri = Uri.parse('$baseUrl$path');
+
+    try {
+      final request = await _client.putUrl(uri);
+      
+      var requestHeaders = <String, String>{
+        'Content-Type': 'multipart/form-data; boundary=$boundary',
+        'Accept': 'application/json',
+        ...?headers,
+      };
+
+      for (final interceptor in requestInterceptors) {
+        requestHeaders = await interceptor.onRequest(requestHeaders);
+      }
+      requestHeaders.forEach((key, value) => request.headers.set(key, value));
+
+      // Build body
+      final sink = request;
+      
+      // Fields
+      fields.forEach((key, value) {
+        sink.write('--$boundary\r\n');
+        sink.write('Content-Disposition: form-data; name="$key"\r\n\r\n');
+        sink.write('$value\r\n');
+      });
+
+      // Files
+      if (files != null) {
+        for (final entry in files.entries) {
+          final file = entry.value;
+          final filename = file.path.split(Platform.pathSeparator).last;
+          sink.write('--$boundary\r\n');
+          sink.write(
+            'Content-Disposition: form-data; name="${entry.key}"; filename="$filename"\r\n',
+          );
+          sink.write('Content-Type: application/octet-stream\r\n\r\n');
+          await sink.addStream(file.openRead());
+          sink.write('\r\n');
+        }
+      }
+
+      sink.write('--$boundary--\r\n');
+
+      final response = await request.close().timeout(timeout);
+      final responseBody = await response.transform(utf8.decoder).join();
+
+      dynamic jsonResponse;
+      try {
+        jsonResponse = json.decode(responseBody);
+      } catch (_) {
+        jsonResponse = responseBody;
+      }
+
+      for (final interceptor in responseInterceptors) {
+        await interceptor.onResponse(response.statusCode, jsonResponse);
+      }
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = parser != null ? parser(jsonResponse) : jsonResponse as T?;
+        return ApiResponse.success(data as T, statusCode: response.statusCode);
+      } else {
+        throw ApiException(
+          statusCode: response.statusCode,
+          message: _getErrorMessage(response.statusCode, jsonResponse),
+          data: jsonResponse,
+        );
+      }
+    } on Exception catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(statusCode: -3, message: e.toString());
+    }
+  }
+
   /// Internal request method
   Future<ApiResponse<T>> _request<T>(
     HttpMethod method,

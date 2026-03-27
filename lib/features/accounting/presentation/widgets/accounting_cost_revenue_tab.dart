@@ -6,16 +6,19 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../revenue/domain/entities/revenue_entity.dart';
+import '../../../cost/domain/entities/cost_entity.dart';
 import '../models/accounting_mock_models.dart';
 
 class AccountingCostRevenueTab extends StatelessWidget {
   final List<RevenueEntity> revenues;
-  final List<AccountingItemModel> costs;
+  final List<CostEntity> costs;
   final VoidCallback onAddRevenue;
   final VoidCallback onAddCost;
   final ValueChanged<RevenueEntity> onEditRevenue;
   final ValueChanged<RevenueEntity> onTapRevenue;
-  final ValueChanged<AccountingItemModel> onEditCost;
+  final ValueChanged<RevenueEntity> onDeleteRevenue;
+  final ValueChanged<CostEntity> onEditCost;
+  final ValueChanged<CostEntity> onDeleteCost;
 
   const AccountingCostRevenueTab({
     super.key,
@@ -25,7 +28,9 @@ class AccountingCostRevenueTab extends StatelessWidget {
     required this.onAddCost,
     required this.onEditRevenue,
     required this.onTapRevenue,
+    required this.onDeleteRevenue,
     required this.onEditCost,
+    required this.onDeleteCost,
   });
 
   @override
@@ -46,6 +51,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
                     isRevenue: true,
                     onTap: () => onTapRevenue(item),
                     onEdit: () => onEditRevenue(item),
+                    onDelete: () => onDeleteRevenue(item),
                   ),
                 )
                 .toList(),
@@ -64,6 +70,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
                     isRevenue: false,
                     onTap: null,
                     onEdit: () => onEditCost(item),
+                    onDelete: () => onDeleteCost(item),
                   ),
                 )
                 .toList(),
@@ -79,6 +86,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     required bool isRevenue,
     VoidCallback? onTap,
     required VoidCallback onEdit,
+    required VoidCallback onDelete,
   }) {
     String title = '';
     String subtitle = '';
@@ -88,8 +96,8 @@ class AccountingCostRevenueTab extends StatelessWidget {
       title = 'REV-${item.id}';
       subtitle = item.description;
       amount = item.amount;
-    } else if (item is AccountingItemModel) {
-      title = item.code;
+    } else if (item is CostEntity) {
+      title = 'COST-${item.id}';
       subtitle = item.description;
       amount = item.amount;
     }
@@ -112,6 +120,12 @@ class AccountingCostRevenueTab extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             onPressed: onEdit,
+            visualDensity: VisualDensity.compact,
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.error),
+            onPressed: onDelete,
+            visualDensity: VisualDensity.compact,
           ),
         ],
       ),

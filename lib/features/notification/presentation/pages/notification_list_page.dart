@@ -15,6 +15,7 @@ import '../../../../shared/context/notification_context.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/models/user_notification_dto.dart';
 import '../../data/notification_repository.dart';
+import '../../../../shared/cache/cache_manager.dart';
 
 class NotificationListPage extends StatefulWidget {
   const NotificationListPage({super.key});
@@ -65,29 +66,45 @@ class _NotificationListPageState extends State<NotificationListPage> {
       _currentPage = 1;
     });
 
-    try {
-      final page = await _repository.getMyNotifications(
+    await CacheManager().fetchWithSWR<PaginatedNotificationsDto>(
+      key: "notifications_page_${_currentPage}_size_${_pageSize}",
+      fetcher: () => _repository.getMyNotifications(
         pageNumber: _currentPage,
         pageSize: _pageSize,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _notifications
-          ..clear()
-          ..addAll(page.items);
-        _hasNextPage = page.hasNextPage;
-        _isInitialLoading = false;
-      });
-
-      NotificationContext().refreshUnreadCount();
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = error.toString();
-        _isInitialLoading = false;
-      });
-    }
+      ),
+      onData: (page, isFromCache) {
+        if (!mounted) return;
+        setState(() {
+          if (_currentPage == 1) {
+             _notifications.clear();
+          }
+          final ids = _notifications.map((e) => e.userNotificationId).toSet();
+          for (var item in page.items) {
+             if (!ids.contains(item.userNotificationId)) {
+                _notifications.add(item);
+                ids.add(item.userNotificationId);
+             } else {
+                final idx = _notifications.indexWhere((n) => n.userNotificationId == item.userNotificationId);
+                if (idx != -1) _notifications[idx] = item;
+             }
+          }
+          _hasNextPage = page.hasNextPage;
+          _isInitialLoading = false;
+        });
+        NotificationContext().refreshUnreadCount();
+      },
+      onError: (error) {
+        if (!mounted) return;
+        if (_notifications.isEmpty) {
+          setState(() {
+            _errorMessage = error.toString();
+            _isInitialLoading = false;
+          });
+        }
+      },
+      fromJson: (json) => PaginatedNotificationsDto.fromJson(json),
+      toJson: (data) => data.toJson(),
+    );
   }
 
   Future<void> _loadMore() async {

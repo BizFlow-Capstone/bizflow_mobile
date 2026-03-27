@@ -58,6 +58,9 @@ import 'core/reference/presentation/bloc/reference_event.dart';
 import 'features/revenue/data/revenue_api_service.dart';
 import 'features/revenue/data/revenue_repository.dart';
 import 'features/revenue/presentation/bloc/revenue_bloc.dart';
+import 'features/cost/data/cost_api_service.dart';
+import 'features/cost/data/cost_repository.dart';
+import 'features/cost/presentation/bloc/cost_bloc.dart';
 
 import 'shared/context/business_context.dart';
 import 'shared/context/notification_context.dart';
@@ -112,6 +115,8 @@ class _MyAppState extends State<MyApp> {
   late GLRepository _glRepository;
   late RevenueApiService _revenueApiService;
   late RevenueRepository _revenueRepository;
+  late CostApiService _costApiService;
+  late CostRepository _costRepository;
   late NotificationApiService _notificationApiService;
   late NotificationRepository _notificationRepository;
 
@@ -191,6 +196,7 @@ class _MyAppState extends State<MyApp> {
     _notificationApiService = NotificationApiService(apiClient: _apiClient);
     _referenceApiService = ReferenceApiService(apiClient: _apiClient);
     _revenueApiService = RevenueApiService(apiClient: _apiClient);
+    _costApiService = CostApiService(apiClient: _apiClient);
 
     // Initialize Repositories (calls Services)
     _locationRepository = LocationRepository(service: _locationApiService);
@@ -220,6 +226,7 @@ class _MyAppState extends State<MyApp> {
     );
     _glRepository = GLRepository(apiService: _glApiService);
     _revenueRepository = RevenueRepository(apiService: _revenueApiService);
+    _costRepository = CostRepository(apiService: _costApiService);
 
     _firebaseMessagingService = FirebaseMessagingService(
       pushTokenApiService: _pushTokenApiService,
@@ -297,6 +304,9 @@ class _MyAppState extends State<MyApp> {
         BlocProvider(
           create: (context) => RevenueBloc(repository: _revenueRepository),
         ),
+        BlocProvider(
+          create: (context) => CostBloc(repository: _costRepository),
+        ),
         Provider<EmployeeRepository>.value(value: _employeeRepository),
         Provider<ImportRepository>.value(value: _importRepository),
         Provider<NotificationRepository>.value(value: _notificationRepository),
@@ -322,6 +332,7 @@ class _MyAppState extends State<MyApp> {
                     context.read<ProductBloc>().add(const ResetProducts());
                     context.read<DebtorBloc>().add(const ResetDebtors());
                     context.read<RevenueBloc>().add(const ResetRevenues());
+                    context.read<CostBloc>().add(const ResetCosts());
                     NotificationContext().clear();
                     _notificationRealtimeService.disconnect();
 

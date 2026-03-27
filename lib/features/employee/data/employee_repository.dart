@@ -1,7 +1,9 @@
+import "../../../../shared/cache/cache_manager.dart";
 import 'package:flutter/foundation.dart';
 import '../domain/entities/employee_entity.dart';
 import 'employee_api_service.dart';
 import 'models/employee_invitation_dto.dart';
+import '../../../core/storage/local_storage.dart';
 
 /// Employee Repository - Orchestrates employee data flow
 ///
@@ -71,21 +73,32 @@ class EmployeeRepository {
     }
   }
 
-  Future<void> acceptInvitation(int hireId) async {
-    try {
-      await _service.acceptInvitation(hireId);
+  Future<void> acceptInvitation(EmployeeInvitationDto invitation) async {
+    try {await _service.acceptInvitation(invitation.hireId);
+      final store = await LocalStorage.getInstance();
+      final userName = store.getString(StorageKeys.currentUserFullName) ?? "Một nhân viên";
+      await _service.sendInvitationReply(invitation.ownerId, true, userName);
+      await clearCache();
     } catch (e) {
       debugPrint('EmployeeRepository.acceptInvitation error: $e');
       rethrow;
     }
   }
 
-  Future<void> rejectInvitation(int hireId) async {
-    try {
-      await _service.rejectInvitation(hireId);
+  Future<void> rejectInvitation(EmployeeInvitationDto invitation) async {
+    try {await _service.rejectInvitation(invitation.hireId);
+      final store = await LocalStorage.getInstance();
+      final userName = store.getString(StorageKeys.currentUserFullName) ?? "Một nhân viên";
+      await _service.sendInvitationReply(invitation.ownerId, false, userName);
+      await clearCache();
     } catch (e) {
       debugPrint('EmployeeRepository.rejectInvitation error: $e');
       rethrow;
     }
+  }
+
+  Future<void> clearCache() async {
+    await CacheManager().removeByPrefix("cache_employees_");
+    await CacheManager().removeByPrefix("employees_");
   }
 }

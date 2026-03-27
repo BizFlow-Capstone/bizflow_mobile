@@ -119,6 +119,8 @@ class StorageKeys {
   // Business Context
   static const String currentBusinessId = 'current_business_id';
   static const String currentBusinessName = 'current_business_name';
+  static const String isOwnerOfCurrentLocation = 'is_owner_of_current_location';
+
 
   // Cache
   static const String lastSyncTime = 'last_sync_time';

@@ -145,6 +145,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       _orders.insert(0, order);
 
       emit(OrderCreated(order: order));
+      add(const RefreshOrdersRequested());
     } catch (e) {
       emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
@@ -199,6 +200,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       }
 
       emit(OrderUpdated(order: order));
+      add(const RefreshOrdersRequested());
     } catch (e) {
       emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }
@@ -218,6 +220,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       }
 
       emit(OrderPublished(order: order));
+      add(const RefreshOrdersRequested());
     } catch (e) {
       emit(OrderError(message: ApiErrorMessageParser.parse(e)));
     }

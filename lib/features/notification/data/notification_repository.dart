@@ -1,3 +1,4 @@
+import "../../../shared/cache/cache_manager.dart";
 import 'models/user_notification_dto.dart';
 import 'notification_api_service.dart';
 
@@ -19,8 +20,17 @@ class NotificationRepository {
 
   Future<int> getUnreadCount() => _apiService.getUnreadCount();
 
-  Future<void> markAsRead(int userNotificationId) =>
-      _apiService.markAsRead(userNotificationId);
+  Future<void> markAsRead(int userNotificationId) async {
+    await _apiService.markAsRead(userNotificationId);
+    await clearCache();
+  }
 
-  Future<void> markAllAsRead() => _apiService.markAllAsRead();
+  Future<void> markAllAsRead() async {
+    await _apiService.markAllAsRead();
+    await clearCache();
+  }
+
+  Future<void> clearCache() async {
+    await CacheManager().removeByPrefix("notifications_");
+  }
 }

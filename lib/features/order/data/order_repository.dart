@@ -111,6 +111,7 @@ class OrderRepository {
   /// Create a new order (pending)
   Future<OrderEntity> createOrder(Map<String, dynamic> requestBody) async {
     final dto = await _apiService.createOrder(requestBody);
+    await clearCache();
     return _mapToEntity(dto);
   }
 
@@ -125,6 +126,7 @@ class OrderRepository {
       body: requestBody,
       idempotencyKey: idempotencyKey,
     );
+    await clearCache();
     return _mapToEntity(dto);
   }
 
@@ -137,12 +139,17 @@ class OrderRepository {
       orderId,
       confirmLowStock: confirmLowStock,
     );
+    await clearCache();
     return _mapToEntity(dto);
   }
 
   /// Cancel an order
   Future<bool> cancelOrder(String orderId, {required String cancelReason}) async {
-    return await _apiService.cancelOrder(orderId, cancelReason: cancelReason);
+    final result = await _apiService.cancelOrder(orderId, cancelReason: cancelReason);
+    if (result) {
+      await clearCache();
+    }
+    return result;
   }
 
   /// Clear all cache keys related to orders

@@ -49,6 +49,7 @@ class ApiEndpoints {
     static String deleteEmployee(String employeeId) => '/api/my-employee/$employeeId';
     static const String registerDeviceToken = '/api/notifications/register-device-token';
     static const String unregisterDeviceToken = '/api/notifications/unregister-device-token';
+    static const String invitationReplyNotification = '/api/my-employee/invitations/reply-notification';
 
   // Location with ID - use with String interpolation
   static String updateLocationStatus(String id) =>
@@ -78,6 +79,12 @@ class ApiEndpoints {
   static const String revenues = '/api/my-business/accounting/revenues';
   static const String createManualRevenue = '/api/my-business/accounting/revenues/manual';
   static String deleteManualRevenue(String id) => '/api/my-business/accounting/revenues/$id';
+
+  // Cost
+  static const String costs = '/api/my-business/accounting/costs';
+  static const String createManualCost = '/api/my-business/accounting/costs/manual';
+  static String updateManualCost(String id) => '/api/my-business/accounting/costs/$id';
+  static String deleteManualCost(String id) => '/api/my-business/accounting/costs/$id';
 
   // Product
   static const String products = '/api/my-business/products';
@@ -147,4 +154,7 @@ class ApiEndpoints {
       '/api/locations/$locationId/accounting/periods/$periodId/reopen';
   static String accountingPeriodAuditLogs(String locationId, String periodId) =>
       '/api/locations/$locationId/accounting/periods/$periodId/audit-logs';
+
+  // GL Entries
+  static const String glEntries = '/api/my-business/accounting/gl-entries';
 }

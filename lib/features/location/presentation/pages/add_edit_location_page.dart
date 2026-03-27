@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/storage/secure_storage.dart';
@@ -194,6 +195,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                 .switchBusinessLocation(
                   state.newLocation.id,
                   state.newLocation.name,
+                  isOwner: true, // Creating a location → always owner
                 )
                 .then((_) {
                   if (!mounted) {
@@ -202,6 +204,15 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                   AppRouter.navigateAndClearStack(AppRoutes.home);
                 });
           } else if (state is LocationEditSuccess) {
+            final businessContext =
+                Provider.of<BusinessContext>(context, listen: false);
+            if (businessContext.currentBusinessId == state.updatedLocation.id) {
+              businessContext.switchBusinessLocation(
+                state.updatedLocation.id,
+                state.updatedLocation.name,
+                isOwner: true, // Editing a location → must be owner to have reached this screen
+              );
+            }
             Navigator.pop(context);
           } else if (state is AddEmployeeToLocationSuccess) {
             AppSnackBar.show(

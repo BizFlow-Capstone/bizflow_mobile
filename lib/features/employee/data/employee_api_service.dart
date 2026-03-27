@@ -219,6 +219,21 @@ class EmployeeApiService {
     }
   }
 
+  Future<void> sendInvitationReply(String ownerId, bool isAccepted, String employeeName) async {
+    try {
+      await _apiClient.post(
+        ApiEndpoints.invitationReplyNotification,
+        body: {
+          'ownerUserId': ownerId,
+          'isAccepted': isAccepted,
+          'employeeName': employeeName,
+        },
+      );
+    } catch (e) {
+      debugPrint('EmployeeApiService.sendInvitationReply error: $e');
+    }
+  }
+
   Future<void> acceptInvitation(int hireId) async {
     try {
       final response = await _apiClient.post(

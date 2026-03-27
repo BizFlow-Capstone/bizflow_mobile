@@ -1,5 +1,6 @@
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/network/api_endpoints.dart';
 import 'package:intl/intl.dart';
 
 class GLApiService {
@@ -52,7 +53,7 @@ class GLApiService {
     }
 
     final response = await _apiClient.get<Map<String, dynamic>>(
-      '/api/my-business/accounting/gl-entries',
+      ApiEndpoints.glEntries,
       queryParams: queryParams,
     );
 
