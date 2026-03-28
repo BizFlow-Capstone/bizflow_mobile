@@ -46,8 +46,14 @@ class ApiErrorMessageParser {
   }
 
   static String? _extractFromPayload(dynamic payload) {
+    if (payload == null) return null;
+
     if (payload is String) {
       return _stripTechnicalPrefix(payload);
+    }
+
+    if (payload is List && payload.isNotEmpty) {
+       return _extractFromPayload(payload.first);
     }
 
     if (payload is! Map) {
@@ -59,26 +65,34 @@ class ApiErrorMessageParser {
     for (final key in const ['message', 'detail', 'title', 'error']) {
       final value = map[key];
       if (value != null) {
-        final clean = _stripTechnicalPrefix(value.toString());
-        if (clean != null && clean.isNotEmpty) {
-          return clean;
+        if (value is String) {
+          final clean = _stripTechnicalPrefix(value);
+          if (clean != null && clean.isNotEmpty) {
+            return clean;
+          }
+        } else if (value is Map || value is List) {
+          final extracted = _extractFromPayload(value);
+          if (extracted != null && extracted.isNotEmpty) {
+            return extracted;
+          }
+        } else {
+          final clean = _stripTechnicalPrefix(value.toString());
+          if (clean != null && clean.isNotEmpty) {
+            return clean;
+          }
         }
       }
     }
 
     final errors = map['errors'];
-    if (errors is Map && errors.isNotEmpty) {
-      final firstValue = errors.values.first;
-      if (firstValue is List && firstValue.isNotEmpty) {
-        final clean = _stripTechnicalPrefix(firstValue.first?.toString());
-        if (clean != null && clean.isNotEmpty) {
-          return clean;
-        }
-      }
-
-      final clean = _stripTechnicalPrefix(firstValue?.toString());
-      if (clean != null && clean.isNotEmpty) {
-        return clean;
+    if (errors != null) {
+      if (errors is Map && errors.isNotEmpty) {
+         final firstValue = errors.values.first;
+         final extracted = _extractFromPayload(firstValue);
+         if (extracted != null && extracted.isNotEmpty) return extracted;
+      } else {
+         final extracted = _extractFromPayload(errors);
+         if (extracted != null && extracted.isNotEmpty) return extracted;
       }
     }
 
@@ -92,8 +106,9 @@ class ApiErrorMessageParser {
     if (value.isEmpty) return null;
 
     value = value.replaceFirst(RegExp(r'^Exception:\s*', caseSensitive: false), '');
+    // Allow matching negative status codes like [-1]
     value = value.replaceFirst(
-      RegExp(r'^ApiException:\s*\[\d+\]\s*', caseSensitive: false),
+      RegExp(r'^ApiException:\s*\[-?\d+\]\s*', caseSensitive: false),
       '',
     );
     value = value.trim();

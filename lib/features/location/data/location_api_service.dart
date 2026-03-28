@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/api_error_message_parser.dart';
 import '../../employee/data/models/employee_dto.dart';
 import 'models/location_dto.dart';
 
@@ -54,34 +55,18 @@ class LocationApiService {
     } on ApiException catch (e) {
       // Transform ApiException to domain exception with user-friendly messages
       if (e.statusCode == -1) {
-        throw Exception(
-          'No network connection\n\n'
-          'Check:\n'
-          '• Is backend running?\n'
-          '• URL: $_currentBaseUrl',
-        );
+        throw Exception('Không có kết nối mạng, vui lòng kiểm tra lại');
       } else if (e.statusCode == -2) {
-        throw Exception(
-          'Connection timeout\n\n'
-          'Backend did not respond within 30 seconds',
-        );
+        throw Exception('Kết nối máy chủ bị gián đoạn (Timeout)');
       } else if (e.statusCode == -3) {
         // HttpException or connection error
-        throw Exception(
-          'Backend connection error\n\n'
-          '${e.message}\n\n'
-          'Solutions:\n'
-          '1. Check backend is running: dotnet run\n'
-          '2. Ensure backend port is not blocked\n'
-          '3. Hot restart app (press R)\n'
-          '4. Check URL: $_currentBaseUrl',
-        );
+        throw Exception('Lỗi kết nối máy chủ');
       } else if (e.statusCode == 401) {
-        throw Exception('Session expired\n\nPlease login again');
+        throw Exception('Phiên đăng nhập đã hết hạn\n\nVui lòng đăng nhập lại');
       } else if (e.statusCode == 404) {
-        throw Exception('Data not found');
+        throw Exception('Không tìm thấy dữ liệu');
       }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('LocationApiService.getMyOwnedLocations error: $e');
       rethrow;
@@ -107,7 +92,7 @@ class LocationApiService {
       if (e.statusCode == 401) {
         throw Exception('Session expired');
       }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('LocationApiService.getWorkAtLocations error: $e');
       rethrow;
@@ -361,7 +346,7 @@ class LocationApiService {
       if (e.statusCode == 401) {
         throw Exception('Session expired');
       }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('LocationApiService.getLocationEmployees error: $e');
       rethrow;

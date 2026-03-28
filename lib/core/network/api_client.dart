@@ -731,9 +731,9 @@ class ApiClient {
         throw error;
       }
     } on SocketException {
-      throw ApiException(statusCode: -1, message: 'No internet connection');
+      throw ApiException(statusCode: -1, message: 'Không có kết nối mạng, vui lòng kiểm tra lại');
     } on TimeoutException {
-      throw ApiException(statusCode: -2, message: 'Request timeout');
+      throw ApiException(statusCode: -2, message: 'Kết nối máy chủ bị gián đoạn (Timeout)');
     } on ApiException {
       rethrow;
     } catch (e) {
