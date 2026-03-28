@@ -35,7 +35,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
 
     await _cacheManager.fetchWithSWR<List<EmployeeEntity>>(
       key: cacheKey,
-      fetcher: () => _repository.getEmployees(event.businessId),
+      fetcher: ({cancelToken}) => _repository.getEmployees(event.businessId),
       fromJson: (json) {
         final dataList = json['data'] as List? ?? [];
         return dataList.map((item) {

@@ -68,7 +68,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
 
     await CacheManager().fetchWithSWR<PaginatedNotificationsDto>(
       key: "notifications_page_${_currentPage}_size_${_pageSize}",
-      fetcher: () => _repository.getMyNotifications(
+      fetcher: ({cancelToken}) => _repository.getMyNotifications(
         pageNumber: _currentPage,
         pageSize: _pageSize,
       ),

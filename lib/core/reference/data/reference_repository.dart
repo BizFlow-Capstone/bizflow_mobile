@@ -18,7 +18,7 @@ class ReferenceRepository {
     // Implement SWR logic using fetchWithSWR to fetch all reference enums in parallel
     await _cache.fetchWithSWR<Map<String, List<String>>>(
       key: 'reference_data',
-      fetcher: () async {
+      fetcher: ({cancelToken}) async {
         final results = await Future.wait([
           _apiService.getPaymentMethods(),
           _apiService.getBusinessTypeStatuses(),

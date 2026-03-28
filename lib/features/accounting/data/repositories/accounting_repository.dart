@@ -31,7 +31,7 @@ class AccountingRepository {
   }) async {
     await _cache.fetchWithSWR<List<AccountingPeriod>>(
       key: _periodsKey(locationId),
-      fetcher: () => _apiService.listPeriods(locationId),
+        fetcher: ({cancelToken}) => _apiService.listPeriods(locationId),
       onData: onData,
       onError: onError,
       fromJson: (json) {
@@ -145,7 +145,7 @@ class AccountingRepository {
   }) async {
     await _cache.fetchWithSWR<AccountingPeriod>(
       key: _periodDetailKey(locationId, periodId),
-      fetcher: () => _apiService.getPeriodDetail(locationId, periodId),
+        fetcher: ({cancelToken}) => _apiService.getPeriodDetail(locationId, periodId),
       onData: onData,
       onError: onError,
       fromJson: (json) => AccountingPeriod.fromJson(json),

@@ -44,7 +44,7 @@ class CostRepository {
 
     await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,
-      fetcher: () => _apiService
+      fetcher: ({cancelToken}) => _apiService
           .getCosts(
             pageNumber: pageNumber,
             pageSize: pageSize,

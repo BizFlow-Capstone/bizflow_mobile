@@ -1,3 +1,4 @@
+﻿import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'cache_manager.dart';
 
@@ -5,7 +6,7 @@ import 'cache_manager.dart';
 /// Hiển thị dữ liệu từ cache trước (nếu có), sau đó ngầm sync từ Server
 class SwrBuilder<T> extends StatefulWidget {
   final String cacheKey;
-  final Future<T> Function() fetcher;
+  final Future<T> Function({CancelToken? cancelToken}) fetcher;
   final T Function(Map<String, dynamic> json)? fromJson;
   final Map<String, dynamic> Function(T data)? toJson;
   final Widget Function(

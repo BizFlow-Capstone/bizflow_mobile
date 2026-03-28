@@ -3,10 +3,12 @@ import 'package:flutter/foundation.dart';
 class SyncStatusState {
   final bool isSyncing;
   final DateTime? lastUpdatedAt;
+  final bool hasError;
 
   const SyncStatusState({
     required this.isSyncing,
     this.lastUpdatedAt,
+    this.hasError = false,
   });
 }
 
@@ -26,12 +28,13 @@ class SyncStatusController extends ChangeNotifier {
       _state = SyncStatusState(
         isSyncing: true,
         lastUpdatedAt: _state.lastUpdatedAt,
+        hasError: false,
       );
       notifyListeners();
     }
   }
 
-  void endSync({DateTime? updatedAt}) {
+  void endSync({DateTime? updatedAt, bool hasError = false}) {
     if (_activeRequests > 0) {
       _activeRequests -= 1;
     }
@@ -40,6 +43,7 @@ class SyncStatusController extends ChangeNotifier {
       _state = SyncStatusState(
         isSyncing: false,
         lastUpdatedAt: updatedAt ?? DateTime.now(),
+        hasError: hasError,
       );
       notifyListeners();
     }
@@ -47,7 +51,7 @@ class SyncStatusController extends ChangeNotifier {
 
   void reset() {
     _activeRequests = 0;
-    _state = const SyncStatusState(isSyncing: false);
+    _state = const SyncStatusState(isSyncing: false, hasError: false);
     notifyListeners();
   }
 }

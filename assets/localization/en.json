@@ -220,7 +220,8 @@
   "sync": {
     "syncing": "Syncing...",
     "updated_at": "Updated at {time}",
-    "idle": "Ready to sync"
+    "idle": "Ready to sync",
+    "failed": "Sync failed"
   },
   "sidebar": {
     "add_location": "Add",

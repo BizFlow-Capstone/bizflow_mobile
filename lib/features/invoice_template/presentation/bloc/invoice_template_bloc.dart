@@ -30,7 +30,7 @@ class InvoiceTemplateBloc extends Bloc<InvoiceTemplateEvent, InvoiceTemplateStat
 
     await CacheManager().fetchWithSWR<InvoiceTemplateEntity>(
       key: 'my_invoice_template',
-      fetcher: _refreshInvoiceTemplate,
+      fetcher: ({cancelToken}) => _refreshInvoiceTemplate(),
       fromJson: (json) {
         return InvoiceTemplateEntity.fromMap(json['data'] as Map<String, dynamic>);
       },

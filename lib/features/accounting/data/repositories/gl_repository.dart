@@ -31,7 +31,7 @@ class GLRepository {
 
     await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,
-      fetcher: () => _apiService.getGLEntries(
+      fetcher: ({cancelToken}) => _apiService.getGLEntries(
         businessLocationId: businessLocationId,
         pageNumber: pageNumber,
         pageSize: pageSize,

@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
 import '../../data/product_repository.dart';
@@ -52,7 +52,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     await CacheManager().fetchWithSWR<List<BusinessTypeDto>>(
       key: 'cache_business_types',
-      fetcher: () async {
+      fetcher: ({cancelToken}) async {
         final result = await repository.getBusinessTypes();
         if (result is List) {
           return List<BusinessTypeDto>.from(result);
@@ -93,7 +93,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
     await CacheManager().fetchWithSWR<List<ProductEntity>>(
       key: cacheKey,
-      fetcher: () async {
+      fetcher: ({cancelToken}) async {
         debugPrint(
           'ProductBloc: Loading products for location ${event.locationId} with filters: $_searchQuery, $_filterStatus',
         );
@@ -827,7 +827,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
     await CacheManager().fetchWithSWR<List<Map<String, dynamic>>>(
       key: cacheKey,
-      fetcher: () async {
+      fetcher: ({cancelToken}) async {
         final response = await repository.getProductSaleItems(event.productId);
         return _extractSaleItems(response);
       },
@@ -883,7 +883,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
     await CacheManager().fetchWithSWR<ProductEntity?>(
       key: cacheKey,
-      fetcher: () async {
+      fetcher: ({cancelToken}) async {
         debugPrint(
           'ProductBloc: Background loading detail for ${event.productId}',
         );

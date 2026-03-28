@@ -25,7 +25,9 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
         final state = SyncStatusController().state;
         final String text;
 
-        if (state.isSyncing) {
+        if (state.hasError && !state.isSyncing) {
+          text = l10n.translate('sync.failed');
+        } else if (state.isSyncing) {
           text = l10n.translate('sync.syncing');
         } else if (state.lastUpdatedAt != null) {
           final time = DateFormatter.formatTime(state.lastUpdatedAt!);
@@ -53,9 +55,9 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
                 height: 6,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: state.isSyncing
-                      ? AppColors.warning
-                      : AppColors.success,
+                  color: state.hasError && !state.isSyncing
+                      ? AppColors.error
+                      : (state.isSyncing ? AppColors.warning : AppColors.success),
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),

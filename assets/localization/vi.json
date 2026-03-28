@@ -1,4 +1,4 @@
-{
+﻿{
   "app_name": "BizFlow",
   "common": {
     "ok": "OK",
@@ -224,7 +224,8 @@
   "sync": {
     "syncing": "Đang đồng bộ...",
     "updated_at": "Đã cập nhật lúc {time}",
-    "idle": "Sẵn sàng đồng bộ"
+    "idle": "Sẵn sàng đồng bộ",
+    "failed": "Đồng bộ thất bại"
   },
   "sidebar": {
     "add_location": "Thêm",

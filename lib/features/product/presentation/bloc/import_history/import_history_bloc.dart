@@ -63,7 +63,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
     if (!_hasActiveFilters) {
       await CacheManager().fetchWithSWR<List<ImportHistoryItemModel>>(
         key: cacheKey,
-        fetcher: () async {
+        fetcher: ({cancelToken}) async {
           final response = await _repository.getImports(
             businessLocationId: effectiveLocationId,
             pageNumber: 1,

@@ -76,7 +76,7 @@ class OrderRepository {
     await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,
       fetcher:
-          () => _apiService
+            ({cancelToken}) => _apiService
               .getOrders(
                 pageNumber: pageNumber,
                 pageSize: pageSize,

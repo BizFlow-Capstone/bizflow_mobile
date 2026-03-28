@@ -72,7 +72,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
 
     await CacheManager().fetchWithSWR<DebtorListResult>(
       key: cacheKey,
-      fetcher: () {
+      fetcher: ({cancelToken}) {
         return repository.getDebtors(
           businessLocationIds: resolvedLocationIds,
           search: event.search,
@@ -374,7 +374,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
 
     await CacheManager().fetchWithSWR<List<DebtorEntity>>(
       key: cacheKey,
-      fetcher: () => repository.getActiveDebtorsByLocation(event.locationId),
+      fetcher: ({cancelToken}) => repository.getActiveDebtorsByLocation(event.locationId),
       fromJson: (json) {
         // BE returns { "data": [...] } — a direct list, not paginated
         // DebtorMinimalDto is missing isActive & businessLocationId,

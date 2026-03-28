@@ -48,7 +48,7 @@ class RevenueRepository {
     await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,
       fetcher:
-          () => _apiService
+            ({cancelToken}) => _apiService
               .getRevenues(
                 pageNumber: pageNumber,
                 pageSize: pageSize,

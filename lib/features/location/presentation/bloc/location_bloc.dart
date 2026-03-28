@@ -91,7 +91,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
 
     await CacheManager().fetchWithSWR<List<LocationEntity>>(
       key: 'my_locations',
-      fetcher: _refreshLocations,
+      fetcher: ({cancelToken}) => _refreshLocations(),
       fromJson: (json) {
         final list = json['data'] as List;
         return list
