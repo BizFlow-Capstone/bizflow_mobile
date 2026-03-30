@@ -8,6 +8,7 @@ import '../../../../shared/context/business_context.dart';
 
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 
 import '../../domain/entities/employee_entity.dart';
 import '../bloc/employee_bloc.dart';
@@ -37,12 +38,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
   void _onSave() {
     FocusScope.of(context).unfocus();
     if (_selectedEmployees.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Vui lòng tìm và chọn ít nhất một nhân viên để gửi lời mời.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      AppSnackBar.error(context, 'Vui lòng tìm và chọn ít nhất một nhân viên để gửi lời mời.');
       return;
     }
 
@@ -53,22 +49,12 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
 
   void _selectSearchResult(EmployeeEntity employee) {
     if (employee.status == EmployeeStatus.active) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Người này đã là nhân viên.'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      AppSnackBar.warning(context, 'Người này đã là nhân viên.');
       return;
     }
 
     if (_selectedEmployees.any((e) => e.id == employee.id)) {
-       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã chọn người này rồi.'),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+      AppSnackBar.warning(context, 'Đã chọn người này rồi.');
       return;
     }
 
@@ -103,14 +89,18 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
               setState(() => _isLoading = false);
               
               if (state is EmployeeActionSuccess) {
+                AppSnackBar.success(context, 'Gửi lời mời thành công');
                 Navigator.pop(context);
               } else if (state is EmployeeSearchLoaded) {
                 setState(() {
                   _searchResults = state.results;
                 });
               } else if (state is EmployeeFailure) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
+                final isAlreadyInvited = state.message.contains('đã được mời') || state.message.contains('409');
+                AppSnackBar.show(
+                  context,
+                  message: state.message,
+                  type: isAlreadyInvited ? AppSnackBarType.warning : AppSnackBarType.error,
                 );
               }
             }

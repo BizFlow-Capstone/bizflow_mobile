@@ -144,8 +144,11 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       case 'active':
         return employee.isActive ? EmployeeStatus.active : EmployeeStatus.inactive;
       default:
-        if (!employee.isActive) return EmployeeStatus.inactive;
-        return employee.isAlreadyHired ? EmployeeStatus.active : EmployeeStatus.pending;
+        // if status is empty but isAlreadyHired is true, check isActive
+        if (employee.status.isEmpty && employee.isAlreadyHired) {
+          return employee.isActive ? EmployeeStatus.active : EmployeeStatus.inactive;
+        }
+        return EmployeeStatus.pending;
     }
   }
 

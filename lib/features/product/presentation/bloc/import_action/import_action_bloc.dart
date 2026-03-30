@@ -4,6 +4,7 @@ import '../../../data/models/import_model.dart';
 import '../../../../../shared/cache/cache_manager.dart';
 import 'import_action_event.dart';
 import 'import_action_state.dart';
+import '../../../../../core/network/api_error_message_parser.dart';
 
 class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
   final ImportRepository _repository;
@@ -40,7 +41,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
-          errorMessage: e.toString(),
+          errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }
@@ -70,7 +71,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
-          errorMessage: e.toString(),
+          errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }
@@ -99,7 +100,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
-          errorMessage: e.toString(),
+          errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }
@@ -124,7 +125,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
-          errorMessage: e.toString(),
+          errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }
@@ -148,7 +149,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
-          errorMessage: e.toString(),
+          errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }
@@ -172,7 +173,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
-          errorMessage: e.toString(),
+          errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }

@@ -3,6 +3,7 @@ import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../data/employee_management_repository.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import 'employee_event.dart';
 import 'employee_state.dart';
 
@@ -14,6 +15,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       : _repository = repository,
         super(EmployeeInitial()) {
     on<LoadEmployeesRequested>(_onLoadEmployees);
+    on<EmployeesNetworkDataReceived>(_onEmployeesNetworkDataReceived);
     on<SelectEmployeeTabRequested>(_onSelectTab);
       on<SearchEmployeeKeywordChanged>(_onSearchKeywordChanged);
       on<SearchEmployeesRequested>(_onSearchEmployees);
@@ -85,24 +87,32 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
         };
       },
       onData: (data, isFromCache) {
-        if (!isClosed) {
-          emit(
-            _createLoadedState(
-              data,
-              state is EmployeeLoaded ? (state as EmployeeLoaded).currentTab : 0,
-              state is EmployeeLoaded
-                  ? (state as EmployeeLoaded).searchKeyword
-                  : '',
-            ),
-          );
-        }
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(EmployeesNetworkDataReceived(employees: data, isFromCache: isFromCache));
       },
       onError: (error) {
         if (!isClosed && state is! EmployeeLoaded) {
-          emit(EmployeeFailure(error.toString()));
+          emit(EmployeeFailure(ApiErrorMessageParser.parse(error)));
         }
       },
     );
+  }
+
+  Future<void> _onEmployeesNetworkDataReceived(
+    EmployeesNetworkDataReceived event,
+    Emitter<EmployeeState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(
+        _createLoadedState(
+          event.employees,
+          state is EmployeeLoaded ? (state as EmployeeLoaded).currentTab : 0,
+          state is EmployeeLoaded
+              ? (state as EmployeeLoaded).searchKeyword
+              : '',
+        ),
+      );
+    }
   }
 
   void _onSelectTab(
@@ -154,7 +164,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       emit(EmployeeSearchLoaded(results));
       if (currentState is EmployeeLoaded) emit(currentState);
     } catch (e) {
-      emit(EmployeeFailure(e.toString()));
+      emit(EmployeeFailure(ApiErrorMessageParser.parse(e)));
       if (currentState is EmployeeLoaded) emit(currentState);
     }
   }
@@ -178,7 +188,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       add(LoadEmployeesRequested(businessId: event.businessId));
 
     } catch (e) {
-      emit(EmployeeFailure(e.toString()));
+      emit(EmployeeFailure(ApiErrorMessageParser.parse(e)));
       emit(currentState);
     }
   }
@@ -204,7 +214,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       // Request a reload from network
       add(LoadEmployeesRequested(businessId: event.businessId));
     } catch (e) {
-      emit(EmployeeFailure(e.toString()));
+      emit(EmployeeFailure(ApiErrorMessageParser.parse(e)));
       emit(currentState);
     }
   }
@@ -224,7 +234,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       emit(const EmployeeActionSuccess('Cập nhật nhân viên thành công'));
       await _reloadEmployeesFromServer(currentState, emit);
     } catch (e) {
-      emit(EmployeeFailure(e.toString()));
+      emit(EmployeeFailure(ApiErrorMessageParser.parse(e)));
       emit(currentState);
     }
   }
@@ -248,7 +258,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       emit(const EmployeeActionSuccess('Cập nhật trạng thái nhân viên thành công'));
       await _reloadEmployeesFromServer(currentState, emit);
     } catch (e) {
-      emit(EmployeeFailure(e.toString()));
+      emit(EmployeeFailure(ApiErrorMessageParser.parse(e)));
       emit(currentState);
     }
   }

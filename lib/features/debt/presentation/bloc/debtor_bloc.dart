@@ -14,10 +14,13 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
 
   DebtorBloc({required this.repository}) : super(const DebtorState()) {
     on<LoadDebtorsRequested>(_onLoadDebtorsRequested);
+    on<DebtorsNetworkDataReceived>(_onDebtorsNetworkDataReceived);
+    on<DebtorsNetworkErrorOccurred>(_onDebtorsNetworkErrorOccurred);
     on<RefreshDebtorsRequested>(_onRefreshDebtorsRequested);
     on<ToggleDebtorStatusRequested>(_onToggleDebtorStatusRequested);
     on<DeleteDebtorRequested>(_onDeleteDebtorRequested);
     on<LoadActiveDebtorsByLocationRequested>(_onLoadActiveDebtorsByLocation);
+    on<ActiveDebtorsByLocationNetworkDataReceived>(_onActiveDebtorsByLocationNetworkDataReceived);
     on<CreateDebtorRequested>(_onCreateDebtorRequested);
     on<UpdateDebtorRequested>(_onUpdateDebtorRequested);
     on<RecordDebtAdjustmentRequested>(_onRecordDebtAdjustmentRequested);
@@ -85,24 +88,12 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
       toJson: (result) => result.toCacheMap(),
       onData: (result, _) {
         _debtors = result.items;
-        emit(
-          state.copyWith(
-            status: DebtorStatus.success,
-            debtors: result.items,
-            hasReachedMax: !result.hasNextPage,
-            currentPage: result.pageNumber,
-            totalCount: result.totalCount,
-            errorMessage: null,
-          ),
-        );
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(DebtorsNetworkDataReceived(result: result));
       },
       onError: (error) {
-        emit(
-          state.copyWith(
-            status: DebtorStatus.failure,
-            errorMessage: _parseErrorMessage(error),
-          ),
-        );
+        // Add event instead of direct emit
+        add(DebtorsNetworkErrorOccurred(error: error));
       },
     );
   }
@@ -119,6 +110,38 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
         pageNumber: 1,
       ),
     );
+  }
+
+  Future<void> _onDebtorsNetworkDataReceived(
+    DebtorsNetworkDataReceived event,
+    Emitter<DebtorState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.success,
+          debtors: event.result.items,
+          hasReachedMax: !event.result.hasNextPage,
+          currentPage: event.result.pageNumber,
+          totalCount: event.result.totalCount,
+          errorMessage: null,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onDebtorsNetworkErrorOccurred(
+    DebtorsNetworkErrorOccurred event,
+    Emitter<DebtorState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.failure,
+          errorMessage: _parseErrorMessage(event.error),
+        ),
+      );
+    }
   }
 
   Future<void> _onToggleDebtorStatusRequested(
@@ -407,12 +430,22 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
         debugPrint(
           'DebtorBloc._onLoadActiveDebtorsByLocation: loaded ${data.length} debtors for location ${event.locationId}',
         );
-        emit(state.copyWith(activeDebtorsByLocation: data, errorMessage: null));
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(ActiveDebtorsByLocationNetworkDataReceived(debtors: data, locationId: event.locationId));
       },
       onError: (error) {
         debugPrint('DebtorBloc._onLoadActiveDebtorsByLocation error: $error');
       },
     );
+  }
+
+  Future<void> _onActiveDebtorsByLocationNetworkDataReceived(
+    ActiveDebtorsByLocationNetworkDataReceived event,
+    Emitter<DebtorState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(state.copyWith(activeDebtorsByLocation: event.debtors, errorMessage: null));
+    }
   }
 
   List<int>? _resolveBusinessLocationIds({List<int>? explicit}) {

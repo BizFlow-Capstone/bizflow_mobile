@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/product_entity.dart';
+import '../../data/models/business_type_model.dart';
 
 /// Product Events
 /// Các sự kiện được phát ra từ UI layers
@@ -292,4 +294,58 @@ class ApplyLocalPriceAdjustmentRequested extends ProductEvent {
 
   @override
   List<Object?> get props => [locationId, affectedProductIds, deltaAmount];
+}
+
+/// Event untuk handle business types dari network sync (SWR background update)
+class BusinessTypesNetworkDataReceived extends ProductEvent {
+  final List<BusinessTypeDto> businessTypes;
+
+  const BusinessTypesNetworkDataReceived({required this.businessTypes});
+
+  @override
+  List<Object?> get props => [businessTypes];
+}
+
+/// Event untuk handle products dari network sync (SWR background update)  
+class ProductsNetworkDataReceived extends ProductEvent {
+  final List<ProductEntity> products;
+  final String locationId;
+
+  const ProductsNetworkDataReceived({
+    required this.products,
+    required this.locationId,
+  });
+
+  @override
+  List<Object?> get props => [products, locationId];
+}
+
+/// Event untuk handle product error dari network sync
+class ProductNetworkErrorOccurred extends ProductEvent {
+  final dynamic error;
+
+  const ProductNetworkErrorOccurred({required this.error});
+
+  @override
+  List<Object?> get props => [error];
+}
+
+/// Event untuk handle sale items dari network sync (SWR background update)
+class ProductSaleItemsNetworkDataReceived extends ProductEvent {
+  final List<Map<String, dynamic>> saleItems;
+
+  const ProductSaleItemsNetworkDataReceived({required this.saleItems});
+
+  @override
+  List<Object?> get props => [saleItems];
+}
+
+/// Event untuk handle product detail dari network sync (SWR background update)
+class ProductDetailNetworkDataReceived extends ProductEvent {
+  final ProductEntity? product;
+
+  const ProductDetailNetworkDataReceived({required this.product});
+
+  @override
+  List<Object?> get props => [product];
 }

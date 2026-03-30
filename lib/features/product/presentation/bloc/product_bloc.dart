@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
 import '../../data/product_repository.dart';
@@ -7,6 +7,7 @@ import '../../data/models/business_type_model.dart';
 import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/date_formatter.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import 'product_event.dart';
 import 'product_state.dart';
 
@@ -17,7 +18,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
   ProductBloc({required this.repository}) : super(const ProductInitial()) {
     on<LoadBusinessTypesRequested>(_onLoadBusinessTypesRequested);
+    on<BusinessTypesNetworkDataReceived>(_onBusinessTypesNetworkDataReceived);
     on<LoadProductsByLocationRequested>(_onLoadProductsByLocationRequested);
+    on<ProductsNetworkDataReceived>(_onProductsNetworkDataReceived);
+    on<ProductNetworkErrorOccurred>(_onProductNetworkErrorOccurred);
     on<RefreshProductsRequested>(_onRefreshProductsRequested);
     on<SearchProductsRequested>(_onSearchProductsRequested);
     on<FilterProductsRequested>(_onFilterProductsRequested);
@@ -29,8 +33,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<DeleteProductRequested>(_onDeleteProductRequested);
     on<UpdateProductStatusRequested>(_onUpdateProductStatusRequested);
     on<LoadProductSaleItemsRequested>(_onLoadProductSaleItemsRequested);
+    on<ProductSaleItemsNetworkDataReceived>(_onProductSaleItemsNetworkDataReceived);
     on<ImportInventoryRequested>(_onImportInventoryRequested);
     on<LoadProductDetailRequested>(_onLoadProductDetailRequested);
+    on<ProductDetailNetworkDataReceived>(_onProductDetailNetworkDataReceived);
     on<ApplyLocalPriceAdjustmentRequested>(_onApplyLocalPriceAdjustment);
     on<ResetProducts>(_onResetProducts);
   }
@@ -69,14 +75,22 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         return {'data': data.map((e) => e.toJson()).toList()};
       },
       onData: (businessTypes, isFromCache) {
-        if (businessTypes.isNotEmpty) {
-          emit(BusinessTypesLoaded(businessTypes: businessTypes));
-        }
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(BusinessTypesNetworkDataReceived(businessTypes: businessTypes));
       },
       onError: (e) {
         debugPrint('ProductBloc._onLoadBusinessTypesRequested error: $e');
       },
     );
+  }
+
+  Future<void> _onBusinessTypesNetworkDataReceived(
+    BusinessTypesNetworkDataReceived event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (!isClosed && event.businessTypes.isNotEmpty) {
+      emit(BusinessTypesLoaded(businessTypes: event.businessTypes));
+    }
   }
 
   Future<void> _onLoadProductsByLocationRequested(
@@ -118,26 +132,46 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       },
       onData: (products, isFromCache) {
         _products = products;
-        emit(
-          ProductsLoaded(
-            products: products,
-            hasReachedMax: products.length < 20,
-            currentPage: 1,
-            locationId: event.locationId,
-            searchQuery: _searchQuery,
-            filterStatus: _filterStatus,
-            filterBusinessTypeId: _filterBusinessTypeId,
-            apiMessage: null,
-          ),
-        );
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(ProductsNetworkDataReceived(products: products, locationId: event.locationId));
       },
       onError: (e) {
         debugPrint('ProductBloc._onLoadProductsByLocationRequested error: $e');
-        emit(
-          ProductFailure(message: 'Failed to load products: ${e.toString()}'),
-        );
+        // Add event instead of direct emit
+        add(ProductNetworkErrorOccurred(error: e));
       },
     );
+  }
+
+  Future<void> _onProductsNetworkDataReceived(
+    ProductsNetworkDataReceived event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(
+        ProductsLoaded(
+          products: event.products,
+          hasReachedMax: event.products.length < 20,
+          currentPage: 1,
+          locationId: event.locationId,
+          searchQuery: _searchQuery,
+          filterStatus: _filterStatus,
+          filterBusinessTypeId: _filterBusinessTypeId,
+          apiMessage: null,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onProductNetworkErrorOccurred(
+    ProductNetworkErrorOccurred event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(
+        ProductFailure(message: ApiErrorMessageParser.parse(event.error)),
+      );
+    }
   }
 
   Future<void> _onRefreshProductsRequested(
@@ -173,7 +207,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     } catch (e) {
       debugPrint('ProductBloc._onRefreshProductsRequested error: $e');
       emit(
-        ProductFailure(message: 'Failed to refresh products: ${e.toString()}'),
+        ProductFailure(message: ApiErrorMessageParser.parse(e)),
       );
     }
   }
@@ -491,7 +525,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       );
     } catch (e) {
       debugPrint('ProductBloc._onSortProductsRequested error: $e');
-      emit(ProductFailure(message: 'Failed to sort products: ${e.toString()}'));
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -590,12 +624,12 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         ),
       );
     } on DioException catch (e) {
-      final message = e.response?.data?['message'] ?? e.message ?? e.toString();
+      final message = ApiErrorMessageParser.parse(e);
       debugPrint('ProductBloc._onAddProductRequested DioError: $message');
-      emit(ProductFailure(message: message.toString()));
+      emit(ProductFailure(message: message));
     } catch (e) {
       debugPrint('ProductBloc._onAddProductRequested error: $e');
-      emit(ProductFailure(message: 'Failed to add product: ${e.toString()}'));
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -700,13 +734,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         );
       }
     } on DioException catch (e) {
-      final message = e.response?.data?['message'] ?? e.message ?? e.toString();
+      final message = ApiErrorMessageParser.parse(e);
       debugPrint('ProductBloc._onUpdateProductRequested DioError: $message');
-      emit(ProductFailure(message: message.toString()));
+      emit(ProductFailure(message: message));
     } catch (e) {
       debugPrint('ProductBloc._onUpdateProductRequested error: $e');
       emit(
-        ProductFailure(message: 'Failed to update product: ${e.toString()}'),
+        ProductFailure(message: ApiErrorMessageParser.parse(e)),
       );
     }
   }
@@ -740,13 +774,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         ),
       );
     } on DioException catch (e) {
-      final message = e.response?.data?['message'] ?? e.message ?? e.toString();
+      final message = ApiErrorMessageParser.parse(e);
       debugPrint('ProductBloc._onDeleteProductRequested DioError: $message');
-      emit(ProductFailure(message: message.toString()));
+      emit(ProductFailure(message: message));
     } catch (e) {
       debugPrint('ProductBloc._onDeleteProductRequested error: $e');
       emit(
-        ProductFailure(message: 'Failed to delete product: ${e.toString()}'),
+        ProductFailure(message: ApiErrorMessageParser.parse(e)),
       );
     }
   }
@@ -812,7 +846,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       debugPrint('ProductBloc._onUpdateProductStatusRequested error: $e');
       emit(
         ProductFailure(
-          message: 'Failed to update product status: ${e.toString()}',
+          message: ApiErrorMessageParser.parse(e),
         ),
       );
     }
@@ -840,15 +874,25 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         return {'data': data};
       },
       onData: (saleItems, _) {
-        emit(ProductSaleItemsLoaded(saleItems: saleItems));
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(ProductSaleItemsNetworkDataReceived(saleItems: saleItems));
       },
       onError: (e) {
         debugPrint(
           'ProductBloc._onLoadProductSaleItemsRequested: No sale items found or error: $e',
         );
-        emit(const ProductSaleItemsLoaded(saleItems: []));
+        add(ProductSaleItemsNetworkDataReceived(saleItems: []));
       },
     );
+  }
+
+  Future<void> _onProductSaleItemsNetworkDataReceived(
+    ProductSaleItemsNetworkDataReceived event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(ProductSaleItemsLoaded(saleItems: event.saleItems));
+    }
   }
 
   Future<void> _onImportInventoryRequested(
@@ -870,7 +914,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     } catch (e) {
       debugPrint('ProductBloc._onImportInventoryRequested error: $e');
       emit(
-        ProductFailure(message: 'Failed to import inventory: ${e.toString()}'),
+        ProductFailure(message: ApiErrorMessageParser.parse(e)),
       );
     }
   }
@@ -896,21 +940,32 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         return product?.toMap() ?? {};
       },
       onData: (product, isFromCache) {
-        if (product != null) {
-          emit(ProductDetailLoaded(product: product));
-        }
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(ProductDetailNetworkDataReceived(product: product));
       },
       onError: (e) {
         debugPrint('ProductBloc._onLoadProductDetailRequested error: $e');
-        if (state is! ProductDetailLoaded) {
-          emit(
-            ProductFailure(
-              message: 'Failed to load product detail: ${e.toString()}',
-            ),
-          );
-        }
+        // Add event instead of direct emit
+        add(ProductDetailNetworkDataReceived(product: null));
       },
     );
+  }
+
+  Future<void> _onProductDetailNetworkDataReceived(
+    ProductDetailNetworkDataReceived event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (!isClosed) {
+      if (event.product != null) {
+        emit(ProductDetailLoaded(product: event.product!));
+      } else if (state is! ProductDetailLoaded) {
+        emit(
+          ProductFailure(
+            message: 'Không tìm thấy chi tiết sản phẩm',
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _onApplyLocalPriceAdjustment(

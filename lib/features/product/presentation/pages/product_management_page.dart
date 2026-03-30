@@ -23,6 +23,7 @@ import '../widgets/product_filter_dialog.dart';
 import 'add_product_page.dart';
 import 'bulk_adjust_selling_price_page.dart';
 import 'import_history_page.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 
 /// Product Management by Location Page
 /// SC-INV-03.1: Quản lý sản phẩm theo địa điểm kinh doanh
@@ -180,12 +181,14 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         type: AppSnackBarType.success,
       );
 
-      productBloc.add(RefreshProductsRequested(locationId: widget.locationId));
+      if (mounted) {
+        productBloc.add(RefreshProductsRequested(locationId: widget.locationId));
+      }
     } catch (e) {
       if (!mounted) return;
       AppSnackBar.show(
         context,
-        message: e.toString().replaceFirst('Exception: ', ''),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     }
@@ -366,7 +369,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         setState(() {
                           _searchController.text = res;
                         });
-                        _searchProducts(res);
+                        if (mounted) {
+                          _searchProducts(res);
+                        }
                       }
                     },
                     color: AppColors.textSecondary,

@@ -41,7 +41,7 @@ class ProductApiService {
       if (e.statusCode == 401) {
         throw Exception('Session expired');
       }
-      throw Exception('API Error: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.getLocationProducts error: $e');
       rethrow;
@@ -109,7 +109,7 @@ class ProductApiService {
       } else if (e.statusCode == 404) {
         throw Exception('Products not found');
       }
-      throw Exception('Error loading products: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.getProducts error: $e');
       rethrow;
@@ -146,7 +146,7 @@ class ProductApiService {
       } else if (e.statusCode == 404) {
         throw Exception('Product not found');
       }
-      throw Exception('Error loading product detail: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.getProductDetail error: $e');
       rethrow;
@@ -183,7 +183,7 @@ class ProductApiService {
       } else if (e.statusCode == 404) {
         throw Exception('Product or sale items not found');
       }
-      throw Exception('Error loading sale items: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.getProductSaleItems error: $e');
       rethrow;
@@ -220,7 +220,7 @@ class ProductApiService {
       } else if (e.statusCode == 404) {
         throw Exception('Product not found');
       }
-      throw Exception('Error loading cost price history: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.getProductCostPriceHistory error: $e');
       rethrow;
@@ -260,7 +260,7 @@ class ProductApiService {
       if (e.statusCode == 403) {
         throw Exception('Permission denied: Only owner can adjust prices');
       }
-      throw Exception('Error adjusting selling prices: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.bulkAdjustSellingPrice error: $e');
       rethrow;
@@ -309,7 +309,7 @@ class ProductApiService {
       } else if (e.statusCode == 404) {
         throw Exception('Product not found');
       }
-      throw Exception('Error adjusting product stock: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.adjustProductStock error: $e');
       rethrow;
@@ -685,7 +685,7 @@ class ProductApiService {
       } else if (e.statusCode == 404) {
         throw Exception('Product not found');
       }
-      throw Exception('Error updating product status: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.updateProductStatus error: $e');
       rethrow;
@@ -720,7 +720,7 @@ class ProductApiService {
       } else if (e.statusCode == 404) {
         throw Exception('Product not found');
       }
-      throw Exception('Error deleting product: ${e.message}');
+      rethrow;
     } catch (e) {
       debugPrint('ProductApiService.deleteProduct error: $e');
       return;

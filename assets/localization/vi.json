@@ -1,4 +1,4 @@
-﻿{
+{
   "app_name": "BizFlow",
   "common": {
     "ok": "OK",
@@ -504,7 +504,19 @@
       "a2": "Chúng tôi hỗ trợ chuyển khoản ngân hàng, ví điện tử và thanh toán quốc tế.",
       "q3": "Tôi có thể nâng cấp hoặc hạ cấp gói không?",
       "a3": "Có, bạn có thể thay đổi gói bất cứ lúc nào. Phí sẽ được tính theo tỷ lệ."
-    }
+    },
+    "my_current_plan": "Gói Đăng Ký Hiện Tại",
+    "active_until": "Có hiệu lực đến: {date}",
+    "usage_limits": "Mức Sử Dụng Tính Năng",
+    "unlimited": "Không giới hạn",
+    "used_format": "{used} / {limit}",
+    "subscribe_now": "Đăng Ký Ngay",
+    "manage_plan": "Quản Lý Gói",
+    "registered_label": "Đã đăng ký",
+    "renew_more": "Gia hạn thêm",
+    "expires_soon": "Sắp hết hạn",
+    "no_active_plan": "Chưa đăng ký gói nào",
+    "plan_details": "Chi tiết Gói"
   },
   "payment": {
     "appbar_title": "Thanh Toán Gói Premium",
@@ -523,7 +535,14 @@
     "content": "Nội dung",
     "content_value": "PREMIUM SUB123456",
     "confirm": "Xác nhận\nthanh toán",
-    "security_note": "Thông tin thanh toán của bạn được mã hóa và\nbảo mật theo tiêu chuẩn PCI DSS"
+    "security_note": "Thông tin thanh toán của bạn được mã hóa và\nbảo mật theo tiêu chuẩn PCI DSS",
+    "result": {
+      "appbar_title": "Kết Quả Thanh Toán",
+      "success_title": "Thanh toán thành công",
+      "success_message": "Gói đăng ký của bạn đã được kích hoạt. Bạn có thể bắt đầu sử dụng ngay.",
+      "cancel_title": "Thanh toán chưa hoàn tất",
+      "cancel_message": "Bạn đã hủy hoặc chưa hoàn tất thanh toán. Bạn có thể thử lại bất cứ lúc nào."
+    }
   },
   "order": {
     "title": "Danh sách đơn hàng",
@@ -672,8 +691,22 @@
     "order_total": "Tổng tiền đơn hàng",
     "remaining": "Còn lại:",
     "payment_methods": "Hình thức thanh toán",
+    "select_methods": "Chọn phương thức thanh toán",
+    "select_at_least_one": "Vui lòng chọn ít nhất 1 phương thức",
+    "method_cash": "Tiền mặt",
+    "method_bank": "Chuyển khoản",
+    "method_debt": "Ghi nợ",
     "select_debtor_list": "Chọn khách hàng từ danh sách",
-    "confirm_and_complete": "Xác nhận và Hoàn tất"
+    "confirm_and_complete": "Xác nhận và Hoàn tất",
+    "complete_order": "Hoàn tất đơn hàng",
+    "view_order_list": "Xem danh sách đơn hàng",
+    "pending_confirmation": "Chờ xác nhận đơn hàng",
+    "order_summary": "Tóm tắt đơn hàng",
+    "invoice_preview": "Xem trước hóa đơn",
+    "share_invoice": "Chia sẻ hóa đơn",
+    "download_invoice": "Tải xuống hóa đơn",
+    "back_to_list": "Về danh sách",
+    "save_pdf_success": "Đã lưu PDF thành công"
   },
   "invoice_template": {
     "title": "Cấu Hình Mẫu",

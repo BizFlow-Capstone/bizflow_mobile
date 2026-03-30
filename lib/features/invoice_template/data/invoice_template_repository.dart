@@ -1,3 +1,4 @@
+import '../../../core/storage/local_storage.dart';
 import '../domain/entities/invoice_template_entity.dart';
 import 'models/invoice_template_dto.dart';
 
@@ -7,14 +8,15 @@ abstract class InvoiceTemplateRepository {
 }
 
 class InvoiceTemplateRepositoryMock implements InvoiceTemplateRepository {
-  // In-memory mock storage
+  static const String _storageKey = 'mock_invoice_template';
+
   InvoiceTemplateEntity _mockTemplate = const InvoiceTemplateEntity(
     id: 'tpl_001',
-    businessName: 'Hộ Kinh Doanh TNHH ABC',
-    businessAddress: '123 Đường Lê Lợi, Quận 1, TP.HCM',
-    businessPhone: '0900123456',
-    businessEmail: 'info@abc.com',
-    businessTaxCode: '0123456789',
+    businessName: '', // Empty initially for auto-fill
+    businessAddress: '',
+    businessPhone: '',
+    businessEmail: '',
+    businessTaxCode: '',
     businessLogoUrl: '',
     templateType: 'basic',
     showStt: true,
@@ -36,24 +38,39 @@ class InvoiceTemplateRepositoryMock implements InvoiceTemplateRepository {
     showFooterNote: true,
     showFooterTerms: false,
     showSignature: false,
-    footerNoteText: 'Cảm ơn quý khách...',
+    footerNoteText: 'Cảm ơn quý khách và hẹn gặp lại!',
     primaryColor: '#000000',
     secondaryColor: '#000000',
-    appliedLocationIds: [], // Empty initially
+    appliedLocationIds: [],
   );
+
+  bool _isInitialized = false;
+
+  Future<void> _ensureInitialized() async {
+    if (_isInitialized) return;
+    final storage = await LocalStorage.getInstance();
+    final saved = storage.getObject(_storageKey);
+    if (saved != null) {
+      _mockTemplate = InvoiceTemplateEntity.fromMap(saved);
+    }
+    _isInitialized = true;
+  }
 
   @override
   Future<InvoiceTemplateEntity> getInvoiceTemplate() async {
+    await _ensureInitialized();
     // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 500));
     return _mockTemplate;
   }
 
   @override
-  Future<InvoiceTemplateEntity> updateInvoiceTemplate(UpdateInvoiceTemplateRequestDto request) async {
+  Future<InvoiceTemplateEntity> updateInvoiceTemplate(
+      UpdateInvoiceTemplateRequestDto request) async {
+    await _ensureInitialized();
     // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 1000));
-    
+    await Future.delayed(const Duration(milliseconds: 800));
+
     _mockTemplate = _mockTemplate.copyWith(
       businessName: request.businessName,
       businessAddress: request.businessAddress,
@@ -86,6 +103,9 @@ class InvoiceTemplateRepositoryMock implements InvoiceTemplateRepository {
       secondaryColor: request.secondaryColor,
       appliedLocationIds: request.appliedLocationIds,
     );
+
+    final storage = await LocalStorage.getInstance();
+    await storage.setObject(_storageKey, _mockTemplate.toMap());
 
     return _mockTemplate;
   }

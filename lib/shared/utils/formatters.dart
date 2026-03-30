@@ -55,6 +55,12 @@ class CurrencyFormatter {
     final cleaned = value.replaceAll(RegExp(r'[^\d.-]'), '');
     return num.tryParse(cleaned);
   }
+
+  /// Format date to dd/MM/yyyy
+  static String formatDate(DateTime? date) {
+    if (date == null) return '';
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
 }
 
 /// Number Utils

@@ -500,7 +500,19 @@
       "a2": "We support bank transfer, e-wallets, and international payments.",
       "q3": "Can I upgrade or downgrade my plan?",
       "a3": "Yes, you can change your plan anytime. Charges are prorated."
-    }
+    },
+    "my_current_plan": "My Current Plan",
+    "active_until": "Active until: {date}",
+    "usage_limits": "Feature Usage",
+    "unlimited": "Unlimited",
+    "used_format": "{used} / {limit}",
+    "subscribe_now": "Subscribe Now",
+    "manage_plan": "Manage Plan",
+    "registered_label": "Subscribed",
+    "renew_more": "Renew",
+    "expires_soon": "Expires soon",
+    "no_active_plan": "No active plan",
+    "plan_details": "Plan Details"
   },
   "payment": {
     "appbar_title": "Premium Payment",
@@ -519,7 +531,14 @@
     "content": "Content",
     "content_value": "PREMIUM SUB123456",
     "confirm": "Confirm\npayment",
-    "security_note": "Your payment information is encrypted and\nprotected under PCI DSS standards"
+    "security_note": "Your payment information is encrypted and\nprotected under PCI DSS standards",
+    "result": {
+      "appbar_title": "Payment Result",
+      "success_title": "Payment successful",
+      "success_message": "Your subscription has been activated. You can start using premium features now.",
+      "cancel_title": "Payment not completed",
+      "cancel_message": "You canceled or did not complete payment. You can try again anytime."
+    }
   },
   "order": {
     "title": "Orders",
@@ -649,8 +668,22 @@
     "order_total": "Order Total",
     "remaining": "Remaining:",
     "payment_methods": "Payment Methods",
+    "select_methods": "Select payment methods",
+    "select_at_least_one": "Please select at least one method",
+    "method_cash": "Cash",
+    "method_bank": "Bank Transfer",
+    "method_debt": "Debt",
     "select_debtor_list": "Select customer from list",
-    "confirm_and_complete": "Confirm and Complete"
+    "confirm_and_complete": "Confirm and Complete",
+    "complete_order": "Complete Order",
+    "view_order_list": "View Order List",
+    "pending_confirmation": "Order Pending Confirmation",
+    "order_summary": "Order Summary",
+    "invoice_preview": "Invoice Preview",
+    "share_invoice": "Share Invoice",
+    "download_invoice": "Download Invoice",
+    "back_to_list": "Back to List",
+    "save_pdf_success": "PDF saved successfully"
   },
   "invoice_template": {
     "title": "Template Settings",

@@ -60,7 +60,7 @@ class EmployeeDto {
     this.avatarUrl,
     this.isAlreadyHired = false,
     this.isActive = true,
-    this.status = 'accepted',
+    this.status = '',
     this.startAt,
     this.endAt,
   });
@@ -74,7 +74,7 @@ class EmployeeDto {
     }
 
     final rawStatus = (json['status'] ?? json['Status'] ?? '').toString().trim();
-    final status = rawStatus.isEmpty ? 'accepted' : rawStatus.toLowerCase();
+    final status = rawStatus.toLowerCase();
     final isAlreadyHired = json['isAlreadyHired'] as bool? ?? false;
     final isActive = json['isActive'] as bool? ??
         json['IsActive'] as bool? ??

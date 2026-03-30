@@ -4,6 +4,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
+import 'package:app_links/app_links.dart';
+import 'dart:async';
 import 'core/config/app_config.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/services/firebase_messaging_service.dart';
@@ -34,6 +36,8 @@ import 'features/invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import 'features/invoice_template/presentation/bloc/invoice_template_event.dart';
 import 'features/location/data/location_repository.dart';
 import 'features/location/presentation/bloc/location_bloc.dart';
+import 'features/subscription/data/subscription_api_service.dart';
+import 'features/subscription/data/subscription_repository.dart';
 import 'features/order/data/order_api_service.dart';
 import 'features/order/data/order_repository.dart';
 import 'features/order/presentation/bloc/order_bloc.dart';
@@ -85,6 +89,9 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  final AppLinks _appLinks = AppLinks();
+  StreamSubscription<Uri>? _deepLinkSubscription;
+
   late LocalizationProvider _localizationProvider;
   late ApiClient _apiClient;
   late SecureStorage _secureStorage;
@@ -94,6 +101,8 @@ class _MyAppState extends State<MyApp> {
   late LocationRepository _locationRepository;
   late EmployeeApiService _employeeApiService;
   late EmployeeRepository _employeeRepository;
+  late SubscriptionApiService _subscriptionApiService;
+  late SubscriptionRepository _subscriptionRepository;
   late OrderApiService _orderApiService;
   late OrderRepository _orderRepository;
   late ProductApiService _productApiService;
@@ -186,6 +195,8 @@ class _MyAppState extends State<MyApp> {
     // Initialize Services (calls ApiClient)
     _locationApiService = LocationApiService(apiClient: _apiClient);
     _employeeApiService = EmployeeApiService(apiClient: _apiClient);
+    _subscriptionApiService = SubscriptionApiService(_apiClient);
+    _subscriptionRepository = SubscriptionRepository(_subscriptionApiService);
     _orderApiService = OrderApiService(apiClient: _apiClient);
     _productApiService = ProductApiService(apiClient: _apiClient);
     _importApiService = ImportApiService(apiClient: _apiClient);
@@ -243,10 +254,28 @@ class _MyAppState extends State<MyApp> {
       name: userProfile.fullName,
       avatarUrl: userProfile.avatarUrl,
     );
+
+    Future.microtask(_initializeDeepLinks);
+  }
+
+  Future<void> _initializeDeepLinks() async {
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          unawaited(AppRouter.handleIncomingDeepLink(initialUri));
+        });
+      }
+    } catch (_) {}
+
+    _deepLinkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      unawaited(AppRouter.handleIncomingDeepLink(uri));
+    });
   }
 
   @override
   void dispose() {
+    _deepLinkSubscription?.cancel();
     _firebaseMessagingService.dispose();
     _notificationRealtimeService.dispose();
     _localizationProvider.dispose();
@@ -308,6 +337,8 @@ class _MyAppState extends State<MyApp> {
           create: (context) => CostBloc(repository: _costRepository),
         ),
         Provider<EmployeeRepository>.value(value: _employeeRepository),
+        Provider<SubscriptionRepository>.value(value: _subscriptionRepository),
+        Provider<SubscriptionApiService>.value(value: _subscriptionApiService),
         Provider<ImportRepository>.value(value: _importRepository),
         Provider<NotificationRepository>.value(value: _notificationRepository),
       ],

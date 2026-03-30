@@ -14,6 +14,7 @@ class ApiEndpoints {
   static const String linkPhone = '/api/auth/link/phone';
   static const String linkEmail = '/api/auth/link/email';
   static const String linkGoogle = '/api/auth/link/google';
+    static const String firebaseCustomToken = '/api/auth/firebase/custom-token';
 
   // Legacy aliases (kept for compatibility if any file references them)
   static const String login = '/api/auth/login/email';
@@ -157,4 +158,11 @@ class ApiEndpoints {
 
   // GL Entries
   static const String glEntries = '/api/my-business/accounting/gl-entries';
+
+  // Subscription & Settings
+  static const String adminFeatures = '/api/admin/features';
+  static const String subscriptionPlans = '/api/subscription-plans';
+  static const String currentSubscription = '/api/subscriptions/current';
+  static const String checkoutSubscription = '/api/subscriptions/checkout';
+  static const String subscriptionTransactions = '/api/subscriptions/transactions';
 }

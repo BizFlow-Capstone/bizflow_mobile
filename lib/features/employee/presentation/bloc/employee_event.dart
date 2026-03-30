@@ -81,3 +81,17 @@ class DeleteEmployeeRequested extends EmployeeEvent {
   @override
   List<Object?> get props => [employeeId];
 }
+
+/// Event untuk handle data dari network sync (SWR background update)
+class EmployeesNetworkDataReceived extends EmployeeEvent {
+  final List<EmployeeEntity> employees;
+  final bool isFromCache;
+
+  const EmployeesNetworkDataReceived({
+    required this.employees,
+    required this.isFromCache,
+  });
+
+  @override
+  List<Object?> get props => [employees, isFromCache];
+}

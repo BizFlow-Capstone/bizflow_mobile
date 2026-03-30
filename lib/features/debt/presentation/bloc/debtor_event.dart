@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/debtor_entity.dart';
+import '../../data/models/debtor_models.dart';
 
 abstract class DebtorEvent extends Equatable {
   const DebtorEvent();
@@ -161,4 +163,38 @@ class LoadDebtPaymentHistoryRequested extends DebtorEvent {
 
   @override
   List<Object?> get props => [debtorId];
+}
+
+/// Event untuk handle debtors dari network sync (SWR background update)
+class DebtorsNetworkDataReceived extends DebtorEvent {
+  final DebtorListResult result;
+
+  const DebtorsNetworkDataReceived({required this.result});
+
+  @override
+  List<Object?> get props => [result];
+}
+
+/// Event untuk handle debtors error dari network sync
+class DebtorsNetworkErrorOccurred extends DebtorEvent {
+  final dynamic error;
+
+  const DebtorsNetworkErrorOccurred({required this.error});
+
+  @override
+  List<Object?> get props => [error];
+}
+
+/// Event untuk handle active debtors dari network sync (SWR background update)
+class ActiveDebtorsByLocationNetworkDataReceived extends DebtorEvent {
+  final List<DebtorEntity> debtors;
+  final int locationId;
+
+  const ActiveDebtorsByLocationNetworkDataReceived({
+    required this.debtors,
+    required this.locationId,
+  });
+
+  @override
+  List<Object?> get props => [debtors, locationId];
 }

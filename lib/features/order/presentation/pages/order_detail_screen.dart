@@ -1,7 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -18,10 +24,7 @@ import '../../data/order_api_service.dart';
 class OrderDetailScreen extends StatefulWidget {
   final String orderId;
 
-  const OrderDetailScreen({
-    super.key,
-    required this.orderId,
-  });
+  const OrderDetailScreen({super.key, required this.orderId});
 
   @override
   State<OrderDetailScreen> createState() => _OrderDetailScreenState();
@@ -85,7 +88,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             onPressed: () {
               if (reasonController.text.trim().isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(l10n.translate('order.cancel_reason_required'))),
+                  SnackBar(
+                    content: Text(
+                      l10n.translate('order.cancel_reason_required'),
+                    ),
+                  ),
                 );
                 return;
               }
@@ -112,9 +119,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) {
         setState(() => _isCancelling = false);
@@ -122,42 +129,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  Future<void> _completeOrder(OrderEntity detail, {bool confirmLowStock = false}) async {
+  Future<void> _completeOrder(
+    OrderEntity detail, {
+    bool confirmLowStock = false,
+  }) async {
     if (_isPublishing) return;
-    
+
     final l10n = AppLocalizations.of(context);
     setState(() => _isPublishing = true);
-    
+
     try {
       final repository = context.read<OrderBloc>().repository;
-      await repository.completeOrder(detail.id, confirmLowStock: confirmLowStock);
-      
+      await repository.completeOrder(
+        detail.id,
+        confirmLowStock: confirmLowStock,
+      );
+
       if (!mounted) return;
       AppSnackBar.show(
         context,
         message: 'Đơn hàng đã được hoàn thành thành công!',
         type: AppSnackBarType.success,
       );
-      
+
       // Refresh detail
       setState(() {
         _detailFuture = repository.getOrder(widget.orderId);
       });
-      
+
       // Optionally notify Bloc about the update to refresh list
-      context.read<OrderBloc>().add(RefreshOrdersRequested(
-        locationId: detail.locationId,
-      ));
-      
+      context.read<OrderBloc>().add(
+        RefreshOrdersRequested(locationId: detail.locationId),
+      );
     } catch (e) {
       if (!mounted) return;
-      
+
       if (e is OrderConfirmationRequiredException) {
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
-            content: Text('${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}'),
+            content: Text(
+              '${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -191,6 +205,108 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<File> _buildPdfFile(OrderEntity detail) async {
+    final pdf = pw.Document();
+    final itemRows = detail.items
+        .map(
+          (item) => [
+            item.productName,
+            item.quantity.toString(),
+            CurrencyFormatter.formatVND(item.price),
+            CurrencyFormatter.formatVND(item.price * item.quantity),
+          ],
+        )
+        .toList();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) => [
+          pw.Text(
+            'HOA DON BAN HANG',
+            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Text(
+            'Ma don: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+          ),
+          pw.Text('Trang thai: ${detail.status}'),
+          pw.Text('Dia diem: ${detail.locationName}'),
+          pw.Text(
+            'Khach hang: ${detail.customerName?.isNotEmpty == true ? detail.customerName : "Khach le"}${detail.customerPhone?.isNotEmpty == true ? " - ${detail.customerPhone}" : ""}',
+          ),
+          pw.Text(
+            'Ngay tao: ${DateFormat('dd/MM/yyyy').format(detail.createdAt.toLocal())}',
+          ),
+          pw.SizedBox(height: 12),
+          pw.TableHelper.fromTextArray(
+            headers: const ['San pham', 'SL', 'Don gia', 'Thanh tien'],
+            data: itemRows,
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            cellStyle: const pw.TextStyle(fontSize: 10),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text(
+              'Tong thanh toan: ${CurrencyFormatter.formatVND(detail.totalAmount)}',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File(
+      '${directory.path}/invoice_${detail.id}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+    );
+    await file.writeAsBytes(await pdf.save(), flush: true);
+    return file;
+  }
+
+  Future<void> _shareInvoice(OrderEntity detail) async {
+    final file = await _buildPdfFile(detail);
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text:
+          'Hoa don ban hang #${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+    );
+  }
+
+  Future<void> _downloadInvoice(OrderEntity detail) async {
+    final l10n = AppLocalizations.of(context);
+    try {
+      final file = await _buildPdfFile(detail);
+
+      if (Platform.isAndroid) {
+        final downloadDir = Directory('/storage/emulated/0/Download');
+        if (await downloadDir.exists()) {
+          final copiedFile = File(
+            '${downloadDir.path}/${file.path.split('/').last}',
+          );
+          await file.copy(copiedFile.path);
+        }
+      }
+
+      if (!mounted) return;
+      AppSnackBar.show(
+        context,
+        message:
+            l10n.translate('order_payment.save_pdf_success') +
+            (Platform.isAndroid ? ' (Downloads)' : ''),
+        type: AppSnackBarType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.show(
+        context,
+        message: e.toString(),
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -219,7 +335,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 : (state as OrderUpdated).order.id;
             if (orderId == widget.orderId) {
               setState(() {
-                _detailFuture = context.read<OrderBloc>().repository.getOrder(widget.orderId);
+                _detailFuture = context.read<OrderBloc>().repository.getOrder(
+                  widget.orderId,
+                );
               });
             }
           } else if (state is OrderError) {
@@ -238,212 +356,285 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
-          final detail = snapshot.data;
-          if (detail == null) {
-            return Center(
-              child: Text(l10n.translate('common.no_data')),
-            );
-          }
+            final detail = snapshot.data;
+            if (detail == null) {
+              return Center(child: Text(l10n.translate('common.no_data')));
+            }
 
-          return Column(
-            children: [
-              if (detail.isPublished && !detail.isCancelled)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => OrderFormScreen(
-                              inputType: 'manual',
-                              initialOrder: detail,
+            return Column(
+              children: [
+                if (detail.isPublished && !detail.isCancelled)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => OrderFormScreen(
+                                inputType: 'manual',
+                                initialOrder: detail,
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Sửa đơn hàng'),
+                          );
+                        },
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Sửa đơn hàng'),
+                      ),
                     ),
                   ),
-                ),
-              if (detail.isPending) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isCancelling ? null : () => _cancelOrder(detail),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            side: const BorderSide(color: AppColors.error),
+                if (detail.status.toLowerCase() == 'completed')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _shareInvoice(detail),
+                            icon: const Icon(Icons.share_outlined),
+                            label: Text(
+                              l10n.translate('order_payment.share_invoice'),
+                            ),
                           ),
-                          icon: _isCancelling
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.cancel),
-                          label: Text(l10n.translate('order.action_cancel')),
                         ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _downloadInvoice(detail),
+                            icon: const Icon(Icons.download_outlined),
+                            label: Text(
+                              l10n.translate('order_payment.download_invoice'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (detail.isPending) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _isCancelling
+                                ? null
+                                : () => _cancelOrder(detail),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.error,
+                              side: const BorderSide(color: AppColors.error),
+                            ),
+                            icon: _isCancelling
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.cancel),
+                            label: Text(l10n.translate('order.action_cancel')),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => OrderFormScreen(
+                                    inputType: 'manual',
+                                    initialOrder: detail,
+                                    pendingOrderId: detail.id,
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.edit),
+                            label: const Text('Sửa đơn'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: AppSpacing.sm,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isPublishing
+                            ? null
+                            : () => _completeOrder(detail),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: _isPublishing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.check_circle),
+                        label: const Text('Hoàn thành đơn hàng'),
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => OrderFormScreen(
-                                  inputType: 'manual',
-                                  initialOrder: detail,
-                                  pendingOrderId: detail.id,
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    children: [
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                detail.orderCode.trim().isNotEmpty
+                                    ? detail.orderCode
+                                    : l10n.translate(
+                                        'order.order_number',
+                                        params: {'number': detail.id},
+                                      ),
+                                style: AppTextStyles.titleMedium.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            );
-                          },
-                          icon: const Icon(Icons.edit),
-                          label: const Text('Sửa đơn'),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                '${l10n.translate('order.detail_status')}: ${detail.status}',
+                              ),
+                              Text(
+                                '${l10n.translate('order.detail_location')}: ${detail.locationName}',
+                              ),
+                              Text(
+                                '${l10n.translate('order.detail_customer_name')}: ${((detail.customerName ?? '').trim().isNotEmpty) ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
+                              ),
+                              if ((detail.customerPhone ?? '')
+                                  .trim()
+                                  .isNotEmpty)
+                                Text(
+                                  '${l10n.translate('order.detail_customer_phone')}: ${detail.customerPhone}',
+                                ),
+                              Text(
+                                '${l10n.translate('order.detail_created_at')}: ${_formatDateTime(detail.createdAt)}',
+                              ),
+                              Text(
+                                '${l10n.translate('order.detail_updated_at')}: ${_formatDateTime(detail.updatedAt)}',
+                              ),
+                              if (detail.completedAt != null)
+                                Text(
+                                  '${l10n.translate('order.detail_completed_at')}: ${_formatDateTime(detail.completedAt!)}',
+                                ),
+                              if (detail.cancelledAt != null)
+                                Text(
+                                  '${l10n.translate('order.detail_cancelled_at')}: ${_formatDateTime(detail.cancelledAt!)}',
+                                ),
+                              if ((detail.cancelReason ?? '').trim().isNotEmpty)
+                                Text(
+                                  '${l10n.translate('order.detail_cancel_reason')}: ${detail.cancelReason}',
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.translate('order.detail_payment_section'),
+                                style: AppTextStyles.titleSmall.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                '${l10n.translate('order.detail_cash_amount')}: ${CurrencyFormatter.formatVND(detail.cashAmount)}',
+                              ),
+                              Text(
+                                '${l10n.translate('order.detail_bank_amount')}: ${CurrencyFormatter.formatVND(detail.bankAmount)}',
+                              ),
+                              Text(
+                                '${l10n.translate('order.detail_debt_amount')}: ${CurrencyFormatter.formatVND(detail.debtAmount)}',
+                              ),
+                              const Divider(height: 20),
+                              Text(
+                                '${l10n.translate('order.detail_subtotal')}: ${CurrencyFormatter.formatVND(detail.subtotal)}',
+                              ),
+                              Text(
+                                '${l10n.translate('order.detail_discount')}: ${CurrencyFormatter.formatVND(detail.discountAmount)}',
+                              ),
+                              Text(
+                                '${l10n.translate('order.detail_tax')}: ${CurrencyFormatter.formatVND(detail.taxAmount)}',
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(
+                                '${l10n.translate('order.detail_total')}: ${CurrencyFormatter.formatVND(detail.totalAmount)}',
+                                style: AppTextStyles.titleSmall.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        l10n.translate('order.detail_items_section'),
+                        style: AppTextStyles.titleSmall.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      ...detail.items.map(
+                        (item) => Card(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: ListTile(
+                            title: Text(item.productName),
+                            subtitle: Text(
+                              '${l10n.translate('order.detail_qty_label')}: ${item.quantity} | ${l10n.translate('order.detail_unit_price_label')}: ${CurrencyFormatter.formatVND(item.price)}',
+                            ),
+                            trailing: Text(
+                              CurrencyFormatter.formatVND(
+                                item.price * item.quantity,
+                              ),
+                              style: AppTextStyles.titleSmall.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md,
-                    vertical: AppSpacing.sm,
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isPublishing ? null : () => _completeOrder(detail),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                      ),
-                      icon: _isPublishing 
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check_circle),
-                      label: const Text('Hoàn thành đơn hàng'),
-                    ),
-                  ),
-                ),
               ],
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              detail.orderCode.trim().isNotEmpty
-                                  ? detail.orderCode
-                                  : l10n.translate('order.order_number', params: {'number': detail.id}),
-                              style: AppTextStyles.titleMedium.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text('${l10n.translate('order.detail_status')}: ${detail.status}'),
-                            Text('${l10n.translate('order.detail_location')}: ${detail.locationName}'),
-                            if ((detail.customerName ?? '').trim().isNotEmpty)
-                              Text('${l10n.translate('order.detail_customer_name')}: ${detail.customerName}'),
-                            if ((detail.customerPhone ?? '').trim().isNotEmpty)
-                              Text('${l10n.translate('order.detail_customer_phone')}: ${detail.customerPhone}'),
-                            Text('${l10n.translate('order.detail_created_at')}: ${_formatDateTime(detail.createdAt)}'),
-                            Text('${l10n.translate('order.detail_updated_at')}: ${_formatDateTime(detail.updatedAt)}'),
-                            if (detail.completedAt != null)
-                              Text('${l10n.translate('order.detail_completed_at')}: ${_formatDateTime(detail.completedAt!)}'),
-                            if (detail.cancelledAt != null)
-                              Text('${l10n.translate('order.detail_cancelled_at')}: ${_formatDateTime(detail.cancelledAt!)}'),
-                            if ((detail.cancelReason ?? '').trim().isNotEmpty)
-                              Text('${l10n.translate('order.detail_cancel_reason')}: ${detail.cancelReason}'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.translate('order.detail_payment_section'),
-                              style: AppTextStyles.titleSmall.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text('${l10n.translate('order.detail_cash_amount')}: ${CurrencyFormatter.formatVND(detail.cashAmount)}'),
-                            Text('${l10n.translate('order.detail_bank_amount')}: ${CurrencyFormatter.formatVND(detail.bankAmount)}'),
-                            Text('${l10n.translate('order.detail_debt_amount')}: ${CurrencyFormatter.formatVND(detail.debtAmount)}'),
-                            const Divider(height: 20),
-                            Text('${l10n.translate('order.detail_subtotal')}: ${CurrencyFormatter.formatVND(detail.subtotal)}'),
-                            Text('${l10n.translate('order.detail_discount')}: ${CurrencyFormatter.formatVND(detail.discountAmount)}'),
-                            Text('${l10n.translate('order.detail_tax')}: ${CurrencyFormatter.formatVND(detail.taxAmount)}'),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text(
-                              '${l10n.translate('order.detail_total')}: ${CurrencyFormatter.formatVND(detail.totalAmount)}',
-                              style: AppTextStyles.titleSmall.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      l10n.translate('order.detail_items_section'),
-                      style: AppTextStyles.titleSmall.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    ...detail.items.map(
-                      (item) => Card(
-                        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: ListTile(
-                          title: Text(item.productName),
-                          subtitle: Text(
-                            '${l10n.translate('order.detail_qty_label')}: ${item.quantity} | ${l10n.translate('order.detail_unit_price_label')}: ${CurrencyFormatter.formatVND(item.price)}',
-                          ),
-                          trailing: Text(
-                            CurrencyFormatter.formatVND(item.price * item.quantity),
-                            style: AppTextStyles.titleSmall.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
+            );
           },
         ),
       ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -15,6 +16,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/services/firebase_messaging_service.dart';
 import '../../../location/data/location_repository.dart';
 import '../../data/auth_repository.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../data/models/auth_response.dart';
 import '../../data/models/credentials_response.dart';
 
@@ -146,6 +148,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await UserProfileContext().saveProfile(
         fullName: result.fullName,
         avatarUrl: result.avatarUrl,
+        email: event.email,
+        phone: result.phone ?? event.phone,
       );
       AppRouter.globalAppBarState.updateProfile(
         name: result.fullName,
@@ -165,7 +169,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         LoginFailure(
           errorCode: AuthErrorCode.loginFailed,
-          serverMessage: e.toString(),
+          serverMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }
@@ -179,7 +183,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(LoginInProgress());
     try {
       await _resetGoogleSessionForAccountPicker();
-      final googleUser = await _googleSignIn.signIn();
+      final googleUser = await _signInWithTimeout();
       if (googleUser == null) {
         // User cancelled sign-in
         emit(AuthInitial());
@@ -217,6 +221,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await UserProfileContext().saveProfile(
         fullName: result.fullName,
         avatarUrl: result.avatarUrl,
+        email: googleUser.email,
+        phone: result.phone,
       );
       AppRouter.globalAppBarState.updateProfile(
         name: result.fullName,
@@ -241,7 +247,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         LoginFailure(
           errorCode: AuthErrorCode.loginFailed,
-          serverMessage: e.toString(),
+          serverMessage: _mapGoogleSignInError(e),
         ),
       );
     }
@@ -263,7 +269,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(SetPasswordFailure(message: result.message));
       }
     } catch (e) {
-      emit(SetPasswordFailure(message: e.toString()));
+      emit(SetPasswordFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -482,7 +488,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(const LinkCredentialInProgress());
     try {
       await _resetGoogleSessionForAccountPicker();
-      final googleUser = await _googleSignIn.signIn();
+      final googleUser = await _signInWithTimeout();
       if (googleUser == null) {
         emit(const LinkCredentialFailure(message: 'Google linking canceled'));
         return;
@@ -506,7 +512,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       emit(
         LinkCredentialFailure(
-          message: e.toString().replaceAll('Exception: ', ''),
+          message: _mapGoogleSignInError(e),
         ),
       );
     }
@@ -787,6 +793,29 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await _googleSignIn.disconnect();
     } catch (_) {}
+  }
+
+  Future<GoogleSignInAccount?> _signInWithTimeout() {
+    return _googleSignIn.signIn().timeout(
+      const Duration(seconds: 20),
+      onTimeout: () => throw TimeoutException('Google sign-in timed out'),
+    );
+  }
+
+  String _mapGoogleSignInError(Object error) {
+    if (error is TimeoutException) {
+      return 'Google sign-in timed out. Please try again.';
+    }
+
+    if (error is PlatformException) {
+      final code = error.code.toLowerCase();
+      final details = '${error.message ?? ''} ${error.details ?? ''}'.toLowerCase();
+      if (code.contains('sign_in_failed') || details.contains('developer_error')) {
+        return 'Google Sign-In configuration is invalid on this device build. Please check Firebase Android app config and Play Services.';
+      }
+    }
+
+    return ApiErrorMessageParser.parse(error);
   }
 
   String _extractTokenMetadata(String token) {

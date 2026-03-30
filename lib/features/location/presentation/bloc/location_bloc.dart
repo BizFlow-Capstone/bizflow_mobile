@@ -8,6 +8,7 @@ import '../../domain/entities/location_entity.dart';
 import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
 import '../../../../shared/cache/cache_manager.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 
 /// Location BLoC
 /// Quản lý logic của tất cả các thao tác liên quan đến địa điểm kinh doanh
@@ -107,7 +108,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         emit(LocationsLoaded(locations: data));
       },
       onError: (error) {
-        emit(LocationFailure(message: error.toString()));
+        emit(LocationFailure(message: ApiErrorMessageParser.parse(error)));
       },
     );
   }
@@ -159,7 +160,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         }
       }
     } catch (e) {
-      emit(LocationFailure(message: e.toString()));
+      emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -195,7 +196,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       emit(LocationAddSuccess(newLocation: createdLocation));
       emit(LocationsLoaded(locations: List.from(refreshed)));
     } catch (e) {
-      emit(LocationFailure(message: e.toString()));
+      emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -295,7 +296,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
 
       emit(LocationDeleteSuccess(locationId: event.locationId));
     } catch (e) {
-      emit(LocationFailure(message: e.toString()));
+      emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -325,7 +326,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         ),
       );
     } catch (e) {
-      emit(LocationFailure(message: e.toString()));
+      emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -351,7 +352,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         ),
       );
     } catch (e) {
-      emit(LocationFailure(message: e.toString()));
+      emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -377,7 +378,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         ),
       );
     } catch (e) {
-      emit(LocationFailure(message: e.toString()));
+      emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -407,7 +408,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
         ),
       );
     } catch (e) {
-      emit(LocationFailure(message: e.toString()));
+      emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 

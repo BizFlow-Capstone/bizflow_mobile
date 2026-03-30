@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 import 'package:bizflow_mobile/core/localization/app_localizations.dart';
+import '../../core/theme/app_colors.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/verify_otp_page.dart';
@@ -22,8 +24,10 @@ import '../../features/product/presentation/pages/import_history_page.dart';
 import '../../features/order/presentation/pages/order_list_screen.dart';
 import '../../features/order/presentation/pages/order_status_screen.dart';
 import '../../features/order/presentation/pages/order_creation_selection_screen.dart';
+import '../../features/subscription/presentation/pages/current_subscription_page.dart';
 import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
 import '../../features/subscription/presentation/pages/premium_payment_page.dart';
+import '../../features/subscription/presentation/pages/subscription_checkout_result_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notification/presentation/pages/notification_list_page.dart';
 import '../../features/notification/presentation/pages/notification_detail_page.dart';
@@ -69,8 +73,11 @@ class AppRoutes {
   static const String orderList = '/order-list';
   static const String orderStatus = '/order-status';
   static const String orderCreateSelection = '/order-create-selection';
+  static const String currentSubscription = '/current-subscription';
   static const String subscriptionPlans = '/subscription-plans';
   static const String premiumPayment = '/premium-payment';
+  static const String paymentResultSuccess = '/payment-result-success';
+  static const String paymentResultCancel = '/payment-result-cancel';
   static const String profile = '/profile';
   static const String settings = '/settings';
   static const String importHistory = '/import-history';
@@ -210,6 +217,15 @@ class AppRouter {
       case AppRoutes.orderStatus:
         return _buildRoute(settings, const OrderStatusScreen());
 
+      case AppRoutes.currentSubscription:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          CurrentSubscriptionPage(
+            fromCheckoutResult: args?['fromCheckoutResult'] as bool? ?? false,
+          ),
+        );
+
       case AppRoutes.subscriptionPlans:
         return _buildRoute(settings, const SubscriptionPlansPage());
 
@@ -223,6 +239,26 @@ class AppRouter {
             period: args?['period'] ?? '/tháng',
             vatPercent: args?['vatPercent'] ?? 10,
             total: args?['total'] ?? 328900,
+          ),
+        );
+
+      case AppRoutes.paymentResultSuccess:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          SubscriptionCheckoutResultPage(
+            isSuccess: true,
+            sessionId: args?['sessionId'] as String?,
+          ),
+        );
+
+      case AppRoutes.paymentResultCancel:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          SubscriptionCheckoutResultPage(
+            isSuccess: false,
+            sessionId: args?['sessionId'] as String?,
           ),
         );
 
@@ -404,6 +440,32 @@ class AppRouter {
 
     await navigateTo(target);
   }
+
+  static Future<void> handleIncomingDeepLink(Uri uri) async {
+    if (uri.scheme.toLowerCase() != 'bizflow') {
+      return;
+    }
+
+    final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+    final sessionId = uri.queryParameters['session_id'];
+
+    if (host == 'payment' && path == '/success') {
+      await navigateAndClearStack(
+        AppRoutes.paymentResultSuccess,
+        arguments: {'sessionId': sessionId},
+      );
+      return;
+    }
+
+    if (host == 'payment' && path == '/cancel') {
+      await navigateAndClearStack(
+        AppRoutes.paymentResultCancel,
+        arguments: {'sessionId': sessionId},
+      );
+      return;
+    }
+  }
 }
 
 /// Global AppBar Shell - Wraps pages để cung cấp AppBar global
@@ -578,7 +640,18 @@ class _NotFoundPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Not Found')),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.textPrimary,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          color: Colors.black,
+        ),
+        title: const Text('Not Found'),
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -7,6 +7,7 @@ import '../../../../../shared/context/business_context.dart';
 import '../../../../../shared/utils/date_formatter.dart';
 import 'import_history_event.dart';
 import 'import_history_state.dart';
+import '../../../../../core/network/api_error_message_parser.dart';
 
 class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
   final ImportRepository _repository;
@@ -101,7 +102,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
           emit(
             state.copyWith(
               status: ImportHistoryStatus.failure,
-              errorMessage: e.toString(),
+              errorMessage: ApiErrorMessageParser.parse(e),
             ),
           );
         },

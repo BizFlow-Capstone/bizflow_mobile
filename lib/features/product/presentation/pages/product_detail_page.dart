@@ -16,6 +16,7 @@ import 'edit_product_page.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 
 /// Product Detail Page
 /// Displays detailed information about a product
@@ -75,7 +76,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _costHistoryError = e.toString().replaceFirst('Exception: ', '');
+        _costHistoryError = ApiErrorMessageParser.parse(e);
         _costPriceHistory = const [];
       });
     } finally {
@@ -422,7 +423,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           );
 
                           if (stock == null || stock < 0) {
-                            ScaffoldMessenger.of(this.context).showSnackBar(
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
                                   l10n?.translate(
@@ -448,35 +450,39 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             if (!mounted) return;
                             Navigator.pop(dialogContext);
 
-                            ScaffoldMessenger.of(this.context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  l10n?.translate(
-                                        'product.stock_adjust.success',
-                                      ) ??
-                                      'Cập nhật tồn kho thành công',
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    l10n?.translate(
+                                          'product.stock_adjust.success',
+                                        ) ??
+                                        'Cập nhật tồn kho thành công',
+                                  ),
+                                  backgroundColor: AppColors.success,
                                 ),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
+                              );
+                            }
 
-                            context.read<ProductBloc>().add(
-                              LoadProductDetailRequested(
-                                productId: _currentProduct.id,
-                              ),
-                            );
-                            context.read<ProductBloc>().add(
-                              LoadProductsByLocationRequested(
-                                locationId: widget.locationId,
-                              ),
-                            );
-                            _loadCostPriceHistory();
+                             if (mounted) {
+                              context.read<ProductBloc>().add(
+                                LoadProductDetailRequested(
+                                  productId: _currentProduct.id,
+                                ),
+                              );
+                              context.read<ProductBloc>().add(
+                                LoadProductsByLocationRequested(
+                                  locationId: widget.locationId,
+                                ),
+                              );
+                              _loadCostPriceHistory();
+                            }
                           } catch (e) {
                             if (!mounted) return;
-                            ScaffoldMessenger.of(this.context).showSnackBar(
+                            ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  e.toString().replaceFirst('Exception: ', ''),
+                                  ApiErrorMessageParser.parse(e),
                                 ),
                                 backgroundColor: AppColors.error,
                               ),

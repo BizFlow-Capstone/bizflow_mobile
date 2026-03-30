@@ -12,8 +12,10 @@ import '../widgets/invoice_preview_widget.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_state.dart';
 import '../../data/models/invoice_template_dto.dart';
+import '../../../location/domain/entities/location_entity.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import 'dart:async';
+import '../../../../shared/context/business_context.dart';
 
 class AdvancedInvoiceTemplatePage extends StatefulWidget {
   const AdvancedInvoiceTemplatePage({super.key});
@@ -87,14 +89,37 @@ class _AdvancedInvoiceTemplatePageState
 
   void _populateData(InvoiceTemplateLoaded state) {
     final tpl = state.template;
-    if (_businessNameController.text.isEmpty && tpl.businessName.isNotEmpty) {
-      _businessNameController.text = tpl.businessName;
-      _businessAddressController.text = tpl.businessAddress;
-      _businessPhoneController.text = tpl.businessPhone;
-      _businessEmailController.text = tpl.businessEmail;
-      _businessTaxController.text = tpl.businessTaxCode;
-      _businessLogoController.text = tpl.businessLogoUrl;
-      _noteTextController.text = tpl.footerNoteText;
+
+    bool isBrandNew = tpl.businessName.isEmpty ||
+        tpl.businessName == 'Hộ Kinh Doanh TNHH ABC';
+
+    if (_businessNameController.text.isEmpty) {
+      if (!isBrandNew) {
+        _businessNameController.text = tpl.businessName;
+        _businessAddressController.text = tpl.businessAddress;
+        _businessPhoneController.text = tpl.businessPhone;
+        _businessEmailController.text = tpl.businessEmail;
+        _businessTaxController.text = tpl.businessTaxCode;
+        _businessLogoController.text = tpl.businessLogoUrl;
+        _noteTextController.text = tpl.footerNoteText;
+      } else {
+        // Auto-fill from current location if template is empty/default
+        final locationState = context.read<LocationBloc>().state;
+        if (locationState is LocationsLoaded) {
+          final currentId = BusinessContext().currentBusinessId;
+          final currentLocation = locationState.locations.cast<LocationEntity?>().firstWhere(
+                (l) => l?.id == currentId,
+                orElse: () => locationState.locations.isNotEmpty ? locationState.locations.first : null,
+              );
+
+          if (currentLocation != null) {
+            _businessNameController.text = currentLocation.name;
+            _businessAddressController.text = currentLocation.fullAddress;
+            _businessPhoneController.text = currentLocation.phone;
+            _businessTaxController.text = currentLocation.taxCode ?? '';
+          }
+        }
+      }
 
       _selectedTemplate = tpl.templateType;
       _primaryColor = tpl.primaryColor;

@@ -10,6 +10,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../../shared/context/user_profile_context.dart';
 
 /// Settings Page - Trang cài đặt hệ thống
 /// Theo thiết kế SC-ORD-05
@@ -69,7 +70,7 @@ class SettingsPage extends StatelessWidget {
                 title: l10n.translate('settings_page.premium_plan'),
                 subtitle: l10n.translate('settings_page.premium_plan_sub'),
                 badge: 'Premium',
-                onTap: () => AppRouter.navigateTo(AppRoutes.subscriptionPlans),
+                onTap: () => AppRouter.navigateTo(AppRoutes.currentSubscription),
               ),
               const SizedBox(height: AppSpacing.lg),
 
@@ -290,7 +291,9 @@ class SettingsPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nguyễn Văn A',
+                        UserProfileContext().fullName?.isNotEmpty == true
+                            ? UserProfileContext().fullName!
+                            : 'User',
                         style: AppTextStyles.titleMedium.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -298,9 +301,13 @@ class SettingsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'nguyenvana@email.com',
+                        UserProfileContext().email?.isNotEmpty == true
+                            ? UserProfileContext().email!
+                            : (UserProfileContext().phone?.isNotEmpty == true
+                                ? UserProfileContext().phone!
+                                : 'No contact info'),
                         style: AppTextStyles.labelSmall.copyWith(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: Colors.white.withAlpha(204), // 80% opacity
                         ),
                       ),
                     ],
@@ -335,7 +342,7 @@ class SettingsPage extends StatelessWidget {
                 // Upgrade button
                 ElevatedButton(
                   onPressed: () =>
-                      AppRouter.navigateTo(AppRoutes.subscriptionPlans),
+                      AppRouter.navigateTo(AppRoutes.currentSubscription),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFB300),
                     foregroundColor: Colors.white,

@@ -68,8 +68,8 @@ class NotificationNavigationContract {
     }
 
     final normalizedType = type?.trim().toLowerCase();
-    if (normalizedType == 'employee_invite') {
-      return AppRoutes.employeeInvitations;
+    if (normalizedType == 'employee_invite' || normalizedType == 'employee_invite_accepted') {
+      return AppRoutes.notifications;
     }
 
     return null;

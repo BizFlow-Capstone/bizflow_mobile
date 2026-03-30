@@ -105,12 +105,23 @@ class ApiErrorMessageParser {
     var value = input.trim();
     if (value.isEmpty) return null;
 
+    // Remove technical labels
     value = value.replaceFirst(RegExp(r'^Exception:\s*', caseSensitive: false), '');
-    // Allow matching negative status codes like [-1]
     value = value.replaceFirst(
-      RegExp(r'^ApiException:\s*\[-?\d+\]\s*', caseSensitive: false),
+      RegExp(r'^ApiException\s*:?\s*\[-?\d+\]\s*:?\s*', caseSensitive: false),
       '',
     );
+
+    // Remove common English prefixes followed by a colon (e.g., "Error loading products:", "Failed to refresh:")
+    // This regex looks for 1-5 words at the start ending with a colon.
+    value = value.replaceFirst(
+      RegExp(r'^(Error|Failed|Message|Detail|Exception)\s+[^:]+:\s*', caseSensitive: false),
+      '',
+    );
+
+    // Additional generic cleanup for leading colons or dashes
+    value = value.replaceFirst(RegExp(r'^[ :\-]+'), '');
+
     value = value.trim();
 
     if (value.isEmpty) return null;

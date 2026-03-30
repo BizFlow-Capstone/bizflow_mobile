@@ -16,6 +16,10 @@ import '../../../debt/presentation/bloc/debtor_state.dart';
 import '../../data/order_api_service.dart';
 import '../../domain/entities/order_item_entity.dart';
 import '../bloc/order_bloc.dart';
+import 'order_completion_confirmation_screen.dart';
+
+/// Payment method enum for selectable toggles
+enum PaymentMethod { cash, bank, debt }
 
 class OrderPaymentScreen extends StatefulWidget {
   final double totalAmount;
@@ -51,21 +55,35 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
   final TextEditingController _cashController = TextEditingController(text: '0');
   final TextEditingController _bankController = TextEditingController(text: '0');
   final TextEditingController _debtController = TextEditingController(text: '0');
-  
+
+  /// Currently selected payment methods
+  final Set<PaymentMethod> _selectedMethods = {};
+
   DebtorEntity? _selectedDebtor;
   bool _isSubmitting = false;
 
-  double get _cashAmount => CurrencyFormatter.parse(_cashController.text)?.toDouble() ?? 0;
-  double get _bankAmount => CurrencyFormatter.parse(_bankController.text)?.toDouble() ?? 0;
-  double get _debtAmount => CurrencyFormatter.parse(_debtController.text)?.toDouble() ?? 0;
+  /// Track which controller the user is currently editing to avoid
+  /// overwriting their input during auto-fill.
+  PaymentMethod? _currentlyEditing;
+
+  double get _cashAmount =>
+      CurrencyFormatter.parse(_cashController.text)?.toDouble() ?? 0;
+  double get _bankAmount =>
+      CurrencyFormatter.parse(_bankController.text)?.toDouble() ?? 0;
+  double get _debtAmount =>
+      CurrencyFormatter.parse(_debtController.text)?.toDouble() ?? 0;
   double get _totalPaid => _cashAmount + _bankAmount + _debtAmount;
   double get _remaining => widget.totalAmount - _totalPaid;
 
   @override
   void initState() {
     super.initState();
-    _cashController.text = CurrencyFormatter.formatNumber(widget.totalAmount.round());
-    
+
+    // Pre-select cash and auto-fill total
+    _selectedMethods.add(PaymentMethod.cash);
+    _cashController.text =
+        CurrencyFormatter.formatNumber(widget.totalAmount.round());
+
     if (widget.initialDebtorId != null && widget.initialDebtorId! > 0) {
       _selectedDebtor = DebtorEntity(
         debtorId: widget.initialDebtorId!,
@@ -77,13 +95,16 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         currentBalance: 0.0,
         isActive: true,
       );
+      // Also enable debt method if debtor was passed in
+      // _selectedMethods.add(PaymentMethod.debt);
+      // NOTE: Removed as per user request to manual choice
     }
 
     final locId = int.tryParse(widget.locationId ?? '');
     if (locId != null) {
       context.read<DebtorBloc>().add(LoadActiveDebtorsByLocationRequested(
-        locationId: locId,
-      ));
+            locationId: locId,
+          ));
     } else {
       context.read<DebtorBloc>().add(const LoadDebtorsRequested());
     }
@@ -97,46 +118,153 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
     super.dispose();
   }
 
-  void _onAmountChanged(String value) {
-    setState(() {});
+  // ──────────────────────── Toggle logic ────────────────────────
+
+  void _onMethodToggled(PaymentMethod method) {
+    setState(() {
+      if (_selectedMethods.contains(method)) {
+        // Don't allow deselecting the last method
+        if (_selectedMethods.length <= 1) return;
+        _selectedMethods.remove(method);
+        // Zero out the deselected method
+        _controllerFor(method).text = CurrencyFormatter.formatNumber(0);
+        if (method == PaymentMethod.debt) {
+          _selectedDebtor = null;
+        }
+      } else {
+        _selectedMethods.add(method);
+      }
+      _recalculateAmounts();
+    });
   }
 
-  Future<void> _submitPayment({bool confirmLowStock = false, bool confirmCreditLimit = false}) async {
+  /// Auto-fill amounts for the selected methods.
+  ///
+  /// Rule: the *last* selected method (in display order: cash → bank → debt)
+  /// that the user is NOT currently editing receives the remainder.
+  void _recalculateAmounts() {
+    final methods = _orderedSelectedMethods;
+    if (methods.isEmpty) return;
+
+    if (methods.length == 1) {
+      // Single method → fill total
+      _controllerFor(methods.first).text =
+          CurrencyFormatter.formatNumber(widget.totalAmount.round());
+      return;
+    }
+
+    // Find the method to auto-fill (the "last" one that user is NOT editing)
+    PaymentMethod autoFillTarget = methods.last;
+    if (_currentlyEditing != null && methods.contains(_currentlyEditing)) {
+      // Pick another method to auto-fill (the last one that isn't the one being edited)
+      for (int i = methods.length - 1; i >= 0; i--) {
+        if (methods[i] != _currentlyEditing) {
+          autoFillTarget = methods[i];
+          break;
+        }
+      }
+    }
+
+    // Sum all methods except autoFillTarget
+    double otherSum = 0;
+    for (final m in methods) {
+      if (m != autoFillTarget) {
+        otherSum += _amountFor(m);
+      }
+    }
+
+    final remaining = widget.totalAmount - otherSum;
+    _controllerFor(autoFillTarget).text =
+        CurrencyFormatter.formatNumber(remaining.round().clamp(0, 999999999999));
+  }
+
+  /// Get ordered list of selected methods in display order
+  List<PaymentMethod> get _orderedSelectedMethods {
+    return PaymentMethod.values
+        .where(_selectedMethods.contains)
+        .toList();
+  }
+
+  TextEditingController _controllerFor(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.cash:
+        return _cashController;
+      case PaymentMethod.bank:
+        return _bankController;
+      case PaymentMethod.debt:
+        return _debtController;
+    }
+  }
+
+  double _amountFor(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.cash:
+        return _cashAmount;
+      case PaymentMethod.bank:
+        return _bankAmount;
+      case PaymentMethod.debt:
+        return _debtAmount;
+    }
+  }
+
+  void _onAmountChanged(PaymentMethod method, String value) {
+    _currentlyEditing = method;
+    setState(() {
+      _recalculateAmounts();
+    });
+    // Reset after frame so subsequent taps work
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _currentlyEditing = null;
+    });
+  }
+
+  // ──────────────────────── Submit logic ────────────────────────
+
+  Future<void> _submitPayment(
+      {bool confirmLowStock = false,
+      bool confirmCreditLimit = false}) async {
     final l10n = AppLocalizations.of(context);
-    if (_remaining.abs() > 10) { 
-      AppSnackBar.show(
-          context,
+
+    if (_selectedMethods.isEmpty) {
+      AppSnackBar.show(context,
+          message: l10n.translate('order_payment.select_at_least_one'),
+          type: AppSnackBarType.error);
+      return;
+    }
+
+    if (_remaining.abs() > 10) {
+      AppSnackBar.show(context,
           message: l10n.translate('order_payment.error_total_mismatch'),
-          type: AppSnackBarType.error
-      );
+          type: AppSnackBarType.error);
       return;
     }
 
     if (_debtAmount > 0 && _selectedDebtor == null) {
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('order_payment.error_select_debtor'),
-        type: AppSnackBarType.error
-      );
+      AppSnackBar.show(context,
+          message: l10n.translate('order_payment.error_select_debtor'),
+          type: AppSnackBarType.error);
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     final repository = context.read<OrderBloc>().repository;
-    
+
     final body = {
       'businessLocationId': int.tryParse(widget.locationId ?? '0'),
       'items': widget.items.map((e) => {
-        if (e.saleItemId != null && e.saleItemId! > 0) 'saleItemId': e.saleItemId,
-        if (e.productId.isNotEmpty) 'productId': e.productId,
-        'quantity': e.quantity,
-        'discount': e.discount,
-      }).toList(),
+            if (e.saleItemId != null && e.saleItemId! > 0)
+              'saleItemId': e.saleItemId,
+            if (e.productId.isNotEmpty) 'productId': e.productId,
+            'quantity': e.quantity,
+            'discount': e.discount,
+          }).toList(),
       'cashAmount': _cashAmount,
       'bankAmount': _bankAmount,
       'debtAmount': _debtAmount,
-      if (_debtAmount > 0 && _selectedDebtor != null) 'debtorId': _selectedDebtor!.debtorId,
+      if (_selectedDebtor != null) 'debtorId': _selectedDebtor!.debtorId,
+      'customerName': _selectedDebtor?.name ?? widget.customerName,
+      'customerPhone': _selectedDebtor?.phone ?? widget.customerPhone,
       if (widget.note != null) 'note': widget.note,
       'confirmLowStock': confirmLowStock,
       'confirmCreditLimitExceeded': confirmCreditLimit,
@@ -144,51 +272,49 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
 
     try {
       if (widget.pendingOrderId != null) {
-        await repository.updateOrder(
-            orderId: widget.pendingOrderId!,
-            requestBody: body
-        );
-        
-        // Record debt adjustment if needed
+        final order = await repository.updateOrder(
+            orderId: widget.pendingOrderId!, requestBody: body);
+
         if (_debtAmount > 0 && _selectedDebtor != null) {
           final debtorRepo = context.read<DebtorBloc>().repository;
           await debtorRepo.recordDebtAdjustment(
             debtorId: _selectedDebtor!.debtorId,
             amount: _debtAmount,
-            paymentMethod: _cashAmount > 0 ? 'cash' : (_bankAmount > 0 ? 'bank' : 'cash'),
+            paymentMethod:
+                _cashAmount > 0 ? 'cash' : (_bankAmount > 0 ? 'bank' : 'cash'),
             notes: widget.note,
           );
         }
 
         if (mounted) {
-          AppSnackBar.show(
+          Navigator.pushReplacement(
             context,
-            message: l10n.translate('order_payment.success_update_pending'),
-            type: AppSnackBarType.success,
+            MaterialPageRoute(
+              builder: (_) => OrderCompletionConfirmationScreen(order: order),
+            ),
           );
-          Navigator.of(context).popUntil((route) => route.isFirst);
         }
       } else {
-        await repository.createOrder(body);
+        final order = await repository.createOrder(body);
 
-        // Record debt adjustment if needed
         if (_debtAmount > 0 && _selectedDebtor != null) {
           final debtorRepo = context.read<DebtorBloc>().repository;
           await debtorRepo.recordDebtAdjustment(
             debtorId: _selectedDebtor!.debtorId,
             amount: _debtAmount,
-            paymentMethod: _cashAmount > 0 ? 'cash' : (_bankAmount > 0 ? 'bank' : 'cash'),
+            paymentMethod:
+                _cashAmount > 0 ? 'cash' : (_bankAmount > 0 ? 'bank' : 'cash'),
             notes: widget.note,
           );
         }
 
         if (mounted) {
-          AppSnackBar.show(
+          Navigator.pushReplacement(
             context,
-            message: l10n.translate('order_create.payment_success'),
-            type: AppSnackBarType.success,
+            MaterialPageRoute(
+              builder: (_) => OrderCompletionConfirmationScreen(order: order),
+            ),
           );
-          Navigator.of(context).popUntil((route) => route.isFirst);
         }
       }
     } catch (e) {
@@ -197,42 +323,45 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         final confirm = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: Text(l10n.translate('order_create.confirm_continue_title')),
-              content: Text('${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(l10n.translate('common.cancel')),
-                ),
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(l10n.translate('common.confirm')),
-                ),
-              ],
-            )
-        );
+                  title: Text(
+                      l10n.translate('order_create.confirm_continue_title')),
+                  content: Text(
+                      '${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(l10n.translate('common.cancel')),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(l10n.translate('common.confirm')),
+                    ),
+                  ],
+                ));
 
         if (confirm == true) {
           setState(() => _isSubmitting = false);
           await _submitPayment(
-              confirmLowStock: e.warnings.contains('LOW_STOCK_CONFIRM_REQUIRED') || confirmLowStock,
-              confirmCreditLimit: e.warnings.contains('CREDIT_LIMIT_CONFIRM_REQUIRED') || confirmCreditLimit
-          );
+              confirmLowStock:
+                  e.warnings.contains('LOW_STOCK_CONFIRM_REQUIRED') ||
+                      confirmLowStock,
+              confirmCreditLimit:
+                  e.warnings.contains('CREDIT_LIMIT_CONFIRM_REQUIRED') ||
+                      confirmCreditLimit);
         }
         return;
       }
 
-      AppSnackBar.show(
-        context,
-        message: e.toString(),
-        type: AppSnackBarType.error,
-      );
+      AppSnackBar.show(context,
+          message: e.toString(), type: AppSnackBarType.error);
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
   }
+
+  // ──────────────────────── Build UI ────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -263,9 +392,13 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
                   children: [
                     _buildTotalSection(l10n),
                     const SizedBox(height: AppSpacing.lg),
-                    _buildPaymentInputs(l10n),
+                    _buildMethodSelector(l10n),
                     const SizedBox(height: AppSpacing.lg),
-                    if (_debtAmount > 0) _buildDebtorSection(l10n),
+                    _buildSelectedMethodInputs(l10n),
+                    if (_selectedMethods.contains(PaymentMethod.debt)) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildDebtorSection(l10n),
+                    ],
                   ],
                 ),
               ),
@@ -287,7 +420,8 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
       ),
       child: Column(
         children: [
-          Text(l10n.translate('order_payment.order_total'), style: AppTextStyles.bodyMedium),
+          Text(l10n.translate('order_payment.order_total'),
+              style: AppTextStyles.bodyMedium),
           const SizedBox(height: AppSpacing.xs),
           Text(
             CurrencyFormatter.formatVND(widget.totalAmount),
@@ -317,37 +451,140 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
     );
   }
 
-  Widget _buildPaymentInputs(AppLocalizations l10n) {
+  // ──────────── Payment method selector chips ────────────
+
+  Widget _buildMethodSelector(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.translate('order_payment.payment_methods'), style: AppTextStyles.titleSmall),
-        const SizedBox(height: AppSpacing.md),
-        _buildAmountInput(
-          controller: _cashController,
-          label: l10n.translate('order_create.pay_method_cash'),
-          icon: Icons.money,
-          onChanged: _onAmountChanged,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _buildAmountInput(
-          controller: _bankController,
-          label: l10n.translate('order_create.pay_method_transfer'),
-          icon: Icons.account_balance,
-          onChanged: _onAmountChanged,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _buildAmountInput(
-          controller: _debtController,
-          label: l10n.translate('order_create.debt'),
-          icon: Icons.history_edu,
-          onChanged: _onAmountChanged,
+        Text(l10n.translate('order_payment.select_methods'),
+            style: AppTextStyles.titleSmall),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: [
+            _buildMethodChip(
+              method: PaymentMethod.cash,
+              label: l10n.translate('order_payment.method_cash'),
+              icon: Icons.money,
+            ),
+            _buildMethodChip(
+              method: PaymentMethod.bank,
+              label: l10n.translate('order_payment.method_bank'),
+              icon: Icons.account_balance,
+            ),
+            _buildMethodChip(
+              method: PaymentMethod.debt,
+              label: l10n.translate('order_payment.method_debt'),
+              icon: Icons.history_edu,
+            ),
+          ],
         ),
       ],
     );
   }
 
+  Widget _buildMethodChip({
+    required PaymentMethod method,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _selectedMethods.contains(method);
+    return FilterChip(
+      selected: isSelected,
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: isSelected ? AppColors.white : AppColors.textSecondary,
+          ),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
+      selectedColor: AppColors.primary,
+      checkmarkColor: AppColors.white,
+      labelStyle: TextStyle(
+        color: isSelected ? AppColors.white : AppColors.textPrimary,
+        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+      ),
+      backgroundColor: AppColors.surface,
+      side: BorderSide(
+        color: isSelected ? AppColors.primary : AppColors.divider,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+      ),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+      onSelected: (_) => _onMethodToggled(method),
+    );
+  }
+
+  // ──────────── Dynamic amount inputs ────────────
+
+  Widget _buildSelectedMethodInputs(AppLocalizations l10n) {
+    final methods = _orderedSelectedMethods;
+    if (methods.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+        child: Text(
+          l10n.translate('order_payment.select_at_least_one'),
+          style: AppTextStyles.bodyMedium
+              .copyWith(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l10n.translate('order_payment.payment_methods'),
+            style: AppTextStyles.titleSmall),
+        const SizedBox(height: AppSpacing.md),
+        ...methods.map((method) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: _buildAmountInput(
+              method: method,
+              controller: _controllerFor(method),
+              label: _labelFor(method, l10n),
+              icon: _iconFor(method),
+              onChanged: (v) => _onAmountChanged(method, v),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  String _labelFor(PaymentMethod method, AppLocalizations l10n) {
+    switch (method) {
+      case PaymentMethod.cash:
+        return l10n.translate('order_payment.method_cash');
+      case PaymentMethod.bank:
+        return l10n.translate('order_payment.method_bank');
+      case PaymentMethod.debt:
+        return l10n.translate('order_payment.method_debt');
+    }
+  }
+
+  IconData _iconFor(PaymentMethod method) {
+    switch (method) {
+      case PaymentMethod.cash:
+        return Icons.money;
+      case PaymentMethod.bank:
+        return Icons.account_balance;
+      case PaymentMethod.debt:
+        return Icons.history_edu;
+    }
+  }
+
   Widget _buildAmountInput({
+    required PaymentMethod method,
     required TextEditingController controller,
     required String label,
     required IconData icon,
@@ -367,16 +604,19 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
     );
   }
 
+  // ──────────── Debtor section (only when debt selected) ────────────
+
   Widget _buildDebtorSection(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(l10n.translate('order_create.customer_loyal'), style: AppTextStyles.titleSmall),
+        Text(l10n.translate('order_create.customer_loyal'),
+            style: AppTextStyles.titleSmall),
         const SizedBox(height: AppSpacing.md),
         BlocBuilder<DebtorBloc, DebtorState>(
           builder: (context, state) {
             final debtors = state.activeDebtorsByLocation;
-            
+
             return DropdownButtonFormField<int>(
               value: _selectedDebtor?.debtorId,
               decoration: InputDecoration(
@@ -393,7 +633,8 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
               onChanged: (value) {
                 if (value != null) {
                   setState(() {
-                    _selectedDebtor = debtors.firstWhere((d) => d.debtorId == value);
+                    _selectedDebtor =
+                        debtors.firstWhere((d) => d.debtorId == value);
                   });
                 }
               },
@@ -411,6 +652,8 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
       ],
     );
   }
+
+  // ──────────── Bottom action button ────────────
 
   Widget _buildBottomAction(AppLocalizations l10n) {
     return Container(
@@ -439,11 +682,13 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
             ? const SizedBox(
                 height: 24,
                 width: 24,
-                child: CircularProgressIndicator(color: AppColors.white, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                    color: AppColors.white, strokeWidth: 2),
               )
             : Text(
                 l10n.translate('order_payment.confirm_and_complete'),
-                style: AppTextStyles.titleMedium.copyWith(color: AppColors.white, fontWeight: FontWeight.bold),
+                style: AppTextStyles.titleMedium.copyWith(
+                    color: AppColors.white, fontWeight: FontWeight.bold),
               ),
       ),
     );
