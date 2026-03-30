@@ -70,11 +70,13 @@ import 'shared/context/business_context.dart';
 import 'shared/context/notification_context.dart';
 import 'shared/context/user_profile_context.dart';
 import 'shared/cache/cache_manager.dart';
+import 'core/services/connectivity_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await Firebase.initializeApp();
+  await ConnectivityService().initialize();
   await CacheManager().init();
   await BusinessContext().init();
   await UserProfileContext().init();
@@ -242,7 +244,20 @@ class _MyAppState extends State<MyApp> {
     _firebaseMessagingService = FirebaseMessagingService(
       pushTokenApiService: _pushTokenApiService,
     );
-    Future.microtask(() => _firebaseMessagingService.initialize());
+    unawaited(_firebaseMessagingService.initialize());
+    
+    _notificationRealtimeService = NotificationRealtimeService();
+    unawaited(_notificationRealtimeService.initialize());
+    
+    ConnectivityService().statusStream.listen((status) {
+      if (status == ConnectivityStatus.online) {
+        // Trigger generic data refresh when network is back
+        _locationRepository.getMyOwnedLocations().then((_) {
+          debugPrint('Main: Triggered auto-refresh of locations after network recovery.');
+        }).catchError((_) {});
+      }
+    });
+
     Future.microtask(() async {
       if (await _secureStorage.hasAccessToken()) {
         await _notificationRealtimeService.connect();

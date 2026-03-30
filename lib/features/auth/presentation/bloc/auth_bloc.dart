@@ -99,7 +99,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(const NeedsSetPasswordOnResume());
           return;
         }
-        await firebaseMessagingService.registerCurrentToken();
+        try {
+          await firebaseMessagingService
+              .registerCurrentToken()
+              .timeout(const Duration(seconds: 2));
+        } catch (e) {
+          debugPrint('AuthBloc: Token registration timed out or failed, proceeding...');
+        }
         final token = await authRepository.getStoredAccessToken();
         emit(AuthAuthenticated(accessToken: token ?? ''));
       } else {

@@ -6,6 +6,7 @@ import 'package:signalr_netcore/signalr_client.dart';
 
 import '../config/app_config.dart';
 import '../storage/secure_storage.dart';
+import 'connectivity_service.dart';
 import 'signalr_dev_http_client.dart';
 
 class NotificationRealtimeService {
@@ -25,9 +26,19 @@ class NotificationRealtimeService {
   final SecureStorage _secureStorage = SecureStorage();
 
   HubConnection? _hubConnection;
+  StreamSubscription<ConnectivityStatus>? _connectivitySubscription;
 
   bool get _isConnected =>
       _hubConnection?.state == HubConnectionState.Connected;
+
+  Future<void> initialize() async {
+    _connectivitySubscription = ConnectivityService().statusStream.listen((status) {
+      if (status == ConnectivityStatus.online && !_isConnected) {
+        debugPrint('NotificationRealtimeService: Network restored, retrying connection...');
+        unawaited(connect());
+      }
+    });
+  }
 
   Future<void> connect() async {
     if (_isConnected) {
@@ -114,6 +125,7 @@ class NotificationRealtimeService {
   }
 
   Future<void> dispose() async {
+    await _connectivitySubscription?.cancel();
     await disconnect();
   }
 

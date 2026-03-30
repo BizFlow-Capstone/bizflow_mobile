@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
@@ -9,8 +8,8 @@ import 'package:flutter/foundation.dart';
 import '../notification/notification_navigation_contract.dart';
 import '../../features/auth/data/push_token_api_service.dart';
 import '../notification/notification_service.dart';
-import '../routing/app_router.dart';
 import '../storage/secure_storage.dart';
+import 'connectivity_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -56,9 +55,11 @@ class FirebaseMessagingService {
   final NotificationService _notificationService;
 
   bool _initialized = false;
+  bool _registrationSuccessful = false;
   String? _currentToken;
   StreamSubscription<String>? _tokenRefreshSubscription;
   StreamSubscription<RemoteMessage>? _onMessageSubscription;
+  StreamSubscription<ConnectivityStatus>? _connectivitySubscription;
 
   FirebaseMessagingService({
     required PushTokenApiService pushTokenApiService,
@@ -68,6 +69,14 @@ class FirebaseMessagingService {
 
   Future<void> initialize() async {
     if (_initialized) return;
+
+    // Listen for connectivity changes to retry registration if it failed
+    _connectivitySubscription = ConnectivityService().statusStream.listen((status) {
+      if (status == ConnectivityStatus.online && !_registrationSuccessful) {
+        debugPrint('FirebaseMessagingService: Network restored, retrying token registration...');
+        unawaited(registerCurrentToken());
+      }
+    });
 
     final messaging = FirebaseMessaging.instance;
 
@@ -195,6 +204,7 @@ class FirebaseMessagingService {
       while (attempt < maxRetries) {
         final success = await _safeRegister(token);
         if (success) {
+          _registrationSuccessful = true;
           return; // Success
         }
 
@@ -224,6 +234,7 @@ class FirebaseMessagingService {
   }
 
   Future<void> dispose() async {
+    await _connectivitySubscription?.cancel();
     await _tokenRefreshSubscription?.cancel();
     await _onMessageSubscription?.cancel();
   }

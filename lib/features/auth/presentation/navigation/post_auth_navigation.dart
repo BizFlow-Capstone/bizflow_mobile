@@ -19,9 +19,15 @@ class PostAuthNavigation {
       state = currentState;
     } else {
       locationBloc.add(const LoadLocationsRequested());
-      state = await locationBloc.stream.firstWhere(
-        (s) => s is LocationsLoaded || s is LocationFailure,
-      );
+      try {
+        state = await locationBloc.stream.firstWhere(
+          (s) => s is LocationsLoaded || s is LocationFailure,
+        ).timeout(const Duration(seconds: 5));
+      } catch (e) {
+        debugPrint('PostAuthNavigation: Timeout waiting for locations, proceeding to home.');
+        // Fallback to currently loaded state or empty
+        state = locationBloc.state;
+      }
     }
 
     if (!context.mounted) {

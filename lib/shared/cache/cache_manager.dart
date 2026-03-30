@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -126,6 +126,7 @@ class CacheManager {
     Function(dynamic error)? onError,
     T Function(Map<String, dynamic> json)? fromJson,
     Map<String, dynamic> Function(T data)? toJson,
+    Duration networkTimeout = const Duration(seconds: 5),
   }) async {
     await init();
     final completer = Completer<void>();
@@ -153,6 +154,15 @@ class CacheManager {
       }
     } catch (e) {
       debugPrint('SWR Cache Error (Read): $e');
+    }
+
+    if (!hasLocalData) {
+      Timer(networkTimeout, () {
+        if (!completer.isCompleted) {
+          debugPrint('SWR: Initial fetch for $key timed out after ${networkTimeout.inSeconds}s, resolving.');
+          completer.complete();
+        }
+      });
     }
 
     _cancelTokens[key]?.cancel('New request triggered for $key');
