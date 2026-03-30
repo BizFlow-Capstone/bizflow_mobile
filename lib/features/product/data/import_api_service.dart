@@ -1,67 +1,22 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:dio/dio.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
-import '../../../../core/network/multipart_auth_helper.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import 'models/import_model.dart';
 
 class ImportApiService {
   final ApiClient _apiClient;
-  late final MultipartAuthHelper _multipartAuth;
 
-  ImportApiService({required ApiClient apiClient}) : _apiClient = apiClient {
-    _multipartAuth = MultipartAuthHelper(apiClient: _apiClient);
-  }
+  ImportApiService({required ApiClient apiClient}) : _apiClient = apiClient;
 
   Map<String, dynamic> _buildImportItemPayload(ImportItemModel item) {
     return {
-      'productId': item.productId,
-      'quantity': item.quantity,
-      'costPrice': item.costPrice,
+      'ProductId': item.productId,
+      'Quantity': item.quantity,
+      'CostPrice': item.costPrice,
     };
-  }
-
-  Future<Map<String, dynamic>> _postMultipart(
-    String endpoint,
-    Map<String, dynamic> dataMap,
-  ) async {
-    final response = await _multipartAuth.executeWithRefresh(
-      send: (dio) {
-        final formData = FormData.fromMap(dataMap);
-        return dio.post('${_apiClient.baseUrl}$endpoint', data: formData);
-      },
-    );
-
-    if (response.statusCode != null &&
-        response.statusCode! >= 200 &&
-        response.statusCode! < 300) {
-      return (response.data as Map<String, dynamic>?) ?? {};
-    }
-
-    throw Exception(response.statusMessage ?? 'Multipart request failed');
-  }
-
-  Future<Map<String, dynamic>> _putMultipart(
-    String endpoint,
-    Map<String, dynamic> dataMap,
-  ) async {
-    final response = await _multipartAuth.executeWithRefresh(
-      send: (dio) {
-        final formData = FormData.fromMap(dataMap);
-        return dio.put('${_apiClient.baseUrl}$endpoint', data: formData);
-      },
-    );
-
-    if (response.statusCode != null &&
-        response.statusCode! >= 200 &&
-        response.statusCode! < 300) {
-      return (response.data as Map<String, dynamic>?) ?? {};
-    }
-
-    throw Exception(response.statusMessage ?? 'Multipart request failed');
   }
 
   Future<Map<String, dynamic>> getImports({
@@ -93,7 +48,9 @@ class ImportApiService {
       queryParams: queryParams,
     );
 
-    return response.data ?? {};
+    return (response.data?['data'] as Map<String, dynamic>?) ??
+        response.data ??
+        {};
   }
 
   Future<Map<String, dynamic>> getImportDetail(int importId) async {
@@ -101,17 +58,19 @@ class ImportApiService {
       ApiEndpoints.getImportDetail(importId.toString()),
     );
 
-    return response.data ?? {};
+    return (response.data?['data'] as Map<String, dynamic>?) ??
+        response.data ??
+        {};
   }
 
   Future<Map<String, dynamic>> createImport(CreateImportRequest request) async {
     try {
-      final Map<String, dynamic> dataMap = {
+      final Map<String, String> fields = {
         'ImportType': request.importType,
-        'BusinessLocationId': request.businessLocationId,
+        'BusinessLocationId': request.businessLocationId.toString(),
         'Supplier': request.supplier,
         'Note': request.note,
-        'SaveAsDraft': request.saveAsDraft,
+        'SaveAsDraft': request.saveAsDraft.toString(),
         if (request.receivedAt != null)
           'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
         'Items': jsonEncode(
@@ -119,18 +78,24 @@ class ImportApiService {
         ),
       };
 
+      final Map<String, File> files = {};
       if (request.imagePath != null && request.imagePath!.isNotEmpty) {
         final imageFile = File(request.imagePath!);
         if (imageFile.existsSync()) {
-          final imageBytes = await imageFile.readAsBytes();
-          dataMap['image'] = MultipartFile.fromBytes(
-            imageBytes,
-            filename: '${DateTime.now().millisecondsSinceEpoch}.jpg',
-          );
+          files['image'] = imageFile;
         }
       }
 
-      return await _postMultipart(ApiEndpoints.createImport, dataMap);
+      final response = await _apiClient.postMultipart(
+        ApiEndpoints.createImport,
+        fields: fields,
+        files: files,
+      );
+
+      if (response.isSuccess) {
+        return response.data ?? {};
+      }
+      throw Exception(response.message ?? 'Create import failed');
     } catch (e) {
       throw Exception(ApiErrorMessageParser.parse(e));
     }
@@ -141,11 +106,11 @@ class ImportApiService {
     UpdateImportRequest request,
   ) async {
     try {
-      final Map<String, dynamic> dataMap = {
+      final Map<String, String> fields = {
         'ImportType': request.importType,
         'Supplier': request.supplier,
         'Note': request.note,
-        'RemoveImage': request.removeImage,
+        'RemoveImage': request.removeImage.toString(),
         if (request.receivedAt != null)
           'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
         'Items': jsonEncode(
@@ -153,21 +118,24 @@ class ImportApiService {
         ),
       };
 
+      final Map<String, File> files = {};
       if (request.imagePath != null && request.imagePath!.isNotEmpty) {
         final imageFile = File(request.imagePath!);
         if (imageFile.existsSync()) {
-          final imageBytes = await imageFile.readAsBytes();
-          dataMap['image'] = MultipartFile.fromBytes(
-            imageBytes,
-            filename: '${DateTime.now().millisecondsSinceEpoch}.jpg',
-          );
+          files['image'] = imageFile;
         }
       }
 
-      return await _putMultipart(
+      final response = await _apiClient.putMultipart(
         ApiEndpoints.updateImport(importId.toString()),
-        dataMap,
+        fields: fields,
+        files: files,
       );
+
+      if (response.isSuccess) {
+        return response.data ?? {};
+      }
+      throw Exception(response.message ?? 'Update import failed');
     } catch (e) {
       throw Exception(ApiErrorMessageParser.parse(e));
     }
@@ -201,3 +169,4 @@ class ImportApiService {
     return response.data ?? {};
   }
 }
+

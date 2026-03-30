@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/models/accounting_period.dart';
+import '../../domain/models/accounting_book.dart';
 import '../../data/repositories/accounting_repository.dart';
 
 // ─────────────────────────── EVENTS ───────────────────────────
@@ -94,69 +95,117 @@ class LoadPeriodDetailRequested extends AccountingPeriodEvent {
   LoadPeriodDetailRequested({required this.locationId, required this.periodId});
 }
 
+class CreateBooksRequested extends AccountingPeriodEvent {
+  final String locationId;
+  final int periodId;
+  final int groupNumber;
+  final String taxMethod;
+  final List<String> templateCodes;
+
+  CreateBooksRequested({
+    required this.locationId,
+    required this.periodId,
+    required this.groupNumber,
+    required this.taxMethod,
+    required this.templateCodes,
+  });
+}
+
+class LoadBooksForPeriodRequested extends AccountingPeriodEvent {
+  final String locationId;
+  final int periodId;
+
+  LoadBooksForPeriodRequested({
+    required this.locationId,
+    required this.periodId,
+  });
+}
+
 // ─────────────────────────── STATES ───────────────────────────
 
-abstract class AccountingPeriodState {}
+enum AccountingPeriodStatus { initial, loading, loaded, error, actionSuccess }
 
-class AccountingPeriodInitial extends AccountingPeriodState {}
-
-class AccountingPeriodLoading extends AccountingPeriodState {}
-
-class AccountingPeriodLoaded extends AccountingPeriodState {
+class AccountingPeriodState {
   final List<AccountingPeriod> periods;
-  final bool isRefreshing;
+  final AccountingPeriod? periodDetail;
+  final List<AccountingBook> books;
+  final List<AccountingPeriodAuditLog> auditLogs;
+  final OpeningBalanceSuggestion? suggestion;
 
-  AccountingPeriodLoaded({required this.periods, this.isRefreshing = false});
+  final AccountingPeriodStatus status;
+  final String? errorMessage;
+  final String? actionSuccessKey;
 
-  AccountingPeriodLoaded copyWith({
+  final bool isListLoading;
+  final bool isDetailLoading;
+  final bool isBooksLoading;
+  final bool isLogsLoading;
+  final bool isActionLoading;
+  final bool isListRefreshing; 
+  final bool isDetailRefreshing;
+  final bool isBooksRefreshing;
+
+  AccountingPeriodState({
+    this.periods = const [],
+    this.periodDetail,
+    this.books = const [],
+    this.auditLogs = const [],
+    this.suggestion,
+    this.status = AccountingPeriodStatus.initial,
+    this.errorMessage,
+    this.actionSuccessKey,
+    this.isListLoading = false,
+    this.isDetailLoading = false,
+    this.isBooksLoading = false,
+    this.isLogsLoading = false,
+    this.isActionLoading = false,
+    this.isListRefreshing = false,
+    this.isDetailRefreshing = false,
+    this.isBooksRefreshing = false,
+  });
+
+  AccountingPeriodState copyWith({
     List<AccountingPeriod>? periods,
-    bool? isRefreshing,
-  }) =>
-      AccountingPeriodLoaded(
-        periods: periods ?? this.periods,
-        isRefreshing: isRefreshing ?? this.isRefreshing,
-      );
+    AccountingPeriod? periodDetail,
+    List<AccountingBook>? books,
+    List<AccountingPeriodAuditLog>? auditLogs,
+    OpeningBalanceSuggestion? suggestion,
+    AccountingPeriodStatus? status,
+    String? errorMessage,
+    String? actionSuccessKey,
+    bool? isListLoading,
+    bool? isDetailLoading,
+    bool? isBooksLoading,
+    bool? isLogsLoading,
+    bool? isActionLoading,
+    bool? isListRefreshing,
+    bool? isDetailRefreshing,
+    bool? isBooksRefreshing,
+    bool clearDetail = false,
+    bool clearBooks = false,
+    bool clearAction = false,
+  }) {
+    return AccountingPeriodState(
+      periods: periods ?? this.periods,
+      periodDetail: clearDetail ? null : (periodDetail ?? this.periodDetail),
+      books: clearBooks ? const [] : (books ?? this.books),
+      auditLogs: auditLogs ?? this.auditLogs,
+      suggestion: suggestion ?? this.suggestion,
+      status: status ?? this.status,
+      errorMessage: errorMessage, // Reset error if not provided
+      actionSuccessKey: clearAction ? null : (actionSuccessKey ?? this.actionSuccessKey),
+      isListLoading: isListLoading ?? this.isListLoading,
+      isDetailLoading: isDetailLoading ?? this.isDetailLoading,
+      isBooksLoading: isBooksLoading ?? this.isBooksLoading,
+      isLogsLoading: isLogsLoading ?? this.isLogsLoading,
+      isActionLoading: isActionLoading ?? this.isActionLoading,
+      isListRefreshing: isListRefreshing ?? this.isListRefreshing,
+      isDetailRefreshing: isDetailRefreshing ?? this.isDetailRefreshing,
+      isBooksRefreshing: isBooksRefreshing ?? this.isBooksRefreshing,
+    );
+  }
 }
 
-class AccountingPeriodError extends AccountingPeriodState {
-  final String message;
-  AccountingPeriodError(this.message);
-}
-
-class AccountingPeriodActionSuccess extends AccountingPeriodState {
-  final String messageKey; // localization key
-  final List<AccountingPeriod> updatedPeriods;
-
-  AccountingPeriodActionSuccess({
-    required this.messageKey,
-    required this.updatedPeriods,
-  });
-}
-
-class AccountingPeriodSuggestionLoaded extends AccountingPeriodState {
-  final OpeningBalanceSuggestion suggestion;
-  AccountingPeriodSuggestionLoaded(this.suggestion);
-}
-
-class AccountingPeriodSuggestionError extends AccountingPeriodState {
-  final String message;
-  AccountingPeriodSuggestionError(this.message);
-}
-
-class AccountingAuditLogsLoaded extends AccountingPeriodState {
-  final List<AccountingPeriodAuditLog> logs;
-  AccountingAuditLogsLoaded(this.logs);
-}
-
-class AccountingPeriodDetailLoaded extends AccountingPeriodState {
-  final AccountingPeriod period;
-  final bool isRefreshing;
-
-  AccountingPeriodDetailLoaded({
-    required this.period,
-    this.isRefreshing = false,
-  });
-}
 
 // ─────────────────────────── BLOC ───────────────────────────
 
@@ -166,7 +215,7 @@ class AccountingPeriodBloc
 
   AccountingPeriodBloc({required AccountingRepository repository})
       : _repository = repository,
-        super(AccountingPeriodInitial()) {
+        super(AccountingPeriodState()) {
     on<LoadPeriodsRequested>(_onLoadPeriods);
     on<CreatePeriodRequested>(_onCreatePeriod);
     on<CreateCustomPeriodRequested>(_onCreateCustomPeriod);
@@ -175,27 +224,38 @@ class AccountingPeriodBloc
     on<ReopenPeriodRequested>(_onReopenPeriod);
     on<LoadAuditLogsRequested>(_onLoadAuditLogs);
     on<LoadPeriodDetailRequested>(_onLoadPeriodDetail);
+    on<CreateBooksRequested>(_onCreateBooks);
+    on<LoadBooksForPeriodRequested>(_onLoadBooksForPeriod);
   }
 
   Future<void> _onLoadPeriods(
     LoadPeriodsRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(AccountingPeriodLoading());
+    emit(state.copyWith(
+      status: AccountingPeriodStatus.loading,
+      isListLoading: true,
+    ));
 
     await _repository.fetchPeriodsSWR(
       locationId: event.locationId,
       onData: (periods, fromCache) {
         if (!isClosed) {
-          emit(AccountingPeriodLoaded(
+          emit(state.copyWith(
+            status: AccountingPeriodStatus.loaded,
             periods: periods,
-            isRefreshing: fromCache,
+            isListLoading: false,
+            isListRefreshing: fromCache,
           ));
         }
       },
       onError: (error) {
         if (!isClosed) {
-          emit(AccountingPeriodError(error.toString()));
+          emit(state.copyWith(
+            status: AccountingPeriodStatus.error,
+            errorMessage: error.toString(),
+            isListLoading: false,
+          ));
         }
       },
     );
@@ -205,7 +265,11 @@ class AccountingPeriodBloc
     CreatePeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(AccountingPeriodLoading());
+    emit(state.copyWith(
+      status: AccountingPeriodStatus.loading,
+      isActionLoading: true,
+      clearAction: true,
+    ));
     try {
       await _repository.createPeriod(
         locationId: event.locationId,
@@ -218,12 +282,18 @@ class AccountingPeriodBloc
       );
       final updated =
           await _repository.fetchPeriodsFromServer(event.locationId);
-      emit(AccountingPeriodActionSuccess(
-        messageKey: 'accounting.period_created_success',
-        updatedPeriods: updated,
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.actionSuccess,
+        actionSuccessKey: 'accounting.period_created_success',
+        periods: updated,
+        isActionLoading: false,
       ));
     } catch (e) {
-      emit(AccountingPeriodError(e.toString()));
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.error,
+        errorMessage: e.toString(),
+        isActionLoading: false,
+      ));
     }
   }
 
@@ -231,7 +301,11 @@ class AccountingPeriodBloc
     CreateCustomPeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(AccountingPeriodLoading());
+    emit(state.copyWith(
+      status: AccountingPeriodStatus.loading,
+      isActionLoading: true,
+      clearAction: true,
+    ));
     try {
       await _repository.createCustomPeriod(
         locationId: event.locationId,
@@ -243,12 +317,18 @@ class AccountingPeriodBloc
       );
       final updated =
           await _repository.fetchPeriodsFromServer(event.locationId);
-      emit(AccountingPeriodActionSuccess(
-        messageKey: 'accounting.period_created_success',
-        updatedPeriods: updated,
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.actionSuccess,
+        actionSuccessKey: 'accounting.period_created_success',
+        periods: updated,
+        isActionLoading: false,
       ));
     } catch (e) {
-      emit(AccountingPeriodError(e.toString()));
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.error,
+        errorMessage: e.toString(),
+        isActionLoading: false,
+      ));
     }
   }
 
@@ -256,6 +336,7 @@ class AccountingPeriodBloc
     FetchSuggestionRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
+    // Note: This operation sets a temporary suggestion field
     try {
       final suggestion = await _repository.getOpeningBalanceSuggestion(
         locationId: event.locationId,
@@ -264,9 +345,12 @@ class AccountingPeriodBloc
         quarter: event.quarter,
         startDate: event.startDate,
       );
-      emit(AccountingPeriodSuggestionLoaded(suggestion));
+      emit(state.copyWith(suggestion: suggestion));
     } catch (e) {
-      emit(AccountingPeriodSuggestionError(e.toString()));
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.error,
+        errorMessage: e.toString(),
+      ));
     }
   }
 
@@ -274,7 +358,11 @@ class AccountingPeriodBloc
     FinalizePeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(AccountingPeriodLoading());
+    emit(state.copyWith(
+      status: AccountingPeriodStatus.loading,
+      isActionLoading: true,
+      clearAction: true,
+    ));
     try {
       await _repository.finalizePeriod(
         locationId: event.locationId,
@@ -282,12 +370,18 @@ class AccountingPeriodBloc
       );
       final updated =
           await _repository.fetchPeriodsFromServer(event.locationId);
-      emit(AccountingPeriodActionSuccess(
-        messageKey: 'accounting.period_finalized_success',
-        updatedPeriods: updated,
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.actionSuccess,
+        actionSuccessKey: 'accounting.period_finalized_success',
+        periods: updated,
+        isActionLoading: false,
       ));
     } catch (e) {
-      emit(AccountingPeriodError(e.toString()));
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.error,
+        errorMessage: e.toString(),
+        isActionLoading: false,
+      ));
     }
   }
 
@@ -295,7 +389,11 @@ class AccountingPeriodBloc
     ReopenPeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(AccountingPeriodLoading());
+    emit(state.copyWith(
+      status: AccountingPeriodStatus.loading,
+      isActionLoading: true,
+      clearAction: true,
+    ));
     try {
       await _repository.reopenPeriod(
         locationId: event.locationId,
@@ -304,12 +402,18 @@ class AccountingPeriodBloc
       );
       final updated =
           await _repository.fetchPeriodsFromServer(event.locationId);
-      emit(AccountingPeriodActionSuccess(
-        messageKey: 'accounting.period_reopened_success',
-        updatedPeriods: updated,
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.actionSuccess,
+        actionSuccessKey: 'accounting.period_reopened_success',
+        periods: updated,
+        isActionLoading: false,
       ));
     } catch (e) {
-      emit(AccountingPeriodError(e.toString()));
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.error,
+        errorMessage: e.toString(),
+        isActionLoading: false,
+      ));
     }
   }
 
@@ -317,14 +421,22 @@ class AccountingPeriodBloc
     LoadAuditLogsRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
+    emit(state.copyWith(isLogsLoading: true));
     try {
       final logs = await _repository.getAuditLogs(
         locationId: event.locationId,
         periodId: event.periodId,
       );
-      emit(AccountingAuditLogsLoaded(logs));
+      emit(state.copyWith(
+        auditLogs: logs,
+        isLogsLoading: false,
+      ));
     } catch (e) {
-      emit(AccountingPeriodError(e.toString()));
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.error,
+        errorMessage: e.toString(),
+        isLogsLoading: false,
+      ));
     }
   }
 
@@ -332,22 +444,113 @@ class AccountingPeriodBloc
     LoadPeriodDetailRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
+    emit(state.copyWith(isDetailLoading: true));
     await _repository.fetchPeriodDetailSWR(
       locationId: event.locationId,
       periodId: event.periodId,
       onData: (period, fromCache) {
         if (!isClosed) {
-          emit(AccountingPeriodDetailLoaded(
-            period: period,
-            isRefreshing: fromCache,
+          emit(state.copyWith(
+            periodDetail: period,
+            isDetailLoading: false,
+            isDetailRefreshing: fromCache,
           ));
         }
       },
       onError: (error) {
         if (!isClosed) {
-          emit(AccountingPeriodError(error.toString()));
+          emit(state.copyWith(
+            status: AccountingPeriodStatus.error,
+            errorMessage: error.toString(),
+            isDetailLoading: false,
+          ));
         }
       },
     );
   }
+
+  Future<void> _onCreateBooks(
+    CreateBooksRequested event,
+    Emitter<AccountingPeriodState> emit,
+  ) async {
+    emit(state.copyWith(
+      status: AccountingPeriodStatus.loading,
+      isActionLoading: true,
+      clearAction: true,
+    ));
+    try {
+      final response = await _repository.createBooksForPeriod(
+        locationId: event.locationId,
+        body: {
+          'periodId': event.periodId,
+          'groupNumber': event.groupNumber,
+          'taxMethod': event.taxMethod,
+          'templateCodes': event.templateCodes,
+        },
+      );
+
+      if (response.success && response.createdBooks.isNotEmpty) {
+        emit(state.copyWith(
+          status: AccountingPeriodStatus.actionSuccess,
+          actionSuccessKey: 'accounting.books_created_success',
+          books: response.createdBooks,
+          isActionLoading: false,
+        ));
+        // Refresh period list after successful book creation
+        await _repository.fetchPeriodsFromServer(event.locationId);
+      } else {
+        emit(state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: 'Failed to create accounting books',
+          isActionLoading: false,
+        ));
+      }
+    } catch (e) {
+      emit(state.copyWith(
+        status: AccountingPeriodStatus.error,
+        errorMessage: e.toString(),
+        isActionLoading: false,
+      ));
+    }
+  }
+
+  Future<void> _onLoadBooksForPeriod(
+    LoadBooksForPeriodRequested event,
+    Emitter<AccountingPeriodState> emit,
+  ) async {
+    emit(state.copyWith(isBooksLoading: true));
+    try {
+      await _repository.fetchBooksForPeriodSWR(
+        locationId: event.locationId,
+        periodId: event.periodId.toString(),
+        onData: (fetchedBooks, fromCache) {
+          if (!isClosed) {
+            emit(state.copyWith(
+              books: fetchedBooks,
+              isBooksLoading: false,
+              isBooksRefreshing: fromCache,
+            ));
+          }
+        },
+        onError: (error) {
+          if (!isClosed) {
+            emit(state.copyWith(
+              status: AccountingPeriodStatus.error,
+              errorMessage: error.toString(),
+              isBooksLoading: false,
+            ));
+          }
+        },
+      );
+    } catch (e) {
+      if (!isClosed) {
+        emit(state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: e.toString(),
+          isBooksLoading: false,
+        ));
+      }
+    }
+  }
 }
+

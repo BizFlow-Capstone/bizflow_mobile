@@ -71,6 +71,8 @@ dependencies:
   path_provider: ^2.1.5
   share_plus: ^10.1.2
   pdf: ^3.11.1
+  docx_template: ^0.4.0
+  archive: ^3.6.0
   simple_barcode_scanner: ^0.3.0
   barcode_widget: ^2.0.4
   qr_flutter: ^4.1.0
@@ -122,6 +124,7 @@ flutter:
     - assets/images/backgrounds/
     - assets/images/icons/
     - assets/localization/
+    - "assets/Mẫu sổ sách kế toán HKD theo Thông tư số 152-2025-TT-BTC/"
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -134,7 +134,7 @@ class _StockImportViewState extends State<_StockImportView> {
 
     if (widget.importId == null) {
       final req = CreateImportRequest(
-        importType: _hasInvoice ? 'INVOICE' : 'MANUAL',
+        importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
         businessLocationId: int.parse(widget.locationId),
         supplier: _supplierController.text,
         note: _noteController.text,
@@ -146,7 +146,7 @@ class _StockImportViewState extends State<_StockImportView> {
       context.read<ImportActionBloc>().add(CreateImportEvent(req));
     } else {
       final req = UpdateImportRequest(
-        importType: _hasInvoice ? 'INVOICE' : 'MANUAL',
+        importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
         supplier: _supplierController.text,
         note: _noteController.text,
         receivedAt: null,
@@ -186,7 +186,7 @@ class _StockImportViewState extends State<_StockImportView> {
               Navigator.pop(dialogContext);
               if (widget.importId == null) {
                 final req = CreateImportRequest(
-                  importType: _hasInvoice ? 'INVOICE' : 'MANUAL',
+                  importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
                   businessLocationId: int.parse(widget.locationId),
                   supplier: _supplierController.text,
                   note: _noteController.text,
@@ -199,7 +199,7 @@ class _StockImportViewState extends State<_StockImportView> {
               } else {
                 _confirmAfterUpdate = true;
                 final req = UpdateImportRequest(
-                  importType: _hasInvoice ? 'INVOICE' : 'MANUAL',
+                  importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
                   supplier: _supplierController.text,
                   note: _noteController.text,
                   receivedAt: null,

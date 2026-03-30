@@ -340,6 +340,7 @@ class _MyAppState extends State<MyApp> {
         Provider<SubscriptionRepository>.value(value: _subscriptionRepository),
         Provider<SubscriptionApiService>.value(value: _subscriptionApiService),
         Provider<ImportRepository>.value(value: _importRepository),
+        Provider<AccountingRepository>.value(value: _accountingRepository),
         Provider<NotificationRepository>.value(value: _notificationRepository),
       ],
       child: Consumer<LocalizationProvider>(

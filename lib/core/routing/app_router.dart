@@ -21,6 +21,7 @@ import '../../features/location/presentation/pages/add_edit_location_page.dart';
 import '../../features/location/presentation/pages/no_location_page.dart';
 import '../../features/product/presentation/pages/product_management_page.dart';
 import '../../features/product/presentation/pages/import_history_page.dart';
+import '../../features/product/presentation/pages/stock_import_page.dart';
 import '../../features/order/presentation/pages/order_list_screen.dart';
 import '../../features/order/presentation/pages/order_status_screen.dart';
 import '../../features/order/presentation/pages/order_creation_selection_screen.dart';
@@ -33,6 +34,7 @@ import '../../features/notification/presentation/pages/notification_list_page.da
 import '../../features/notification/presentation/pages/notification_detail_page.dart';
 import '../../features/debt/presentation/pages/debt_list_page.dart';
 import '../../features/accounting/presentation/pages/accounting_hub_page.dart';
+import '../../features/accounting/presentation/pages/accounting_book_detail_page.dart';
 import '../../features/accounting/presentation/pages/general_ledger_page.dart';
 import '../../features/invoice_template/presentation/pages/invoice_template_page.dart';
 import '../../features/invoice_template/presentation/pages/advanced_invoice_template_page.dart';
@@ -85,6 +87,7 @@ class AppRoutes {
   static const String notificationDetail = '/notification-detail';
   static const String debtList = '/debt-list';
   static const String accounting = '/accounting';
+  static const String accountingBookDetail = '/accounting-book-detail';
   static const String generalLedger = '/general-ledger';
   static const String invoiceTemplate = '/invoice-template';
   static const String advancedInvoiceTemplate = '/advanced-invoice-template';
@@ -95,6 +98,7 @@ class AppRoutes {
   static const String employeeAssign = '/employee-assign';
   static const String employeeUnassign = '/employee-unassign';
   static const String employeeInvitations = '/employee-invitations';
+  static const String stockImport = '/stock-import';
 }
 
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
@@ -290,11 +294,33 @@ class AppRouter {
       case AppRoutes.accounting:
         return _buildRoute(settings, const AccountingHubPage());
 
+      case AppRoutes.accountingBookDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args?['book'] != null && args?['locationId'] != null) {
+          return _buildRoute(
+            settings,
+            AccountingBookDetailPage(
+              book: args!['book'],
+              locationId: args['locationId'],
+            ),
+          );
+        }
+        return _buildRoute(settings, const AccountingHubPage());
+
       case AppRoutes.generalLedger:
         return _buildRoute(settings, const GeneralLedgerPage());
 
       case AppRoutes.importHistory:
         return _buildRoute(settings, const ImportHistoryPage());
+
+      case AppRoutes.stockImport:
+        final args = settings.arguments as Map<String, dynamic>?;
+        final locationId = args?['locationId'] ?? '';
+        final importId = args?['importId'] as int?;
+        return _buildRoute(
+          settings,
+          StockImportPage(locationId: locationId, importId: importId),
+        );
 
       case AppRoutes.invoiceTemplate:
         return _buildRoute(settings, const InvoiceTemplatePage());

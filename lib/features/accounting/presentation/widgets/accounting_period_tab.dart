@@ -11,6 +11,7 @@ import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_period.dart';
 import '../bloc/accounting_period_bloc.dart';
+import 'accounting_books_list_widget.dart';
 
 class AccountingPeriodTab extends StatefulWidget {
   final String locationId;
@@ -23,7 +24,6 @@ class AccountingPeriodTab extends StatefulWidget {
 
 class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
   List<AccountingPeriod> _cachedPeriods = const [];
-  bool _hasLoadedOnce = false;
 
   @override
   Widget build(BuildContext context) {
@@ -33,41 +33,31 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
     return BlocConsumer<AccountingPeriodBloc, AccountingPeriodState>(
       listener: (context, state) {
         if (messenger == null) return;
-        if (state is AccountingPeriodActionSuccess) {
+        if (state.status == AccountingPeriodStatus.actionSuccess && state.actionSuccessKey != null) {
           messenger.showSnackBar(
             SnackBar(
-              content: Text(l10n.translate(state.messageKey)),
+              content: Text(l10n.translate(state.actionSuccessKey!)),
               backgroundColor: AppColors.success,
             ),
           );
-        } else if (state is AccountingPeriodError) {
-          _showErrorSnack(messenger, state.message, l10n);
+        } else if (state.status == AccountingPeriodStatus.error && state.errorMessage != null) {
+          _showErrorSnack(messenger, state.errorMessage!, l10n);
         }
       },
       builder: (context, state) {
         // Determine list to display
         List<AccountingPeriod> periods = _cachedPeriods;
-        bool isLoading = false;
-        bool isRefreshing = false;
+        bool isLoading = state.isListLoading && _cachedPeriods.isEmpty;
+        bool isRefreshing = state.isListRefreshing;
 
-        if (state is AccountingPeriodLoading) {
-          if (_cachedPeriods.isEmpty && !_hasLoadedOnce) {
-            isLoading = true;
-          } else {
-            isRefreshing = true;
-          }
-        } else if (state is AccountingPeriodLoaded) {
+        if (state.status == AccountingPeriodStatus.loaded || state.status == AccountingPeriodStatus.actionSuccess) {
           periods = state.periods;
           _cachedPeriods = state.periods;
-          _hasLoadedOnce = true;
-          isRefreshing = state.isRefreshing;
-        } else if (state is AccountingPeriodActionSuccess) {
-          periods = state.updatedPeriods;
-          _cachedPeriods = state.updatedPeriods;
-          _hasLoadedOnce = true;
-        } else if (state is AccountingPeriodError && _cachedPeriods.isEmpty) {
+        }
+
+        if (state.status == AccountingPeriodStatus.error && _cachedPeriods.isEmpty) {
           return _ErrorView(
-            message: state.message,
+            message: state.errorMessage ?? l10n.translate('common.unknown_error'),
             onRetry: () => context.read<AccountingPeriodBloc>().add(
                   LoadPeriodsRequested(widget.locationId),
                 ),
@@ -123,7 +113,7 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
     AppLocalizations l10n,
   ) {
     if (messenger == null) return;
-    String userMessage = rawMessage;
+    String userMessage;
     if (rawMessage.contains('period_already_exists')) {
       userMessage = l10n.translate('accounting.period_already_exists');
     } else if (rawMessage.contains('period_no_books')) {
@@ -133,9 +123,11 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
     } else if (rawMessage.contains('period_already_finalized')) {
       userMessage = l10n.translate('accounting.period_status_finalized');
     } else if (rawMessage.contains('PERIOD_OPENING_BALANCE_REQUIRED') ||
-        rawMessage.contains('Kỳ đầu tiên bắt buộc nhập số dư đầu kỳ')) {
+        rawMessage.contains('Kỳ đầu tiên bắt buộc')) {
       userMessage =
           l10n.translate('accounting.first_period_opening_balance_required');
+    } else {
+      userMessage = rawMessage;
     }
     messenger.showSnackBar(
       SnackBar(content: Text(userMessage), backgroundColor: AppColors.error),
@@ -236,7 +228,11 @@ class _PeriodCard extends StatelessWidget {
   }
 
   String _statusLabel() {
-    switch (period.status) {
+    return _statusText(period.status);
+  }
+
+  String _statusText(String status) {
+    switch (status) {
       case 'finalized':
         return l10n.translate('accounting.period_status_finalized');
       case 'reopened':
@@ -330,6 +326,22 @@ class _PeriodCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Create Books button (if period is open)
+                  if (period.isOpen)
+                    TextButton.icon(
+                      onPressed: () => _showCreateBooksDialog(context),
+                      icon: const Icon(Icons.book_outlined, size: 16),
+                      label: Text(
+                        l10n.translate('accounting.action_create_books'),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.secondary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sm,
+                        ),
+                      ),
+                    ),
                   // Finalize / Reopen button
                   if (period.isOpen)
                     TextButton.icon(
@@ -491,6 +503,14 @@ class _PeriodCard extends StatelessWidget {
       ),
     );
 
+    // Load books for this period
+    bloc.add(
+      LoadBooksForPeriodRequested(
+        locationId: locationId,
+        periodId: period.periodId,
+      ),
+    );
+
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -500,9 +520,107 @@ class _PeriodCard extends StatelessWidget {
         child: _PeriodDetailSheet(
           periodLabel: period.displayLabel,
           l10n: l10n,
+          locationId: locationId,
         ),
       ),
     );
+  }
+
+  Future<void> _showCreateBooksDialog(BuildContext context) async {
+    if (!context.mounted) return;
+
+    String? selectedGroup;
+    late int groupNumber;
+    late String taxMethod;
+    late List<String> templateCodes;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          title: Text(l10n.translate('accounting.create_accounting_books')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.translate('accounting.select_accounting_group')),
+              const SizedBox(height: AppSpacing.md),
+              DropdownButton<String>(
+                isExpanded: true,
+                value: selectedGroup,
+                hint: Text(l10n.translate('accounting.select_group')),
+                items: [
+                  DropdownMenuItem(
+                    value: 'group1',
+                    child: Text(
+                      '${l10n.translate("accounting.group")} 1 - Exempt (S1a)',
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: 'group2_m1',
+                    child: Text(
+                      '${l10n.translate("accounting.group")} 2 - ${l10n.translate("accounting.method")} 1 (S2a)',
+                    ),
+                  ),
+                  DropdownMenuItem(
+                    value: 'group234_m2',
+                    child: Text(
+                      '${l10n.translate("accounting.group")} 2-4 - ${l10n.translate("accounting.method")} 2 (S2b+S2c+S2d+S2e)',
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setStateDialog(() => selectedGroup = value);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: selectedGroup == null
+                  ? null
+                  : () {
+                      // Map selection to group/method/templates
+                      switch (selectedGroup) {
+                        case 'group1':
+                          groupNumber = 1;
+                          taxMethod = 'exempt';
+                          templateCodes = ['S1a'];
+                          break;
+                        case 'group2_m1':
+                          groupNumber = 2;
+                          taxMethod = 'method_1';
+                          templateCodes = ['S2a'];
+                          break;
+                        case 'group234_m2':
+                          groupNumber = 2; // default group 2; user adjust if needed
+                          taxMethod = 'method_2';
+                          templateCodes = ['S2b', 'S2c', 'S2d', 'S2e'];
+                          break;
+                      }
+                      Navigator.pop(ctx, true);
+                    },
+              child: Text(l10n.translate('common.create')),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<AccountingPeriodBloc>().add(
+            CreateBooksRequested(
+              locationId: locationId,
+              periodId: period.periodId,
+              groupNumber: groupNumber,
+              taxMethod: taxMethod,
+              templateCodes: templateCodes,
+            ),
+          );
+    }
   }
 }
 
@@ -552,28 +670,24 @@ class _AuditLogSheet extends StatelessWidget {
             Expanded(
               child: BlocBuilder<AccountingPeriodBloc, AccountingPeriodState>(
                 builder: (context, state) {
-                  if (state is AccountingPeriodLoading) {
+                  if (state.isLogsLoading) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  if (state is AccountingAuditLogsLoaded) {
-                    if (state.logs.isEmpty) {
-                      return Center(
-                        child: Text(
-                          l10n.translate('accounting.audit_log_empty'),
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      );
-                    }
-                    return ListView.builder(
-                      controller: controller,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      itemCount: state.logs.length,
-                      itemBuilder: (_, i) =>
-                          _AuditLogItem(log: state.logs[i], l10n: l10n),
+                  final logs = state.auditLogs;
+                  if (logs.isEmpty) {
+                    return Center(
+                      child: Text(
+                        l10n.translate('accounting.audit_log_empty'),
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
                     );
                   }
-                  return Center(
-                    child: Text(l10n.translate('common.loading')),
+                  return ListView.builder(
+                    controller: controller,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    itemCount: logs.length,
+                    itemBuilder: (_, i) =>
+                        _AuditLogItem(log: logs[i], l10n: l10n),
                   );
                 },
               ),
@@ -618,7 +732,7 @@ class _AuditLogItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  log.action.replaceAll('_', ' ').toUpperCase(),
+                  _auditActionLabel(log.action),
                   style: AppTextStyles.labelSmall.copyWith(
                     color: AppColors.secondary,
                     fontWeight: FontWeight.bold,
@@ -643,25 +757,46 @@ class _AuditLogItem extends StatelessWidget {
       ),
     );
   }
+
+  String _auditActionLabel(String action) {
+    // Try to translate action name, fallback to human-readable version
+    final key = 'accounting.action_${action.toLowerCase()}';
+    final translated = l10n.translate(key);
+    if (translated != key) return translated;
+    return action.replaceAll('_', ' ').toUpperCase();
+  }
 }
 
 // ─────────────────────── PERIOD DETAIL SHEET ───────────────────────
 
-class _PeriodDetailSheet extends StatelessWidget {
+class _PeriodDetailSheet extends StatefulWidget {
   final String periodLabel;
   final AppLocalizations l10n;
+  final String locationId;
 
-  const _PeriodDetailSheet({required this.periodLabel, required this.l10n});
+  const _PeriodDetailSheet({
+    required this.periodLabel,
+    required this.l10n,
+    required this.locationId,
+  });
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case 'finalized':
-        return l10n.translate('accounting.period_status_finalized');
-      case 'reopened':
-        return l10n.translate('accounting.period_status_reopened');
-      default:
-        return l10n.translate('accounting.period_status_open');
-    }
+  @override
+  State<_PeriodDetailSheet> createState() => _PeriodDetailSheetState();
+}
+
+class _PeriodDetailSheetState extends State<_PeriodDetailSheet> with TickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -693,78 +828,28 @@ class _PeriodDetailSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Text(
-                '${l10n.translate("accounting.period_detail")} • $periodLabel',
+                '${widget.l10n.translate("accounting.period_detail")} • ${widget.periodLabel}',
                 style: AppTextStyles.titleMedium.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            const Divider(height: 1),
+            TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(text: widget.l10n.translate('accounting.period_info')),
+                Tab(text: widget.l10n.translate('accounting.books')),
+              ],
+            ),
             Expanded(
-              child: BlocBuilder<AccountingPeriodBloc, AccountingPeriodState>(
-                builder: (context, state) {
-                  if (state is AccountingPeriodDetailLoaded) {
-                    final period = state.period;
-                    return ListView(
-                      controller: controller,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      children: [
-                        if (state.isRefreshing)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: AppSpacing.sm),
-                            child: LinearProgressIndicator(minHeight: 2),
-                          ),
-                        _DetailRow(
-                          label: l10n.translate('accounting.period_type_label'),
-                          value: period.periodType,
-                        ),
-                        _DetailRow(
-                          label: l10n.translate('accounting.select_year'),
-                          value: period.year.toString(),
-                        ),
-                        if (period.quarter != null)
-                          _DetailRow(
-                            label: l10n.translate('accounting.select_quarter'),
-                            value: 'Q${period.quarter}',
-                          ),
-                        _DetailRow(
-                          label: l10n.translate('accounting.start_date'),
-                          value: period.startDate,
-                        ),
-                        _DetailRow(
-                          label: l10n.translate('accounting.end_date'),
-                          value: period.endDate,
-                        ),
-                        _DetailRow(
-                          label: l10n.translate('accounting.opening_cash_balance'),
-                          value: currency.format(period.openingCashBalance ?? 0),
-                        ),
-                        _DetailRow(
-                          label: l10n.translate('accounting.opening_bank_balance'),
-                          value: currency.format(period.openingBankBalance ?? 0),
-                        ),
-                        _DetailRow(
-                          label: l10n.translate('common.status'),
-                          value: _statusLabel(period.status),
-                        ),
-                      ],
-                    );
-                  }
-
-                  if (state is AccountingPeriodError) {
-                    return Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: Text(
-                          state.message,
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  }
-
-                  return const Center(child: CircularProgressIndicator());
-                },
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Period Info Tab
+                  _buildPeriodInfoTab(context, currency, controller),
+                  // Books Tab
+                  _buildBooksTab(context),
+                ],
               ),
             ),
           ],
@@ -772,13 +857,177 @@ class _PeriodDetailSheet extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildPeriodInfoTab(
+    BuildContext context,
+    NumberFormat currency,
+    ScrollController controller,
+  ) {
+    return BlocBuilder<AccountingPeriodBloc, AccountingPeriodState>(
+      builder: (context, state) {
+        if (state.isDetailLoading && state.periodDetail == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final period = state.periodDetail;
+        if (period != null) {
+          return ListView(
+            controller: controller,
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: [
+              if (state.isDetailRefreshing)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              _DetailRow(
+                label: widget.l10n.translate('accounting.period_type_label'),
+                value: _periodTypeLabel(period.periodType),
+              ),
+              _DetailRow(
+                label: widget.l10n.translate('accounting.select_year'),
+                value: period.year.toString(),
+              ),
+              if (period.quarter != null)
+                _DetailRow(
+                  label: widget.l10n.translate('accounting.select_quarter'),
+                  value: 'Q${period.quarter}',
+                ),
+              _DetailRow(
+                label: widget.l10n.translate('accounting.start_date'),
+                value: period.startDate,
+              ),
+              _DetailRow(
+                label: widget.l10n.translate('accounting.end_date'),
+                value: period.endDate,
+              ),
+              _DetailRow(
+                label: widget.l10n.translate('accounting.opening_cash_balance'),
+                value: currency.format(period.openingCashBalance ?? 0),
+              ),
+              _DetailRow(
+                label: widget.l10n.translate('accounting.opening_bank_balance'),
+                value: currency.format(period.openingBankBalance ?? 0),
+              ),
+              _DetailRow(
+                label: widget.l10n.translate('common.status'),
+                value: _statusLabel(period.status),
+                valueColor: period.isOpen ? AppColors.success : AppColors.error,
+              ),
+            ],
+          );
+        }
+
+        if (state.status == AccountingPeriodStatus.error && state.periodDetail == null) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Text(
+                state.errorMessage ?? widget.l10n.translate('common.unknown_error'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
+          );
+        }
+
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+
+  Widget _buildBooksTab(BuildContext context) {
+    return BlocBuilder<AccountingPeriodBloc, AccountingPeriodState>(
+      builder: (context, state) {
+        if (state.isBooksLoading && state.books.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final books = state.books;
+        final locationId = _getLocationIdFromContext(context);
+
+        if (books.isNotEmpty) {
+          return AccountingBooksListWidget(
+            books: books,
+            locationId: locationId,
+            isLoading: state.isBooksRefreshing,
+            onRefresh: () {
+              // Can be used to manually refresh
+            },
+          );
+        }
+
+        if (state.status == AccountingPeriodStatus.error && state.books.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Text(
+                state.errorMessage ?? widget.l10n.translate('common.unknown_error'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
+          );
+        }
+
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.book_outlined, size: 48, color: Colors.grey[400]),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                widget.l10n.translate('accounting.period_no_books'),
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _getLocationIdFromContext(BuildContext context) {
+    // This should be extracted from parent widget context
+    // For now, return empty - will be fixed in next step
+    return widget.locationId;
+  }
+
+  String _periodTypeLabel(String type) {
+    switch (type) {
+      case 'quarter':
+        return widget.l10n.translate('accounting.period_quarter');
+      case 'year':
+        return widget.l10n.translate('accounting.period_year');
+      case 'custom':
+        return widget.l10n.translate('accounting.period_custom');
+      default:
+        return type;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'finalized':
+        return widget.l10n.translate('accounting.period_status_finalized');
+      case 'reopened':
+        return widget.l10n.translate('accounting.period_status_reopened');
+      default:
+        return widget.l10n.translate('accounting.period_status_open');
+    }
+  }
 }
 
 class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
+  final Color? valueColor;
 
-  const _DetailRow({required this.label, required this.value});
+  const _DetailRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -804,6 +1053,7 @@ class _DetailRow extends StatelessWidget {
               textAlign: TextAlign.right,
               style: AppTextStyles.bodyMedium.copyWith(
                 fontWeight: FontWeight.w600,
+                color: valueColor,
               ),
             ),
           ),
@@ -952,17 +1202,19 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<AccountingPeriodBloc, AccountingPeriodState>(
+      listenWhen: (prev, curr) => prev.suggestion != curr.suggestion,
       listener: (context, state) {
         if (!mounted) return;
-        if (state is AccountingPeriodSuggestionLoaded) {
+        final suggestion = state.suggestion;
+        if (suggestion != null) {
           setState(() {
             _loadingSuggestion = false;
-            if (state.suggestion.hasSuggestion) {
+            if (suggestion.hasSuggestion) {
               _cashController.text = CurrencyFormatter.formatNumber(
-                state.suggestion.openingCashBalance ?? 0,
+                suggestion.openingCashBalance ?? 0,
               );
               _bankController.text = CurrencyFormatter.formatNumber(
-                state.suggestion.openingBankBalance ?? 0,
+                suggestion.openingBankBalance ?? 0,
               );
               _useSuggestion = true;
             } else {
@@ -974,8 +1226,6 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
               );
             }
           });
-        } else if (state is AccountingPeriodSuggestionError) {
-          setState(() => _loadingSuggestion = false);
         }
       },
       child: DraggableScrollableSheet(

@@ -26,6 +26,10 @@ import '../widgets/accounting_books_reports_tab.dart';
 import '../widgets/accounting_cost_revenue_tab.dart';
 import '../widgets/accounting_gl_tab.dart';
 import '../widgets/accounting_period_tab.dart';
+import '../bloc/accounting_book_bloc.dart';
+import '../../domain/models/accounting_book.dart';
+import '../../data/repositories/accounting_repository.dart';
+import '../../data/services/word_export_service.dart';
 
 class AccountingHubPage extends StatefulWidget {
   const AccountingHubPage({super.key});
@@ -44,20 +48,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   DateTime _reportToDate = DateTime(2026, 3, 31);
   String _reportFormat = 'pdf';
 
-  final List<BookItemModel> _books = const [
-    BookItemModel(code: 'S1a', name: 'Sổ chi tiết bán hàng', group: 'Nhóm 1'),
-    BookItemModel(
-      code: 'S2a',
-      name: 'Sổ doanh thu bán hàng hóa, dịch vụ',
-      group: 'Nhóm 2 - Cách 1',
-    ),
-    BookItemModel(
-      code: 'S2b',
-      name: 'Sổ doanh thu bán hàng hóa, dịch vụ',
-      group: 'Nhóm 2/3/4 - Cách 2',
-    ),
-  ];
-
   final List<TaxPaymentItemModel> _taxPayments = [
     TaxPaymentItemModel(
       taxType: 'VAT',
@@ -74,25 +64,47 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
 
-    // Trigger load of accounting periods from API
+    _tabController.addListener(_handleTabSelection);
+ 
+    // Initial load of first tab and references only
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final locationId = context.read<BusinessContext>().currentBusinessId;
-      if (locationId != null) {
-        context.read<AccountingPeriodBloc>().add(
-          LoadPeriodsRequested(locationId),
-        );
-        context.read<RevenueBloc>().add(
-          LoadRevenuesRequested(businessLocationId: locationId),
-        );
-        context.read<CostBloc>().add(
-          LoadCostsRequested(businessLocationId: locationId),
-        );
-      }
-      final refState = context.read<ReferenceBloc>().state;
-      if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
-        context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
-      }
+      _loadTab(0);
+      _loadReferences();
     });
+  }
+ 
+  void _handleTabSelection() {
+    if (_tabController.indexIsChanging) {
+      _loadTab(_tabController.index);
+    }
+  }
+ 
+  void _loadTab(int index) {
+    final locationId = context.read<BusinessContext>().currentBusinessId;
+    if (locationId == null) return;
+ 
+    switch (index) {
+      case 0: // Kỳ kế toán
+        context.read<AccountingPeriodBloc>().add(LoadPeriodsRequested(locationId));
+        break;
+      case 2: // Doanh thu & Chi phí
+        context.read<RevenueBloc>().add(LoadRevenuesRequested(businessLocationId: locationId));
+        if (context.mounted) {
+          context.read<CostBloc>().add(LoadCostsRequested(businessLocationId: locationId));
+        }
+        break;
+      case 3: // Sổ kế toán
+        context.read<AccountingBookBloc>().add(LoadBooksRequested(locationId: locationId));
+        break;
+      // Tab 1 (Nhật ký/Sổ cái) is handled by AccountingGlTab internally or we could add triggering logic here later
+    }
+  }
+ 
+  void _loadReferences() {
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
   }
 
   @override
@@ -215,13 +227,39 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     refController.dispose();
   }
 
-  Future<void> _exportBook(BookItemModel book) async {
+  Future<void> _exportBook(AccountingBook book) async {
     final ok = await _confirmAction(
       title: l10n.translate('accounting.confirm_title'),
       message: l10n.translate('accounting.confirm_export_book'),
     );
     if (!ok) return;
-    _showSuccess(l10n.translate('accounting.export_success'));
+
+    // Show loading
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đang tải dữ liệu và xuất file word...')),
+    );
+
+    try {
+      final locationId = context.read<BusinessContext>().currentBusinessId;
+      if (locationId == null) return;
+
+      final rowsResponse = await context.read<AccountingRepository>().getBookRows(
+            locationId: locationId,
+            bookId: book.bookId.toString(),
+          );
+
+      final file = await WordExportService.exportToWord(book, rowsResponse.rows);
+      if (file != null) {
+        await WordExportService.shareExportedFile(file);
+        _showSuccess(l10n.translate('accounting.export_success'));
+      } else {
+        throw Exception('Không thể tạo file word');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   Future<void> _generateReport() async {
@@ -236,6 +274,32 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
   @override
   Widget build(BuildContext context) {
+    final locationId = context.watch<BusinessContext>().currentBusinessId;
+
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AccountingBookBloc>(
+          create: (context) => AccountingBookBloc(
+            repository: context.read<AccountingRepository>(),
+          ),
+        ),
+      ],
+      child: BlocListener<AccountingBookBloc, AccountingBookState>(
+        listener: (context, state) {
+          if (state is AccountingBookOperationSuccess) {
+            _showSuccess(state.message);
+          } else if (state is AccountingBookError) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
+            );
+          }
+        },
+        child: _buildScaffold(context, locationId),
+      ),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, String? locationId) {
     return MultiBlocListener(
       listeners: [
         BlocListener<RevenueBloc, RevenueState>(
@@ -320,7 +384,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   Tab(text: l10n.translate('accounting.tab_period')),
                   Tab(text: l10n.translate('accounting.tab_gl')),
                   Tab(text: l10n.translate('accounting.tab_cost_revenue')),
-                  Tab(text: l10n.translate('accounting.tab_books_reports')),
+                  // Tab(text: l10n.translate('accounting.tab_books_reports')),
                 ],
               ),
               Expanded(
@@ -373,21 +437,47 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         );
                       },
                     ),
-                    AccountingBooksReportsTab(
-                      books: _books,
-                      taxPayments: _taxPayments,
-                      fromDate: _reportFromDate,
-                      toDate: _reportToDate,
-                      reportFormat: _reportFormat,
-                      onExportBook: _exportBook,
-                      onEditTaxPayment: _editTaxPayment,
-                      onFromDateChanged: (value) =>
-                          setState(() => _reportFromDate = value),
-                      onToDateChanged: (value) =>
-                          setState(() => _reportToDate = value),
-                      onReportFormatChanged: (value) =>
-                          setState(() => _reportFormat = value),
-                      onGenerateReport: _generateReport,
+                    BlocBuilder<AccountingBookBloc, AccountingBookState>(
+                      builder: (context, state) {
+                        List<BookItemModel> bookModels = [];
+                        if (state is AccountingBookLoaded) {
+                          bookModels = state.books
+                              .map(
+                                (b) => BookItemModel(
+                                  code: b.bookCode,
+                                  name: b.templateCode, // Template code as name for now
+                                  group: 'Nhóm ${b.groupNumber}',
+                                  // Store the original book object if needed, but here we just map to model
+                                ),
+                              )
+                              .toList();
+                        }
+
+                        return AccountingBooksReportsTab(
+                          books: bookModels,
+                          taxPayments: _taxPayments,
+                          fromDate: _reportFromDate,
+                          toDate: _reportToDate,
+                          reportFormat: _reportFormat,
+                          onExportBook: (bookModel) {
+                            // Find the original book from state
+                            if (state is AccountingBookLoaded) {
+                              final originalBook = state.books.firstWhere(
+                                (b) => b.bookCode == bookModel.code,
+                              );
+                              _exportBook(originalBook);
+                            }
+                          },
+                          onEditTaxPayment: _editTaxPayment,
+                          onFromDateChanged: (value) =>
+                              setState(() => _reportFromDate = value),
+                          onToDateChanged: (value) =>
+                              setState(() => _reportToDate = value),
+                          onReportFormatChanged: (value) =>
+                              setState(() => _reportFormat = value),
+                          onGenerateReport: _generateReport,
+                        );
+                      },
                     ),
                   ],
                 ),

@@ -156,6 +156,16 @@ class ApiEndpoints {
   static String accountingPeriodAuditLogs(String locationId, String periodId) =>
       '/api/locations/$locationId/accounting/periods/$periodId/audit-logs';
 
+  // Accounting Books
+  static String accountingBooks(String locationId) =>
+      '/api/locations/$locationId/accounting/books';
+  static String createAccountingBooks(String locationId) =>
+      '/api/locations/$locationId/accounting/books';
+  static String accountingBooksDetail(String locationId, String bookId) =>
+      '/api/locations/$locationId/accounting/books/$bookId';
+  static String accountingBookRows(String locationId, String bookId) =>
+      '/api/locations/$locationId/accounting/books/$bookId/rows';
+
   // GL Entries
   static const String glEntries = '/api/my-business/accounting/gl-entries';
 

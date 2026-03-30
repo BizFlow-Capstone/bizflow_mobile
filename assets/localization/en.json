@@ -24,7 +24,8 @@
     "tap_to_select": "Tap to select",
     "required_field": "This field is required",
     "detail": "Detail",
-    "error_occurred": "An error occurred, please try again"
+    "error_occurred": "An error occurred, please try again",
+    "status": "Status"
   },
   "auth": {
     "login": "Login",
@@ -937,6 +938,8 @@
     "revenue_created_success": "New revenue added",
     "revenue_deleted_success": "Revenue deleted",
     "revenue_list": "Revenue List",
+    "add_cost": "Add Cost",
+    "confirm_delete_cost": "Confirm Delete Cost",
     "cost_list": "Cost List",
     "edit_revenue": "Update Revenue",
     "edit_cost": "Update Cost",
@@ -1022,6 +1025,15 @@
     "gl_filter_time": "Time range",
     "gl_filter_load_failed": "Unable to load filters.",
     "gl_location_required": "Please select a business location to view the general ledger.",
-    "general_ledger": "General ledger"
+    "general_ledger": "General ledger",
+    "create_accounting_books": "Create Accounting Books",
+    "select_accounting_group": "Select an accounting group to create books according to TT152 regulations",
+    "select_group": "Select group...",
+    "group": "Group",
+    "method": "Method",
+    "action_create_books": "Create Books",
+    "books_created_success": "Accounting books created successfully",
+    "period_info": "Period Info",
+    "books": "Books"
   }
 }

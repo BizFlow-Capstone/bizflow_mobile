@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../../../shared/cache/cache_manager.dart';
 import '../../domain/models/accounting_period.dart';
+import '../../domain/models/accounting_book.dart';
 import '../services/accounting_api_service.dart';
 
 class AccountingRepository {
@@ -198,6 +199,65 @@ class AccountingRepository {
     return _apiService.getAuditLogs(locationId, periodId);
   }
 
+  // ──────────────────────────────────────────────────────
+  // Create Accounting Books (TT152 templates)
+  // ──────────────────────────────────────────────────────
+
+  /// Create books from selected template codes for a period
+  /// Required: periodId, groupNumber, taxMethod, templateCodes[]
+  /// Example templateCodes per group:
+  /// - Group 1: ["S1a"]
+  /// - Group 2 + method_1: ["S2a"]
+  /// - Group 2-4 + method_2: ["S2b", "S2c", "S2d", "S2e"]
+  Future<CreateBooksResponse> createBooksForPeriod({
+    required String locationId,
+    required Map<String, dynamic> body,
+  }) async {
+    return _apiService.createBooksForPeriod(locationId, body);
+  }
+
+  /// Get books for specific period with SWR pattern
+  Future<void> fetchBooksForPeriodSWR({
+    required String locationId,
+    required String periodId,
+    required void Function(List<AccountingBook> books, bool fromCache) onData,
+    void Function(dynamic error)? onError,
+  }) async {
+    final cacheKey = 'books_${locationId}_$periodId';
+    await _cache.fetchWithSWR<List<AccountingBook>>(
+      key: cacheKey,
+      fetcher: ({cancelToken}) =>
+          _apiService.listBooks(locationId, periodId: periodId),
+      onData: onData,
+      onError: onError,
+      fromJson: (json) {
+        final list = json['items'] as List<dynamic>? ?? [];
+        return list
+            .map((e) => AccountingBook.fromJson(e as Map<String, dynamic>))
+            .toList();
+      },
+      toJson: (books) => {
+        'items': books.map((b) => b.toJson()).toList(),
+      },
+    );
+  }
+
+  Future<List<AccountingBook>> listBooks({
+    required String locationId,
+    String? periodId,
+  }) async {
+    return _apiService.listBooks(locationId, periodId: periodId);
+  }
+
+  /// Direct server fetch for books (used after book creation)
+  Future<List<AccountingBook>> fetchBooksFromServer({
+    required String locationId,
+    required String periodId,
+  }) async {
+    return _apiService.listBooks(locationId, periodId: periodId);
+  }
+
+  /// ──────────────────────────────────────────────────────
   /// Direct server fetch (used after mutations to refresh list)
   Future<List<AccountingPeriod>> fetchPeriodsFromServer(
     String locationId,
@@ -210,6 +270,24 @@ class AccountingRepository {
       });
     } catch (_) {}
     return periods;
+  }
+
+  // ──────────────────────────────────────────────────────
+  // Get Book Rows (for rendering template & export)
+  // ──────────────────────────────────────────────────────
+
+  Future<BookRowsResponse> getBookRows({
+    required String locationId,
+    required String bookId,
+    String? cursor,
+    int batchSize = 200,
+  }) async {
+    return _apiService.getBookRows(
+      locationId,
+      bookId,
+      cursor: cursor,
+      batchSize: batchSize,
+    );
   }
 
   // ──────────────────────────────────────────────────────

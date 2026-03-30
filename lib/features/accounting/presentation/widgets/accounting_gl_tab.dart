@@ -1,7 +1,8 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
@@ -9,7 +10,6 @@ import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../bloc/gl_bloc/gl_bloc.dart';
 import '../bloc/gl_bloc/gl_event.dart';
 import '../bloc/gl_bloc/gl_state.dart';
@@ -433,12 +433,27 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   }
 
   void _showEntryDetail(GeneralLedgerEntryModel entry) {
-    if ((entry.entityType ?? '').toLowerCase() == 'order' && (entry.entityId ?? 0) > 0) {
+    final entityType = (entry.entityType ?? '').toLowerCase();
+    final entityId = entry.entityId ?? 0;
+
+    if (entityType == 'order' && entityId > 0) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => OrderDetailScreen(orderId: entry.entityId.toString()),
+          builder: (context) => OrderDetailScreen(orderId: entityId.toString()),
         ),
+      );
+      return;
+    }
+
+    if ((entityType == 'import' || entityType == 'inventoryimport') && entityId > 0) {
+      final locationId = context.read<BusinessContext>().currentBusinessId;
+      AppRouter.navigateTo(
+        AppRoutes.stockImport,
+        arguments: {
+          'locationId': locationId,
+          'importId': entityId,
+        },
       );
       return;
     }

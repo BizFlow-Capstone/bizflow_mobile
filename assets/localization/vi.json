@@ -24,7 +24,8 @@
     "tap_to_select": "Nhấn để chọn",
     "required_field": "Trường này là bắt buộc",
     "detail": "Chi tiết",
-    "error_occurred": "Có lỗi xảy ra, vui lòng thử lại"
+    "error_occurred": "Có lỗi xảy ra, vui lòng thử lại",
+    "status": "Trạng thái"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -928,7 +929,7 @@
     "tab_period": "Kỳ kế toán",
     "tab_gl": "Sổ cái",
     "tab_cost_revenue": "Doanh thu & Chi phí",
-    "tab_books_reports": "Sổ & Báo cáo",
+    "tab_books_reports": "Sổ kế toán",
     "rule_engine_suggestion": "Gợi ý từ Rule Engine",
     "current_revenue_hint": "Doanh thu lũy kế hiện tại: 620,000,000đ",
     "suggested_group_value": "Gợi ý: Nhóm 2 • Cách 2",
@@ -960,6 +961,8 @@
     "revenue_created_success": "Đã thêm doanh thu mới",
     "revenue_deleted_success": "Đã xóa doanh thu",
     "revenue_list": "Danh sách doanh thu",
+    "add_cost": "Thêm chi phí",
+    "confirm_delete_cost": "Xác nhận xóa chi phí",
     "cost_list": "Danh sách chi phí",
     "edit_revenue": "Cập nhật doanh thu",
     "edit_cost": "Cập nhật chi phí",
@@ -1027,6 +1030,9 @@
     "quarter_3": "Quý 3 (T7–T9)",
     "quarter_4": "Quý 4 (T10–T12)",
     "loading_periods": "Đang tải kỳ kế toán...",
+    "action_create_period": "Khởi tạo kỳ",
+    "action_finalize_period": "Chốt kỳ",
+    "action_reopen_period": "Mở lại kỳ",
     "action_finalize": "Chốt kỳ",
     "action_reopen": "Mở lại",
     "action_view_audit": "Xem lịch sử",
@@ -1045,6 +1051,15 @@
     "gl_filter_time": "Thời gian",
     "gl_filter_load_failed": "Không thể tải bộ lọc.",
     "gl_location_required": "Vui lòng chọn địa điểm kinh doanh để xem sổ nhật ký chung.",
-    "general_ledger": "Sổ nhật ký chung"
+    "general_ledger": "Sổ nhật ký chung",
+    "create_accounting_books": "Tạo Sổ Kế Toán",
+    "select_accounting_group": "Chọn nhóm kế toán để tạo sổ theo Thông tư 152",
+    "select_group": "Chọn nhóm...",
+    "group": "Nhóm",
+    "method": "Phương pháp",
+    "action_create_books": "Tạo Sổ",
+    "books_created_success": "Sổ kế toán đã được tạo thành công",
+    "period_info": "Thông tin kỳ",
+    "books": "Sổ kế toán"
   }
 }
