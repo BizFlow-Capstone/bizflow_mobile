@@ -1,4 +1,5 @@
 import '../../../../shared/cache/cache_manager.dart';
+import '../../../../shared/cache/local_api_cache_store.dart';
 import '../domain/entities/revenue_entity.dart';
 import 'revenue_api_service.dart';
 import 'models/revenue_dto.dart';
@@ -6,12 +7,15 @@ import 'models/revenue_dto.dart';
 class RevenueRepository {
   final RevenueApiService _apiService;
   final CacheManager _cache;
+  final LocalApiCacheStore _localApiCache;
 
   RevenueRepository({
     required RevenueApiService apiService,
     CacheManager? cacheManager,
+    LocalApiCacheStore? localApiCacheStore,
   }) : _apiService = apiService,
-       _cache = cacheManager ?? CacheManager();
+       _cache = cacheManager ?? CacheManager(),
+       _localApiCache = localApiCacheStore ?? LocalApiCacheStore();
 
   RevenueEntity _mapToEntity(RevenueDto dto) {
     return RevenueEntity(
@@ -46,7 +50,18 @@ class RevenueRepository {
     onData,
     Function(dynamic error)? onError,
   }) async {
-    final key = 'revenues_${businessLocationId}_p${pageNumber}_s$pageSize';    await _cache.fetchWithSWR<Map<String, dynamic>>(
+    final key = 'revenues_${businessLocationId}_p${pageNumber}_s$pageSize';
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      final items = (localCached['items'] as List<dynamic>? ?? [])
+          .map((e) => RevenueDto.fromJson(e as Map<String, dynamic>))
+          .map(_mapToEntity)
+          .toList();
+      final totalCount = localCached['total'] as int? ?? 0;
+      onData(items, totalCount, true);
+    }
+
+    await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,
       fetcher: ({cancelToken}) => _apiService
           .getRevenues(
@@ -63,6 +78,7 @@ class RevenueRepository {
             },
           ),
       onData: (dataMap, isFromCache) {
+        _localApiCache.setMap(key, dataMap, groupKey: 'revenues', cacheType: 'list');
         final items = (dataMap['items'] as List<dynamic>? ?? [])
             .map((e) => RevenueDto.fromJson(e as Map<String, dynamic>))
             .map(_mapToEntity)
@@ -78,6 +94,7 @@ class RevenueRepository {
 
   Future<void> clearCache() async {
     await _cache.removeByPrefix('revenues_');
+    await _localApiCache.removeByGroup('revenues');
   }
 
   Future<RevenueEntity> createManualRevenue(Map<String, dynamic> body) async {

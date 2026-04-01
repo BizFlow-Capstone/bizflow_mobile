@@ -1,11 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
 import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
-import '../../data/models/business_type_model.dart';
-import '../../../../shared/cache/cache_manager.dart';
-import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import 'product_event.dart';
@@ -56,32 +55,12 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     LoadBusinessTypesRequested event,
     Emitter<ProductState> emit,
   ) async {
-    await CacheManager().fetchWithSWR<List<BusinessTypeDto>>(
-      key: 'cache_business_types',
-      fetcher: ({cancelToken}) async {
-        final result = await repository.getBusinessTypes();
-        if (result is List) {
-          return List<BusinessTypeDto>.from(result);
-        }
-        return <BusinessTypeDto>[];
-      },
-      fromJson: (json) {
-        final list = json['data'] as List;
-        return list
-            .map((e) => BusinessTypeDto.fromJson(e as Map<String, dynamic>))
-            .toList();
-      },
-      toJson: (data) {
-        return {'data': data.map((e) => e.toJson()).toList()};
-      },
-      onData: (businessTypes, isFromCache) {
-        // Add event instead of direct emit to avoid BLoC timing issues
-        add(BusinessTypesNetworkDataReceived(businessTypes: businessTypes));
-      },
-      onError: (e) {
-        debugPrint('ProductBloc._onLoadBusinessTypesRequested error: $e');
-      },
-    );
+    try {
+      final businessTypes = await repository.getBusinessTypes();
+      add(BusinessTypesNetworkDataReceived(businessTypes: businessTypes));
+    } catch (e) {
+      debugPrint('ProductBloc._onLoadBusinessTypesRequested error: $e');
+    }
   }
 
   Future<void> _onBusinessTypesNetworkDataReceived(
@@ -97,50 +76,60 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     LoadProductsByLocationRequested event,
     Emitter<ProductState> emit,
   ) async {
-    final cacheKey = 'cache_products_${event.locationId}';
+    final scopeKey = event.locationId;
 
-    // Check if we have cached data first to decide if we show a full loading state
-    final cachedData = await CacheManager().get(cacheKey);
-    if (cachedData == null) {
+    final localProducts = await repository.getCachedProducts(scopeKey);
+    if (localProducts.isNotEmpty) {
+      _products = localProducts;
+      emit(
+        ProductsLoaded(
+          products: localProducts,
+          hasReachedMax: localProducts.length < 20,
+          currentPage: 1,
+          locationId: event.locationId,
+          searchQuery: _searchQuery,
+          filterStatus: _filterStatus,
+          filterBusinessTypeId: _filterBusinessTypeId,
+          apiMessage: null,
+        ),
+      );
+    } else {
       emit(const ProductLoading());
     }
 
-    await CacheManager().fetchWithSWR<List<ProductEntity>>(
-      key: cacheKey,
-      fetcher: ({cancelToken}) async {
-        debugPrint(
-          'ProductBloc: Loading products for location ${event.locationId} with filters: $_searchQuery, $_filterStatus',
-        );
-        final response = await repository.getProducts(
-          locationId: int.tryParse(event.locationId),
-          search: _searchQuery,
-          businessTypeId: _filterBusinessTypeId,
-          status: _filterStatus,
-        );
-        debugPrint('ProductBloc: Response received');
-        final parsedProducts = _parseProductsFromResponse(response);
-        return await _enrichProductsWithSaleItems(parsedProducts);
-      },
-      fromJson: (json) {
-        final list = json['data'] as List;
-        return list
-            .map((e) => ProductEntity.fromMap(e as Map<String, dynamic>))
-            .toList();
-      },
-      toJson: (data) {
-        return {'data': data.map((e) => e.toMap()).toList()};
-      },
-      onData: (products, isFromCache) {
-        _products = products;
-        // Add event instead of direct emit to avoid BLoC timing issues
-        add(ProductsNetworkDataReceived(products: products, locationId: event.locationId));
-      },
-      onError: (e) {
-        debugPrint('ProductBloc._onLoadProductsByLocationRequested error: $e');
-        // Add event instead of direct emit
+    try {
+      debugPrint(
+        'ProductBloc: Loading products for location ${event.locationId} with filters: $_searchQuery, $_filterStatus',
+      );
+      final response = await repository.getProducts(
+        locationId: int.tryParse(event.locationId),
+        search: _searchQuery,
+        businessTypeId: _filterBusinessTypeId,
+        status: _filterStatus,
+      );
+      debugPrint('ProductBloc: Response received');
+      final parsedProducts = _parseProductsFromResponse(response);
+      final products = await _enrichProductsWithSaleItems(parsedProducts);
+      _products = products;
+      unawaited(repository.saveCachedProducts(scopeKey, products));
+      unawaited(
+        repository.clearProductsDirty(
+          scopeKey,
+          products.map((item) => item.id).toList(),
+        ),
+      );
+      add(
+        ProductsNetworkDataReceived(
+          products: products,
+          locationId: event.locationId,
+        ),
+      );
+    } catch (e) {
+      debugPrint('ProductBloc._onLoadProductsByLocationRequested error: $e');
+      if (localProducts.isEmpty) {
         add(ProductNetworkErrorOccurred(error: e));
-      },
-    );
+      }
+    }
   }
 
   Future<void> _onProductsNetworkDataReceived(
@@ -192,6 +181,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       );
 
       _products = products;
+      await repository.saveCachedProducts(event.locationId, products);
+      await repository.clearProductsDirty(
+        event.locationId,
+        products.map((item) => item.id).toList(),
+      );
       emit(
         ProductsLoaded(
           products: products,
@@ -856,34 +850,19 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     LoadProductSaleItemsRequested event,
     Emitter<ProductState> emit,
   ) async {
-    final businessId = BusinessContext().currentBusinessId ?? 'all';
-    final cacheKey = 'cache_sale_items_${businessId}_${event.productId}';
-
-    await CacheManager().fetchWithSWR<List<Map<String, dynamic>>>(
-      key: cacheKey,
-      fetcher: ({cancelToken}) async {
-        final response = await repository.getProductSaleItems(event.productId);
-        return _extractSaleItems(response);
-      },
-      fromJson: (json) {
-        final list = json['data'];
-        if (list is! List) return <Map<String, dynamic>>[];
-        return list.whereType<Map<String, dynamic>>().toList();
-      },
-      toJson: (data) {
-        return {'data': data};
-      },
-      onData: (saleItems, _) {
-        // Add event instead of direct emit to avoid BLoC timing issues
-        add(ProductSaleItemsNetworkDataReceived(saleItems: saleItems));
-      },
-      onError: (e) {
-        debugPrint(
-          'ProductBloc._onLoadProductSaleItemsRequested: No sale items found or error: $e',
-        );
-        add(ProductSaleItemsNetworkDataReceived(saleItems: []));
-      },
-    );
+    try {
+      final response = await repository.getProductSaleItems(event.productId);
+      add(
+        ProductSaleItemsNetworkDataReceived(
+          saleItems: _extractSaleItems(response),
+        ),
+      );
+    } catch (e) {
+      debugPrint(
+        'ProductBloc._onLoadProductSaleItemsRequested: No sale items found or error: $e',
+      );
+      add(ProductSaleItemsNetworkDataReceived(saleItems: []));
+    }
   }
 
   Future<void> _onProductSaleItemsNetworkDataReceived(
@@ -923,32 +902,25 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     LoadProductDetailRequested event,
     Emitter<ProductState> emit,
   ) async {
-    final cacheKey = 'cache_product_detail_${event.productId}';
-
-    await CacheManager().fetchWithSWR<ProductEntity?>(
-      key: cacheKey,
-      fetcher: ({cancelToken}) async {
-        debugPrint(
-          'ProductBloc: Background loading detail for ${event.productId}',
-        );
-        return await repository.getProductDetail(event.productId);
-      },
-      fromJson: (json) {
-        return ProductEntity.fromMap(json);
-      },
-      toJson: (product) {
-        return product?.toMap() ?? {};
-      },
-      onData: (product, isFromCache) {
-        // Add event instead of direct emit to avoid BLoC timing issues
-        add(ProductDetailNetworkDataReceived(product: product));
-      },
-      onError: (e) {
-        debugPrint('ProductBloc._onLoadProductDetailRequested error: $e');
-        // Add event instead of direct emit
-        add(ProductDetailNetworkDataReceived(product: null));
-      },
+    final cachedProduct = await repository.getCachedProductDetail(
+      event.productId,
     );
+    if (cachedProduct != null) {
+      add(ProductDetailNetworkDataReceived(product: cachedProduct));
+    }
+
+    try {
+      debugPrint(
+        'ProductBloc: Background loading detail for ${event.productId}',
+      );
+      final product = await repository.getProductDetail(event.productId);
+      add(ProductDetailNetworkDataReceived(product: product));
+    } catch (e) {
+      debugPrint('ProductBloc._onLoadProductDetailRequested error: $e');
+      if (cachedProduct == null) {
+        add(ProductDetailNetworkDataReceived(product: null));
+      }
+    }
   }
 
   Future<void> _onProductDetailNetworkDataReceived(
@@ -989,6 +961,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       return product.copyWith(salePrice: nextSalePrice, price: nextSalePrice);
     }).toList();
 
+    await repository.markProductsDirty(event.locationId, event.affectedProductIds);
     await _updateProductCache(event.locationId);
 
     emit(
@@ -1010,13 +983,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     _searchQuery = null;
     _filterStatus = null;
     _filterBusinessTypeId = null;
+    unawaited(repository.clearCachedProducts());
     emit(const ProductInitial());
   }
 
   Future<void> _updateProductCache(String locationId) async {
-    final cacheKey = 'cache_products_$locationId';
-    await CacheManager().set(cacheKey, {
-      'data': _products.map((e) => e.toMap()).toList(),
-    });
+    await repository.saveCachedProducts(locationId, _products);
   }
 }

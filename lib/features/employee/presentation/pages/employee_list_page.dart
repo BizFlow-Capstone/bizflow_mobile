@@ -50,8 +50,18 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
     // Listen to context changes
     _businessContext = Provider.of<BusinessContext>(context, listen: false);
     _businessContext.addListener(_onBusinessContextChanged);
+    _businessContext.registerSwitchGuard(this, _onBeforeBusinessContextSwitch);
 
-    _messageSubscription = FirebaseMessagingService.messageDataStream.listen((data) {
+    _attachMessageSubscription();
+  }
+
+  Future<void> _onBeforeBusinessContextSwitch() async {
+    await _messageSubscription?.cancel();
+    _messageSubscription = null;
+  }
+
+  void _attachMessageSubscription() {
+    _messageSubscription ??= FirebaseMessagingService.messageDataStream.listen((data) {
       if (!mounted) return;
 
       final type = data['type']?.toString();
@@ -69,6 +79,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
 
   void _onBusinessContextChanged() {
     final businessId = Provider.of<BusinessContext>(context, listen: false).currentBusinessId;
+    _attachMessageSubscription();
     if (businessId != null) {
       context.read<EmployeeBloc>().add(LoadEmployeesRequested(businessId: businessId));
     }
@@ -145,6 +156,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
     _messageSubscription?.cancel();
     _tabController.dispose();
     _searchController.dispose();
+    _businessContext.unregisterSwitchGuard(this);
     _businessContext.removeListener(_onBusinessContextChanged);
     super.dispose();
   }

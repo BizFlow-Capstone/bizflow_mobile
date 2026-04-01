@@ -1,9 +1,10 @@
 
 import '../domain/entities/employee_entity.dart';
+import '../../../core/database/app_database.dart';
+import 'datasources/employee_local_datasource.dart';
 import 'employee_api_service.dart';
 import 'models/employee_dto.dart';
 import '../../location/data/location_api_service.dart';
-import '../../../shared/cache/cache_manager.dart';
 
 abstract class EmployeeManagementRepository {
   Future<List<EmployeeEntity>> getEmployees(String businessId);
@@ -14,17 +15,48 @@ abstract class EmployeeManagementRepository {
 }
 
 class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
-  static const String _assignmentCacheKey = 'employee_location_assignments';
-
   final EmployeeApiService _apiService;
   final LocationApiService _locationApiService;
+  final EmployeeLocalDataSource _localDataSource;
   _EmployeeAssignmentMap? _assignmentMemoryCache;
+
+  static const String _employeesSyncResourceKey = 'employees_list';
 
   EmployeeManagementRepositoryApi({
     required EmployeeApiService apiService,
     required LocationApiService locationApiService,
+    EmployeeLocalDataSource? localDataSource,
   })  : _apiService = apiService,
-        _locationApiService = locationApiService;
+        _locationApiService = locationApiService,
+        _localDataSource = localDataSource ?? EmployeeLocalDataSource();
+
+  Future<List<EmployeeEntity>> getCachedEmployees(String businessId) {
+    return _localDataSource.getByBusinessId(businessId);
+  }
+
+  Future<void> saveCachedEmployees(
+    String businessId,
+    List<EmployeeEntity> employees,
+  ) async {
+    await _localDataSource.replaceForBusiness(businessId, employees);
+    await AppDatabase().syncStateDao.upsert(
+      resourceKey: _employeesSyncResourceKey,
+      businessId: businessId,
+      lastSyncedAtEpoch: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  Future<int?> getEmployeesLastSyncedAtEpoch(String businessId) async {
+    final state = await AppDatabase().syncStateDao.getState(
+      resourceKey: _employeesSyncResourceKey,
+      businessId: businessId,
+    );
+    return state?.lastSyncedAtEpoch;
+  }
+
+  Future<void> clearCachedEmployees() {
+    return _localDataSource.clearAll();
+  }
 
   @override
   Future<List<EmployeeEntity>> getEmployees(String businessId) async {
@@ -33,7 +65,7 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       forceRefresh: true,
     );
 
-    return employees
+    final resolved = employees
         .map(
           (employee) {
             final employeeId = employee.profileId;
@@ -56,6 +88,9 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
           },
         )
         .toList();
+
+            await saveCachedEmployees(businessId, resolved);
+            return resolved;
   }
 
   @override
@@ -161,18 +196,8 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       return _assignmentMemoryCache!;
     }
 
-    if (!forceRefresh) {
-      final cached = await CacheManager().get(_assignmentCacheKey);
-      if (cached != null) {
-        final cachedMap = _EmployeeAssignmentMap.fromCache(cached);
-        _assignmentMemoryCache = cachedMap;
-        return cachedMap;
-      }
-    }
-
     final freshMap = await _loadEmployeeLocationAssignmentsFromApi();
     _assignmentMemoryCache = freshMap;
-    await CacheManager().set(_assignmentCacheKey, freshMap.toCache());
     return freshMap;
   }
 
@@ -225,32 +250,6 @@ class _EmployeeAssignmentMap {
     required this.locationIdsByEmployee,
     required this.locationNamesByEmployee,
   });
-
-  Map<String, dynamic> toCache() {
-    return {
-      'locationIdsByEmployee': locationIdsByEmployee,
-      'locationNamesByEmployee': locationNamesByEmployee,
-    };
-  }
-
-  static _EmployeeAssignmentMap fromCache(Map<String, dynamic> cache) {
-    Map<String, List<String>> parseMap(dynamic raw) {
-      if (raw is! Map) return <String, List<String>>{};
-      return raw.map(
-        (key, value) => MapEntry(
-          key.toString(),
-          (value is List)
-              ? value.map((item) => item.toString()).toList()
-              : <String>[],
-        ),
-      );
-    }
-
-    return _EmployeeAssignmentMap(
-      locationIdsByEmployee: parseMap(cache['locationIdsByEmployee']),
-      locationNamesByEmployee: parseMap(cache['locationNamesByEmployee']),
-    );
-  }
 }
 
 class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {

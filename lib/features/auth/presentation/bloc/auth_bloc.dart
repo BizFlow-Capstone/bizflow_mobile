@@ -14,6 +14,8 @@ import '../../../../shared/context/user_profile_context.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/services/firebase_messaging_service.dart';
+import '../../../../core/database/app_database.dart';
+import '../../../../core/database/database_manager.dart';
 import '../../../location/data/location_repository.dart';
 import '../../data/auth_repository.dart';
 import '../../../../core/network/api_error_message_parser.dart';
@@ -94,6 +96,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final loggedIn = await authRepository.isLoggedIn();
       if (loggedIn) {
+        await DatabaseManager().initialize();
         final needsSetPassword = await secureStorage.getNeedsSetPassword();
         if (needsSetPassword) {
           emit(const NeedsSetPasswordOnResume());
@@ -150,6 +153,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken ?? '',
       );
+      await DatabaseManager().initialize();
       await secureStorage.setNeedsSetPassword(false);
       await UserProfileContext().saveProfile(
         fullName: result.fullName,
@@ -223,6 +227,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken ?? '',
       );
+      await DatabaseManager().initialize();
 
       await UserProfileContext().saveProfile(
         fullName: result.fullName,
@@ -769,6 +774,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await BusinessContext().clear();
     await UserProfileContext().clear();
     await CacheManager().clearAll();
+    await DatabaseManager().clearForLogout();
     await secureStorage.clearNeedsSetPassword();
     await secureStorage.clearCredentialTypes();
     AppRouter.globalAppBarState.reset();

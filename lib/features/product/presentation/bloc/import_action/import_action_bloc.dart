@@ -1,13 +1,14 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../data/import_repository.dart';
 import '../../../data/models/import_model.dart';
-import '../../../../../shared/cache/cache_manager.dart';
+import '../../../../../shared/cache/local_api_cache_store.dart';
 import 'import_action_event.dart';
 import 'import_action_state.dart';
 import '../../../../../core/network/api_error_message_parser.dart';
 
 class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
   final ImportRepository _repository;
+  final LocalApiCacheStore _localApiCache = LocalApiCacheStore();
 
   ImportActionBloc({required ImportRepository repository})
     : _repository = repository,
@@ -28,8 +29,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     try {
       final response = await _repository.createImport(event.request);
       final importData = ImportDetailModel.fromJson(response['data']);
-      // Invalidate import history cache
-      await CacheManager().remove('cache_import_history');
+      await _invalidateImportHistoryCache();
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
@@ -58,8 +58,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
         event.request,
       );
       final importData = ImportDetailModel.fromJson(response['data']);
-      // Invalidate import history cache
-      await CacheManager().remove('cache_import_history');
+      await _invalidateImportHistoryCache();
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
@@ -87,8 +86,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
         event.importId,
         event.request,
       );
-      // Invalidate import history cache
-      await CacheManager().remove('cache_import_history');
+      await _invalidateImportHistoryCache();
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
@@ -113,8 +111,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     emit(state.copyWith(status: ImportActionStatus.submitting));
     try {
       final response = await _repository.deleteImport(event.importId);
-      // Invalidate import history cache
-      await CacheManager().remove('cache_import_history');
+      await _invalidateImportHistoryCache();
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
@@ -177,5 +174,9 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
         ),
       );
     }
+  }
+
+  Future<void> _invalidateImportHistoryCache() {
+    return _localApiCache.removeByGroup('imports');
   }
 }

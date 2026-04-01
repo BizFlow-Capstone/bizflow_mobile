@@ -130,7 +130,7 @@ class _LocationPageContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocListener<LocationBloc, LocationState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (state is LocationToggleSuccess) {
           AppSnackBar.show(
             context,
@@ -158,7 +158,7 @@ class _LocationPageContent extends StatelessWidget {
           final businessContext =
               Provider.of<BusinessContext>(context, listen: false);
           if (businessContext.currentBusinessId == state.locationId) {
-            businessContext.clear();
+            await businessContext.clear();
             // In the next frame, LocationsLoaded will trigger and auto-select a new location.
           }
         } else if (state is LocationFailure || state is LocationError) {

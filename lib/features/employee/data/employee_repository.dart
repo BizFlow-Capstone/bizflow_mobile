@@ -1,4 +1,3 @@
-import "../../../../shared/cache/cache_manager.dart";
 import 'package:flutter/foundation.dart';
 import '../domain/entities/employee_entity.dart';
 import 'employee_api_service.dart';
@@ -98,7 +97,6 @@ class EmployeeRepository {
   }
 
   Future<void> clearCache() async {
-    await CacheManager().removeByPrefix("cache_employees_");
-    await CacheManager().removeByPrefix("employees_");
+    // No large employee list cache remains in legacy key-value storage.
   }
 }

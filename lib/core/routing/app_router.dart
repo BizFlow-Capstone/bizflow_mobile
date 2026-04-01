@@ -621,8 +621,8 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                     onAccountSettings: () {
                       AppRouter.navigateTo(AppRoutes.profile);
                     },
-                    onLocationSelected: (location) {
-                      businessContext.switchBusinessLocation(
+                    onLocationSelected: (location) async {
+                      await businessContext.switchBusinessLocation(
                         location.id,
                         location.name,
                         isOwner: location.isOwner,

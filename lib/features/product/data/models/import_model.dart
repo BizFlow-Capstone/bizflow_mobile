@@ -150,6 +150,7 @@ class ImportDetailModel extends ImportHistoryItemModel {
     required super.totalAmount,
     required super.createdAt,
     super.updatedAt,
+    super.imageUrl,
     required this.items,
   });
 
@@ -164,14 +165,16 @@ class ImportDetailModel extends ImportHistoryItemModel {
       businessLocationName: json['businessLocationName'] as String,
       supplier: json['supplier'] as String?,
       note: json['note'] as String?,
-        receivedAt: DateFormatter.parseApiDateTime(json['receivedAt'] as String?),
+      receivedAt: DateFormatter.parseApiDateTime(json['receivedAt'] as String?),
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
-        createdAt: DateFormatter.parseApiDateTime(
-          json['createdAt'] as String?,
-          fallback: DateTime.now().toUtc(),
+      createdAt:
+          DateFormatter.parseApiDateTime(
+            json['createdAt'] as String?,
+            fallback: DateTime.now().toUtc(),
           ) ??
           DateTime.now().toUtc(),
-        updatedAt: DateFormatter.parseApiDateTime(json['updatedAt'] as String?),
+      updatedAt: DateFormatter.parseApiDateTime(json['updatedAt'] as String?),
+      imageUrl: json['imageUrl'] as String?,
       items: itemsRaw
           .map((e) => ImportItemModel.fromJson(e as Map<String, dynamic>))
           .toList(),

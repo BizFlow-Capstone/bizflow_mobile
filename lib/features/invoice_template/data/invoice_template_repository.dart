@@ -1,18 +1,27 @@
+import 'dart:convert';
+
+import '../../../core/database/app_database.dart';
 import '../../../core/storage/local_storage.dart';
 import '../domain/entities/invoice_template_entity.dart';
 import 'models/invoice_template_dto.dart';
 
 abstract class InvoiceTemplateRepository {
   Future<InvoiceTemplateEntity> getInvoiceTemplate();
-  Future<InvoiceTemplateEntity> updateInvoiceTemplate(UpdateInvoiceTemplateRequestDto request);
+  Future<InvoiceTemplateEntity> updateInvoiceTemplate(
+    UpdateInvoiceTemplateRequestDto request,
+  );
 }
 
 class InvoiceTemplateRepositoryMock implements InvoiceTemplateRepository {
-  static const String _storageKey = 'mock_invoice_template';
+  InvoiceTemplateRepositoryMock({
+    AppDatabase? database,
+  }) : _database = database ?? AppDatabase();
 
-  InvoiceTemplateEntity _mockTemplate = const InvoiceTemplateEntity(
+  final AppDatabase _database;
+
+  static const InvoiceTemplateEntity _defaultTemplate = InvoiceTemplateEntity(
     id: 'tpl_001',
-    businessName: '', // Empty initially for auto-fill
+    businessName: '',
     businessAddress: '',
     businessPhone: '',
     businessEmail: '',
@@ -44,34 +53,60 @@ class InvoiceTemplateRepositoryMock implements InvoiceTemplateRepository {
     appliedLocationIds: [],
   );
 
-  bool _isInitialized = false;
-
-  Future<void> _ensureInitialized() async {
-    if (_isInitialized) return;
+  Future<String> _resolveAccountScope() async {
     final storage = await LocalStorage.getInstance();
-    final saved = storage.getObject(_storageKey);
-    if (saved != null) {
-      _mockTemplate = InvoiceTemplateEntity.fromMap(saved);
+    final email = (storage.getString(StorageKeys.currentUserEmail) ?? '')
+        .trim()
+        .toLowerCase();
+    if (email.isNotEmpty) {
+      return 'email:$email';
     }
-    _isInitialized = true;
+
+    final phone = (storage.getString(StorageKeys.currentUserPhone) ?? '').trim();
+    if (phone.isNotEmpty) {
+      return 'phone:$phone';
+    }
+
+    final fullName = (storage.getString(StorageKeys.currentUserFullName) ?? '')
+        .trim()
+        .toLowerCase();
+    if (fullName.isNotEmpty) {
+      return 'name:$fullName';
+    }
+
+    return 'anonymous';
   }
 
   @override
   Future<InvoiceTemplateEntity> getInvoiceTemplate() async {
-    await _ensureInitialized();
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-    return _mockTemplate;
+    final accountScope = await _resolveAccountScope();
+    final row = await _database.invoiceTemplateSettingsDao.getByAccountScope(
+      accountScope,
+    );
+
+    if (row == null) {
+      return _defaultTemplate;
+    }
+
+    try {
+      final decoded = jsonDecode(row.payloadJson);
+      if (decoded is Map<String, dynamic>) {
+        return InvoiceTemplateEntity.fromMap(decoded);
+      }
+      return _defaultTemplate;
+    } catch (_) {
+      return _defaultTemplate;
+    }
   }
 
   @override
   Future<InvoiceTemplateEntity> updateInvoiceTemplate(
-      UpdateInvoiceTemplateRequestDto request) async {
-    await _ensureInitialized();
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
+    UpdateInvoiceTemplateRequestDto request,
+  ) async {
+    final accountScope = await _resolveAccountScope();
+    final current = await getInvoiceTemplate();
 
-    _mockTemplate = _mockTemplate.copyWith(
+    final updatedTemplate = current.copyWith(
       businessName: request.businessName,
       businessAddress: request.businessAddress,
       businessPhone: request.businessPhone,
@@ -104,9 +139,12 @@ class InvoiceTemplateRepositoryMock implements InvoiceTemplateRepository {
       appliedLocationIds: request.appliedLocationIds,
     );
 
-    final storage = await LocalStorage.getInstance();
-    await storage.setObject(_storageKey, _mockTemplate.toMap());
+    await _database.invoiceTemplateSettingsDao.upsert(
+      accountScope: accountScope,
+      payloadJson: jsonEncode(updatedTemplate.toMap()),
+      updatedAtEpoch: DateTime.now().millisecondsSinceEpoch,
+    );
 
-    return _mockTemplate;
+    return updatedTemplate;
   }
 }

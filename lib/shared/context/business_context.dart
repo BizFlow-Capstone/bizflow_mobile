@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 import '../../core/storage/local_storage.dart';
+import '../../core/database/database_manager.dart';
+
+typedef BusinessContextSwitchGuard = Future<void> Function();
 
 /// Quản lý context kinh doanh hiện tại của user (Dựa trên BusinessLocation)
 class BusinessContext extends ChangeNotifier {
@@ -12,6 +15,8 @@ class BusinessContext extends ChangeNotifier {
   String? _currentOwnerProfileId;
   bool _isOwnerOfCurrentLocation = false;
   LocalStorage? _storage;
+  final Map<Object, BusinessContextSwitchGuard> _switchGuards =
+      <Object, BusinessContextSwitchGuard>{};
 
   String? get currentBusinessId => _currentBusinessId;
   String? get currentBusinessName => _currentBusinessName;
@@ -37,37 +42,65 @@ class BusinessContext extends ChangeNotifier {
     bool isOwner = false,
     String? ownerProfileId,
   }) async {
-    _currentBusinessId = id;
-    _currentBusinessName = name;
-    _isOwnerOfCurrentLocation = isOwner;
-    _currentOwnerProfileId = ownerProfileId;
+    await DatabaseManager().runAtomic(() async {
+      await init();
+      await _runSwitchGuards();
 
-    await _storage?.setString(StorageKeys.currentBusinessId, id);
-    await _storage?.setString(StorageKeys.currentBusinessName, name);
-    await _storage?.setBool(
-      StorageKeys.isOwnerOfCurrentLocation,
-      isOwner,
-    );
-    if ((ownerProfileId ?? '').isNotEmpty) {
-      await _storage?.setString(StorageKeys.currentOwnerProfileId, ownerProfileId!);
-    } else {
-      await _storage?.remove(StorageKeys.currentOwnerProfileId);
-    }
+      _currentBusinessId = id;
+      _currentBusinessName = name;
+      _isOwnerOfCurrentLocation = isOwner;
+      _currentOwnerProfileId = ownerProfileId;
 
-    // Kích hoạt tất cả UI widget phụ thuộc đang build với BusinessContext
-    notifyListeners();
+      await _storage?.setString(StorageKeys.currentBusinessId, id);
+      await _storage?.setString(StorageKeys.currentBusinessName, name);
+      await _storage?.setBool(
+        StorageKeys.isOwnerOfCurrentLocation,
+        isOwner,
+      );
+      if ((ownerProfileId ?? '').isNotEmpty) {
+        await _storage?.setString(StorageKeys.currentOwnerProfileId, ownerProfileId!);
+      } else {
+        await _storage?.remove(StorageKeys.currentOwnerProfileId);
+      }
+
+      // Kích hoạt tất cả UI widget phụ thuộc đang build với BusinessContext
+      notifyListeners();
+    });
   }
 
   /// Xoá context (thường gọi lúc Logout)
   Future<void> clear() async {
-    _currentBusinessId = null;
-    _currentBusinessName = null;
-    _currentOwnerProfileId = null;
-    _isOwnerOfCurrentLocation = false;
-    await _storage?.remove(StorageKeys.currentBusinessId);
-    await _storage?.remove(StorageKeys.currentBusinessName);
-    await _storage?.remove(StorageKeys.currentOwnerProfileId);
-    await _storage?.remove(StorageKeys.isOwnerOfCurrentLocation);
-    notifyListeners();
+    await DatabaseManager().runAtomic(() async {
+      await init();
+      await _runSwitchGuards();
+
+      _currentBusinessId = null;
+      _currentBusinessName = null;
+      _currentOwnerProfileId = null;
+      _isOwnerOfCurrentLocation = false;
+      await _storage?.remove(StorageKeys.currentBusinessId);
+      await _storage?.remove(StorageKeys.currentBusinessName);
+      await _storage?.remove(StorageKeys.currentOwnerProfileId);
+      await _storage?.remove(StorageKeys.isOwnerOfCurrentLocation);
+      notifyListeners();
+    });
+  }
+
+  void registerSwitchGuard(Object owner, BusinessContextSwitchGuard guard) {
+    _switchGuards[owner] = guard;
+  }
+
+  void unregisterSwitchGuard(Object owner) {
+    _switchGuards.remove(owner);
+  }
+
+  Future<void> _runSwitchGuards() async {
+    for (final entry in _switchGuards.entries.toList()) {
+      try {
+        await entry.value();
+      } catch (error) {
+        debugPrint('BusinessContext switch guard failed: $error');
+      }
+    }
   }
 }

@@ -15,6 +15,8 @@ import 'core/network/api_endpoints.dart';
 import 'core/providers/localization_provider.dart';
 import 'core/routing/app_router.dart';
 import 'core/storage/secure_storage.dart';
+import 'core/database/app_database.dart';
+import 'core/database/database_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/data/auth_api_service.dart';
@@ -78,6 +80,7 @@ void main() async {
   await Firebase.initializeApp();
   await ConnectivityService().initialize();
   await CacheManager().init();
+  await DatabaseManager().initialize();
   await BusinessContext().init();
   await UserProfileContext().init();
   runApp(const MyApp());
@@ -172,6 +175,7 @@ class _MyAppState extends State<MyApp> {
           await BusinessContext().clear();
           await UserProfileContext().clear();
           await CacheManager().clearAll();
+          await DatabaseManager().clearForLogout();
           AppRouter.globalAppBarState.reset();
           AppRouter.navigateAndClearStack(AppRoutes.login);
         },
@@ -252,8 +256,10 @@ class _MyAppState extends State<MyApp> {
     ConnectivityService().statusStream.listen((status) {
       if (status == ConnectivityStatus.online) {
         // Trigger generic data refresh when network is back
-        _locationRepository.getMyOwnedLocations().then((_) {
-          debugPrint('Main: Triggered auto-refresh of locations after network recovery.');
+        _locationRepository.refreshAndCacheAllLocations().then((locations) {
+          debugPrint(
+            'Main: Auto-refreshed and cached ${locations.length} locations after network recovery.',
+          );
         }).catchError((_) {});
       }
     });

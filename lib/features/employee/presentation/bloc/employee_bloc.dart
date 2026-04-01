@@ -1,5 +1,6 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../data/employee_management_repository.dart';
@@ -9,7 +10,6 @@ import 'employee_state.dart';
 
 class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
   final EmployeeManagementRepository _repository;
-  final CacheManager _cacheManager = CacheManager();
 
   EmployeeBloc({required EmployeeManagementRepository repository})
       : _repository = repository,
@@ -29,73 +29,23 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     LoadEmployeesRequested event,
     Emitter<EmployeeState> emit,
   ) async {
-    final cacheKey = 'employees_${event.businessId}';
+    final localEmployees = await _getCachedEmployeesLocal(event.businessId);
 
-    if (state is! EmployeeLoaded) {
+    if (localEmployees.isNotEmpty) {
+      emit(_createLoadedState(localEmployees, 0, ''));
+    } else if (state is! EmployeeLoaded) {
       emit(EmployeeLoading());
     }
 
-    await _cacheManager.fetchWithSWR<List<EmployeeEntity>>(
-      key: cacheKey,
-      fetcher: ({cancelToken}) => _repository.getEmployees(event.businessId),
-      fromJson: (json) {
-        final dataList = json['data'] as List? ?? [];
-        return dataList.map((item) {
-          return EmployeeEntity(
-            id: item['id'] ?? '',
-            name: item['name'] ?? '',
-            phone: item['phone'] ?? '',
-            email: item['email'] ?? '',
-            status: EmployeeStatus.values.firstWhere(
-              (e) => e.name == (item['status'] ?? 'active'),
-              orElse: () => EmployeeStatus.active,
-            ),
-            isActive: item['isActive'] ?? true,
-            employmentStatus: item['employmentStatus'] ?? '',
-            startedAt: item['startedAt'] != null ? DateTime.parse(item['startedAt']) : null,
-            endedAt: item['endedAt'] != null ? DateTime.parse(item['endedAt']) : null,
-            assignedBusinessId: item['assignedBusinessId'] ?? '',
-            assignedLocationIds: List<String>.from(item['assignedLocationIds'] ?? []),
-            assignedLocationNames: List<String>.from(item['assignedLocationNames'] ?? []),
-          );
-        }).toList();
-      },
-      toJson: (data) {
-        return {
-          'data': data
-              .map(
-                (e) => {
-                  'id': e.id,
-                  'name': e.name,
-                  'phone': e.phone,
-                  'email': e.email,
-                  'status': e.status.name,
-                  'isActive': e.isActive,
-                  'employmentStatus': e.employmentStatus,
-                  'startedAt': e.startedAt != null
-                    ? DateFormatter.toApiUtcIsoString(e.startedAt!)
-                    : null,
-                  'endedAt': e.endedAt != null
-                    ? DateFormatter.toApiUtcIsoString(e.endedAt!)
-                    : null,
-                  'assignedBusinessId': e.assignedBusinessId,
-                  'assignedLocationIds': e.assignedLocationIds,
-                  'assignedLocationNames': e.assignedLocationNames,
-                },
-              )
-              .toList(),
-        };
-      },
-      onData: (data, isFromCache) {
-        // Add event instead of direct emit to avoid BLoC timing issues
-        add(EmployeesNetworkDataReceived(employees: data, isFromCache: isFromCache));
-      },
-      onError: (error) {
-        if (!isClosed && state is! EmployeeLoaded) {
-          emit(EmployeeFailure(ApiErrorMessageParser.parse(error)));
-        }
-      },
-    );
+    try {
+      final data = await _repository.getEmployees(event.businessId);
+      unawaited(_saveCachedEmployeesLocal(event.businessId, data));
+      add(EmployeesNetworkDataReceived(employees: data, isFromCache: false));
+    } catch (error) {
+      if (!isClosed && localEmployees.isEmpty && state is! EmployeeLoaded) {
+        emit(EmployeeFailure(ApiErrorMessageParser.parse(error)));
+      }
+    }
   }
 
   Future<void> _onEmployeesNetworkDataReceived(
@@ -284,33 +234,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     }
 
     final freshEmployees = await _repository.getEmployees(businessId);
-    await _cacheManager.set(
-      'employees_$businessId',
-      {
-        'data': freshEmployees
-            .map(
-              (e) => {
-                'id': e.id,
-                'name': e.name,
-                'phone': e.phone,
-                'email': e.email,
-                'status': e.status.name,
-                'isActive': e.isActive,
-                'employmentStatus': e.employmentStatus,
-                'startedAt': e.startedAt != null
-                  ? DateFormatter.toApiUtcIsoString(e.startedAt!)
-                  : null,
-                'endedAt': e.endedAt != null
-                  ? DateFormatter.toApiUtcIsoString(e.endedAt!)
-                  : null,
-                'assignedBusinessId': e.assignedBusinessId,
-                'assignedLocationIds': e.assignedLocationIds,
-                'assignedLocationNames': e.assignedLocationNames,
-              },
-            )
-            .toList(),
-      },
-    );
+    await _saveCachedEmployeesLocal(businessId, freshEmployees);
 
     emit(
       _createLoadedState(
@@ -378,5 +302,24 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       currentTab: safeTabIndex,
       searchKeyword: searchKeyword,
     );
+  }
+
+  Future<List<EmployeeEntity>> _getCachedEmployeesLocal(String businessId) {
+    final repository = _repository;
+    if (repository is EmployeeManagementRepositoryApi) {
+      return repository.getCachedEmployees(businessId);
+    }
+    return Future.value(const <EmployeeEntity>[]);
+  }
+
+  Future<void> _saveCachedEmployeesLocal(
+    String businessId,
+    List<EmployeeEntity> employees,
+  ) {
+    final repository = _repository;
+    if (repository is EmployeeManagementRepositoryApi) {
+      return repository.saveCachedEmployees(businessId, employees);
+    }
+    return Future.value();
   }
 }

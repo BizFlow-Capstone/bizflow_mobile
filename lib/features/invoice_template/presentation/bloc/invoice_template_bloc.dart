@@ -3,6 +3,7 @@ import '../../data/invoice_template_repository.dart';
 import '../../domain/entities/invoice_template_entity.dart';
 import 'invoice_template_event.dart';
 import 'invoice_template_state.dart';
+import '../../../../core/storage/local_storage.dart';
 import '../../../../shared/cache/cache_manager.dart';
 
 class InvoiceTemplateBloc extends Bloc<InvoiceTemplateEvent, InvoiceTemplateState> {
@@ -11,9 +12,34 @@ class InvoiceTemplateBloc extends Bloc<InvoiceTemplateEvent, InvoiceTemplateStat
   // In-memory cache
   InvoiceTemplateEntity? _templateCache;
 
-  InvoiceTemplateBloc({required this.repository}) : super(const InvoiceTemplateInitial()) {
+  InvoiceTemplateBloc({required this.repository})
+    : super(const InvoiceTemplateInitial()) {
     on<LoadInvoiceTemplateRequested>(_onLoadInvoiceTemplateRequested);
     on<SaveInvoiceTemplateRequested>(_onSaveInvoiceTemplateRequested);
+  }
+
+  Future<String> _resolveCacheKey() async {
+    final storage = await LocalStorage.getInstance();
+    final email = (storage.getString(StorageKeys.currentUserEmail) ?? '')
+        .trim()
+        .toLowerCase();
+    if (email.isNotEmpty) {
+      return 'my_invoice_template:email:$email';
+    }
+
+    final phone = (storage.getString(StorageKeys.currentUserPhone) ?? '').trim();
+    if (phone.isNotEmpty) {
+      return 'my_invoice_template:phone:$phone';
+    }
+
+    final fullName = (storage.getString(StorageKeys.currentUserFullName) ?? '')
+        .trim()
+        .toLowerCase();
+    if (fullName.isNotEmpty) {
+      return 'my_invoice_template:name:$fullName';
+    }
+
+    return 'my_invoice_template:anonymous';
   }
 
   Future<InvoiceTemplateEntity> _refreshInvoiceTemplate() async {
@@ -27,9 +53,10 @@ class InvoiceTemplateBloc extends Bloc<InvoiceTemplateEvent, InvoiceTemplateStat
     Emitter<InvoiceTemplateState> emit,
   ) async {
     emit(const InvoiceTemplateLoading());
+    final cacheKey = await _resolveCacheKey();
 
     await CacheManager().fetchWithSWR<InvoiceTemplateEntity>(
-      key: 'my_invoice_template',
+      key: cacheKey,
       fetcher: ({cancelToken}) => _refreshInvoiceTemplate(),
       fromJson: (json) {
         return InvoiceTemplateEntity.fromMap(json['data'] as Map<String, dynamic>);
@@ -54,11 +81,12 @@ class InvoiceTemplateBloc extends Bloc<InvoiceTemplateEvent, InvoiceTemplateStat
     emit(const InvoiceTemplateSaveInProgress());
     try {
       final updatedTemplate = await repository.updateInvoiceTemplate(event.request);
-      
+      final cacheKey = await _resolveCacheKey();
+
       _templateCache = updatedTemplate;
-      
+
       // Update cache storage
-      await CacheManager().set('my_invoice_template', {
+      await CacheManager().set(cacheKey, {
         'data': _templateCache!.toMap(),
       });
 

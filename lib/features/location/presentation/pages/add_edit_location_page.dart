@@ -189,25 +189,22 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
         ),
       ),
       body: BlocListener<LocationBloc, LocationState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state is LocationAddSuccess) {
-            BusinessContext()
-                .switchBusinessLocation(
-                  state.newLocation.id,
-                  state.newLocation.name,
-                  isOwner: true, // Creating a location → always owner
-                )
-                .then((_) {
-                  if (!mounted) {
-                    return;
-                  }
-                  AppRouter.navigateAndClearStack(AppRoutes.home);
-                });
+            await BusinessContext().switchBusinessLocation(
+              state.newLocation.id,
+              state.newLocation.name,
+              isOwner: true, // Creating a location → always owner
+            );
+            if (!mounted) {
+              return;
+            }
+            AppRouter.navigateAndClearStack(AppRoutes.home);
           } else if (state is LocationEditSuccess) {
             final businessContext =
                 Provider.of<BusinessContext>(context, listen: false);
             if (businessContext.currentBusinessId == state.updatedLocation.id) {
-              businessContext.switchBusinessLocation(
+              await businessContext.switchBusinessLocation(
                 state.updatedLocation.id,
                 state.updatedLocation.name,
                 isOwner: true, // Editing a location → must be owner to have reached this screen

@@ -1,6 +1,9 @@
+import '../../../../core/database/app_database.dart';
 import '../../../../shared/cache/cache_manager.dart';
+import '../../../../shared/cache/local_api_cache_store.dart';
 import '../domain/entities/order_entity.dart';
 import '../domain/entities/order_item_entity.dart';
+import 'datasources/order_local_datasource.dart';
 import 'order_api_service.dart';
 import 'models/order_dto.dart';
 
@@ -8,12 +11,20 @@ import 'models/order_dto.dart';
 class OrderRepository {
   final OrderApiService _apiService;
   final CacheManager _cache;
+  final LocalApiCacheStore _localApiCache;
+  final OrderLocalDataSource _localDataSource;
+
+  static const String _ordersSyncResourceKey = 'orders_list';
 
   OrderRepository({
     required OrderApiService apiService,
     CacheManager? cacheManager,
-  })  : _apiService = apiService,
-        _cache = cacheManager ?? CacheManager();
+    LocalApiCacheStore? localApiCacheStore,
+    OrderLocalDataSource? localDataSource,
+  }) : _apiService = apiService,
+       _cache = cacheManager ?? CacheManager(),
+       _localApiCache = localApiCacheStore ?? LocalApiCacheStore(),
+       _localDataSource = localDataSource ?? OrderLocalDataSource();
 
   // Convert DTO to Entity
   OrderEntity _mapToEntity(OrderDto dto) {
@@ -36,6 +47,7 @@ class OrderRepository {
               price: item.price,
               quantity: item.quantity,
               discount: item.discount,
+              note: item.note,
             ),
           )
           .toList(),
@@ -46,6 +58,7 @@ class OrderRepository {
       cashAmount: dto.cashAmount,
       bankAmount: dto.bankAmount,
       debtAmount: dto.debtAmount,
+      debtorId: dto.debtorId,
       note: dto.note,
       createdAt: dto.createdAt,
       updatedAt: dto.updatedAt,
@@ -63,56 +76,97 @@ class OrderRepository {
     required int pageSize,
     String? status,
     String? locationId,
-    required Function(
-      List<OrderEntity> data,
-      int totalCount,
-      bool isFromCache,
-    )
+    required Function(List<OrderEntity> data, int totalCount, bool isFromCache)
     onData,
     Function(dynamic error)? onError,
   }) async {
     final key = 'orders_${locationId}_${status}_p${pageNumber}_s$pageSize';
+    final scopeKey = _scopeKey(status: status, locationId: locationId);
+    var hasLocalData = false;
 
-    await _cache.fetchWithSWR<Map<String, dynamic>>(
-      key: key,
-      fetcher:
-            ({cancelToken}) => _apiService
-              .getOrders(
-                pageNumber: pageNumber,
-                pageSize: pageSize,
-                status: status,
-                locationId: locationId,
-              )
-              .then((res) => {
-                'items': res.orders.map((e) => e.toJson()).toList(),
-                'total': res.total,
-              }),
-      onData: (dataMap, isFromCache) {
-        final items =
-            (dataMap['items'] as List<dynamic>? ?? [])
-                .map((e) => OrderDto.fromJson(e as Map<String, dynamic>))
-                .map(_mapToEntity)
-                .toList();
-        final totalCount = dataMap['total'] as int? ?? 0;
-        onData(items, totalCount, isFromCache);
-      },
-      onError: onError,
-      toJson: (data) => data,
-      fromJson: (json) => json,
-    );
+    final localOrders = await _localDataSource.getByScopeKey(scopeKey);
+    if (localOrders.isNotEmpty) {
+      onData(localOrders, localOrders.length, true);
+      hasLocalData = true;
+    }
+
+    final localCached = await _localApiCache.getMap(key);
+    if (!hasLocalData && localCached != null) {
+      final items = (localCached['items'] as List<dynamic>? ?? [])
+          .map((e) => OrderDto.fromJson(e as Map<String, dynamic>))
+          .map(_mapToEntity)
+          .toList();
+      final totalCount = localCached['total'] as int? ?? 0;
+      onData(items, totalCount, true);
+      hasLocalData = true;
+    }
+
+    try {
+      final response = await _apiService.getOrders(
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+        status: status,
+        locationId: locationId,
+      );
+      final dataMap = {
+        'items': response.orders.map((e) => e.toJson()).toList(),
+        'total': response.total,
+      };
+      await _localApiCache.setMap(
+        key,
+        dataMap,
+        groupKey: 'orders',
+        cacheType: 'list',
+      );
+      final items = response.orders.map(_mapToEntity).toList();
+      await _localDataSource.replaceForScope(scopeKey, items);
+      await AppDatabase().syncStateDao.upsert(
+        resourceKey: _ordersSyncResourceKey,
+        businessId: scopeKey,
+        lastSyncedAtEpoch: DateTime.now().millisecondsSinceEpoch,
+      );
+      onData(items, response.total, false);
+    } catch (error) {
+      if (!hasLocalData && onError != null) {
+        onError(error);
+      }
+    }
   }
 
   /// Get single order by ID
   Future<OrderEntity> getOrder(String orderId) async {
-    final dto = await _apiService.getOrder(orderId);
-    return _mapToEntity(dto);
+    final key = 'order_detail_$orderId';
+    try {
+      final dto = await _apiService.getOrder(orderId);
+      final order = _mapToEntity(dto);
+      await _localApiCache.setMap(
+        key,
+        dto.toJson(),
+        groupKey: 'orders',
+        cacheType: 'detail',
+      );
+      await _localDataSource.upsertDetail(order);
+      return order;
+    } catch (e) {
+      final localOrder = await _localDataSource.getById(orderId);
+      if (localOrder != null) {
+        return localOrder;
+      }
+      final localCached = await _localApiCache.getMap(key);
+      if (localCached != null) {
+        return _mapToEntity(OrderDto.fromJson(localCached));
+      }
+      rethrow;
+    }
   }
 
   /// Create a new order (pending)
   Future<OrderEntity> createOrder(Map<String, dynamic> requestBody) async {
     final dto = await _apiService.createOrder(requestBody);
+    final order = _mapToEntity(dto);
+    await _localDataSource.upsertDetail(order);
     await clearCache();
-    return _mapToEntity(dto);
+    return order;
   }
 
   /// Update an existing order
@@ -126,8 +180,10 @@ class OrderRepository {
       body: requestBody,
       idempotencyKey: idempotencyKey,
     );
+    final order = _mapToEntity(dto);
+    await _localDataSource.upsertDetail(order);
     await clearCache();
-    return _mapToEntity(dto);
+    return order;
   }
 
   /// Complete an order (convert pending to completed)
@@ -139,21 +195,47 @@ class OrderRepository {
       orderId,
       confirmLowStock: confirmLowStock,
     );
+    final order = _mapToEntity(dto);
+    await _localDataSource.upsertDetail(order);
     await clearCache();
-    return _mapToEntity(dto);
+    return order;
   }
 
   /// Cancel an order
-  Future<bool> cancelOrder(String orderId, {required String cancelReason}) async {
-    final result = await _apiService.cancelOrder(orderId, cancelReason: cancelReason);
+  Future<bool> cancelOrder(
+    String orderId, {
+    required String cancelReason,
+  }) async {
+    final result = await _apiService.cancelOrder(
+      orderId,
+      cancelReason: cancelReason,
+    );
     if (result) {
+      await _localDataSource.deleteById(orderId);
       await clearCache();
     }
     return result;
   }
 
+  String _scopeKey({String? status, String? locationId}) {
+    return 'orders_${locationId ?? 'all'}_${status ?? 'all'}';
+  }
+
+  Future<int?> getOrdersLastSyncedAtEpoch({
+    String? status,
+    String? locationId,
+  }) async {
+    final scopeKey = _scopeKey(status: status, locationId: locationId);
+    final state = await AppDatabase().syncStateDao.getState(
+      resourceKey: _ordersSyncResourceKey,
+      businessId: scopeKey,
+    );
+    return state?.lastSyncedAtEpoch;
+  }
+
   /// Clear all cache keys related to orders
   Future<void> clearCache() async {
     await _cache.removeByPrefix('orders_');
+    await _localApiCache.removeByGroup('orders');
   }
 }

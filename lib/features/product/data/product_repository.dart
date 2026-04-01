@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:drift/drift.dart';
+import '../../../core/database/app_database.dart';
 import '../domain/entities/product_entity.dart';
+import 'datasources/product_local_datasource.dart';
 import 'product_api_service.dart';
+import 'models/business_type_model.dart';
 import 'models/product_dto.dart';
-import '../../../shared/cache/cache_manager.dart';
+import '../../../shared/cache/local_api_cache_store.dart';
 import '../../../shared/context/business_context.dart';
 
 /// Product Repository - Orchestrates product data flow
@@ -10,8 +14,117 @@ import '../../../shared/context/business_context.dart';
 /// Architecture: BLoC → Repository → Service → ApiClient
 class ProductRepository {
   final ProductApiService _service;
+  final ProductLocalDataSource _localDataSource;
+  final LocalApiCacheStore _localApiCache;
 
-  ProductRepository({required ProductApiService service}) : _service = service;
+  static const String _productsSyncResourceKey = 'products_list';
+  static const String _productDirtyResourcePrefix = 'dirty_product:';
+
+  ProductRepository({
+    required ProductApiService service,
+    ProductLocalDataSource? localDataSource,
+    LocalApiCacheStore? localApiCacheStore,
+  }) : _service = service,
+       _localDataSource = localDataSource ?? ProductLocalDataSource(),
+       _localApiCache = localApiCacheStore ?? LocalApiCacheStore();
+
+  Future<List<ProductEntity>> getCachedProducts(String scopeKey) {
+    return _localDataSource.getByScopeKey(scopeKey);
+  }
+
+  Future<ProductEntity?> getCachedProductDetail(String productId) {
+    return _localDataSource.getById(productId);
+  }
+
+  Future<void> saveCachedProducts(
+    String scopeKey,
+    List<ProductEntity> products,
+  ) async {
+    final mergedProducts = await _mergeWithDirtyProducts(scopeKey, products);
+    await _localDataSource.replaceForScope(scopeKey, mergedProducts);
+    await AppDatabase().syncStateDao.upsert(
+      resourceKey: _productsSyncResourceKey,
+      businessId: scopeKey,
+      lastSyncedAtEpoch: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  Future<void> markProductsDirty(
+    String scopeKey,
+    List<String> productIds,
+  ) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final rows = productIds
+        .toSet()
+        .map(
+          (id) => SyncStateTableCompanion.insert(
+            resourceKey: '$_productDirtyResourcePrefix$id',
+            businessId: Value(scopeKey),
+            lastSyncedAtEpoch: now,
+            etag: const Value('dirty'),
+          ),
+        )
+        .toList();
+    await AppDatabase().syncStateDao.upsertAll(rows);
+  }
+
+  Future<void> clearProductsDirty(
+    String scopeKey,
+    List<String> productIds,
+  ) {
+    final resourceKeys = productIds
+        .toSet()
+        .map((id) => '$_productDirtyResourcePrefix$id')
+        .toList();
+    return AppDatabase().syncStateDao.deleteByBusinessAndResourceKeys(
+      businessId: scopeKey,
+      resourceKeys: resourceKeys,
+    );
+  }
+
+  Future<int?> getProductsLastSyncedAtEpoch(String scopeKey) async {
+    final state = await AppDatabase().syncStateDao.getState(
+      resourceKey: _productsSyncResourceKey,
+      businessId: scopeKey,
+    );
+    return state?.lastSyncedAtEpoch;
+  }
+
+  Future<void> clearCachedProducts() {
+    return _localDataSource.clearAll();
+  }
+
+  Future<List<ProductEntity>> _mergeWithDirtyProducts(
+    String scopeKey,
+    List<ProductEntity> incoming,
+  ) async {
+    final dirtyRows = await AppDatabase().syncStateDao
+        .listByBusinessAndResourcePrefix(
+          businessId: scopeKey,
+          resourcePrefix: _productDirtyResourcePrefix,
+        );
+    if (dirtyRows.isEmpty) return incoming;
+
+    final dirtyIds = dirtyRows
+        .map((row) => row.resourceKey.replaceFirst(_productDirtyResourcePrefix, ''))
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (dirtyIds.isEmpty) return incoming;
+
+    final localProducts = await _localDataSource.getByScopeKey(scopeKey);
+    final localById = {for (final item in localProducts) item.id: item};
+
+    final merged = incoming
+        .where((item) => !dirtyIds.contains(item.id))
+        .toList(growable: true);
+    for (final dirtyId in dirtyIds) {
+      final local = localById[dirtyId];
+      if (local != null) {
+        merged.add(local);
+      }
+    }
+    return merged;
+  }
 
   /// Get products for a specific location (Legacy endpoint)
   Future<List<ProductEntity>> getLocationProducts(String locationId) async {
@@ -80,35 +193,37 @@ class ProductRepository {
 
   /// Get product detail with images and sale items
   Future<ProductEntity?> getProductDetail(String productId) async {
+    final detailCacheKey = 'product_detail_$productId';
     try {
       final response = await _service.getProductDetail(productId);
       if (response != null &&
           response is Map<String, dynamic> &&
           response['success'] == true &&
           response['data'] != null) {
-        final dto = ProductDto.fromJson(
+        final payload = Map<String, dynamic>.from(
           response['data'] as Map<String, dynamic>,
         );
-        return ProductEntity(
-          id: dto.id,
-          name: dto.name,
-          description: dto.description,
-          price: dto.price,
-          costPrice: dto.costPrice,
-          salePrice: dto.salePrice,
-          quantity: dto.quantity,
-          imageUrl: dto.imageUrl,
-          businessTypeId: dto.businessTypeId,
-          manufacturer: dto.manufacturer,
-          businessLocationName: dto.businessLocationName,
-          unit: dto.unit,
-          barcode: dto.barcode,
-          isActive: dto.isActive,
-          saleItems: dto.saleItems,
+        final product = _mapDtoToEntity(ProductDto.fromJson(payload));
+        await _localApiCache.setMap(
+          detailCacheKey,
+          payload,
+          groupKey: 'products',
+          cacheType: 'detail',
         );
+        await _localDataSource.upsertDetail(product);
+        return product;
       }
-      return null;
+      return await _localDataSource.getById(productId);
     } catch (e) {
+      final localProduct = await _localDataSource.getById(productId);
+      if (localProduct != null) {
+        return localProduct;
+      }
+
+      final localCached = await _localApiCache.getMap(detailCacheKey);
+      if (localCached != null) {
+        return _mapDtoToEntity(ProductDto.fromJson(localCached));
+      }
       debugPrint('ProductRepository.getProductDetail error: $e');
       rethrow;
     }
@@ -119,12 +234,17 @@ class ProductRepository {
     final businessId = BusinessContext().currentBusinessId ?? 'all';
     final cacheKey = 'cache_sale_items_${businessId}_$productId';
 
-    final cached = await CacheManager().get(cacheKey);
+    final cached = await _localApiCache.getMap(cacheKey);
 
     try {
       final response = await _service.getProductSaleItems(productId);
       final normalized = _normalizeSaleItems(response);
-      await CacheManager().set(cacheKey, {'data': normalized});
+      await _localApiCache.setMap(
+        cacheKey,
+        {'data': normalized},
+        groupKey: 'product_sale_items',
+        cacheType: 'list',
+      );
       return {'data': normalized};
     } catch (e) {
       debugPrint('ProductRepository.getProductSaleItems error: $e');
@@ -291,7 +411,10 @@ class ProductRepository {
     required bool status,
   }) async {
     try {
-      final result = await _service.updateProductStatus(productId, status: status);
+      final result = await _service.updateProductStatus(
+        productId,
+        status: status,
+      );
       await clearCache();
       return result;
     } catch (e) {
@@ -312,18 +435,62 @@ class ProductRepository {
   }
 
   /// Get business types
-  Future<dynamic> getBusinessTypes() async {
+  Future<List<BusinessTypeDto>> getBusinessTypes() async {
+    const cacheKey = 'product_business_types';
+
     try {
-      return await _service.getBusinessTypes();
+      final result = await _service.getBusinessTypes();
+      final normalized = result.map((item) => item.toJson()).toList();
+
+      await _localApiCache.setMap(
+        cacheKey,
+        {'data': normalized},
+        groupKey: 'product_business_types',
+        cacheType: 'list',
+      );
+
+      return result;
     } catch (e) {
+      final cached = await _localApiCache.getMap(cacheKey);
+      if (cached != null) {
+        final data = cached['data'];
+        if (data is List) {
+          return data
+              .whereType<Map>()
+              .map((item) => BusinessTypeDto.fromJson(Map<String, dynamic>.from(item)))
+              .toList();
+        }
+        return <BusinessTypeDto>[];
+      }
       debugPrint('ProductRepository.getBusinessTypes error: $e');
       rethrow;
     }
   }
 
+  ProductEntity _mapDtoToEntity(ProductDto dto) {
+    return ProductEntity(
+      id: dto.id,
+      name: dto.name,
+      description: dto.description,
+      price: dto.price,
+      costPrice: dto.costPrice,
+      salePrice: dto.salePrice,
+      quantity: dto.quantity,
+      imageUrl: dto.imageUrl,
+      businessTypeId: dto.businessTypeId,
+      manufacturer: dto.manufacturer,
+      businessLocationName: dto.businessLocationName,
+      unit: dto.unit,
+      barcode: dto.barcode,
+      isActive: dto.isActive,
+      saleItems: dto.saleItems,
+    );
+  }
+
   Future<void> clearCache() async {
-    await CacheManager().removeByPrefix("cache_products_");
-    await CacheManager().removeByPrefix("cache_sale_items_");
-    await CacheManager().removeByPrefix("cache_product_detail_");
+    await _localApiCache.removeByGroup('products');
+    await _localApiCache.removeByGroup('product_sale_items');
+    await _localApiCache.removeByGroup('product_business_types');
+    await clearCachedProducts();
   }
 }
