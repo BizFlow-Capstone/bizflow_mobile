@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -68,10 +67,9 @@ class WordExportService {
 
       final path = '$_templateDir/$filename';
       final bytes = await rootBundle.load(path);
-      // Use toList() to create a modifiable and growable copy of the bytes
-      return bytes.buffer
-          .asUint8List(bytes.offsetInBytes, bytes.lengthInBytes)
-          .toList();
+      // Create a fully modifiable copy — asset bundles return unmodifiable views
+      final source = bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes);
+      return List<int>.from(source, growable: true);
     } catch (e) {
       print('Error loading template: $e');
       return null;
@@ -86,7 +84,9 @@ class WordExportService {
     List<int> templateBytes,
   ) async {
     try {
-      final docx = await DocxTemplate.fromBytes(templateBytes);
+      final docx = await DocxTemplate.fromBytes(
+        List<int>.from(templateBytes, growable: true),
+      );
 
       final content = Content();
 
@@ -97,23 +97,31 @@ class WordExportService {
       content.add(TextContent('exportedAt', DateFormatter.formatDateTime(DateTime.now())));
 
       // Table rows
-      // We assume the template has a table with a tag matching the templateCode (e.g., 'table_S1a')
-      // OR a generic 'items' tag for the repeating part.
-      // Based on common patterns, let's look for a table.
-      
       final tableRows = <RowContent>[];
-      for (final row in rows) {
+      for (var i = 0; i < rows.length; i++) {
+        final row = rows[i];
         final rowContent = RowContent();
         for (final field in template.fields) {
-          final val = row[field.fieldCode];
+          final val = _resolveCellValue(row, field, rowIndex: i);
           final formattedVal = _formatCellValue(val, field.fieldType) ?? '';
           rowContent.add(TextContent(field.fieldCode, formattedVal));
         }
         tableRows.add(rowContent);
       }
 
-      // Try to find the items table
-      content.add(TableContent('items', tableRows));
+      // Add table content with common placeholder names so template variations still work.
+      for (final tag in _tableTagCandidates(template.templateCode)) {
+        content.add(TableContent(tag, tableRows));
+      }
+
+      for (final formulaField in template.formulaFields) {
+        final expression = formulaField.formulaExpression;
+        if (expression == null || expression.isEmpty) continue;
+        final value = calculateFormulaValue(expression, rows);
+        if ((value ?? '').isNotEmpty) {
+          content.add(TextContent(formulaField.fieldCode, value!));
+        }
+      }
 
       final buf = await docx.generate(content);
 
@@ -187,6 +195,54 @@ class WordExportService {
       default:
         return value.toString();
     }
+  }
+
+  static Iterable<String> _tableTagCandidates(String templateCode) {
+    final code = templateCode.trim();
+    final lower = code.toLowerCase();
+    return <String>{
+      'items',
+      'rows',
+      'table',
+      'table_$code',
+      'table_$lower',
+      'items_$code',
+      'items_$lower',
+      code,
+      lower,
+    };
+  }
+
+  static dynamic _resolveCellValue(
+    Map<String, dynamic> row,
+    TemplateFieldDefinition field, {
+    required int rowIndex,
+  }) {
+    if (field.fieldType == 'auto_increment') {
+      return row['stt'] ?? row['index'] ?? row['no'] ?? (rowIndex + 1);
+    }
+
+    final direct = row[field.fieldCode];
+    if (direct != null) return direct;
+
+    final aliases = <String, List<String>>{
+      'date': ['ngay_thang', 'createdAt', 'transactionDate', 'date'],
+      'ngay_thang': ['date', 'createdAt', 'transactionDate'],
+      'description': ['dien_giai', 'note', 'description'],
+      'dien_giai': ['description', 'note', 'memo'],
+      'so_tien': ['amount', 'totalAmount', 'value'],
+      'revenue': ['so_tien', 'amount', 'totalAmount'],
+      'cost': ['so_tien', 'amount', 'totalAmount'],
+      'so_hieu': ['referenceCode', 'referenceId', 'code'],
+    };
+
+    final keyAliases = aliases[field.fieldCode] ?? const <String>[];
+    for (final key in keyAliases) {
+      final value = row[key];
+      if (value != null) return value;
+    }
+
+    return null;
   }
 
   /// Calculate formula value

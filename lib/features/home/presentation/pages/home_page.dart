@@ -8,6 +8,10 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/services/permission_service.dart';
+import '../../../employee/presentation/bloc/employee_bloc.dart';
+import '../../../employee/presentation/bloc/employee_event.dart';
+import '../../../employee/presentation/bloc/employee_state.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_event.dart';
 import '../../../location/presentation/bloc/location_state.dart';
@@ -30,6 +34,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  String? _lastEmployeeLoadedBusinessId;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +50,18 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final businessContext = context.watch<BusinessContext>();
+    final isOwner = businessContext.isOwner;
+
+    if (isOwner && businessContext.currentBusinessId != null) {
+      final businessId = businessContext.currentBusinessId!;
+      if (_lastEmployeeLoadedBusinessId != businessId) {
+        _lastEmployeeLoadedBusinessId = businessId;
+        context.read<EmployeeBloc>().add(
+          LoadEmployeesRequested(businessId: businessId),
+        );
+      }
+    }
 
     return BlocListener<LocationBloc, LocationState>(
       listener: (context, state) {
@@ -55,13 +73,17 @@ class _HomePageState extends State<HomePage> {
             });
           } else {
             // Auto-select first location if context is empty
-            final businessContext = Provider.of<BusinessContext>(context, listen: false);
+            final businessContext = Provider.of<BusinessContext>(
+              context,
+              listen: false,
+            );
             if (businessContext.currentBusinessId == null) {
               final firstLocation = state.locations.first;
               businessContext.switchBusinessLocation(
                 firstLocation.id,
                 firstLocation.name,
                 isOwner: firstLocation.isOwner,
+                ownerProfileId: firstLocation.ownerProfileId,
               );
             }
           }
@@ -144,6 +166,7 @@ class _HomePageState extends State<HomePage> {
                   onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
                   onDebt: () => AppRouter.navigateTo(AppRoutes.debtList),
                   onReport: () => AppRouter.navigateTo(AppRoutes.accounting),
+                  showReport: PermissionService.canViewReports(isOwner),
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -160,69 +183,75 @@ class _HomePageState extends State<HomePage> {
                     final locationsCount = locationState is LocationsLoaded
                         ? locationState.locations.length
                         : 0;
-                    return ManagementCards(
-                      locationsCount: locationsCount,
-                      onProductsTab: () {
-                        final contextData = Provider.of<BusinessContext>(
-                          context,
-                          listen: false,
-                        );
-                        if (contextData.currentBusinessId != null) {
-                          String address = '';
-                          if (locationState is LocationsLoaded) {
-                            try {
-                              final currentLoc = locationState.locations.firstWhere(
-                                (loc) => loc.id == contextData.currentBusinessId,
-                              );
-                              address = currentLoc.address;
-                            } catch (_) {}
-                          }
+                    return BlocBuilder<EmployeeBloc, EmployeeState>(
+                      builder: (context, employeeState) {
+                        final employeesCount = employeeState is EmployeeLoaded
+                            ? employeeState.totalCount
+                            : 0;
+                        return ManagementCards(
+                          locationsCount: locationsCount,
+                          employeesCount: employeesCount,
+                          showEmployeesCard:
+                              PermissionService.canManageEmployees(isOwner),
+                          onProductsTab: () {
+                            final contextData = Provider.of<BusinessContext>(
+                              context,
+                              listen: false,
+                            );
+                            if (contextData.currentBusinessId != null) {
+                              String address = '';
+                              if (locationState is LocationsLoaded) {
+                                try {
+                                  final currentLoc = locationState.locations
+                                      .firstWhere(
+                                        (loc) =>
+                                            loc.id ==
+                                            contextData.currentBusinessId,
+                                      );
+                                  address = currentLoc.address;
+                                } catch (_) {}
+                              }
 
-                          AppRouter.navigateTo(
-                            AppRoutes.productManagement,
-                            arguments: {
-                              'locationId': contextData.currentBusinessId,
-                              'locationName': contextData.currentBusinessName,
-                              'locationAddress': address,
-                            },
-                          );
-                        } else {
-                          AppSnackBar.show(
-                            context,
-                            message: l10n.translate(
-                              'home.please_select_location',
-                            ),
-                            type: AppSnackBarType.warning,
-                          );
-                        }
-                      },
-                      onLocationsTab: () =>
-                          AppRouter.navigateTo(AppRoutes.locationManagement),
-                      onEmployeesTab: () {
-                        final contextData = Provider.of<BusinessContext>(
-                          context,
-                          listen: false,
+                              AppRouter.navigateTo(
+                                AppRoutes.productManagement,
+                                arguments: {
+                                  'locationId': contextData.currentBusinessId,
+                                  'locationName':
+                                      contextData.currentBusinessName,
+                                  'locationAddress': address,
+                                },
+                              );
+                            } else {
+                              AppSnackBar.show(
+                                context,
+                                message: l10n.translate(
+                                  'home.please_select_location',
+                                ),
+                                type: AppSnackBarType.warning,
+                              );
+                            }
+                          },
+                          onLocationsTab: () => AppRouter.navigateTo(
+                            AppRoutes.locationManagement,
+                          ),
+                          onEmployeesTab: () {
+                            final contextData = Provider.of<BusinessContext>(
+                              context,
+                              listen: false,
+                            );
+                            if (contextData.currentBusinessId != null) {
+                              AppRouter.navigateTo(AppRoutes.employeeList);
+                            } else {
+                              AppSnackBar.show(
+                                context,
+                                message: l10n.translate(
+                                  'home.please_select_location',
+                                ),
+                                type: AppSnackBarType.warning,
+                              );
+                            }
+                          },
                         );
-                        if (!contextData.isOwner) {
-                          // Employees don't have access to employee management
-                          AppSnackBar.show(
-                            context,
-                            message: l10n.translate('common.permission_denied'),
-                            type: AppSnackBarType.warning,
-                          );
-                          return;
-                        }
-                        if (contextData.currentBusinessId != null) {
-                          AppRouter.navigateTo(AppRoutes.employeeList);
-                        } else {
-                          AppSnackBar.show(
-                            context,
-                            message: l10n.translate(
-                              'home.please_select_location',
-                            ),
-                            type: AppSnackBarType.warning,
-                          );
-                        }
                       },
                     );
                   },

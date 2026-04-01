@@ -3,12 +3,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
+import '../../../../core/reference/presentation/bloc/reference_event.dart';
+import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/services/permission_service.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/debtor_entity.dart';
 import '../bloc/debtor_bloc.dart';
 import '../bloc/debtor_event.dart';
@@ -16,7 +22,6 @@ import '../bloc/debtor_state.dart';
 import 'debt_detail_page.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_state.dart';
-
 
 class DebtListPage extends StatefulWidget {
   const DebtListPage({super.key});
@@ -33,7 +38,23 @@ class _DebtListPageState extends State<DebtListPage> {
   @override
   void initState() {
     super.initState();
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
     _loadDebtors();
+  }
+
+  List<String> _paymentMethodsFromReference() {
+    final state = context.read<ReferenceBloc>().state;
+    if (state is ReferenceLoaded) {
+      final methods = (state.references['paymentMethods'] ?? const <String>[])
+          .where((m) => m.trim().isNotEmpty)
+          .toSet()
+          .toList();
+      if (methods.isNotEmpty) return methods;
+    }
+    return const <String>['CASH', 'BANK_TRANSFER'];
   }
 
   @override
@@ -48,8 +69,15 @@ class _DebtListPageState extends State<DebtListPage> {
     int? locationId,
     bool clearLocation = false,
   }) {
+    final businessContext = context.read<BusinessContext>();
+    final isOwner = businessContext.isOwner;
+    final currentLocationId = int.tryParse(
+      businessContext.currentBusinessId ?? '',
+    );
     final int? locId;
-    if (clearLocation) {
+    if (!isOwner && currentLocationId != null && currentLocationId > 0) {
+      locId = currentLocationId;
+    } else if (clearLocation) {
       locId = null;
     } else {
       locId = locationId ?? _selectedLocationId;
@@ -82,73 +110,39 @@ class _DebtListPageState extends State<DebtListPage> {
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg,
                   AppSpacing.md,
-                AppSpacing.lg,
-                AppSpacing.xl,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Bộ lọc',
-                        style: AppTextStyles.titleMedium.copyWith(
-                          fontWeight: FontWeight.bold,
+                  AppSpacing.lg,
+                  AppSpacing.xl,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Bộ lọc',
+                          style: AppTextStyles.titleMedium.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setSheetState(() {
-                            tempIsActive = null;
-                            tempLocationId = null;
-                          });
-                        },
-                        child: const Text('Đặt lại'),
-                      ),
-                    ],
-                  ),
-                  const Divider(),
-                  const SizedBox(height: AppSpacing.sm),
-                  // --- Status filter ---
-                  Text(
-                    'Trạng thái',
-                    style: AppTextStyles.labelMedium.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                        TextButton(
+                          onPressed: () {
+                            setSheetState(() {
+                              tempIsActive = null;
+                              tempLocationId = null;
+                            });
+                          },
+                          child: const Text('Đặt lại'),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    children: [
-                      ChoiceChip(
-                        label: Text(l10n.translate('debt.filter_all')),
-                        selected: tempIsActive == null,
-                        onSelected: (_) =>
-                            setSheetState(() => tempIsActive = null),
-                      ),
-                      ChoiceChip(
-                        label: Text(l10n.translate('debt.filter_active')),
-                        selected: tempIsActive == true,
-                        onSelected: (_) =>
-                            setSheetState(() => tempIsActive = true),
-                      ),
-                      ChoiceChip(
-                        label: Text(l10n.translate('debt.filter_inactive')),
-                        selected: tempIsActive == false,
-                        onSelected: (_) =>
-                            setSheetState(() => tempIsActive = false),
-                      ),
-                    ],
-                  ),
-                  // --- Location filter (only if > 1 location) ---
-                  if (locations.length > 1) ...[
-                    const SizedBox(height: AppSpacing.md),
+                    const Divider(),
+                    const SizedBox(height: AppSpacing.sm),
+                    // --- Status filter ---
                     Text(
-                      'Địa điểm kinh doanh',
+                      'Trạng thái',
                       style: AppTextStyles.labelMedium.copyWith(
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
@@ -157,51 +151,86 @@ class _DebtListPageState extends State<DebtListPage> {
                     const SizedBox(height: AppSpacing.xs),
                     Wrap(
                       spacing: AppSpacing.xs,
-                      runSpacing: AppSpacing.xs,
                       children: [
                         ChoiceChip(
                           label: Text(l10n.translate('debt.filter_all')),
-                          selected: tempLocationId == null,
+                          selected: tempIsActive == null,
                           onSelected: (_) =>
-                              setSheetState(() => tempLocationId = null),
+                              setSheetState(() => tempIsActive = null),
                         ),
-                        ...locations.map((loc) {
-                          final locId = int.tryParse(loc.id.toString());
-                          return ChoiceChip(
-                            label: Text(loc.name),
-                            selected: tempLocationId == locId,
-                            onSelected: (_) => setSheetState(
-                              () => tempLocationId =
-                                  tempLocationId == locId ? null : locId,
-                            ),
-                          );
-                        }),
+                        ChoiceChip(
+                          label: Text(l10n.translate('debt.filter_active')),
+                          selected: tempIsActive == true,
+                          onSelected: (_) =>
+                              setSheetState(() => tempIsActive = true),
+                        ),
+                        ChoiceChip(
+                          label: Text(l10n.translate('debt.filter_inactive')),
+                          selected: tempIsActive == false,
+                          onSelected: (_) =>
+                              setSheetState(() => tempIsActive = false),
+                        ),
                       ],
                     ),
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  // Apply button
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        setState(() => _selectedLocationId = tempLocationId);
-                        _loadDebtors(
-                          search: _searchController.text,
-                          isActive: tempIsActive,
-                          locationId: tempLocationId,
-                        );
-                      },
-                      child: const Text('Áp dụng'),
+                    // --- Location filter (only if > 1 location) ---
+                    if (locations.length > 1) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Địa điểm kinh doanh',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          ChoiceChip(
+                            label: Text(l10n.translate('debt.filter_all')),
+                            selected: tempLocationId == null,
+                            onSelected: (_) =>
+                                setSheetState(() => tempLocationId = null),
+                          ),
+                          ...locations.map((loc) {
+                            final locId = int.tryParse(loc.id.toString());
+                            return ChoiceChip(
+                              label: Text(loc.name),
+                              selected: tempLocationId == locId,
+                              onSelected: (_) => setSheetState(
+                                () => tempLocationId = tempLocationId == locId
+                                    ? null
+                                    : locId,
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                    // Apply button
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          setState(() => _selectedLocationId = tempLocationId);
+                          _loadDebtors(
+                            search: _searchController.text,
+                            isActive: tempIsActive,
+                            locationId: tempLocationId,
+                          );
+                        },
+                        child: const Text('Áp dụng'),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      );
+            );
+          },
+        );
       },
     );
   }
@@ -210,6 +239,9 @@ class _DebtListPageState extends State<DebtListPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final isVietnamese = Localizations.localeOf(context).languageCode == 'vi';
+    final isOwner = context.watch<BusinessContext>().isOwner;
+    final canCreateDebtor = PermissionService.canCreateDebtor(isOwner);
+    final canDeleteDebtor = PermissionService.canDeleteDebtor(isOwner);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -230,10 +262,11 @@ class _DebtListPageState extends State<DebtListPage> {
           color: Colors.black,
         ),
         actions: [
-          IconButton(
-            onPressed: () => _showDebtorForm(),
-            icon: const Icon(Icons.person_add_alt_1_outlined),
-          ),
+          if (canCreateDebtor)
+            IconButton(
+              onPressed: () => _showDebtorForm(),
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+            ),
         ],
       ),
       body: SafeArea(
@@ -297,10 +330,11 @@ class _DebtListPageState extends State<DebtListPage> {
                 // ---- Search + Filter button row ----
                 BlocBuilder<LocationBloc, LocationState>(
                   builder: (context, locationState) {
-                    final locations = locationState is LocationsLoaded
+                    final locations =
+                        isOwner && locationState is LocationsLoaded
                         ? locationState.locations
-                            .where((l) => l.isActive)
-                            .toList()
+                              .where((l) => l.isActive)
+                              .toList()
                         : <dynamic>[];
 
                     // Count active filters for badge
@@ -325,19 +359,17 @@ class _DebtListPageState extends State<DebtListPage> {
                                   _loadDebtors(search: value),
                               decoration: InputDecoration(
                                 prefixIcon: const Icon(Icons.search),
-                                hintText:
-                                    l10n.translate('debt.search_hint'),
-                                suffixIcon:
-                                    _searchController.text.isNotEmpty
-                                        ? IconButton(
-                                            onPressed: () {
-                                              _searchController.clear();
-                                              _loadDebtors();
-                                              setState(() {});
-                                            },
-                                            icon: const Icon(Icons.close),
-                                          )
-                                        : null,
+                                hintText: l10n.translate('debt.search_hint'),
+                                suffixIcon: _searchController.text.isNotEmpty
+                                    ? IconButton(
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          _loadDebtors();
+                                          setState(() {});
+                                        },
+                                        icon: const Icon(Icons.close),
+                                      )
+                                    : null,
                               ),
                               onChanged: (_) => setState(() {}),
                             ),
@@ -348,10 +380,8 @@ class _DebtListPageState extends State<DebtListPage> {
                             clipBehavior: Clip.none,
                             children: [
                               IconButton.outlined(
-                                onPressed: () => _showFilterSheet(
-                                  state,
-                                  locations,
-                                ),
+                                onPressed: () =>
+                                    _showFilterSheet(state, locations),
                                 icon: const Icon(Icons.tune_rounded),
                                 style: IconButton.styleFrom(
                                   foregroundColor: activeFilterCount > 0
@@ -475,6 +505,7 @@ class _DebtListPageState extends State<DebtListPage> {
                             customers[index],
                             index,
                             l10n,
+                            canDeleteDebtor,
                           );
                         },
                       ),
@@ -485,12 +516,14 @@ class _DebtListPageState extends State<DebtListPage> {
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showDebtorForm(),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: canCreateDebtor
+          ? FloatingActionButton(
+              onPressed: () => _showDebtorForm(),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
@@ -532,6 +565,7 @@ class _DebtListPageState extends State<DebtListPage> {
     DebtorEntity customer,
     int index,
     AppLocalizations l10n,
+    bool canDeleteDebtor,
   ) {
     final isExpanded = _expandedCards.contains(index);
     final locationDisplay = customer.businessLocationName.trim().isNotEmpty
@@ -738,19 +772,21 @@ class _DebtListPageState extends State<DebtListPage> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: AppSpacing.sm),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _confirmDelete(customer),
-                                icon: const Icon(Icons.delete_outline),
-                                label: Text(l10n.translate('common.delete')),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.danger,
-                                  foregroundColor: Colors.white,
+                            if (canDeleteDebtor) ...[
+                              const SizedBox(height: AppSpacing.sm),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () => _confirmDelete(customer),
+                                  icon: const Icon(Icons.delete_outline),
+                                  label: Text(l10n.translate('common.delete')),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.danger,
+                                    foregroundColor: Colors.white,
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ],
                         );
                       }
@@ -788,18 +824,20 @@ class _DebtListPageState extends State<DebtListPage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _confirmDelete(customer),
-                              icon: const Icon(Icons.delete_outline),
-                              label: Text(l10n.translate('common.delete')),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.danger,
-                                foregroundColor: Colors.white,
+                          if (canDeleteDebtor) ...[
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => _confirmDelete(customer),
+                                icon: const Icon(Icons.delete_outline),
+                                label: Text(l10n.translate('common.delete')),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.danger,
+                                  foregroundColor: Colors.white,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       );
                     },
@@ -869,6 +907,12 @@ class _DebtListPageState extends State<DebtListPage> {
 
     if (normalDelete != true || !mounted) return;
 
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.debtorManagement,
+    );
+    if (!allowed) return;
+
     try {
       context.read<DebtorBloc>().add(
         DeleteDebtorRequested(debtorId: customer.debtorId, force: false),
@@ -923,6 +967,15 @@ class _DebtListPageState extends State<DebtListPage> {
 
   Future<void> _showDebtorForm({DebtorEntity? existing}) async {
     final l10n = AppLocalizations.of(context);
+    final isOwner = context.read<BusinessContext>().isOwner;
+    if (existing == null && !PermissionService.canCreateDebtor(isOwner)) {
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('common.permission_denied'),
+        type: AppSnackBarType.warning,
+      );
+      return;
+    }
     final nameController = TextEditingController(text: existing?.name ?? '');
     final phoneController = TextEditingController(text: existing?.phone ?? '');
     final addressController = TextEditingController(
@@ -930,7 +983,9 @@ class _DebtListPageState extends State<DebtListPage> {
     );
     final notesController = TextEditingController(text: existing?.notes ?? '');
     final creditLimitController = TextEditingController(
-      text: existing == null ? '' : existing.creditLimit.toInt().toString(),
+      text: existing == null
+          ? ''
+          : CurrencyFormatter.formatNumber(existing.creditLimit),
     );
 
     final confirmed = await showDialog<bool>(
@@ -978,8 +1033,10 @@ class _DebtListPageState extends State<DebtListPage> {
                 TextField(
                   controller: creditLimitController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
                   decoration: InputDecoration(
                     labelText: l10n.translate('debt.credit_limit'),
+                    suffixText: 'đ',
                   ),
                 ),
               ],
@@ -1016,6 +1073,12 @@ class _DebtListPageState extends State<DebtListPage> {
     );
 
     if (existing == null) {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.debtorManagement,
+      );
+      if (!allowed) return;
+
       final locationId = int.tryParse(
         BusinessContext().currentBusinessId ?? '',
       );
@@ -1044,6 +1107,12 @@ class _DebtListPageState extends State<DebtListPage> {
         ),
       );
     } else {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.debtorManagement,
+      );
+      if (!allowed) return;
+
       context.read<DebtorBloc>().add(
         UpdateDebtorRequested(
           debtorId: existing.debtorId,
@@ -1068,7 +1137,8 @@ class _DebtListPageState extends State<DebtListPage> {
     final amountController = TextEditingController();
     final noteController = TextEditingController();
     String direction = 'increase';
-    String paymentMethod = 'cash';
+    final paymentMethods = _paymentMethodsFromReference();
+    String paymentMethod = paymentMethods.first;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1116,8 +1186,10 @@ class _DebtListPageState extends State<DebtListPage> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [CurrencyInputFormatter()],
                       decoration: InputDecoration(
                         labelText: l10n.translate('debt.adjust_amount'),
+                        suffixText: 'đ',
                       ),
                     ),
                     if (direction == 'decrease') ...[
@@ -1125,21 +1197,17 @@ class _DebtListPageState extends State<DebtListPage> {
                       DropdownButtonFormField<String>(
                         initialValue: paymentMethod,
                         isExpanded: true,
-                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                        items: [
-                          DropdownMenuItem(
-                            value: 'cash',
-                            child: Text(
-                              l10n.translate('order_create.pay_method_cash'),
-                            ),
-                          ),
-                          DropdownMenuItem(
-                            value: 'bank',
-                            child: Text(
-                              l10n.translate('order_create.pay_method_transfer'),
-                            ),
-                          ),
-                        ],
+                        borderRadius: BorderRadius.circular(
+                          AppSpacing.radiusSm,
+                        ),
+                        items: paymentMethods
+                            .map(
+                              (method) => DropdownMenuItem(
+                                value: method,
+                                child: Text(method),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (value) {
                           if (value == null) return;
                           setDialogState(() => paymentMethod = value);
@@ -1186,6 +1254,12 @@ class _DebtListPageState extends State<DebtListPage> {
 
     if (confirmed != true || !mounted) return;
 
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.debtorManagement,
+    );
+    if (!allowed) return;
+
     final rawAmount = double.tryParse(
       amountController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
     );
@@ -1193,11 +1267,35 @@ class _DebtListPageState extends State<DebtListPage> {
 
     final signedAmount = direction == 'decrease' ? -rawAmount : rawAmount;
 
+    // Check if debt increase exceeds credit limit
+    if (direction == 'increase' &&
+        customer.creditLimit > 0 &&
+        (customer.currentBalance + rawAmount) > customer.creditLimit) {
+      final confirmExceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.translate('debt.credit_limit_warning_title')),
+          content: Text(l10n.translate('debt.credit_limit_warning_message')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.translate('common.confirm')),
+            ),
+          ],
+        ),
+      );
+      if (confirmExceed != true || !mounted) return;
+    }
+
     context.read<DebtorBloc>().add(
       RecordDebtAdjustmentRequested(
         debtorId: customer.debtorId,
         amount: signedAmount,
-        paymentMethod: direction == 'increase' ? 'cash' : paymentMethod,
+        paymentMethod: paymentMethod,
         notes: noteController.text.trim().isEmpty
             ? null
             : noteController.text.trim(),

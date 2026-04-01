@@ -9,6 +9,7 @@ import '../../core/theme/app_text_styles.dart';
 class LocationItem {
   final String id;
   final String name;
+  final String? ownerProfileId;
   final String? logoUrl;
   final bool isActive;
   final bool isOwner; // true = current user owns this location
@@ -16,6 +17,7 @@ class LocationItem {
   LocationItem({
     required this.id,
     required this.name,
+    this.ownerProfileId,
     this.logoUrl,
     this.isActive = true,
     this.isOwner = false,

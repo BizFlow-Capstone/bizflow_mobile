@@ -65,6 +65,8 @@ class CreateOrderRequested extends OrderEvent {
   final double bankAmount;
   final double debtAmount;
   final String? note;
+  final DateTime? documentDate;
+  final String? documentNumber;
 
   const CreateOrderRequested({
     required this.locationId,
@@ -73,6 +75,8 @@ class CreateOrderRequested extends OrderEvent {
     this.bankAmount = 0,
     this.debtAmount = 0,
     this.note,
+    this.documentDate,
+    this.documentNumber,
   });
 
   @override
@@ -83,6 +87,8 @@ class CreateOrderRequested extends OrderEvent {
     bankAmount,
     debtAmount,
     note,
+    documentDate,
+    documentNumber,
   ];
 }
 

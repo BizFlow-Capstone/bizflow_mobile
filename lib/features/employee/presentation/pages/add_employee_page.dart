@@ -14,6 +14,8 @@ import '../../domain/entities/employee_entity.dart';
 import '../bloc/employee_bloc.dart';
 import '../bloc/employee_event.dart';
 import '../bloc/employee_state.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 class AddEmployeePage extends StatefulWidget {
   const AddEmployeePage({super.key});
@@ -25,7 +27,7 @@ class AddEmployeePage extends StatefulWidget {
 class _AddEmployeePageState extends State<AddEmployeePage> {
   final TextEditingController _searchController = TextEditingController();
 
-  List<EmployeeEntity> _selectedEmployees = [];
+  final List<EmployeeEntity> _selectedEmployees = [];
   List<EmployeeEntity> _searchResults = const [];
   bool _isLoading = false;
 
@@ -35,12 +37,18 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
     super.dispose();
   }
 
-  void _onSave() {
+  Future<void> _onSave() async {
     FocusScope.of(context).unfocus();
     if (_selectedEmployees.isEmpty) {
       AppSnackBar.error(context, 'Vui lòng tìm và chọn ít nhất một nhân viên để gửi lời mời.');
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.employeeManagement,
+    );
+    if (!allowed) return;
 
     final businessId = Provider.of<BusinessContext>(context, listen: false).currentBusinessId ?? '';
     final employeeIds = _selectedEmployees.map((e) => e.id).toList();

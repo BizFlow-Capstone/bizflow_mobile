@@ -7,11 +7,14 @@ class RevenueDto extends Equatable {
   final String revenueType;
   final double amount;
   final DateTime revenueDate;
+  final DateTime? documentDate;
   final String description;
   final String? moneyChannel;
   final String? referenceType;
   final int? referenceId;
   final String? referenceCode;
+  final String? businessTypeId;
+  final String? businessTypeName;
   final String createdBy;
   final DateTime createdAt;
 
@@ -21,11 +24,14 @@ class RevenueDto extends Equatable {
     required this.revenueType,
     required this.amount,
     required this.revenueDate,
+    this.documentDate,
     required this.description,
     this.moneyChannel,
     this.referenceType,
     this.referenceId,
     this.referenceCode,
+    this.businessTypeId,
+    this.businessTypeName,
     required this.createdBy,
     required this.createdAt,
   });
@@ -65,14 +71,27 @@ class RevenueDto extends Equatable {
       businessLocationId: asInt(json['businessLocationId']),
       revenueType: json['revenueType'] as String? ?? '',
       amount: asDouble(json['amount']),
-      revenueDate: DateFormatter.parseApiDateTime(json['revenueDate'] as String?) ?? DateTime.now(),
+      revenueDate:
+          DateFormatter.parseApiDateTime(json['revenueDate'] as String?) ??
+          DateTime.now(),
+      documentDate: DateFormatter.parseApiDateTime(
+        json['documentDate'] as String?,
+      ),
       description: json['description'] as String? ?? '',
       moneyChannel: asNullableString(json['moneyChannel']),
       referenceType: asNullableString(json['referenceType']),
       referenceId: asNullableInt(json['referenceId']),
       referenceCode: asNullableString(json['referenceCode']),
+      businessTypeId: asNullableString(
+        json['businessTypeId'] ?? json['BusinessTypeId'],
+      ),
+      businessTypeName: asNullableString(
+        json['businessTypeName'] ?? json['BusinessTypeName'],
+      ),
       createdBy: json['createdBy'] as String? ?? '',
-      createdAt: DateFormatter.parseApiDateTime(json['createdAt'] as String?) ?? DateTime.now(),
+      createdAt:
+          DateFormatter.parseApiDateTime(json['createdAt'] as String?) ??
+          DateTime.now(),
     );
   }
 
@@ -83,11 +102,14 @@ class RevenueDto extends Equatable {
       'revenueType': revenueType,
       'amount': amount,
       'revenueDate': revenueDate.toIso8601String(),
+      'documentDate': documentDate?.toIso8601String(),
       'description': description,
       'moneyChannel': moneyChannel,
       'referenceType': referenceType,
       'referenceId': referenceId,
       'referenceCode': referenceCode,
+      'businessTypeId': businessTypeId,
+      'businessTypeName': businessTypeName,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
     };
@@ -95,19 +117,22 @@ class RevenueDto extends Equatable {
 
   @override
   List<Object?> get props => [
-        revenueId,
-        businessLocationId,
-        revenueType,
-        amount,
-        revenueDate,
-        description,
-        moneyChannel,
-        referenceType,
-        referenceId,
-        referenceCode,
-        createdBy,
-        createdAt,
-      ];
+    revenueId,
+    businessLocationId,
+    revenueType,
+    amount,
+    revenueDate,
+    documentDate,
+    description,
+    moneyChannel,
+    referenceType,
+    referenceId,
+    referenceCode,
+    businessTypeId,
+    businessTypeName,
+    createdBy,
+    createdAt,
+  ];
 }
 
 class RevenueResponseDto extends Equatable {
@@ -126,7 +151,8 @@ class RevenueResponseDto extends Equatable {
   factory RevenueResponseDto.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? json;
     return RevenueResponseDto(
-      items: (data['items'] as List<dynamic>?)
+      items:
+          (data['items'] as List<dynamic>?)
               ?.map((e) => RevenueDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

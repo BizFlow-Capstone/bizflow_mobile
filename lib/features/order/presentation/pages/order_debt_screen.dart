@@ -12,6 +12,8 @@ import '../../domain/entities/order_item_entity.dart';
 import '../bloc/order_bloc.dart';
 import 'order_completion_confirmation_screen.dart';
 import 'order_debt_confirmation_screen.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 class OrderDebtScreen extends StatefulWidget {
   final double totalAmount;
@@ -229,7 +231,7 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
 
                     if (_selectedDebtType == 'partial') ...[
                       DropdownButtonFormField<String>(
-                        value: _selectedPaymentMethod,
+                        initialValue: _selectedPaymentMethod,
                         decoration: InputDecoration(
                           labelText: l10n.translate('debt.payment_method'),
                           border: const OutlineInputBorder(),
@@ -406,6 +408,18 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
       return;
     }
 
+    final canManageOrder = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.orderManagement,
+    );
+    if (!canManageOrder) return;
+
+    final canManageDebtor = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.debtorManagement,
+    );
+    if (!canManageDebtor) return;
+
     setState(() => _isSubmitting = true);
     try {
       final repository = context.read<DebtorBloc>().repository;
@@ -471,7 +485,8 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
       await repository.recordDebtAdjustment(
         debtorId: debtorId,
         amount: roundedDebt,
-        paymentMethod: _selectedDebtType == 'full' ? 'cash' : _selectedPaymentMethod,
+        paymentMethod:
+            _selectedDebtType == 'full' ? 'CASH' : _selectedPaymentMethod.toUpperCase(),
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),

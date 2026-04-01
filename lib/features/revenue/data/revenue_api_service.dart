@@ -59,6 +59,28 @@ class RevenueApiService {
     }
   }
 
+  Future<RevenueDto> updateManualRevenue(
+    int revenueId,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final response = await _apiClient.put(
+        ApiEndpoints.updateManualRevenue(revenueId.toString()),
+        body: body,
+      );
+
+      if (response.isSuccess && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        return RevenueDto.fromJson(data['data'] ?? data);
+      }
+
+      throw Exception(response.message ?? 'Failed to update revenue');
+    } catch (e) {
+      debugPrint('RevenueApiService.updateManualRevenue error: $e');
+      rethrow;
+    }
+  }
+
   Future<bool> deleteManualRevenue(int revenueId) async {
     try {
       final response = await _apiClient.delete(

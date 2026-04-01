@@ -9,11 +9,13 @@ class BusinessContext extends ChangeNotifier {
 
   String? _currentBusinessId;
   String? _currentBusinessName;
+  String? _currentOwnerProfileId;
   bool _isOwnerOfCurrentLocation = false;
   LocalStorage? _storage;
 
   String? get currentBusinessId => _currentBusinessId;
   String? get currentBusinessName => _currentBusinessName;
+  String? get currentOwnerProfileId => _currentOwnerProfileId;
 
   /// true nếu user là owner của location hiện tại
   bool get isOwner => _isOwnerOfCurrentLocation;
@@ -23,6 +25,7 @@ class BusinessContext extends ChangeNotifier {
     _storage ??= await LocalStorage.getInstance();
     _currentBusinessId = _storage?.getString(StorageKeys.currentBusinessId);
     _currentBusinessName = _storage?.getString(StorageKeys.currentBusinessName);
+    _currentOwnerProfileId = _storage?.getString(StorageKeys.currentOwnerProfileId);
     _isOwnerOfCurrentLocation =
         _storage?.getBool(StorageKeys.isOwnerOfCurrentLocation) ?? false;
   }
@@ -32,10 +35,12 @@ class BusinessContext extends ChangeNotifier {
     String id,
     String name, {
     bool isOwner = false,
+    String? ownerProfileId,
   }) async {
     _currentBusinessId = id;
     _currentBusinessName = name;
     _isOwnerOfCurrentLocation = isOwner;
+    _currentOwnerProfileId = ownerProfileId;
 
     await _storage?.setString(StorageKeys.currentBusinessId, id);
     await _storage?.setString(StorageKeys.currentBusinessName, name);
@@ -43,6 +48,11 @@ class BusinessContext extends ChangeNotifier {
       StorageKeys.isOwnerOfCurrentLocation,
       isOwner,
     );
+    if ((ownerProfileId ?? '').isNotEmpty) {
+      await _storage?.setString(StorageKeys.currentOwnerProfileId, ownerProfileId!);
+    } else {
+      await _storage?.remove(StorageKeys.currentOwnerProfileId);
+    }
 
     // Kích hoạt tất cả UI widget phụ thuộc đang build với BusinessContext
     notifyListeners();
@@ -52,9 +62,11 @@ class BusinessContext extends ChangeNotifier {
   Future<void> clear() async {
     _currentBusinessId = null;
     _currentBusinessName = null;
+    _currentOwnerProfileId = null;
     _isOwnerOfCurrentLocation = false;
     await _storage?.remove(StorageKeys.currentBusinessId);
     await _storage?.remove(StorageKeys.currentBusinessName);
+    await _storage?.remove(StorageKeys.currentOwnerProfileId);
     await _storage?.remove(StorageKeys.isOwnerOfCurrentLocation);
     notifyListeners();
   }

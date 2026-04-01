@@ -12,6 +12,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
   RevenueBloc({required this.repository}) : super(const RevenueInitial()) {
     on<LoadRevenuesRequested>(_onLoadRevenuesRequested);
     on<CreateManualRevenueRequested>(_onCreateManualRevenueRequested);
+    on<UpdateManualRevenueRequested>(_onUpdateManualRevenueRequested);
     on<DeleteManualRevenueRequested>(_onDeleteManualRevenueRequested);
     on<ResetRevenues>(_onResetRevenues);
   }
@@ -80,6 +81,21 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
       await repository.deleteManualRevenue(event.revenueId);
       emit(RevenueDeleted(revenueId: event.revenueId));
       add(const LoadRevenuesRequested());
+    } catch (e) {
+      emit(RevenueError(message: e.toString()));
+    }
+  }
+
+  Future<void> _onUpdateManualRevenueRequested(
+    UpdateManualRevenueRequested event,
+    Emitter<RevenueState> emit,
+  ) async {
+    try {
+      final revenue = await repository.updateManualRevenue(event.revenueId, event.body);
+      emit(RevenueUpdated(revenue: revenue));
+
+      final locationId = event.body['businessLocationId']?.toString();
+      add(LoadRevenuesRequested(businessLocationId: locationId));
     } catch (e) {
       emit(RevenueError(message: e.toString()));
     }

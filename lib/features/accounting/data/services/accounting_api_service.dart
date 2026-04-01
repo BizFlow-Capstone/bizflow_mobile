@@ -324,4 +324,29 @@ class AccountingApiService {
       throw Exception(_genericError);
     }
   }
+
+  /// GET /api/locations/{locationId}/accounting/books/{bookId}/sections
+  /// Get structured sections data for template-aware rendering
+  Future<BookSectionsResponse> getBookSections(
+    String locationId,
+    String bookId,
+  ) async {
+    try {
+      final response = await _apiClient.get(
+        ApiEndpoints.accountingBookSections(locationId, bookId),
+      );
+      if (response.isSuccess && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        return BookSectionsResponse.fromJson(
+          data['data'] as Map<String, dynamic>? ?? data,
+        );
+      }
+      throw Exception(_genericError);
+    } on ApiException catch (e) {
+      throw Exception(ApiErrorMessageParser.parse(e));
+    } catch (e) {
+      debugPrint('AccountingApiService.getBookSections error: $e');
+      throw Exception(_genericError);
+    }
+  }
 }

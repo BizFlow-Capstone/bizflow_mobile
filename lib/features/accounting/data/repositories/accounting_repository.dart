@@ -291,6 +291,17 @@ class AccountingRepository {
   }
 
   // ──────────────────────────────────────────────────────
+  // Get Book Sections (template-aware structured data)
+  // ──────────────────────────────────────────────────────
+
+  Future<BookSectionsResponse> getBookSections({
+    required String locationId,
+    required String bookId,
+  }) async {
+    return _apiService.getBookSections(locationId, bookId);
+  }
+
+  // ──────────────────────────────────────────────────────
   // Cache helpers
   // ──────────────────────────────────────────────────────
 

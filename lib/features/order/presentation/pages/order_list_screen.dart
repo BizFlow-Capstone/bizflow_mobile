@@ -16,6 +16,8 @@ import 'order_creation_selection_screen.dart';
 import 'order_detail_screen.dart';
 import 'order_form_screen.dart';
 import '../../data/order_api_service.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Order List Screen (SC-ORD-02) - Displays list of draft invoices/orders
 class OrderListScreen extends StatefulWidget {
@@ -105,6 +107,12 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   Future<void> _completeOrder(OrderEntity order, {bool confirmLowStock = false}) async {
     if (_publishingOrderIds.contains(order.id)) return;
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.orderManagement,
+    );
+    if (!allowed) return;
     
     final l10n = AppLocalizations.of(context);
     setState(() => _publishingOrderIds.add(order.id));
@@ -543,10 +551,16 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 );
                 return;
               }
-              context.read<OrderBloc>().add(
-                CancelOrderRequested(orderId: orderId, cancelReason: reason),
-              );
-              Navigator.pop(context);
+              SubscriptionFeatureGuard.ensureAllowed(
+                context,
+                featureCode: SubscriptionFeatureCodes.orderManagement,
+              ).then((allowed) {
+                if (!allowed || !context.mounted) return;
+                context.read<OrderBloc>().add(
+                  CancelOrderRequested(orderId: orderId, cancelReason: reason),
+                );
+                Navigator.pop(context);
+              });
             },
             child: Text(l10n.translate('order.cancel_confirm_yes')),
           ),

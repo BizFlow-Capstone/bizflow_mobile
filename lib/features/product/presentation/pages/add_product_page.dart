@@ -14,6 +14,8 @@ import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
 import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../../data/models/business_type_model.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Add New Product Page
 /// SC-PRO-01: Thêm sản phẩm mới
@@ -260,7 +262,7 @@ class _AddProductPageState extends State<AddProductPage> {
   //   }
   // }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
     final requiredMessage =
         l10n?.translate('common.required_field') ?? 'Trường này là bắt buộc';
     final invalidCostPriceMessage =
@@ -318,6 +320,12 @@ class _AddProductPageState extends State<AddProductPage> {
         _quantityError != null) {
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.productManagement,
+    );
+    if (!allowed) return;
 
     context.read<ProductBloc>().add(
       AddProductRequested(

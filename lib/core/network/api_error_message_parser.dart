@@ -10,6 +10,11 @@ class ApiErrorMessageParser {
     String fallback = genericMessage,
   }) {
     if (error is DioException) {
+      final statusCode = error.response?.statusCode;
+      if (statusCode != null && statusCode >= 500) {
+        return fallback;
+      }
+
       final payloadMessage = _extractFromPayload(error.response?.data);
       if (payloadMessage != null && payloadMessage.isNotEmpty) {
         return payloadMessage;
@@ -20,10 +25,15 @@ class ApiErrorMessageParser {
         return cleanFromMessage;
       }
 
-      return fallback;
+      return _resolveFallbackByStatus(statusCode, fallback: fallback);
     }
 
     if (error is ApiException) {
+      final statusCode = error.statusCode;
+      if (statusCode >= 500) {
+        return fallback;
+      }
+
       final payloadMessage = _extractFromPayload(error.data);
       if (payloadMessage != null && payloadMessage.isNotEmpty) {
         return payloadMessage;
@@ -34,7 +44,7 @@ class ApiErrorMessageParser {
         return cleanFromMessage;
       }
 
-      return fallback;
+      return _resolveFallbackByStatus(statusCode, fallback: fallback);
     }
 
     final clean = _stripTechnicalPrefix(error.toString());
@@ -43,6 +53,18 @@ class ApiErrorMessageParser {
     }
 
     return fallback;
+  }
+
+  static String _resolveFallbackByStatus(
+    int? statusCode, {
+    required String fallback,
+  }) {
+    // Prefer explicit backend messages for 3xx/4xx.
+    // Only use generic fallback for server-side/unknown failures.
+    if (statusCode == null || statusCode <= 0 || statusCode >= 500) {
+      return fallback;
+    }
+    return fallback == genericMessage ? 'Yeu cau khong hop le' : fallback;
   }
 
   static String? _extractFromPayload(dynamic payload) {

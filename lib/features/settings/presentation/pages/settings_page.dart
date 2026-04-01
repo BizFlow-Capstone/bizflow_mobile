@@ -11,6 +11,9 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../../shared/context/user_profile_context.dart';
+import '../../../../shared/cache/swr_builder.dart';
+import '../../../subscription/data/subscription_api_service.dart';
+import '../../../subscription/data/models/subscription_models.dart';
 
 /// Settings Page - Trang cài đặt hệ thống
 /// Theo thiết kế SC-ORD-05
@@ -330,12 +333,26 @@ class SettingsPage extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      'Free Plan',
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    SwrBuilder<CurrentSubscriptionDto?>(
+                      cacheKey: 'current_subscription',
+                      fetcher: ({cancelToken}) =>
+                          context.read<SubscriptionApiService>().getCurrentSubscription(
+                            cancelToken: cancelToken,
+                          ),
+                      fromJson: (json) => json.isEmpty
+                          ? null
+                          : CurrentSubscriptionDto.fromJson(json),
+                      toJson: (data) => data?.toJson() ?? {},
+                      builder: (context, currentSub, isLoading, error) {
+                        final planName = currentSub?.plan?.name;
+                        return Text(
+                          planName?.isNotEmpty == true ? planName! : 'Free Plan',
+                          style: AppTextStyles.titleMedium.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),

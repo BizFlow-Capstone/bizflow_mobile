@@ -11,6 +11,8 @@ import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../pages/edit_product_page.dart';
 import '../pages/product_detail_page.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Product Card Widget
 /// Hiển thị thông tin sản phẩm dưới dạng card
@@ -18,12 +20,14 @@ class ProductCardWidget extends StatelessWidget {
   final ProductEntity product;
   final String locationId;
   final VoidCallback? onQuickAdjustStock;
+  final bool canManageActions;
 
   const ProductCardWidget({
     super.key,
     required this.product,
     required this.locationId,
     this.onQuickAdjustStock,
+    this.canManageActions = true,
   });
 
   String _getStatusBadgeText(BuildContext context) {
@@ -243,103 +247,109 @@ class ProductCardWidget extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: AppSpacing.sm),
-                // Edit and Delete Buttons - Side by Side
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditProductPage(
-                                productId: product.id,
-                                locationId: locationId,
-                                productName: product.name,
-                                barcode: product.barcode,
-                                category: product.category,
-                                costPrice: product.costPrice,
-                                salePrice: product.salePrice,
-                                quantity: product.quantity,
-                                unit: product.unit,
-                                description: product.description,
-                                isActive: product.isActive,
-                                businessTypeId: product.businessTypeId,
-                                manufacturer: product.manufacturer,
-                                imageUrl: product.imageUrl,
-                              ),
-                            ),
-                          );
-                          if (result == true && context.mounted) {
-                            context.read<ProductBloc>().add(
-                              LoadProductsByLocationRequested(
-                                locationId: locationId,
+                if (canManageActions)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final result = await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EditProductPage(
+                                  productId: product.id,
+                                  locationId: locationId,
+                                  productName: product.name,
+                                  barcode: product.barcode,
+                                  category: product.category,
+                                  costPrice: product.costPrice,
+                                  salePrice: product.salePrice,
+                                  quantity: product.quantity,
+                                  unit: product.unit,
+                                  description: product.description,
+                                  isActive: product.isActive,
+                                  businessTypeId: product.businessTypeId,
+                                  manufacturer: product.manufacturer,
+                                  imageUrl: product.imageUrl,
+                                ),
                               ),
                             );
-                          }
-                        },
-                        icon: const Icon(Icons.edit, size: 18),
-                        label: Text(
-                          l10n.translate('product.edit_button_label'),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.secondary,
+                            if (result == true && context.mounted) {
+                              context.read<ProductBloc>().add(
+                                LoadProductsByLocationRequested(
+                                  locationId: locationId,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: Text(
+                            l10n.translate('product.edit_button_label'),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.secondary,
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Show confirmation dialog for delete
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text(
-                                l10n.translate('product.confirm_delete_title'),
-                              ),
-                              content: Text(
-                                l10n.translate(
-                                  'product.confirm_delete_message',
+                      SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // Show confirmation dialog for delete
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text(
+                                  l10n.translate('product.confirm_delete_title'),
                                 ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: Text(l10n.translate('common.cancel')),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    context.read<ProductBloc>().add(
-                                      DeleteProductRequested(
-                                        locationId: locationId,
-                                        productId: product.id,
-                                      ),
-                                    );
-                                  },
-                                  child: Text(
-                                    l10n.translate(
-                                      'product.delete_button_label',
-                                    ),
-                                    style: const TextStyle(color: Colors.red),
+                                content: Text(
+                                  l10n.translate(
+                                    'product.confirm_delete_message',
                                   ),
                                 ),
-                              ],
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        label: Text(
-                          l10n.translate('product.delete_button_label'),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.error,
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text(l10n.translate('common.cancel')),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                                        context,
+                                        featureCode: SubscriptionFeatureCodes.productManagement,
+                                      );
+                                      if (!allowed || !context.mounted) return;
+
+                                      Navigator.pop(context);
+                                      context.read<ProductBloc>().add(
+                                        DeleteProductRequested(
+                                          locationId: locationId,
+                                          productId: product.id,
+                                        ),
+                                      );
+                                    },
+                                    child: Text(
+                                      l10n.translate(
+                                        'product.delete_button_label',
+                                      ),
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(
+                            l10n.translate('product.delete_button_label'),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ],

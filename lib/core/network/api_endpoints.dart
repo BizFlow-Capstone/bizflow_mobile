@@ -79,6 +79,7 @@ class ApiEndpoints {
   // Revenue
   static const String revenues = '/api/my-business/accounting/revenues';
   static const String createManualRevenue = '/api/my-business/accounting/revenues/manual';
+    static String updateManualRevenue(String id) => '/api/my-business/accounting/revenues/$id';
   static String deleteManualRevenue(String id) => '/api/my-business/accounting/revenues/$id';
 
   // Cost
@@ -165,6 +166,8 @@ class ApiEndpoints {
       '/api/locations/$locationId/accounting/books/$bookId';
   static String accountingBookRows(String locationId, String bookId) =>
       '/api/locations/$locationId/accounting/books/$bookId/rows';
+  static String accountingBookSections(String locationId, String bookId) =>
+      '/api/locations/$locationId/accounting/books/$bookId/sections';
 
   // GL Entries
   static const String glEntries = '/api/my-business/accounting/gl-entries';

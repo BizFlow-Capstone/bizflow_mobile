@@ -8,6 +8,7 @@ import '../../../../core/theme/app_text_styles.dart';
 class ManagementCards extends StatelessWidget {
   final int locationsCount;
   final int employeesCount;
+  final bool showEmployeesCard;
   final VoidCallback? onProductsTab;
   final VoidCallback? onLocationsTab;
   final VoidCallback? onEmployeesTab;
@@ -16,6 +17,7 @@ class ManagementCards extends StatelessWidget {
     super.key,
     this.locationsCount = 0,
     this.employeesCount = 0,
+    this.showEmployeesCard = true,
     this.onProductsTab,
     this.onLocationsTab,
     this.onEmployeesTab,
@@ -44,17 +46,19 @@ class ManagementCards extends StatelessWidget {
           ),
           onTap: onLocationsTab,
         ),
-        SizedBox(height: AppSpacing.md),
-        _ManagementCard(
-          icon: Icons.people_outlined,
-          iconColor: const Color(0xFF7C3AED),
-          title: l10n.translate('home.manage_employees'),
-          subtitle: l10n.translate(
-            'home.employees_count',
-            params: {'count': employeesCount.toString()},
+        if (showEmployeesCard) ...[
+          SizedBox(height: AppSpacing.md),
+          _ManagementCard(
+            icon: Icons.people_outlined,
+            iconColor: const Color(0xFF7C3AED),
+            title: l10n.translate('home.manage_employees'),
+            subtitle: l10n.translate(
+              'home.employees_count',
+              params: {'count': employeesCount.toString()},
+            ),
+            onTap: onEmployeesTab,
           ),
-          onTap: onEmployeesTab,
-        ),
+        ],
       ],
     );
   }

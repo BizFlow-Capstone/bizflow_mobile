@@ -29,7 +29,9 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
   @override
   Future<List<EmployeeEntity>> getEmployees(String businessId) async {
     final employees = await _apiService.getMyEmployees();
-    final assignmentMap = await _getEmployeeLocationAssignments();
+    final assignmentMap = await _getEmployeeLocationAssignments(
+      forceRefresh: true,
+    );
 
     return employees
         .map(
@@ -181,9 +183,15 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
 
     for (final location in ownedLocations.data) {
       final locationId = location.id.toString();
-      final locationEmployees = await _locationApiService.getLocationEmployees(
-        locationId: locationId,
-      );
+      List<EmployeeDto> locationEmployees = const [];
+      try {
+        locationEmployees = await _locationApiService.getLocationEmployees(
+          locationId: locationId,
+        );
+      } catch (_) {
+        // Skip one failed location fetch instead of dropping all assignment data.
+        continue;
+      }
 
       for (final employee in locationEmployees) {
         final employeeId = employee.profileId;

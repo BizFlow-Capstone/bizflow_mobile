@@ -97,6 +97,13 @@ class DateFormatter {
     return dateTime.toUtc().toIso8601String();
   }
 
+  /// Serialize datetime to date-only string (yyyy-MM-dd) for API requests.
+  static String toApiDateOnly(DateTime dateTime) {
+    return '${dateTime.year.toString().padLeft(4, '0')}-'
+        '${dateTime.month.toString().padLeft(2, '0')}-'
+        '${dateTime.day.toString().padLeft(2, '0')}';
+  }
+
   /// Parse date from string
   static DateTime? parse(String? dateString, {String? format}) {
     if (dateString == null || dateString.isEmpty) return null;

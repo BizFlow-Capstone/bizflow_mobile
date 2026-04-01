@@ -715,15 +715,10 @@ class ProductApiService {
       debugPrint(
         'ApiException - StatusCode: ${e.statusCode}, Message: ${e.message}',
       );
-      if (e.statusCode == 403) {
-        throw Exception('Permission denied: Only owner can delete products');
-      } else if (e.statusCode == 404) {
-        throw Exception('Product not found');
-      }
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('ProductApiService.deleteProduct error: $e');
-      return;
+      rethrow;
     }
   }
 

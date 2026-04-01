@@ -141,9 +141,7 @@ class AccountingPeriodState {
   final bool isBooksLoading;
   final bool isLogsLoading;
   final bool isActionLoading;
-  final bool isListRefreshing; 
-  final bool isDetailRefreshing;
-  final bool isBooksRefreshing;
+  final bool isRefreshing; // from cache flag
 
   AccountingPeriodState({
     this.periods = const [],
@@ -159,9 +157,7 @@ class AccountingPeriodState {
     this.isBooksLoading = false,
     this.isLogsLoading = false,
     this.isActionLoading = false,
-    this.isListRefreshing = false,
-    this.isDetailRefreshing = false,
-    this.isBooksRefreshing = false,
+    this.isRefreshing = false,
   });
 
   AccountingPeriodState copyWith({
@@ -178,9 +174,7 @@ class AccountingPeriodState {
     bool? isBooksLoading,
     bool? isLogsLoading,
     bool? isActionLoading,
-    bool? isListRefreshing,
-    bool? isDetailRefreshing,
-    bool? isBooksRefreshing,
+    bool? isRefreshing,
     bool clearDetail = false,
     bool clearBooks = false,
     bool clearAction = false,
@@ -199,9 +193,7 @@ class AccountingPeriodState {
       isBooksLoading: isBooksLoading ?? this.isBooksLoading,
       isLogsLoading: isLogsLoading ?? this.isLogsLoading,
       isActionLoading: isActionLoading ?? this.isActionLoading,
-      isListRefreshing: isListRefreshing ?? this.isListRefreshing,
-      isDetailRefreshing: isDetailRefreshing ?? this.isDetailRefreshing,
-      isBooksRefreshing: isBooksRefreshing ?? this.isBooksRefreshing,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 }
@@ -245,7 +237,7 @@ class AccountingPeriodBloc
             status: AccountingPeriodStatus.loaded,
             periods: periods,
             isListLoading: false,
-            isListRefreshing: fromCache,
+            isRefreshing: fromCache,
           ));
         }
       },
@@ -370,10 +362,21 @@ class AccountingPeriodBloc
       );
       final updated =
           await _repository.fetchPeriodsFromServer(event.locationId);
+
+      // Refresh period detail so bottom sheet reflects the new status
+      AccountingPeriod? refreshedDetail;
+      try {
+        refreshedDetail = await _repository.getPeriodDetail(
+          locationId: event.locationId,
+          periodId: event.periodId,
+        );
+      } catch (_) {}
+
       emit(state.copyWith(
         status: AccountingPeriodStatus.actionSuccess,
         actionSuccessKey: 'accounting.period_finalized_success',
         periods: updated,
+        periodDetail: refreshedDetail,
         isActionLoading: false,
       ));
     } catch (e) {
@@ -402,10 +405,23 @@ class AccountingPeriodBloc
       );
       final updated =
           await _repository.fetchPeriodsFromServer(event.locationId);
+
+      // Also refresh period detail so the bottom sheet reflects the new status
+      AccountingPeriod? refreshedDetail;
+      try {
+        refreshedDetail = await _repository.getPeriodDetail(
+          locationId: event.locationId,
+          periodId: event.periodId,
+        );
+      } catch (_) {
+        // Non-critical — the period list is enough to show success
+      }
+
       emit(state.copyWith(
         status: AccountingPeriodStatus.actionSuccess,
         actionSuccessKey: 'accounting.period_reopened_success',
         periods: updated,
+        periodDetail: refreshedDetail,
         isActionLoading: false,
       ));
     } catch (e) {
@@ -453,7 +469,7 @@ class AccountingPeriodBloc
           emit(state.copyWith(
             periodDetail: period,
             isDetailLoading: false,
-            isDetailRefreshing: fromCache,
+            isRefreshing: fromCache,
           ));
         }
       },
@@ -528,7 +544,7 @@ class AccountingPeriodBloc
             emit(state.copyWith(
               books: fetchedBooks,
               isBooksLoading: false,
-              isBooksRefreshing: fromCache,
+              isRefreshing: fromCache,
             ));
           }
         },

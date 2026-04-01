@@ -69,7 +69,12 @@ class CurrentSubscriptionPage extends StatelessWidget {
             return Center(child: Text(error.toString()));
           }
 
-          final repoStream = repo.streamUsageTracking();
+          final ownerProfileId = isOwner
+              ? null
+              : businessContext.currentOwnerProfileId;
+          final repoStream = repo.streamUsageTracking(
+            ownerProfileId: ownerProfileId,
+          );
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),

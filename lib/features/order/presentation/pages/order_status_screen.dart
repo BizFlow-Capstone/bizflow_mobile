@@ -6,13 +6,13 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/storage/local_storage.dart';
 import '../../domain/entities/order_entity.dart';
 import '../bloc/order_bloc.dart';
-import '../bloc/order_event.dart';
-import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_detail_screen.dart';
 import 'order_form_screen.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Order Status Screen (SC-ORD-02.2)
 /// Displays unpublished invoices and draft orders with tabs
@@ -274,9 +274,15 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
               _openDraftForEditing(order);
             },
             onPublish: () {
-              context.read<OrderBloc>().add(
-                PublishOrderRequested(orderId: order.id),
-              );
+              SubscriptionFeatureGuard.ensureAllowed(
+                context,
+                featureCode: SubscriptionFeatureCodes.orderManagement,
+              ).then((allowed) {
+                if (!allowed || !context.mounted) return;
+                context.read<OrderBloc>().add(
+                  PublishOrderRequested(orderId: order.id),
+                );
+              });
             },
             onCancel: () {
               _showCancelConfirmDialog(context, order.id);
@@ -391,10 +397,16 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
                 );
                 return;
               }
-              context.read<OrderBloc>().add(
-                CancelOrderRequested(orderId: orderId, cancelReason: reason),
-              );
-              Navigator.pop(context);
+              SubscriptionFeatureGuard.ensureAllowed(
+                context,
+                featureCode: SubscriptionFeatureCodes.orderManagement,
+              ).then((allowed) {
+                if (!allowed || !context.mounted) return;
+                context.read<OrderBloc>().add(
+                  CancelOrderRequested(orderId: orderId, cancelReason: reason),
+                );
+                Navigator.pop(context);
+              });
             },
             child: Text(l10n.translate('order.cancel_confirm_yes')),
           ),

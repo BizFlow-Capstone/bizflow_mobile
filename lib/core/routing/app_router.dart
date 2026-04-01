@@ -572,6 +572,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                           (loc) => LocationItem(
                             id: loc.id,
                             name: loc.name,
+                            ownerProfileId: loc.ownerProfileId,
                             isActive: loc.isActive,
                             isOwner: loc.isOwner,
                           ),
@@ -625,6 +626,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                         location.id,
                         location.name,
                         isOwner: location.isOwner,
+                        ownerProfileId: location.ownerProfileId,
                       );
                       // Go back to Home
                       AppRouter.navigateAndClearStack(AppRoutes.home);

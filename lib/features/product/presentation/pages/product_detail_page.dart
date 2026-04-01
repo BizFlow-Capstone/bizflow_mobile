@@ -3,13 +3,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../../../shared/services/permission_service.dart';
 import '../../domain/entities/product_entity.dart';
 import '../../data/product_repository.dart';
 import 'edit_product_page.dart';
@@ -280,6 +281,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     BuildContext context,
     AppLocalizations? l10n,
   ) {
+    final isOwner = context.watch<BusinessContext>().isOwner;
+    final canAdjustStock = PermissionService.canAdjustStock(isOwner);
+    final canEditProduct = PermissionService.canEditProduct(isOwner);
+
     return AppBar(
       backgroundColor: AppColors.white,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -293,53 +298,55 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         style: AppTextStyles.titleMedium.copyWith(color: AppColors.textPrimary),
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.inventory_2_outlined),
-          tooltip:
-              l10n?.translate('product.stock_adjust.title') ?? 'Chỉnh tồn kho',
-          onPressed: () => _showAdjustStockDialog(l10n),
-        ),
-        Padding(
-          padding: EdgeInsets.only(right: AppSpacing.md),
-          child: Center(
-            child: GestureDetector(
-              onTap: () async {
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditProductPage(
-                      productId: _currentProduct.id,
-                      locationId: widget.locationId,
-                      productName: _currentProduct.name,
-                      barcode: _currentProduct.barcode,
-                      category: _currentProduct.category,
-                      costPrice: _currentProduct.costPrice,
-                      salePrice: _currentProduct.salePrice,
-                      quantity: _currentProduct.quantity,
-                      unit: _currentProduct.unit,
-                      description: _currentProduct.description,
-                      isActive: _currentProduct.isActive,
-                      businessTypeId: _currentProduct.businessTypeId,
-                      manufacturer: _currentProduct.manufacturer,
-                      imageUrl: _currentProduct.imageUrl,
+        if (canAdjustStock)
+          IconButton(
+            icon: const Icon(Icons.inventory_2_outlined),
+            tooltip:
+                l10n?.translate('product.stock_adjust.title') ?? 'Chỉnh tồn kho',
+            onPressed: () => _showAdjustStockDialog(l10n),
+          ),
+        if (canEditProduct)
+          Padding(
+            padding: EdgeInsets.only(right: AppSpacing.md),
+            child: Center(
+              child: GestureDetector(
+                onTap: () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditProductPage(
+                        productId: _currentProduct.id,
+                        locationId: widget.locationId,
+                        productName: _currentProduct.name,
+                        barcode: _currentProduct.barcode,
+                        category: _currentProduct.category,
+                        costPrice: _currentProduct.costPrice,
+                        salePrice: _currentProduct.salePrice,
+                        quantity: _currentProduct.quantity,
+                        unit: _currentProduct.unit,
+                        description: _currentProduct.description,
+                        isActive: _currentProduct.isActive,
+                        businessTypeId: _currentProduct.businessTypeId,
+                        manufacturer: _currentProduct.manufacturer,
+                        imageUrl: _currentProduct.imageUrl,
+                      ),
                     ),
+                  );
+                  if (result == true && context.mounted) {
+                    // Pop back to product management screen to reload the list
+                    Navigator.pop(context, true);
+                  }
+                },
+                child: Text(
+                  l10n?.translate('common.edit') ?? 'Chỉnh sửa',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
                   ),
-                );
-                if (result == true && context.mounted) {
-                  // Pop back to product management screen to reload the list
-                  Navigator.pop(context, true);
-                }
-              },
-              child: Text(
-                l10n?.translate('common.edit') ?? 'Chỉnh sửa',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

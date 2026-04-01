@@ -32,6 +32,8 @@ class OrderPaymentScreen extends StatefulWidget {
   final String? customerName;
   final String? customerPhone;
   final String? note;
+  final DateTime? documentDate;
+  final String? documentNumber;
 
   const OrderPaymentScreen({
     super.key,
@@ -45,6 +47,8 @@ class OrderPaymentScreen extends StatefulWidget {
     this.customerName,
     this.customerPhone,
     this.note,
+    this.documentDate,
+    this.documentNumber,
   });
 
   @override
@@ -246,6 +250,32 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
       return;
     }
 
+    // Client-side credit limit exceeded warning
+    if (_debtAmount > 0 &&
+        _selectedDebtor != null &&
+        _selectedDebtor!.creditLimit > 0 &&
+        (_selectedDebtor!.currentBalance + _debtAmount) >
+            _selectedDebtor!.creditLimit) {
+      final confirmExceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.translate('debt.credit_limit_warning_title')),
+          content: Text(l10n.translate('debt.credit_limit_warning_message')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.translate('common.confirm')),
+            ),
+          ],
+        ),
+      );
+      if (confirmExceed != true || !mounted) return;
+    }
+
     setState(() => _isSubmitting = true);
 
     final repository = context.read<OrderBloc>().repository;
@@ -266,6 +296,10 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
       'customerName': _selectedDebtor?.name ?? widget.customerName,
       'customerPhone': _selectedDebtor?.phone ?? widget.customerPhone,
       if (widget.note != null) 'note': widget.note,
+      if (widget.documentDate != null)
+        'documentDate': widget.documentDate!.toIso8601String().split('T')[0],
+      if (widget.documentNumber != null && widget.documentNumber!.isNotEmpty)
+        'documentNumber': widget.documentNumber,
       'confirmLowStock': confirmLowStock,
       'confirmCreditLimitExceeded': confirmCreditLimit,
     };
@@ -618,7 +652,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
             final debtors = state.activeDebtorsByLocation;
 
             return DropdownButtonFormField<int>(
-              value: _selectedDebtor?.debtorId,
+              initialValue: _selectedDebtor?.debtorId,
               decoration: InputDecoration(
                 hintText: l10n.translate('debt.select_debtor'),
                 border: const OutlineInputBorder(),

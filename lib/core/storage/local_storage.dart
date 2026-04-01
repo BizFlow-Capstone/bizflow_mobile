@@ -122,6 +122,7 @@ class StorageKeys {
   static const String currentBusinessId = 'current_business_id';
   static const String currentBusinessName = 'current_business_name';
   static const String isOwnerOfCurrentLocation = 'is_owner_of_current_location';
+  static const String currentOwnerProfileId = 'current_owner_profile_id';
 
 
   // Cache

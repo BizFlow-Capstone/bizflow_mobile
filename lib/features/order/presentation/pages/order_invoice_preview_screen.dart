@@ -18,10 +18,15 @@ import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
 import '../../../invoice_template/presentation/widgets/invoice_preview_widget.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/order_entity.dart';
 import '../../../../shared/utils/string_utils.dart';
 
 class OrderInvoicePreviewScreen extends StatelessWidget {
+  static const String _featureReportExport =
+      SubscriptionFeatureCodes.reportExport;
+
   final OrderEntity order;
 
   const OrderInvoicePreviewScreen({super.key, required this.order});
@@ -30,18 +35,79 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
   String _pdfCurrency(num? amount) =>
       '${CurrencyFormatter.formatNumber(amount?.round() ?? 0)} VND';
 
+  List<Map<String, String>> _buildColumns(InvoiceTemplateEntity template) {
+    final columns = <Map<String, String>>[];
+    if (template.showStt) {
+      columns.add({'key': 'stt', 'label': _pdfFormat('STT')});
+    }
+    if (template.showItemName) {
+      columns.add({'key': 'name', 'label': _pdfFormat('San pham')});
+    }
+    if (template.showQuantity) {
+      columns.add({'key': 'qty', 'label': _pdfFormat('SL')});
+    }
+    if (template.showUnit) {
+      columns.add({'key': 'unit', 'label': _pdfFormat('Don vi')});
+    }
+    if (template.showUnitPrice) {
+      columns.add({'key': 'unitPrice', 'label': _pdfFormat('Don gia')});
+    }
+    if (template.showItemDiscount) {
+      columns.add({'key': 'discount', 'label': _pdfFormat('Giam gia')});
+    }
+    if (template.showItemVat) {
+      columns.add({'key': 'vat', 'label': _pdfFormat('VAT')});
+    }
+    if (template.showItemTotalAmount) {
+      columns.add({'key': 'total', 'label': _pdfFormat('Thanh tien')});
+    }
+    if (columns.isEmpty) {
+      columns.addAll([
+        {'key': 'name', 'label': _pdfFormat('San pham')},
+        {'key': 'qty', 'label': _pdfFormat('SL')},
+        {'key': 'unitPrice', 'label': _pdfFormat('Don gia')},
+        {'key': 'total', 'label': _pdfFormat('Thanh tien')},
+      ]);
+    }
+    return columns;
+  }
+
+  List<String> _buildRow(
+    int index,
+    dynamic item,
+    List<Map<String, String>> columns,
+  ) {
+    return columns.map((column) {
+      switch (column['key']) {
+        case 'stt':
+          return (index + 1).toString();
+        case 'name':
+          return _pdfFormat(item.productName);
+        case 'qty':
+          return item.quantity.toString();
+        case 'unit':
+          return _pdfFormat(item.unitName?.trim().isNotEmpty == true ? item.unitName! : '-');
+        case 'unitPrice':
+          return _pdfCurrency(item.price);
+        case 'discount':
+          return '${item.discount.toStringAsFixed(0)}%';
+        case 'vat':
+          return _pdfCurrency(0);
+        case 'total':
+          return _pdfCurrency(item.total);
+        default:
+          return '';
+      }
+    }).toList();
+  }
+
   Future<File> _buildPdfFile(InvoiceTemplateEntity template) async {
     final pdf = pw.Document();
-    final itemRows = order.items
-        .map(
-          (item) => [
-            _pdfFormat(item.productName),
-            item.quantity.toString(),
-            _pdfCurrency(item.price),
-            _pdfCurrency(item.price * item.quantity),
-          ],
-        )
-        .toList();
+    final columns = _buildColumns(template);
+    final itemRows = <List<String>>[];
+    for (var i = 0; i < order.items.length; i++) {
+      itemRows.add(_buildRow(i, order.items[i], columns));
+    }
 
     pdf.addPage(
       pw.MultiPage(
@@ -54,7 +120,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
               pw.Text(
                 _pdfFormat(template.businessName.isNotEmpty
                     ? template.businessName
-                    : 'BIZFLOW STORE'),
+                    : ''),
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
               if (template.businessAddress.isNotEmpty)
@@ -96,13 +162,15 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
-                  pw.Text(
-                    _pdfFormat(
-                      'Khach hang: ${order.customerName?.isNotEmpty == true ? order.customerName : "Khach le"}',
+                  if (template.showCustomerName)
+                    pw.Text(
+                      _pdfFormat(
+                        'Khach hang: ${order.customerName?.isNotEmpty == true ? order.customerName : "Khach le"}',
+                      ),
                     ),
-                  ),
                   if (order.customerPhone?.isNotEmpty == true)
-                    pw.Text('SDT: ${order.customerPhone}'),
+                    if (template.showCustomerPhone)
+                      pw.Text('SDT: ${order.customerPhone}'),
                 ],
               ),
             ],
@@ -110,7 +178,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
 
           pw.SizedBox(height: 16),
           pw.TableHelper.fromTextArray(
-            headers: ['San pham', 'SL', 'Don gia', 'Thanh tien'],
+            headers: columns.map((c) => c['label']!).toList(),
             data: itemRows,
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
             cellStyle: const pw.TextStyle(fontSize: 10),
@@ -121,6 +189,18 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.end,
               children: [
+                if (template.showSubTotal)
+                  pw.Text(
+                    _pdfFormat('Tam tinh: ${_pdfCurrency(order.subtotal)}'),
+                  ),
+                if (template.showTotalDiscount)
+                  pw.Text(
+                    _pdfFormat('Giam gia: ${_pdfCurrency(order.discountAmount)}'),
+                  ),
+                if (template.showTotalVat)
+                  pw.Text(
+                    _pdfFormat('VAT: ${_pdfCurrency(order.taxAmount)}'),
+                  ),
                 pw.Text(
                   _pdfFormat('Tong thanh toan: ${_pdfCurrency(order.totalAmount)}'),
                   style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
@@ -128,14 +208,22 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (template.showFooterNote && template.footerNoteText.trim().isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Text(
+              _pdfFormat(template.footerNoteText.trim()),
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+          ],
           pw.SizedBox(height: 24),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(_pdfFormat('Nguoi mua hang')),
-              pw.Text(_pdfFormat('Nguoi ban hang')),
-            ],
-          ),
+          if (template.showSignature)
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(_pdfFormat('Nguoi mua hang')),
+                pw.Text(_pdfFormat('Nguoi ban hang')),
+              ],
+            ),
         ],
       ),
     );
@@ -189,6 +277,13 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
         type: AppSnackBarType.error,
       );
     }
+  }
+
+  Future<bool> _checkExportFeature(BuildContext context) async {
+    return SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: _featureReportExport,
+    );
   }
 
   @override
@@ -248,7 +343,11 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => _sharePdf(context, template),
+                          onPressed: () async {
+                            final allowed = await _checkExportFeature(context);
+                            if (!allowed) return;
+                            await _sharePdf(context, template);
+                          },
                           icon: const Icon(Icons.share_outlined),
                           label: Text(
                             l10n.translate('order_payment.share_invoice'),
@@ -258,7 +357,11 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () => _downloadInvoice(context, template),
+                          onPressed: () async {
+                            final allowed = await _checkExportFeature(context);
+                            if (!allowed) return;
+                            await _downloadInvoice(context, template);
+                          },
                           icon: const Icon(Icons.download_outlined),
                           label: Text(
                             l10n.translate('order_payment.download_invoice'),

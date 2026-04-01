@@ -27,7 +27,7 @@ class GLRepository {
   }) async {
     // Generate cache key
     final filterKey = '${transactionTypes?.join('-')}_${referenceTypes?.join('-')}_${moneyChannels?.join('-')}_${fromDate?.toIso8601String()}_${toDate?.toIso8601String()}_$viewMode';
-    final key = 'gl_entries_${businessLocationId}_p${pageNumber}_s$pageSize\_$filterKey';
+    final key = 'gl_entries_${businessLocationId}_p${pageNumber}_s${pageSize}_$filterKey';
 
     await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,

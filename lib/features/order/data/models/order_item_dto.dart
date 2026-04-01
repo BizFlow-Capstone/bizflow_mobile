@@ -56,7 +56,9 @@ class OrderItemDto extends Equatable {
       saleItemId: asInt(json['saleItemId'], fallback: 0) > 0
           ? asInt(json['saleItemId'])
           : null,
-      unitName: json['unitName']?.toString(),
+      unitName: asString(
+        json['unitName'] ?? json['unit'] ?? json['Unit'] ?? json['baseUnit'],
+      ),
       productName: asString(json['productName'] ?? json['saleItemName']),
       price: asDouble(json['price'] ?? json['unitPrice']),
       quantity: asInt(json['quantity']),

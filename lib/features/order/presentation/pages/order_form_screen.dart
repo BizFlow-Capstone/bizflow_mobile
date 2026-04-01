@@ -9,6 +9,7 @@ import '../../../../core/storage/local_storage.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../debt/domain/entities/debtor_entity.dart';
 import '../../../debt/presentation/bloc/debtor_bloc.dart';
@@ -18,6 +19,8 @@ import '../../../product/domain/entities/product_entity.dart';
 import '../../../product/presentation/bloc/product_bloc.dart';
 import '../../../product/presentation/bloc/product_event.dart';
 import '../../../product/presentation/bloc/product_state.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/order_entity.dart';
 import '../../domain/entities/order_item_entity.dart';
 import 'order_payment_screen.dart';
@@ -47,6 +50,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   final TextEditingController _customerPhoneController =
       TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _documentNumberController = TextEditingController();
+  DateTime? _documentDate;
   bool _isCreatingDebtorProfile = false;
 
   static const int _phoneLength = 10;
@@ -100,6 +105,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     _customerNameController.dispose();
     _customerPhoneController.dispose();
     _notesController.dispose();
+    _documentNumberController.dispose();
     super.dispose();
   }
 
@@ -488,6 +494,52 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
 
                 const SizedBox(height: 24),
 
+                // Document Number
+                TextField(
+                  controller: _documentNumberController,
+                  decoration: InputDecoration(
+                    labelText: 'Số chứng từ',
+                    hintText: 'Nhập số chứng từ (nếu có)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Document Date
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _documentDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setState(() => _documentDate = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Ngày chứng từ',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      suffixIcon: const Icon(Icons.calendar_today, size: 20),
+                    ),
+                    child: Text(
+                      _documentDate != null
+                          ? DateFormatter.formatDate(_documentDate)
+                          : 'Chọn ngày chứng từ (nếu có)',
+                      style: _documentDate != null
+                          ? null
+                          : TextStyle(color: Colors.grey[500]),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
                 // Summary Section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -564,6 +616,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                           customerPhone: _customerPhoneController.text.trim(),
                           note: _notesController.text.trim().isNotEmpty
                               ? _notesController.text.trim()
+                              : null,
+                          documentDate: _documentDate,
+                          documentNumber: _documentNumberController.text.trim().isNotEmpty
+                              ? _documentNumberController.text.trim()
                               : null,
                         ),
                       ),
@@ -858,8 +914,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 TextField(
                   controller: creditLimitController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [CurrencyInputFormatter()],
                   decoration: InputDecoration(
                     labelText: l10n.translate('debt.credit_limit'),
+                    suffixText: 'đ',
                   ),
                 ),
               ],
@@ -931,6 +989,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       );
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.debtorManagement,
+    );
+    if (!allowed) return;
 
     setState(() => _isCreatingDebtorProfile = true);
     try {
@@ -1692,7 +1756,7 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
         return;
       }
 
-      final existing = _pendingItems[matched!.id];
+      final existing = _pendingItems[matched.id];
       if (existing != null) {
         existing.quantity = (existing.quantity + 1).clamp(1, 99999);
         _scanHint = l10n
@@ -1753,7 +1817,7 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: item.selectedSaleItemKey,
+            initialValue: item.selectedSaleItemKey,
             isExpanded: true,
             decoration: InputDecoration(
               labelText: l10n.translate('order_create.sale_unit_label'),

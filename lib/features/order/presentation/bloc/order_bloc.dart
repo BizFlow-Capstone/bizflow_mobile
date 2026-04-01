@@ -147,6 +147,10 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
         'bankAmount': event.bankAmount,
         'debtAmount': event.debtAmount,
         'note': event.note,
+        if (event.documentDate != null)
+          'documentDate': event.documentDate!.toIso8601String().split('T')[0],
+        if (event.documentNumber != null && event.documentNumber!.isNotEmpty)
+          'documentNumber': event.documentNumber,
       };
 
       final order = await repository.createOrder(body);

@@ -7,6 +7,7 @@ class CostDto extends Equatable {
   final String costType;
   final double amount;
   final DateTime costDate;
+  final DateTime? documentDate;
   final String description;
   final String? paymentMethod;
   final String? documentUrl;
@@ -22,6 +23,7 @@ class CostDto extends Equatable {
     required this.costType,
     required this.amount,
     required this.costDate,
+    this.documentDate,
     required this.description,
     this.paymentMethod,
     this.documentUrl,
@@ -67,7 +69,12 @@ class CostDto extends Equatable {
       businessLocationId: asInt(json['businessLocationId']),
       costType: json['costType'] as String? ?? '',
       amount: asDouble(json['amount']),
-      costDate: DateFormatter.parseApiDateTime(json['costDate'] as String?) ?? DateTime.now(),
+      costDate:
+          DateFormatter.parseApiDateTime(json['costDate'] as String?) ??
+          DateTime.now(),
+      documentDate: DateFormatter.parseApiDateTime(
+        json['documentDate'] as String?,
+      ),
       description: json['description'] as String? ?? '',
       paymentMethod: asNullableString(json['paymentMethod']),
       documentUrl: asNullableString(json['documentUrl']),
@@ -75,7 +82,9 @@ class CostDto extends Equatable {
       referenceId: asNullableInt(json['referenceId']),
       referenceCode: asNullableString(json['referenceCode']),
       createdBy: json['createdBy'] as String? ?? '',
-      createdAt: DateFormatter.parseApiDateTime(json['createdAt'] as String?) ?? DateTime.now(),
+      createdAt:
+          DateFormatter.parseApiDateTime(json['createdAt'] as String?) ??
+          DateTime.now(),
     );
   }
 
@@ -86,6 +95,7 @@ class CostDto extends Equatable {
       'costType': costType,
       'amount': amount,
       'costDate': costDate.toIso8601String(),
+      'documentDate': documentDate?.toIso8601String(),
       'description': description,
       'paymentMethod': paymentMethod,
       'documentUrl': documentUrl,
@@ -99,20 +109,21 @@ class CostDto extends Equatable {
 
   @override
   List<Object?> get props => [
-        costId,
-        businessLocationId,
-        costType,
-        amount,
-        costDate,
-        description,
-        paymentMethod,
-        documentUrl,
-        referenceType,
-        referenceId,
-        referenceCode,
-        createdBy,
-        createdAt,
-      ];
+    costId,
+    businessLocationId,
+    costType,
+    amount,
+    costDate,
+    documentDate,
+    description,
+    paymentMethod,
+    documentUrl,
+    referenceType,
+    referenceId,
+    referenceCode,
+    createdBy,
+    createdAt,
+  ];
 }
 
 class CostResponseDto extends Equatable {
@@ -132,8 +143,8 @@ class CostResponseDto extends Equatable {
     final data = json['data'] as Map<String, dynamic>? ?? json;
     return CostResponseDto(
       items: (data['items'] as List<dynamic>? ?? [])
-              .map((e) => CostDto.fromJson(e as Map<String, dynamic>))
-              .toList(),
+          .map((e) => CostDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
       totalCount: data['totalCount'] as int? ?? 0,
       pageNumber: data['pageNumber'] as int? ?? 1,
       pageSize: data['pageSize'] as int? ?? 20,

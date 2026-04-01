@@ -48,7 +48,7 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
         // Determine list to display
         List<AccountingPeriod> periods = _cachedPeriods;
         bool isLoading = state.isListLoading && _cachedPeriods.isEmpty;
-        bool isRefreshing = state.isListRefreshing;
+        bool isRefreshing = state.isRefreshing;
 
         if (state.status == AccountingPeriodStatus.loaded || state.status == AccountingPeriodStatus.actionSuccess) {
           periods = state.periods;
@@ -869,13 +869,18 @@ class _PeriodDetailSheetState extends State<_PeriodDetailSheet> with TickerProvi
           return const Center(child: CircularProgressIndicator());
         }
 
+        // Show loading overlay when an action (finalize/reopen) is in progress
+        if (state.isActionLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         final period = state.periodDetail;
         if (period != null) {
           return ListView(
             controller: controller,
             padding: const EdgeInsets.all(AppSpacing.md),
             children: [
-              if (state.isDetailRefreshing)
+              if (state.isRefreshing)
                 const Padding(
                   padding: EdgeInsets.only(bottom: AppSpacing.sm),
                   child: LinearProgressIndicator(minHeight: 2),
@@ -950,7 +955,7 @@ class _PeriodDetailSheetState extends State<_PeriodDetailSheet> with TickerProvi
           return AccountingBooksListWidget(
             books: books,
             locationId: locationId,
-            isLoading: state.isBooksRefreshing,
+            isLoading: state.isRefreshing,
             onRefresh: () {
               // Can be used to manually refresh
             },

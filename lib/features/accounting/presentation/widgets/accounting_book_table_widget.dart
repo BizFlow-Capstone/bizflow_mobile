@@ -81,7 +81,7 @@ class AccountingBookTableWidget extends StatelessWidget {
             // Formula rows (summary/totals)
             ...template.formulaFields.map((field) {
               return DataRow(
-                color: MaterialStateProperty.all(
+                color: WidgetStateProperty.all(
                   Colors.grey[100],
                 ),
                 cells: [

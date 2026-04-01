@@ -20,7 +20,9 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
     on<ToggleDebtorStatusRequested>(_onToggleDebtorStatusRequested);
     on<DeleteDebtorRequested>(_onDeleteDebtorRequested);
     on<LoadActiveDebtorsByLocationRequested>(_onLoadActiveDebtorsByLocation);
-    on<ActiveDebtorsByLocationNetworkDataReceived>(_onActiveDebtorsByLocationNetworkDataReceived);
+    on<ActiveDebtorsByLocationNetworkDataReceived>(
+      _onActiveDebtorsByLocationNetworkDataReceived,
+    );
     on<CreateDebtorRequested>(_onCreateDebtorRequested);
     on<UpdateDebtorRequested>(_onUpdateDebtorRequested);
     on<RecordDebtAdjustmentRequested>(_onRecordDebtAdjustmentRequested);
@@ -397,7 +399,8 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
 
     await CacheManager().fetchWithSWR<List<DebtorEntity>>(
       key: cacheKey,
-      fetcher: ({cancelToken}) => repository.getActiveDebtorsByLocation(event.locationId),
+      fetcher: ({cancelToken}) =>
+          repository.getActiveDebtorsByLocation(event.locationId),
       fromJson: (json) {
         // BE returns { "data": [...] } — a direct list, not paginated
         // DebtorMinimalDto is missing isActive & businessLocationId,
@@ -411,17 +414,14 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
           list = raw['items'] as List;
         }
         if (list == null) return <DebtorEntity>[];
-        return list
-            .whereType<Map<String, dynamic>>()
-            .map((m) {
-              // Inject missing fields from the minimal DTO
-              final patched = Map<String, dynamic>.from(m)
-                ..putIfAbsent('isActive', () => true)
-                ..putIfAbsent('businessLocationId', () => event.locationId)
-                ..putIfAbsent('businessLocationName', () => '');
-              return DebtorEntity.fromMap(patched);
-            })
-            .toList();
+        return list.whereType<Map<String, dynamic>>().map((m) {
+          // Inject missing fields from the minimal DTO
+          final patched = Map<String, dynamic>.from(m)
+            ..putIfAbsent('isActive', () => true)
+            ..putIfAbsent('businessLocationId', () => event.locationId)
+            ..putIfAbsent('businessLocationName', () => '');
+          return DebtorEntity.fromMap(patched);
+        }).toList();
       },
       toJson: (data) {
         return {'data': data.map((e) => e.toMap()).toList()};
@@ -431,7 +431,12 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
           'DebtorBloc._onLoadActiveDebtorsByLocation: loaded ${data.length} debtors for location ${event.locationId}',
         );
         // Add event instead of direct emit to avoid BLoC timing issues
-        add(ActiveDebtorsByLocationNetworkDataReceived(debtors: data, locationId: event.locationId));
+        add(
+          ActiveDebtorsByLocationNetworkDataReceived(
+            debtors: data,
+            locationId: event.locationId,
+          ),
+        );
       },
       onError: (error) {
         debugPrint('DebtorBloc._onLoadActiveDebtorsByLocation error: $error');
@@ -444,12 +449,24 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
     Emitter<DebtorState> emit,
   ) async {
     if (!isClosed) {
-      emit(state.copyWith(activeDebtorsByLocation: event.debtors, errorMessage: null));
+      emit(
+        state.copyWith(
+          activeDebtorsByLocation: event.debtors,
+          errorMessage: null,
+        ),
+      );
     }
   }
 
   List<int>? _resolveBusinessLocationIds({List<int>? explicit}) {
     if (explicit != null && explicit.isNotEmpty) return explicit;
+    final businessContext = BusinessContext();
+    if (!businessContext.isOwner) {
+      final locationId = int.tryParse(businessContext.currentBusinessId ?? '');
+      if (locationId != null && locationId > 0) {
+        return [locationId];
+      }
+    }
     return null;
   }
 

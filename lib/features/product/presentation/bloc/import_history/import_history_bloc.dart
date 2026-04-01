@@ -48,7 +48,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
         ? DateFormatter.toApiUtcIsoString(state.toDate!)
         : 'none';
     final location = locationId?.toString() ?? 'all';
-    return 'cache_import_history_${businessId}_${location}_${status}_${type}_${from}_${to}';
+    return 'cache_import_history_${businessId}_${location}_${status}_${type}_${from}_$to';
   }
 
   Future<void> _onLoadImportHistory(
@@ -70,7 +70,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
             pageNumber: 1,
             pageSize: _pageSize,
           );
-          final itemsRaw = response['data']['items'] as List;
+          final itemsRaw = response['items'] as List;
           return itemsRaw
               .map((e) => ImportHistoryItemModel.fromJson(e))
               .toList();
@@ -120,7 +120,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
           pageSize: _pageSize,
         );
 
-        final itemsRaw = response['data']['items'] as List;
+        final itemsRaw = response['items'] as List;
         final items = itemsRaw
             .map((e) => ImportHistoryItemModel.fromJson(e))
             .toList();
@@ -129,7 +129,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
           state.copyWith(
             status: ImportHistoryStatus.success,
             items: items,
-            hasReachedMax: response['data']['hasNextPage'] == false,
+            hasReachedMax: response['hasNextPage'] == false,
             currentPage: 1,
           ),
         );
@@ -165,7 +165,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
         pageSize: _pageSize,
       );
 
-      final itemsRaw = response['data']['items'] as List;
+      final itemsRaw = response['items'] as List;
       final items = itemsRaw
           .map((e) => ImportHistoryItemModel.fromJson(e))
           .toList();
@@ -174,7 +174,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
         state.copyWith(
           status: ImportHistoryStatus.success,
           items: List.of(state.items)..addAll(items),
-          hasReachedMax: response['data']['hasNextPage'] == false,
+          hasReachedMax: response['hasNextPage'] == false,
           currentPage: nextPage,
         ),
       );

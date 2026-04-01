@@ -10,8 +10,8 @@ class RevenueRepository {
   RevenueRepository({
     required RevenueApiService apiService,
     CacheManager? cacheManager,
-  })  : _apiService = apiService,
-        _cache = cacheManager ?? CacheManager();
+  }) : _apiService = apiService,
+       _cache = cacheManager ?? CacheManager();
 
   RevenueEntity _mapToEntity(RevenueDto dto) {
     return RevenueEntity(
@@ -20,11 +20,14 @@ class RevenueRepository {
       type: dto.revenueType,
       amount: dto.amount,
       date: dto.revenueDate,
+      documentDate: dto.documentDate,
       description: dto.description,
       moneyChannel: dto.moneyChannel,
       referenceType: dto.referenceType,
       referenceId: dto.referenceId,
       referenceCode: dto.referenceCode,
+      businessTypeId: dto.businessTypeId,
+      businessTypeName: dto.businessTypeName,
       createdAt: dto.createdAt,
     );
   }
@@ -43,29 +46,27 @@ class RevenueRepository {
     onData,
     Function(dynamic error)? onError,
   }) async {
-    final key = 'revenues_${businessLocationId}_p${pageNumber}_s$pageSize';
-
-    await _cache.fetchWithSWR<Map<String, dynamic>>(
+    final key = 'revenues_${businessLocationId}_p${pageNumber}_s$pageSize';    await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,
-      fetcher:
-            ({cancelToken}) => _apiService
-              .getRevenues(
-                pageNumber: pageNumber,
-                pageSize: pageSize,
-                businessLocationId: businessLocationId,
-                fromDate: fromDate,
-                toDate: toDate,
-              )
-              .then((res) => {
-                'items': res.items.map((e) => e.toJson()).toList(),
-                'total': res.totalCount,
-              }),
+      fetcher: ({cancelToken}) => _apiService
+          .getRevenues(
+            pageNumber: pageNumber,
+            pageSize: pageSize,
+            businessLocationId: businessLocationId,
+            fromDate: fromDate,
+            toDate: toDate,
+          )
+          .then(
+            (res) => {
+              'items': res.items.map((e) => e.toJson()).toList(),
+              'total': res.totalCount,
+            },
+          ),
       onData: (dataMap, isFromCache) {
-        final items =
-            (dataMap['items'] as List<dynamic>? ?? [])
-                .map((e) => RevenueDto.fromJson(e as Map<String, dynamic>))
-                .map(_mapToEntity)
-                .toList();
+        final items = (dataMap['items'] as List<dynamic>? ?? [])
+            .map((e) => RevenueDto.fromJson(e as Map<String, dynamic>))
+            .map(_mapToEntity)
+            .toList();
         final totalCount = dataMap['total'] as int? ?? 0;
         onData(items, totalCount, isFromCache);
       },
@@ -81,6 +82,15 @@ class RevenueRepository {
 
   Future<RevenueEntity> createManualRevenue(Map<String, dynamic> body) async {
     final dto = await _apiService.createManualRevenue(body);
+    await clearCache();
+    return _mapToEntity(dto);
+  }
+
+  Future<RevenueEntity> updateManualRevenue(
+    int revenueId,
+    Map<String, dynamic> body,
+  ) async {
+    final dto = await _apiService.updateManualRevenue(revenueId, body);
     await clearCache();
     return _mapToEntity(dto);
   }

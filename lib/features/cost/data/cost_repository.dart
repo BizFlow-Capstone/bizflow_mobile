@@ -11,8 +11,8 @@ class CostRepository {
   CostRepository({
     required CostApiService apiService,
     CacheManager? cacheManager,
-  })  : _apiService = apiService,
-        _cache = cacheManager ?? CacheManager();
+  }) : _apiService = apiService,
+       _cache = cacheManager ?? CacheManager();
 
   CostEntity _mapToEntity(CostDto dto) {
     return CostEntity(
@@ -21,6 +21,7 @@ class CostRepository {
       type: dto.costType,
       amount: dto.amount,
       date: dto.costDate,
+      documentDate: dto.documentDate,
       description: dto.description,
       paymentMethod: dto.paymentMethod,
       documentUrl: dto.documentUrl,
@@ -37,10 +38,11 @@ class CostRepository {
     int? businessLocationId,
     DateTime? fromDate,
     DateTime? toDate,
-    required Function(List<CostEntity> data, int totalCount, bool isFromCache) onData,
+    required Function(List<CostEntity> data, int totalCount, bool isFromCache)
+    onData,
     Function(dynamic error)? onError,
   }) async {
-    final key = 'costs_$businessLocationId\_p$pageNumber\_s$pageSize';
+    final key = 'costs_${businessLocationId}_p${pageNumber}_s$pageSize';
 
     await _cache.fetchWithSWR<Map<String, dynamic>>(
       key: key,
@@ -52,10 +54,12 @@ class CostRepository {
             fromDate: fromDate,
             toDate: toDate,
           )
-          .then((res) => {
-                'items': res.items.map((e) => e.toJson()).toList(),
-                'total': res.totalCount,
-              }),
+          .then(
+            (res) => {
+              'items': res.items.map((e) => e.toJson()).toList(),
+              'total': res.totalCount,
+            },
+          ),
       onData: (dataMap, isFromCache) {
         final items = (dataMap['items'] as List<dynamic>? ?? [])
             .map((e) => CostDto.fromJson(e as Map<String, dynamic>))
@@ -74,14 +78,21 @@ class CostRepository {
     await _cache.removeByPrefix('costs_');
   }
 
-  Future<CostEntity> createManualCost(Map<String, dynamic> body, {File? image}) async {
+  Future<CostEntity> createManualCost(
+    Map<String, dynamic> body, {
+    File? image,
+  }) async {
     final dto = await _apiService.createManualCost(body, image: image);
     await clearCache();
     return _mapToEntity(dto);
   }
 
-  Future<CostEntity> updateManualCost(int costId, Map<String, dynamic> body, {File? image}) async {
-    final dto = await _apiService.updateManualCost(costId, body, image: image); 
+  Future<CostEntity> updateManualCost(
+    int costId,
+    Map<String, dynamic> body, {
+    File? image,
+  }) async {
+    final dto = await _apiService.updateManualCost(costId, body, image: image);
     await clearCache();
     return _mapToEntity(dto);
   }

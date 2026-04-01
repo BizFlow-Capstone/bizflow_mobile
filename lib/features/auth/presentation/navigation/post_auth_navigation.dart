@@ -63,6 +63,7 @@ class PostAuthNavigation {
         firstLocation.id,
         firstLocation.name,
         isOwner: firstLocation.isOwner,
+        ownerProfileId: firstLocation.ownerProfileId,
       );
     }
 

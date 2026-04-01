@@ -121,7 +121,7 @@ class OrderApiService {
       } else {
         throw Exception(response.message ?? _genericError);
       }
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.getOrders error: $e');
@@ -149,7 +149,7 @@ class OrderApiService {
       } else {
         throw Exception(response.message ?? _genericError);
       }
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.getOrder error: $e');
@@ -181,7 +181,7 @@ class OrderApiService {
       }
     } on OrderConfirmationRequiredException {
       rethrow;
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.createOrder error: $e');
@@ -226,7 +226,7 @@ class OrderApiService {
       }
     } on OrderConfirmationRequiredException {
       rethrow;
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.updateOrder error: $e');
@@ -258,7 +258,7 @@ class OrderApiService {
       }
     } on OrderConfirmationRequiredException {
       rethrow;
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.completeOrder error: $e');
@@ -287,7 +287,7 @@ class OrderApiService {
       } else {
         throw Exception(response.message ?? _genericError);
       }
-    } on ApiException catch (e) {
+    } on ApiException {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.cancelOrder error: $e');

@@ -164,7 +164,8 @@ class TokenRefreshInterceptor implements ResponseInterceptor {
           if (kDebugMode &&
               (host == 'localhost' ||
                   host == '10.0.2.2' ||
-                  host.startsWith('192.168.'))) {
+                  host.startsWith('192.168.') ||
+                  host.startsWith('172.20.10.'))) {
             return true;
           }
           return false;
@@ -246,7 +247,8 @@ class ApiClient {
         if (kDebugMode &&
             (host == 'localhost' ||
                 host == '10.0.2.2' ||
-                host.startsWith('192.168.'))) {
+                host.startsWith('192.168.') ||
+                host.startsWith('172.20.10.'))) {
           return true;
         }
         return false;

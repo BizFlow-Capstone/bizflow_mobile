@@ -64,9 +64,61 @@ class SubscriptionRepository {
     return await _apiService.checkoutSubscription(planId);
   }
 
+  /// Best-effort mobile pre-check before calling backend protected features.
+  /// Backend is still the final authority for limit enforcement.
+  Future<bool> canUseFeatureCode({
+    required String featureCode,
+    String? ownerProfileId,
+  }) async {
+    final normalizedCode = featureCode.trim();
+    if (normalizedCode.isEmpty) return true;
+
+    try {
+      final currentSub = await _apiService.getCurrentSubscription();
+      final plan = currentSub?.plan;
+      if (plan == null) {
+        return true;
+      }
+
+      PlanFeatureDto? feature;
+      for (final item in plan.features) {
+        if (item.featureCode.toLowerCase() == normalizedCode.toLowerCase()) {
+          feature = item;
+          break;
+        }
+      }
+
+      // If feature is not listed in plan, treat as not limited on mobile side.
+      if (feature == null) {
+        return true;
+      }
+
+      final limit = feature.usageLimit;
+      if (limit < 0) return true; // unlimited
+      if (limit == 0) return false;
+
+      final used = await _getFeatureUsedCount(
+        featureCode: feature.featureCode,
+        ownerProfileId: ownerProfileId,
+      );
+
+      // Fail-open on missing usage snapshot; backend check still runs.
+      if (used == null) return true;
+
+      return used < limit;
+    } catch (_) {
+      // Pre-check should never block user when local check cannot resolve.
+      return true;
+    }
+  }
+
   /// Stream Firestore Usage Tracking Document
-  Stream<DocumentSnapshot<Map<String, dynamic>>> streamUsageTracking() {
-    return Stream.fromFuture(_prepareUsageTrackingDocId()).asyncExpand((docId) {
+  Stream<DocumentSnapshot<Map<String, dynamic>>> streamUsageTracking({
+    String? ownerProfileId,
+  }) {
+    return Stream.fromFuture(
+      _prepareUsageTrackingDocId(ownerProfileId: ownerProfileId),
+    ).asyncExpand((docId) {
       if (docId == null) {
         return const Stream.empty();
       }
@@ -77,14 +129,51 @@ class SubscriptionRepository {
     });
   }
 
-  Future<String?> _prepareUsageTrackingDocId() async {
-    final profileId = await _getCurrentProfileId();
-    if (profileId == null || profileId.isEmpty) {
+  Future<String?> _prepareUsageTrackingDocId({
+    String? ownerProfileId,
+  }) async {
+    final currentProfileId = await _getCurrentProfileId();
+    if (currentProfileId == null || currentProfileId.isEmpty) {
       return null;
     }
 
-    await _ensureFirebaseAuthSession(profileId);
-    return '${profileId}_active';
+    await _ensureFirebaseAuthSession(currentProfileId);
+    final scopeProfileId = (ownerProfileId ?? '').trim().isNotEmpty
+        ? ownerProfileId!.trim()
+        : currentProfileId;
+    return '${scopeProfileId}_active';
+  }
+
+  Future<int?> _getFeatureUsedCount({
+    required String featureCode,
+    String? ownerProfileId,
+  }) async {
+    final docId = await _prepareUsageTrackingDocId(ownerProfileId: ownerProfileId);
+    if (docId == null) return null;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('usage_tracking')
+        .doc(docId)
+        .get();
+    final data = snapshot.data();
+    if (data == null) return null;
+
+    final features = data['features'] as Map<String, dynamic>?;
+    if (features == null || features.isEmpty) return null;
+
+    Map<String, dynamic>? featureData =
+        features[featureCode] as Map<String, dynamic>?;
+
+    if (featureData == null) {
+      for (final entry in features.entries) {
+        if (entry.key.toLowerCase() == featureCode.toLowerCase()) {
+          featureData = entry.value as Map<String, dynamic>?;
+          break;
+        }
+      }
+    }
+
+    return (featureData?['used'] as num?)?.toInt();
   }
 
   Future<void> _ensureFirebaseAuthSession(String profileId) async {

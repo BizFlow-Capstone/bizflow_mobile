@@ -7,7 +7,6 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../revenue/domain/entities/revenue_entity.dart';
 import '../../../cost/domain/entities/cost_entity.dart';
-import '../models/accounting_mock_models.dart';
 
 class AccountingCostRevenueTab extends StatelessWidget {
   final List<RevenueEntity> revenues;

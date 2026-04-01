@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/routing/app_router.dart';
@@ -98,8 +97,10 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     GLLoaded? currentState;
     if (state is GLLoaded) currentState = state;
 
-    final effectiveTransactionTypes = transactionTypes ?? currentState?.transactionTypes;
-    final effectiveReferenceTypes = referenceTypes ?? currentState?.referenceTypes;
+    final effectiveTransactionTypes =
+        transactionTypes ?? currentState?.transactionTypes;
+    final effectiveReferenceTypes =
+        referenceTypes ?? currentState?.referenceTypes;
     final effectiveMoneyChannels = moneyChannels ?? currentState?.moneyChannels;
     final effectiveFromDate = fromDate ?? currentState?.fromDate;
     final effectiveToDate = toDate ?? currentState?.toDate;
@@ -140,52 +141,52 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         ),
         Expanded(
           child: BlocBuilder<GLBloc, GLState>(
-        builder: (context, state) {
-          if (_isLocationUnavailable) {
-            return _buildMissingLocationState();
-          }
+            builder: (context, state) {
+              if (_isLocationUnavailable) {
+                return _buildMissingLocationState();
+              }
 
-          if (state is GLInitial || state is GLLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+              if (state is GLInitial || state is GLLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          if (state is GLError) {
-            final hasData =
-                state.previousEntries != null &&
-                state.previousEntries!.isNotEmpty;
-            
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                AppSnackBar.show(
-                  context,
-                  message: state.message,
-                  type: AppSnackBarType.error,
+              if (state is GLError) {
+                final hasData =
+                    state.previousEntries != null &&
+                    state.previousEntries!.isNotEmpty;
+
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    AppSnackBar.show(
+                      context,
+                      message: state.message,
+                      type: AppSnackBarType.error,
+                    );
+                  }
+                });
+
+                if (!hasData) {
+                  return _buildEmptyState();
+                }
+
+                return _buildListView(state.previousEntries!, true);
+              }
+
+              if (state is GLLoaded) {
+                if (state.entries.isEmpty) {
+                  return _buildEmptyState();
+                }
+                return _buildListView(
+                  state.entries,
+                  state.hasReachedMax,
+                  isLoadMore: state.isLoadMore,
                 );
               }
-            });
 
-            if (!hasData) {
-              return _buildEmptyState();
-            }
-
-            return _buildListView(state.previousEntries!, true);
-          }
-
-          if (state is GLLoaded) {
-            if (state.entries.isEmpty) {
-              return _buildEmptyState();
-            }
-            return _buildListView(
-              state.entries,
-              state.hasReachedMax,
-              isLoadMore: state.isLoadMore,
-            );
-          }
-
-          return const SizedBox.shrink();
-        },
-      ),
-    ),
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
       ],
     );
   }
@@ -390,7 +391,8 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                             ),
                           ),
                         ),
-                      if (entry.referenceType.isNotEmpty && entry.referenceId != null)
+                      if (entry.referenceType.isNotEmpty &&
+                          entry.referenceId != null)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -426,7 +428,9 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     }
 
     try {
-      return await context.read<OrderBloc>().repository.getOrder(entityId.toString());
+      return await context.read<OrderBloc>().repository.getOrder(
+        entityId.toString(),
+      );
     } catch (_) {
       return null;
     }
@@ -446,14 +450,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       return;
     }
 
-    if ((entityType == 'import' || entityType == 'inventoryimport') && entityId > 0) {
+    if ((entityType == 'import' || entityType == 'inventoryimport') &&
+        entityId > 0) {
       final locationId = context.read<BusinessContext>().currentBusinessId;
       AppRouter.navigateTo(
         AppRoutes.stockImport,
-        arguments: {
-          'locationId': locationId,
-          'importId': entityId,
-        },
+        arguments: {'locationId': locationId, 'importId': entityId},
       );
       return;
     }
@@ -471,6 +473,8 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
               children: [
                 Text('Chứng từ: ${entry.documentNumber}'),
                 const SizedBox(height: 6),
+                Text('Ngày chứng từ: ${entry.documentDate ?? '-'}'),
+                const SizedBox(height: 6),
                 Text('Ngày: ${entry.date}'),
                 const SizedBox(height: 6),
                 Text('Nội dung: ${entry.note}'),
@@ -479,9 +483,13 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 const SizedBox(height: 6),
                 Text('Kênh tiền: ${entry.moneyChannel ?? '-'}'),
                 const SizedBox(height: 6),
-                Text('Reference: ${entry.referenceType.isNotEmpty ? entry.referenceType : '-'} ${entry.referenceId ?? ''}'),
+                Text(
+                  'Reference: ${entry.referenceType.isNotEmpty ? entry.referenceType : '-'} ${entry.referenceId ?? ''}',
+                ),
                 const SizedBox(height: 6),
-                Text('Entity: ${entry.entityType ?? '-'} ${entry.entityId ?? ''}'),
+                Text(
+                  'Entity: ${entry.entityType ?? '-'} ${entry.entityId ?? ''}',
+                ),
                 if ((entry.entityType ?? '').toLowerCase() == 'order' &&
                     (entry.entityId ?? 0) > 0) ...[
                   const SizedBox(height: 12),
@@ -514,12 +522,16 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                           const SizedBox(height: 4),
                           Text('Trạng thái: ${order.status}'),
                           const SizedBox(height: 4),
-                          Text('Tổng tiền: ${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(order.totalAmount)}'),
+                          Text(
+                            'Tổng tiền: ${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(order.totalAmount)}',
+                          ),
                           const SizedBox(height: 8),
                           ...order.items.map(
                             (item) => Padding(
                               padding: const EdgeInsets.only(bottom: 6),
-                              child: Text('• ${item.productName} x${item.quantity}'),
+                              child: Text(
+                                '• ${item.productName} x${item.quantity}',
+                              ),
                             ),
                           ),
                         ],
@@ -604,6 +616,3 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     }
   }
 }
-
-
-

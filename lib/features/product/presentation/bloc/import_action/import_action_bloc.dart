@@ -138,7 +138,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     emit(state.copyWith(status: ImportActionStatus.loading));
     try {
       final response = await _repository.getImportDetail(event.importId);
-      final importData = ImportDetailModel.fromJson(response['data']);
+      final importData = ImportDetailModel.fromJson(response);
       emit(
         state.copyWith(
           status: ImportActionStatus.loaded,

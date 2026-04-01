@@ -15,6 +15,8 @@ import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
 import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../../data/models/business_type_model.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Edit Product Page
 /// SC-PRO-02: Chỉnh sửa sản phẩm
@@ -352,7 +354,13 @@ class _EditProductPageState extends State<EditProductPage> {
   }
 
   /// Delete product
-  void _deleteProduct() {
+  Future<void> _deleteProduct() async {
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.productManagement,
+    );
+    if (!allowed) return;
+
     context.read<ProductBloc>().add(
       DeleteProductRequested(
         locationId: widget.locationId,
@@ -362,7 +370,7 @@ class _EditProductPageState extends State<EditProductPage> {
   }
 
   /// Submit form to update product
-  void _submitForm() {
+  Future<void> _submitForm() async {
     final requiredMessage = l10n.translate('common.required_field');
     final invalidCostPriceMessage = l10n.translate('product.invalid_cost_price');
     final invalidSalePriceMessage = l10n.translate('product.invalid_sale_price');
@@ -414,6 +422,12 @@ class _EditProductPageState extends State<EditProductPage> {
         _quantityError != null) {
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.productManagement,
+    );
+    if (!allowed) return;
 
     if (widget.productId.isEmpty) {
       AppSnackBar.show(

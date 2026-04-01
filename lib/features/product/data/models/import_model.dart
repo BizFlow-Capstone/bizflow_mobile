@@ -190,6 +190,8 @@ class CreateImportRequest {
   final String supplier;
   final String note;
   final DateTime? receivedAt;
+  final DateTime? documentDate;
+  final String? documentNumber;
   final bool saveAsDraft;
   final String? imagePath;
   final List<ImportItemModel> items;
@@ -200,6 +202,8 @@ class CreateImportRequest {
     required this.supplier,
     required this.note,
     this.receivedAt,
+    this.documentDate,
+    this.documentNumber,
     required this.saveAsDraft,
     this.imagePath,
     required this.items,
@@ -213,6 +217,10 @@ class CreateImportRequest {
       'note': note,
       if (receivedAt != null)
         'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt!),
+      if (documentDate != null)
+        'documentDate': DateFormatter.toApiDateOnly(documentDate!),
+      if (documentNumber != null && documentNumber!.isNotEmpty)
+        'documentNumber': documentNumber,
       'saveAsDraft': saveAsDraft,
       if (imagePath != null) 'imagePath': imagePath,
       'items': items.map((e) => e.toJson()).toList(),
@@ -225,6 +233,8 @@ class UpdateImportRequest {
   final String supplier;
   final String note;
   final DateTime? receivedAt;
+  final DateTime? documentDate;
+  final String? documentNumber;
   final List<ImportItemModel> items;
   final String? imagePath;
   final bool removeImage;
@@ -234,6 +244,8 @@ class UpdateImportRequest {
     required this.supplier,
     required this.note,
     this.receivedAt,
+    this.documentDate,
+    this.documentNumber,
     required this.items,
     this.imagePath,
     this.removeImage = false,
@@ -246,6 +258,10 @@ class UpdateImportRequest {
       'note': note,
       if (receivedAt != null)
         'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt!),
+      if (documentDate != null)
+        'documentDate': DateFormatter.toApiDateOnly(documentDate!),
+      if (documentNumber != null && documentNumber!.isNotEmpty)
+        'documentNumber': documentNumber,
       'items': items.map((e) => e.toJson()).toList(),
       'removeImage': removeImage,
       if (imagePath != null) 'imagePath': imagePath,

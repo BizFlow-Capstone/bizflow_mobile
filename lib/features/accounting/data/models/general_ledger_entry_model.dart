@@ -1,6 +1,7 @@
 class GeneralLedgerEntryModel {
   final int entryId;
   final String documentNumber;
+  final String? documentDate;
   final String date;
   final String note;
   final double amount;
@@ -18,6 +19,7 @@ class GeneralLedgerEntryModel {
   GeneralLedgerEntryModel({
     required this.entryId,
     required this.documentNumber,
+    this.documentDate,
     required this.date,
     required this.note,
     required this.amount,
@@ -73,9 +75,7 @@ class GeneralLedgerEntryModel {
         ? (debitAmount - creditAmount)
         : asDouble(json['amount']);
 
-    final refType = asString(
-      source['referenceType'] ?? json['referenceType'],
-    );
+    final refType = asString(source['referenceType'] ?? json['referenceType']);
     final refId = asNullableInt(source['referenceId'] ?? json['referenceId']);
     final entityType = asString(source['entityType'], fallback: '');
     final entityId = asNullableInt(source['entityId']);
@@ -92,6 +92,12 @@ class GeneralLedgerEntryModel {
         json['documentNumber'] ?? source['referenceCode'],
         fallback: fallbackDocument,
       ),
+      documentDate:
+          asString(
+            json['documentDate'] ?? source['documentDate'],
+          ).trim().isEmpty
+          ? null
+          : asString(json['documentDate'] ?? source['documentDate']).trim(),
       date: asString(json['date'] ?? json['entryDate'] ?? json['createdAt']),
       note: asString(json['note'] ?? json['description']),
       amount: normalizedAmount,
@@ -116,6 +122,7 @@ class GeneralLedgerEntryModel {
     return {
       'entryId': entryId,
       'documentNumber': documentNumber,
+      'documentDate': documentDate,
       'date': date,
       'note': note,
       'amount': amount,

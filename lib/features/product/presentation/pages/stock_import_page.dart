@@ -23,6 +23,8 @@ import '../bloc/import_action/import_action_state.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Stock Import Page (Tạo / Sửa / Chi tiết phiếu nhập kho)
 /// Flow: Chọn sản phẩm -> Lưu Nháp / Xác nhận
@@ -78,6 +80,8 @@ class _StockImportViewState extends State<_StockImportView> {
   late TextEditingController _noteController;
   late TextEditingController _supplierController;
   late TextEditingController _searchController;
+  late TextEditingController _documentNumberController;
+  DateTime? _documentDate;
 
   @override
   void initState() {
@@ -85,6 +89,7 @@ class _StockImportViewState extends State<_StockImportView> {
     _noteController = TextEditingController();
     _supplierController = TextEditingController();
     _searchController = TextEditingController();
+    _documentNumberController = TextEditingController();
   }
 
   @override
@@ -92,6 +97,7 @@ class _StockImportViewState extends State<_StockImportView> {
     _noteController.dispose();
     _supplierController.dispose();
     _searchController.dispose();
+    _documentNumberController.dispose();
     super.dispose();
   }
 
@@ -126,11 +132,17 @@ class _StockImportViewState extends State<_StockImportView> {
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
-  void _onSaveDraft() {
+  Future<void> _onSaveDraft() async {
     if (_selectedItems.isEmpty) {
       _showErrorSnackBar(l10n.translate('stock_import.add_product_required'));
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.inventoryImport,
+    );
+    if (!allowed) return;
 
     if (widget.importId == null) {
       final req = CreateImportRequest(
@@ -139,6 +151,10 @@ class _StockImportViewState extends State<_StockImportView> {
         supplier: _supplierController.text,
         note: _noteController.text,
         receivedAt: null,
+        documentDate: _documentDate,
+        documentNumber: _documentNumberController.text.isNotEmpty
+            ? _documentNumberController.text
+            : null,
         saveAsDraft: true,
         imagePath: _selectedImagePath,
         items: _selectedItems,
@@ -150,6 +166,10 @@ class _StockImportViewState extends State<_StockImportView> {
         supplier: _supplierController.text,
         note: _noteController.text,
         receivedAt: null,
+        documentDate: _documentDate,
+        documentNumber: _documentNumberController.text.isNotEmpty
+            ? _documentNumberController.text
+            : null,
         imagePath: _selectedImagePath,
         removeImage: _removeImage,
         items: _selectedItems,
@@ -160,11 +180,17 @@ class _StockImportViewState extends State<_StockImportView> {
     }
   }
 
-  void _onConfirm() {
+  Future<void> _onConfirm() async {
     if (_selectedItems.isEmpty) {
       _showErrorSnackBar(l10n.translate('stock_import.add_product_required'));
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.inventoryImport,
+    );
+    if (!allowed) return;
 
     showDialog(
       context: context,
@@ -191,6 +217,10 @@ class _StockImportViewState extends State<_StockImportView> {
                   supplier: _supplierController.text,
                   note: _noteController.text,
                   receivedAt: DateTime.now(),
+                  documentDate: _documentDate,
+                  documentNumber: _documentNumberController.text.isNotEmpty
+                      ? _documentNumberController.text
+                      : null,
                   saveAsDraft: false,
                   imagePath: _selectedImagePath,
                   items: _selectedItems,
@@ -203,6 +233,10 @@ class _StockImportViewState extends State<_StockImportView> {
                   supplier: _supplierController.text,
                   note: _noteController.text,
                   receivedAt: null,
+                  documentDate: _documentDate,
+                  documentNumber: _documentNumberController.text.isNotEmpty
+                      ? _documentNumberController.text
+                      : null,
                   imagePath: _selectedImagePath,
                   removeImage: _removeImage,
                   items: _selectedItems,
@@ -219,7 +253,13 @@ class _StockImportViewState extends State<_StockImportView> {
     );
   }
 
-  void _onCancelDelete() {
+  Future<void> _onCancelDelete() async {
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.inventoryImport,
+    );
+    if (!allowed) return;
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -477,10 +517,16 @@ class _StockImportViewState extends State<_StockImportView> {
         if (state.status == ImportActionStatus.success) {
           if (_confirmAfterUpdate && widget.importId != null) {
             _confirmAfterUpdate = false;
-            final req = ConfirmImportRequest(receivedAt: DateTime.now());
-            context.read<ImportActionBloc>().add(
-              ConfirmImportEvent(widget.importId!, req),
-            );
+            SubscriptionFeatureGuard.ensureAllowed(
+              context,
+              featureCode: SubscriptionFeatureCodes.inventoryImport,
+            ).then((allowed) {
+              if (!allowed || !context.mounted) return;
+              final req = ConfirmImportRequest(receivedAt: DateTime.now());
+              context.read<ImportActionBloc>().add(
+                ConfirmImportEvent(widget.importId!, req),
+              );
+            });
             return;
           }
 
@@ -512,6 +558,62 @@ class _StockImportViewState extends State<_StockImportView> {
         }
       },
       builder: (context, state) {
+        final isDetailLoadFailed =
+            widget.importId != null &&
+            state.status == ImportActionStatus.failure &&
+            state.importDetail == null;
+
+        if (isDetailLoadFailed) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              elevation: 0,
+              backgroundColor: AppColors.white,
+              foregroundColor: AppColors.textPrimary,
+              systemOverlayStyle: SystemUiOverlayStyle.dark,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+                color: Colors.black,
+              ),
+              title: Text(
+                l10n.translate('common.detail'),
+                style: AppTextStyles.titleLarge.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              bottom: const AppSyncStatusText(),
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: AppColors.error,
+                      size: 36,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      state.errorMessage ?? l10n.translate('common.error'),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    ElevatedButton(
+                      onPressed: () => context.read<ImportActionBloc>().add(
+                            GetImportDetailEvent(widget.importId!),
+                          ),
+                      child: Text(l10n.translate('common.retry')),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
@@ -717,6 +819,53 @@ class _StockImportViewState extends State<_StockImportView> {
                     labelText: l10n.translate('stock_import.note'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.md),
+                // Document Number
+                TextField(
+                  controller: _documentNumberController,
+                  enabled: isEditable,
+                  decoration: InputDecoration(
+                    labelText: 'Số chứng từ',
+                    hintText: 'Nhập số chứng từ (nếu có)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.md),
+                // Document Date
+                InkWell(
+                  onTap: isEditable
+                      ? () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _documentDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setState(() => _documentDate = picked);
+                          }
+                        }
+                      : null,
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Ngày chứng từ',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      suffixIcon: const Icon(Icons.calendar_today, size: 20),
+                    ),
+                    child: Text(
+                      _documentDate != null
+                          ? DateFormatter.formatDate(_documentDate)
+                          : 'Chọn ngày chứng từ (nếu có)',
+                      style: _documentDate != null
+                          ? null
+                          : TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
                 ),

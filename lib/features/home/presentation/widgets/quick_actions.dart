@@ -10,6 +10,7 @@ class QuickActions extends StatelessWidget {
   final VoidCallback? onOrders;
   final VoidCallback? onDebt;
   final VoidCallback? onReport;
+  final bool showReport;
 
   const QuickActions({
     super.key,
@@ -17,35 +18,43 @@ class QuickActions extends StatelessWidget {
     this.onOrders,
     this.onDebt,
     this.onReport,
+    this.showReport = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _QuickActionButton(
-          icon: Icons.add_circle_outline,
-          label: l10n.translate('home.create_order'),
-          onTap: onCreateOrder,
-        ),
-        _QuickActionButton(
-          icon: Icons.shopping_cart_outlined,
-          label: l10n.translate('home.orders'),
-          onTap: onOrders,
-        ),
-        _QuickActionButton(
-          icon: Icons.credit_card_outlined,
-          label: l10n.translate('home.debt'),
-          onTap: onDebt,
-        ),
+    final actions = <Widget>[
+      _QuickActionButton(
+        icon: Icons.add_circle_outline,
+        label: l10n.translate('home.create_order'),
+        onTap: onCreateOrder,
+      ),
+      _QuickActionButton(
+        icon: Icons.shopping_cart_outlined,
+        label: l10n.translate('home.orders'),
+        onTap: onOrders,
+      ),
+      _QuickActionButton(
+        icon: Icons.credit_card_outlined,
+        label: l10n.translate('home.debt'),
+        onTap: onDebt,
+      ),
+    ];
+
+    if (showReport) {
+      actions.add(
         _QuickActionButton(
           icon: Icons.bar_chart_outlined,
           label: l10n.translate('home.reports'),
           onTap: onReport,
         ),
-      ],
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: actions,
     );
   }
 }

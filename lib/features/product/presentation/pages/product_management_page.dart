@@ -197,6 +197,12 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final canManageProducts = PermissionService.canEditProduct(
+      context.watch<BusinessContext>().isOwner,
+    );
+    final canAdjustStock = PermissionService.canAdjustStock(
+      context.watch<BusinessContext>().isOwner,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -446,7 +452,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                 } else if (state is ProductFailure) {
                   AppSnackBar.show(
                     context,
-                    message: l10n.translate('common.error_occurred'),
+                    message: state.message,
                     type: AppSnackBarType.error,
                   );
                 } else if (state is ProductDeleteSuccess) {
@@ -543,8 +549,10 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         return ProductCardWidget(
                           product: product,
                           locationId: widget.locationId,
-                          onQuickAdjustStock: () =>
-                              _showQuickAdjustStockDialog(product),
+                          canManageActions: canManageProducts,
+                          onQuickAdjustStock: canAdjustStock
+                              ? () => _showQuickAdjustStockDialog(product)
+                              : null,
                         );
                       },
                     ),
@@ -578,9 +586,12 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                         return ProductCardWidget(
                           product: currentProducts[index],
                           locationId: widget.locationId,
-                          onQuickAdjustStock: () => _showQuickAdjustStockDialog(
-                            currentProducts[index],
-                          ),
+                          canManageActions: canManageProducts,
+                          onQuickAdjustStock: canAdjustStock
+                              ? () => _showQuickAdjustStockDialog(
+                                  currentProducts[index],
+                                )
+                              : null,
                         );
                       },
                     ),

@@ -11,6 +11,8 @@ import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../domain/entities/order_item_entity.dart';
 import '../bloc/order_bloc.dart';
 import 'order_completion_confirmation_screen.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 class OrderPayNowScreen extends StatefulWidget {
   final double totalAmount;
@@ -274,7 +276,7 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
     );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final l10n = AppLocalizations.of(context);
     final locationIdText = widget.locationId?.trim();
     final businessLocationId = int.tryParse(locationIdText ?? '');
@@ -292,6 +294,12 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
       );
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.orderManagement,
+    );
+    if (!allowed) return;
 
     setState(() {
       _isSubmitting = true;

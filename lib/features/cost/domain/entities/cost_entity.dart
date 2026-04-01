@@ -6,6 +6,7 @@ class CostEntity extends Equatable {
   final String type;
   final double amount;
   final DateTime date;
+  final DateTime? documentDate;
   final String description;
   final String? paymentMethod;
   final String? documentUrl;
@@ -20,6 +21,7 @@ class CostEntity extends Equatable {
     required this.type,
     required this.amount,
     required this.date,
+    this.documentDate,
     required this.description,
     this.paymentMethod,
     this.documentUrl,
@@ -31,17 +33,18 @@ class CostEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        locationId,
-        type,
-        amount,
-        date,
-        description,
-        paymentMethod,
-        documentUrl,
-        referenceType,
-        referenceId,
-        referenceCode,
-        createdAt,
-      ];
+    id,
+    locationId,
+    type,
+    amount,
+    date,
+    documentDate,
+    description,
+    paymentMethod,
+    documentUrl,
+    referenceType,
+    referenceId,
+    referenceCode,
+    createdAt,
+  ];
 }

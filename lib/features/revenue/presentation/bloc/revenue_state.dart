@@ -44,6 +44,15 @@ class RevenueCreated extends RevenueState {
   List<Object?> get props => [revenue];
 }
 
+class RevenueUpdated extends RevenueState {
+  final RevenueEntity revenue;
+
+  const RevenueUpdated({required this.revenue});
+
+  @override
+  List<Object?> get props => [revenue];
+}
+
 class RevenueDeleted extends RevenueState {
   final int revenueId;
 

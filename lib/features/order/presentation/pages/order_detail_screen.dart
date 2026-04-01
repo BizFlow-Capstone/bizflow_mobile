@@ -20,6 +20,12 @@ import '../../domain/entities/order_entity.dart';
 import '../bloc/order_bloc.dart';
 import 'order_form_screen.dart';
 import '../../data/order_api_service.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
+import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
+import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
+import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
+import '../../../../shared/utils/string_utils.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String orderId;
@@ -57,6 +63,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _cancelOrder(OrderEntity detail) async {
     if (_isCancelling) return;
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.orderManagement,
+    );
+    if (!allowed) return;
+
     final l10n = AppLocalizations.of(context);
     final reasonController = TextEditingController();
     final confirmed = await showDialog<bool>(
@@ -135,6 +148,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }) async {
     if (_isPublishing) return;
 
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.orderManagement,
+    );
+    if (!allowed) return;
+
     final l10n = AppLocalizations.of(context);
     setState(() => _isPublishing = true);
 
@@ -205,42 +224,161 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
-  Future<File> _buildPdfFile(OrderEntity detail) async {
+  InvoiceTemplateEntity _getTemplate() {
+    final state = context.read<InvoiceTemplateBloc>().state;
+    return state is InvoiceTemplateLoaded
+        ? state.template
+        : InvoiceTemplateEntity.empty();
+  }
+
+  String _pdfFormat(String text) => StringUtils.removeDiacritics(text);
+  String _pdfCurrency(num? amount) =>
+      '${CurrencyFormatter.formatNumber(amount?.round() ?? 0)} VND';
+
+  List<Map<String, String>> _buildColumns(InvoiceTemplateEntity template) {
+    final columns = <Map<String, String>>[];
+    if (template.showStt) {
+      columns.add({'key': 'stt', 'label': _pdfFormat('STT')});
+    }
+    if (template.showItemName) {
+      columns.add({'key': 'name', 'label': _pdfFormat('San pham')});
+    }
+    if (template.showQuantity) {
+      columns.add({'key': 'qty', 'label': _pdfFormat('SL')});
+    }
+    if (template.showUnit) {
+      columns.add({'key': 'unit', 'label': _pdfFormat('Don vi')});
+    }
+    if (template.showUnitPrice) {
+      columns.add({'key': 'unitPrice', 'label': _pdfFormat('Don gia')});
+    }
+    if (template.showItemDiscount) {
+      columns.add({'key': 'discount', 'label': _pdfFormat('Giam gia')});
+    }
+    if (template.showItemVat) {
+      columns.add({'key': 'vat', 'label': _pdfFormat('VAT')});
+    }
+    if (template.showItemTotalAmount) {
+      columns.add({'key': 'total', 'label': _pdfFormat('Thanh tien')});
+    }
+    if (columns.isEmpty) {
+      columns.addAll([
+        {'key': 'name', 'label': _pdfFormat('San pham')},
+        {'key': 'qty', 'label': _pdfFormat('SL')},
+        {'key': 'unitPrice', 'label': _pdfFormat('Don gia')},
+        {'key': 'total', 'label': _pdfFormat('Thanh tien')},
+      ]);
+    }
+    return columns;
+  }
+
+  List<String> _buildRow(
+    int index,
+    dynamic item,
+    List<Map<String, String>> columns,
+  ) {
+    return columns.map((column) {
+      switch (column['key']) {
+        case 'stt':
+          return (index + 1).toString();
+        case 'name':
+          return _pdfFormat(item.productName);
+        case 'qty':
+          return item.quantity.toString();
+        case 'unit':
+          return _pdfFormat(item.unitName?.trim().isNotEmpty == true ? item.unitName! : '-');
+        case 'unitPrice':
+          return _pdfCurrency(item.price);
+        case 'discount':
+          return '${item.discount.toStringAsFixed(0)}%';
+        case 'vat':
+          return _pdfCurrency(0);
+        case 'total':
+          return _pdfCurrency(item.total);
+        default:
+          return '';
+      }
+    }).toList();
+  }
+
+  Future<File> _buildPdfFile(OrderEntity detail, InvoiceTemplateEntity template) async {
     final pdf = pw.Document();
-    final itemRows = detail.items
-        .map(
-          (item) => [
-            item.productName,
-            item.quantity.toString(),
-            CurrencyFormatter.formatVND(item.price),
-            CurrencyFormatter.formatVND(item.price * item.quantity),
-          ],
-        )
-        .toList();
+    final columns = _buildColumns(template);
+    final itemRows = <List<String>>[];
+    for (var i = 0; i < detail.items.length; i++) {
+      itemRows.add(_buildRow(i, detail.items[i], columns));
+    }
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
-          pw.Text(
-            'HOA DON BAN HANG',
-            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+          // Business Info (Seller)
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                _pdfFormat(template.businessName.isNotEmpty
+                    ? template.businessName
+                    : ''),
+                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+              ),
+              if (template.businessAddress.isNotEmpty)
+                pw.Text(_pdfFormat(template.businessAddress),
+                    style: const pw.TextStyle(fontSize: 10)),
+              if (template.businessPhone.isNotEmpty)
+                pw.Text('SDT: ${template.businessPhone}',
+                    style: const pw.TextStyle(fontSize: 10)),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+          pw.Divider(),
+          pw.SizedBox(height: 8),
+
+          pw.Center(
+            child: pw.Text(
+              _pdfFormat('HOA DON BAN HANG'),
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
           ),
           pw.SizedBox(height: 12),
-          pw.Text(
-            'Ma don: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+
+          // Order & Customer Info
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    _pdfFormat(
+                      'Ma don: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+                    ),
+                  ),
+                  pw.Text(_pdfFormat('Ngay: ${CurrencyFormatter.formatDate(detail.createdAt)}')),
+                  pw.Text(_pdfFormat('Dia diem: ${detail.locationName}')),
+                ],
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  if (template.showCustomerName)
+                    pw.Text(
+                      _pdfFormat(
+                        'Khach hang: ${detail.customerName?.isNotEmpty == true ? detail.customerName : "Khach le"}',
+                      ),
+                    ),
+                  if (detail.customerPhone?.isNotEmpty == true)
+                    if (template.showCustomerPhone)
+                      pw.Text('SDT: ${detail.customerPhone}'),
+                ],
+              ),
+            ],
           ),
-          pw.Text('Trang thai: ${detail.status}'),
-          pw.Text('Dia diem: ${detail.locationName}'),
-          pw.Text(
-            'Khach hang: ${detail.customerName?.isNotEmpty == true ? detail.customerName : "Khach le"}${detail.customerPhone?.isNotEmpty == true ? " - ${detail.customerPhone}" : ""}',
-          ),
-          pw.Text(
-            'Ngay tao: ${DateFormat('dd/MM/yyyy').format(detail.createdAt.toLocal())}',
-          ),
-          pw.SizedBox(height: 12),
+
+          pw.SizedBox(height: 16),
           pw.TableHelper.fromTextArray(
-            headers: const ['San pham', 'SL', 'Don gia', 'Thanh tien'],
+            headers: columns.map((c) => c['label']!).toList(),
             data: itemRows,
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
             cellStyle: const pw.TextStyle(fontSize: 10),
@@ -248,11 +386,44 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           pw.SizedBox(height: 12),
           pw.Align(
             alignment: pw.Alignment.centerRight,
-            child: pw.Text(
-              'Tong thanh toan: ${CurrencyFormatter.formatVND(detail.totalAmount)}',
-              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.end,
+              children: [
+                if (template.showSubTotal)
+                  pw.Text(
+                    _pdfFormat('Tam tinh: ${_pdfCurrency(detail.subtotal)}'),
+                  ),
+                if (template.showTotalDiscount)
+                  pw.Text(
+                    _pdfFormat('Giam gia: ${_pdfCurrency(detail.discountAmount)}'),
+                  ),
+                if (template.showTotalVat)
+                  pw.Text(
+                    _pdfFormat('VAT: ${_pdfCurrency(detail.taxAmount)}'),
+                  ),
+                pw.Text(
+                  _pdfFormat('Tong thanh toan: ${_pdfCurrency(detail.totalAmount)}'),
+                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                ),
+              ],
             ),
           ),
+          if (template.showFooterNote && template.footerNoteText.trim().isNotEmpty) ...[
+            pw.SizedBox(height: 10),
+            pw.Text(
+              _pdfFormat(template.footerNoteText.trim()),
+              style: const pw.TextStyle(fontSize: 10),
+            ),
+          ],
+          pw.SizedBox(height: 24),
+          if (template.showSignature)
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(_pdfFormat('Nguoi mua hang')),
+                pw.Text(_pdfFormat('Nguoi ban hang')),
+              ],
+            ),
         ],
       ),
     );
@@ -266,18 +437,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _shareInvoice(OrderEntity detail) async {
-    final file = await _buildPdfFile(detail);
+    final template = _getTemplate();
+    final file = await _buildPdfFile(detail, template);
     await Share.shareXFiles(
       [XFile(file.path)],
-      text:
-          'Hoa don ban hang #${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+      text: _pdfFormat(
+        'Hoa don ban hang #${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+      ),
     );
   }
 
   Future<void> _downloadInvoice(OrderEntity detail) async {
     final l10n = AppLocalizations.of(context);
     try {
-      final file = await _buildPdfFile(detail);
+      final template = _getTemplate();
+      final file = await _buildPdfFile(detail, template);
 
       if (Platform.isAndroid) {
         final downloadDir = Directory('/storage/emulated/0/Download');

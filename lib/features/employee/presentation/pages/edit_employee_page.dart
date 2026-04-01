@@ -8,6 +8,8 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_event.dart';
 import '../../../location/presentation/bloc/location_state.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../bloc/employee_bloc.dart';
 import '../bloc/employee_event.dart';
@@ -56,8 +58,14 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
     }
   }
 
-  void _onSave() {
+  Future<void> _onSave() async {
     if (_employee == null || widget.mode == EmployeeEditMode.detail) return;
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.employeeManagement,
+    );
+    if (!allowed) return;
 
     final updatedEmployee = _employee!.copyWith(
       assignedLocationIds: _selectedLocationIds,

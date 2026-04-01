@@ -9,9 +9,12 @@ import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_state.
 import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
 import 'package:bizflow_mobile/features/revenue/presentation/bloc/revenue_bloc.dart';
 import 'package:bizflow_mobile/features/cost/presentation/bloc/cost_bloc.dart';
+import 'package:bizflow_mobile/features/product/data/models/business_type_model.dart';
+import 'package:bizflow_mobile/features/product/presentation/bloc/product_bloc.dart';
 import 'package:bizflow_mobile/features/revenue/domain/entities/revenue_entity.dart';
 import 'package:bizflow_mobile/features/cost/domain/entities/cost_entity.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -30,6 +33,8 @@ import '../bloc/accounting_book_bloc.dart';
 import '../../domain/models/accounting_book.dart';
 import '../../data/repositories/accounting_repository.dart';
 import '../../data/services/word_export_service.dart';
+import '../../../subscription/data/subscription_repository.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
 
 class AccountingHubPage extends StatefulWidget {
   const AccountingHubPage({super.key});
@@ -40,6 +45,11 @@ class AccountingHubPage extends StatefulWidget {
 
 class _AccountingHubPageState extends State<AccountingHubPage>
     with SingleTickerProviderStateMixin {
+  static const String _featureReportExport =
+      SubscriptionFeatureCodes.reportExport;
+  static const String _featureManualRevenue =
+      SubscriptionFeatureCodes.manualRevenue;
+
   late final TabController _tabController;
 
   // Period BLoC data is managed by AccountingPeriodBloc
@@ -65,41 +75,49 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     _tabController = TabController(length: 4, vsync: this);
 
     _tabController.addListener(_handleTabSelection);
- 
+
     // Initial load of first tab and references only
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadTab(0);
       _loadReferences();
     });
   }
- 
+
   void _handleTabSelection() {
     if (_tabController.indexIsChanging) {
       _loadTab(_tabController.index);
     }
   }
- 
+
   void _loadTab(int index) {
     final locationId = context.read<BusinessContext>().currentBusinessId;
     if (locationId == null) return;
- 
+
     switch (index) {
       case 0: // Kỳ kế toán
-        context.read<AccountingPeriodBloc>().add(LoadPeriodsRequested(locationId));
+        context.read<AccountingPeriodBloc>().add(
+          LoadPeriodsRequested(locationId),
+        );
         break;
       case 2: // Doanh thu & Chi phí
-        context.read<RevenueBloc>().add(LoadRevenuesRequested(businessLocationId: locationId));
+        context.read<RevenueBloc>().add(
+          LoadRevenuesRequested(businessLocationId: locationId),
+        );
         if (context.mounted) {
-          context.read<CostBloc>().add(LoadCostsRequested(businessLocationId: locationId));
+          context.read<CostBloc>().add(
+            LoadCostsRequested(businessLocationId: locationId),
+          );
         }
         break;
       case 3: // Sổ kế toán
-        context.read<AccountingBookBloc>().add(LoadBooksRequested(locationId: locationId));
+        context.read<AccountingBookBloc>().add(
+          LoadBooksRequested(locationId: locationId),
+        );
         break;
       // Tab 1 (Nhật ký/Sổ cái) is handled by AccountingGlTab internally or we could add triggering logic here later
     }
   }
- 
+
   void _loadReferences() {
     final refState = context.read<ReferenceBloc>().state;
     if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
@@ -133,6 +151,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       message: l10n.translate('accounting.confirm_delete_revenue'),
     );
     if (!ok) return;
+
+    final allowed = await _checkFeatureAccess(_featureManualRevenue);
+    if (!allowed) return;
 
     if (!mounted) return;
     context.read<RevenueBloc>().add(
@@ -223,8 +244,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       ),
     );
 
-    amountController.dispose();
-    refController.dispose();
   }
 
   Future<void> _exportBook(AccountingBook book) async {
@@ -233,6 +252,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       message: l10n.translate('accounting.confirm_export_book'),
     );
     if (!ok) return;
+
+    final allowed = await _checkFeatureAccess(_featureReportExport);
+    if (!allowed) return;
 
     // Show loading
     ScaffoldMessenger.of(context).showSnackBar(
@@ -243,12 +265,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       final locationId = context.read<BusinessContext>().currentBusinessId;
       if (locationId == null) return;
 
-      final rowsResponse = await context.read<AccountingRepository>().getBookRows(
-            locationId: locationId,
-            bookId: book.bookId.toString(),
-          );
+      final rowsResponse = await context
+          .read<AccountingRepository>()
+          .getBookRows(locationId: locationId, bookId: book.bookId.toString());
 
-      final file = await WordExportService.exportToWord(book, rowsResponse.rows);
+      final file = await WordExportService.exportToWord(
+        book,
+        rowsResponse.rows,
+      );
       if (file != null) {
         await WordExportService.shareExportedFile(file);
         _showSuccess(l10n.translate('accounting.export_success'));
@@ -272,6 +296,41 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     _showSuccess(l10n.translate('accounting.report_generated_success'));
   }
 
+  Future<bool> _checkFeatureAccess(String featureCode) async {
+    try {
+      final businessContext = context.read<BusinessContext>();
+      final ownerProfileId = businessContext.isOwner
+          ? null
+          : businessContext.currentOwnerProfileId;
+
+      final allowed = await context
+          .read<SubscriptionRepository>()
+          .canUseFeatureCode(
+            featureCode: featureCode,
+            ownerProfileId: ownerProfileId,
+          );
+
+      if (!allowed && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.translate('subscription.feature_blocked')),
+            action: SnackBarAction(
+              label: l10n.translate('settings_page.upgrade'),
+              onPressed: () {
+                AppRouter.navigateTo(AppRoutes.subscriptionPlans);
+              },
+            ),
+          ),
+        );
+      }
+
+      return allowed;
+    } catch (_) {
+      // Do not block feature when pre-check fails; backend remains authoritative.
+      return true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final locationId = context.watch<BusinessContext>().currentBusinessId;
@@ -290,7 +349,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             _showSuccess(state.message);
           } else if (state is AccountingBookError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppColors.error,
+              ),
             );
           }
         },
@@ -316,6 +378,22 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   LoadRevenuesRequested(businessLocationId: locationId),
                 );
               }
+            } else if (state is RevenueUpdated) {
+              _showSuccess(
+                l10n.translate('accounting.revenue_updated_success'),
+              );
+              final locationId = context
+                  .read<BusinessContext>()
+                  .currentBusinessId;
+              if (locationId != null) {
+                context.read<RevenueBloc>().add(
+                  LoadRevenuesRequested(businessLocationId: locationId),
+                );
+              }
+            } else if (state is RevenueDeleted) {
+              _showSuccess(
+                l10n.translate('accounting.revenue_deleted_success'),
+              );
             } else if (state is RevenueError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -445,7 +523,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                               .map(
                                 (b) => BookItemModel(
                                   code: b.bookCode,
-                                  name: b.templateCode, // Template code as name for now
+                                  name: b
+                                      .templateCode, // Template code as name for now
                                   group: 'Nhóm ${b.groupNumber}',
                                   // Store the original book object if needed, but here we just map to model
                                 ),
@@ -500,7 +579,19 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final descriptionController = TextEditingController();
     final referenceOrderIdController = TextEditingController();
     DateTime selectedDate = DateTime.now();
+    DateTime? selectedDocumentDate;
     String? selectedMoneyChannel;
+    String? selectedBusinessTypeId;
+    List<BusinessTypeDto> businessTypes = [];
+
+    try {
+      final result = await context.read<ProductBloc>().repository.getBusinessTypes();
+      if (result is List) {
+        businessTypes = List<BusinessTypeDto>.from(result);
+      }
+    } catch (_) {
+      businessTypes = [];
+    }
 
     List<String> getMoneyChannels() {
       final state = context.read<ReferenceBloc>().state;
@@ -535,8 +626,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: selectedMoneyChannel,
-                  decoration: const InputDecoration(labelText: 'Kênh tiền'),
+                  initialValue: selectedMoneyChannel,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.channel'),
+                  ),
                   items: getMoneyChannels()
                       .map(
                         (channel) => DropdownMenuItem<String>(
@@ -548,6 +641,28 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   onChanged: (value) {
                     setDialogState(() {
                       selectedMoneyChannel = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedBusinessTypeId,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate(
+                      'accounting.revenue_business_type',
+                    ),
+                  ),
+                  items: businessTypes
+                      .map(
+                        (type) => DropdownMenuItem<String>(
+                          value: type.businessTypeId,
+                          child: Text(type.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedBusinessTypeId = value;
                     });
                   },
                 ),
@@ -580,6 +695,41 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     }
                   },
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ngày chứng từ'),
+                  subtitle: Text(
+                    selectedDocumentDate == null
+                        ? l10n.translate('common.no_data')
+                        : DateFormat(
+                            'yyyy-MM-dd',
+                          ).format(selectedDocumentDate!),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (selectedDocumentDate != null)
+                        IconButton(
+                          onPressed: () =>
+                              setDialogState(() => selectedDocumentDate = null),
+                          icon: const Icon(Icons.close),
+                        ),
+                      const Icon(Icons.calendar_today),
+                    ],
+                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogCtx,
+                      initialDate: selectedDocumentDate ?? selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedDocumentDate = picked);
+                    }
+                  },
+                ),
               ],
             ),
           ),
@@ -589,17 +739,32 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final amountString = amountController.text.replaceAll(',', '');
                 final amount = double.tryParse(amountString) ?? 0;
                 if (amount <= 0) return;
 
                 if ((selectedMoneyChannel ?? '').trim().isEmpty) {
                   ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                    const SnackBar(content: Text('Vui lòng chọn kênh tiền')),
+                    SnackBar(
+                      content: Text(
+                        l10n.translate('accounting.money_channel_required'),
+                      ),
+                    ),
                   );
                   return;
                 }
+
+                final ok = await _confirmAction(
+                  title: l10n.translate('accounting.confirm_title'),
+                  message: l10n.translate('accounting.confirm_create_revenue'),
+                );
+                if (!ok || !context.mounted) return;
+
+                final allowed = await _checkFeatureAccess(
+                  _featureManualRevenue,
+                );
+                if (!allowed) return;
 
                 // Use outer page context — dialog ctx has no Providers
                 final locationId = context
@@ -617,8 +782,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       'revenueDate': DateFormat(
                         'yyyy-MM-dd',
                       ).format(selectedDate),
+                      if (selectedDocumentDate != null)
+                        'documentDate': DateFormat(
+                          'yyyy-MM-dd',
+                        ).format(selectedDocumentDate!),
                       'description': descriptionController.text,
                       'moneyChannel': selectedMoneyChannel,
+                      if ((selectedBusinessTypeId ?? '').isNotEmpty)
+                        'businessTypeId': selectedBusinessTypeId,
                       if (referenceOrderId != null) 'referenceType': 'order',
                       if (referenceOrderId != null)
                         'referenceId': referenceOrderId,
@@ -634,9 +805,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       ),
     );
 
-    amountController.dispose();
-    descriptionController.dispose();
-    referenceOrderIdController.dispose();
   }
 
   Future<OrderEntity?> _loadLinkedOrder(RevenueEntity revenue) async {
@@ -663,6 +831,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final amountController = TextEditingController();
     final descriptionController = TextEditingController();
     DateTime selectedDate = DateTime.now();
+    DateTime? selectedDocumentDate;
     String? selectedCostType;
     String? selectedPaymentMethod;
 
@@ -712,7 +881,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: selectedCostType,
+                  initialValue: selectedCostType,
                   decoration: const InputDecoration(labelText: 'Loại chi phí'),
                   items: getCostTypes()
                       .where(
@@ -730,7 +899,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: selectedPaymentMethod,
+                  initialValue: selectedPaymentMethod,
                   decoration: const InputDecoration(
                     labelText: 'Phương thức thanh toán',
                   ),
@@ -763,6 +932,41 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     }
                   },
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ngày chứng từ'),
+                  subtitle: Text(
+                    selectedDocumentDate == null
+                        ? l10n.translate('common.no_data')
+                        : DateFormat(
+                            'yyyy-MM-dd',
+                          ).format(selectedDocumentDate!),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (selectedDocumentDate != null)
+                        IconButton(
+                          onPressed: () =>
+                              setDialogState(() => selectedDocumentDate = null),
+                          icon: const Icon(Icons.close),
+                        ),
+                      const Icon(Icons.calendar_today),
+                    ],
+                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogCtx,
+                      initialDate: selectedDocumentDate ?? selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedDocumentDate = picked);
+                    }
+                  },
+                ),
               ],
             ),
           ),
@@ -792,6 +996,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
                       'amount': amount,
                       'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
+                      if (selectedDocumentDate != null)
+                        'documentDate': DateFormat(
+                          'yyyy-MM-dd',
+                        ).format(selectedDocumentDate!),
                       'description': descriptionController.text,
                       'costType': selectedCostType,
                       'paymentMethod': selectedPaymentMethod,
@@ -807,8 +1015,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       ),
     );
 
-    amountController.dispose();
-    descriptionController.dispose();
   }
 
   Future<void> _showEditCostDialog(CostEntity item) async {
@@ -823,6 +1029,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
     final descriptionController = TextEditingController(text: item.description);
     DateTime selectedDate = item.date;
+    DateTime? selectedDocumentDate = item.documentDate;
     String? selectedCostType;
     String? selectedPaymentMethod;
 
@@ -872,7 +1079,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: selectedCostType,
+                  initialValue: selectedCostType,
                   decoration: const InputDecoration(labelText: 'Loại chi phí'),
                   items: getCostTypes()
                       .where((c) => c.toLowerCase() != 'import')
@@ -888,7 +1095,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: selectedPaymentMethod,
+                  initialValue: selectedPaymentMethod,
                   decoration: const InputDecoration(
                     labelText: 'Phương thức thanh toán',
                   ),
@@ -918,6 +1125,41 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     );
                     if (picked != null) {
                       setDialogState(() => selectedDate = picked);
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ngày chứng từ'),
+                  subtitle: Text(
+                    selectedDocumentDate == null
+                        ? l10n.translate('common.no_data')
+                        : DateFormat(
+                            'yyyy-MM-dd',
+                          ).format(selectedDocumentDate!),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (selectedDocumentDate != null)
+                        IconButton(
+                          onPressed: () =>
+                              setDialogState(() => selectedDocumentDate = null),
+                          icon: const Icon(Icons.close),
+                        ),
+                      const Icon(Icons.calendar_today),
+                    ],
+                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogCtx,
+                      initialDate: selectedDocumentDate ?? selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedDocumentDate = picked);
                     }
                   },
                 ),
@@ -956,6 +1198,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     body: {
                       'amount': amount,
                       'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
+                      'documentDate': selectedDocumentDate == null
+                          ? null
+                          : DateFormat(
+                              'yyyy-MM-dd',
+                            ).format(selectedDocumentDate!),
                       'description': descriptionController.text.trim(),
                       'costType': selectedCostType ?? item.type,
                       'paymentMethod':
@@ -973,8 +1220,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       ),
     );
 
-    amountController.dispose();
-    descriptionController.dispose();
   }
 
   void _showRevenueDetailDialog(RevenueEntity revenue) {
@@ -994,6 +1239,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 Text('Mô tả: ${revenue.description}'),
                 const SizedBox(height: 6),
                 Text('Kênh tiền: ${revenue.moneyChannel ?? '-'}'),
+                const SizedBox(height: 6),
+                Text(
+                  'Ngày chứng từ: ${revenue.documentDate == null ? '-' : DateFormat('yyyy-MM-dd').format(revenue.documentDate!)}',
+                ),
+                const SizedBox(height: 6),
+                Text('Loại hình KD: ${revenue.businessTypeName ?? '-'}'),
                 const SizedBox(height: 6),
                 Text('Loại tham chiếu: ${revenue.referenceType ?? '-'}'),
                 const SizedBox(height: 6),
@@ -1063,7 +1314,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
   }
 
-  void _showEditRevenueDialog(RevenueEntity item) {
+  Future<void> _showEditRevenueDialog(RevenueEntity item) async {
     final l10n = AppLocalizations.of(context);
     final refState = context.read<ReferenceBloc>().state;
     if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
@@ -1075,7 +1326,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
     final descriptionController = TextEditingController(text: item.description);
     DateTime selectedDate = item.date;
-    String? selectedMoneyChannel = item.moneyChannel;
+    DateTime? selectedDocumentDate = item.documentDate;
 
     List<String> getMoneyChannels() {
       final state = context.read<ReferenceBloc>().state;
@@ -1085,7 +1336,31 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       return const <String>[];
     }
 
-    showDialog(
+    List<BusinessTypeDto> businessTypes = [];
+
+    try {
+      final result = await context.read<ProductBloc>().repository.getBusinessTypes();
+      if (result is List) {
+        businessTypes = List<BusinessTypeDto>.from(result);
+      }
+    } catch (_) {
+      businessTypes = [];
+    }
+
+    String? selectedMoneyChannel = item.moneyChannel;
+    final channels = getMoneyChannels();
+    if ((selectedMoneyChannel ?? '').isNotEmpty &&
+        !channels.contains(selectedMoneyChannel)) {
+      selectedMoneyChannel = null;
+    }
+    String? selectedBusinessTypeId = item.businessTypeId;
+    final businessTypeIds = businessTypes.map((e) => e.businessTypeId).toSet();
+    if ((selectedBusinessTypeId ?? '').isNotEmpty &&
+        !businessTypeIds.contains(selectedBusinessTypeId)) {
+      selectedBusinessTypeId = null;
+    }
+
+    await showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
         builder: (dialogCtx, setDialogState) => AlertDialog(
@@ -1111,8 +1386,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
-                  value: selectedMoneyChannel,
-                  decoration: const InputDecoration(labelText: 'Kênh tiền'),
+                  initialValue: selectedMoneyChannel,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate('accounting.channel'),
+                  ),
                   items: getMoneyChannels()
                       .map(
                         (channel) => DropdownMenuItem<String>(
@@ -1128,12 +1405,32 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedBusinessTypeId,
+                  decoration: InputDecoration(
+                    labelText: l10n.translate(
+                      'accounting.revenue_business_type',
+                    ),
+                  ),
+                  items: businessTypes
+                      .map(
+                        (type) => DropdownMenuItem<String>(
+                          value: type.businessTypeId,
+                          child: Text(type.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedBusinessTypeId = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(l10n.translate('accounting.revenue_date')),
-                  subtitle: Text(
-                    DateFormat('yyyy-MM-dd').format(selectedDate),
-                  ),
+                  subtitle: Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () async {
                     final picked = await showDatePicker(
@@ -1144,6 +1441,41 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     );
                     if (picked != null) {
                       setDialogState(() => selectedDate = picked);
+                    }
+                  },
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ngày chứng từ'),
+                  subtitle: Text(
+                    selectedDocumentDate == null
+                        ? l10n.translate('common.no_data')
+                        : DateFormat(
+                            'yyyy-MM-dd',
+                          ).format(selectedDocumentDate!),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (selectedDocumentDate != null)
+                        IconButton(
+                          onPressed: () =>
+                              setDialogState(() => selectedDocumentDate = null),
+                          icon: const Icon(Icons.close),
+                        ),
+                      const Icon(Icons.calendar_today),
+                    ],
+                  ),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: dialogCtx,
+                      initialDate: selectedDocumentDate ?? selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setDialogState(() => selectedDocumentDate = picked);
                     }
                   },
                 ),
@@ -1168,15 +1500,36 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 );
                 if (!ok) return;
 
+                final allowed = await _checkFeatureAccess(
+                  _featureManualRevenue,
+                );
+                if (!allowed) return;
+
                 if (!dialogCtx.mounted) return;
 
-                // Backend currently doesn't have a specific Update Revenue endpoint!
-                // Inform user or TODO for backend team.
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Tính năng sửa doanh thu chưa được backend hỗ trợ (No PUT endpoint)',
-                    ),
+                final locationId = context
+                    .read<BusinessContext>()
+                    .currentBusinessId;
+                context.read<RevenueBloc>().add(
+                  UpdateManualRevenueRequested(
+                    revenueId: item.id,
+                    body: {
+                      'businessLocationId':
+                          int.tryParse(locationId ?? '') ?? item.locationId,
+                      'amount': amount,
+                      'revenueDate': DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(selectedDate),
+                      'documentDate': selectedDocumentDate == null
+                          ? null
+                          : DateFormat(
+                              'yyyy-MM-dd',
+                            ).format(selectedDocumentDate!),
+                      'description': descriptionController.text.trim(),
+                      'moneyChannel': selectedMoneyChannel,
+                      if ((selectedBusinessTypeId ?? '').isNotEmpty)
+                        'businessTypeId': selectedBusinessTypeId,
+                    },
                   ),
                 );
                 Navigator.pop(dialogCtx);
@@ -1187,5 +1540,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         ),
       ),
     );
+
   }
 }

@@ -11,6 +11,8 @@ import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 class BulkAdjustSellingPricePage extends StatefulWidget {
   final String locationId;
@@ -210,6 +212,12 @@ class _BulkAdjustSellingPricePageState
       );
       return;
     }
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.productManagement,
+    );
+    if (!allowed) return;
 
     setState(() => _isSubmitting = true);
     try {

@@ -35,6 +35,19 @@ class CreateManualRevenueRequested extends RevenueEvent {
   List<Object?> get props => [body];
 }
 
+class UpdateManualRevenueRequested extends RevenueEvent {
+  final int revenueId;
+  final Map<String, dynamic> body;
+
+  const UpdateManualRevenueRequested({
+    required this.revenueId,
+    required this.body,
+  });
+
+  @override
+  List<Object?> get props => [revenueId, body];
+}
+
 class DeleteManualRevenueRequested extends RevenueEvent {
   final int revenueId;
 

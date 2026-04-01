@@ -17,6 +17,8 @@ import '../../domain/entities/employee_entity.dart';
 import '../widgets/employee_card_widget.dart';
 import '../widgets/employee_action_sheet.dart';
 import '../widgets/delete_employee_dialog.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 class EmployeeListPage extends StatefulWidget {
   const EmployeeListPage({super.key});
@@ -124,6 +126,12 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
             );
 
             if (confirm == true && context.mounted) {
+                  final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                    context,
+                    featureCode: SubscriptionFeatureCodes.employeeManagement,
+                  );
+                  if (!allowed || !context.mounted) return;
+
               context.read<EmployeeBloc>().add(DeleteEmployeeRequested(employee.id));
             }
           },
