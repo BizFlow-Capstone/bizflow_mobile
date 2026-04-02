@@ -1,4 +1,5 @@
-﻿import 'dart:convert';
+﻿import 'dart:async';
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../shared/cache/cache_manager.dart';
@@ -9,6 +10,10 @@ import '../data/models/subscription_models.dart';
 class SubscriptionRepository {
   final SubscriptionApiService _apiService;
   final CacheManager _cache;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+  _usageTrackingSubscription;
+  String? _activeUsageTrackingDocId;
+  Map<String, int> _latestUsageByFeatureCode = const {};
 
   SubscriptionRepository(this._apiService) : _cache = CacheManager();
 
@@ -31,7 +36,9 @@ class SubscriptionRepository {
       toJson: (data) => {'list': data.map((e) => e.toJson()).toList()},
       fromJson: (json) {
         final list = json['list'] as List<dynamic>? ?? [];
-        return list.map((e) => SubscriptionPlanDto.fromJson(e as Map<String, dynamic>)).toList();
+        return list
+            .map((e) => SubscriptionPlanDto.fromJson(e as Map<String, dynamic>))
+            .toList();
       },
     );
   }
@@ -55,7 +62,8 @@ class SubscriptionRepository {
       },
       onError: onError,
       toJson: (data) => data?.toJson() ?? {},
-      fromJson: (json) => json.isEmpty ? null : CurrentSubscriptionDto.fromJson(json),
+      fromJson: (json) =>
+          json.isEmpty ? null : CurrentSubscriptionDto.fromJson(json),
     );
   }
 
@@ -97,6 +105,13 @@ class SubscriptionRepository {
       if (limit < 0) return true; // unlimited
       if (limit == 0) return false;
 
+      await _ensureUsageTrackingListener(ownerProfileId: ownerProfileId);
+
+      final realtimeUsed = _readUsedCountFromRealtimeCache(normalizedCode);
+      if (realtimeUsed != null) {
+        return realtimeUsed < limit;
+      }
+
       final used = await _getFeatureUsedCount(
         featureCode: feature.featureCode,
         ownerProfileId: ownerProfileId,
@@ -110,6 +125,87 @@ class SubscriptionRepository {
       // Pre-check should never block user when local check cannot resolve.
       return true;
     }
+  }
+
+  Future<void> _ensureUsageTrackingListener({String? ownerProfileId}) async {
+    final docId = await _prepareUsageTrackingDocId(
+      ownerProfileId: ownerProfileId,
+    );
+    if (docId == null) {
+      await _clearUsageTrackingListener();
+      return;
+    }
+
+    if (_activeUsageTrackingDocId == docId &&
+        _usageTrackingSubscription != null) {
+      return;
+    }
+
+    await _clearUsageTrackingListener();
+
+    _activeUsageTrackingDocId = docId;
+    _usageTrackingSubscription = FirebaseFirestore.instance
+        .collection('usage_tracking')
+        .doc(docId)
+        .snapshots()
+        .listen((snapshot) {
+          _latestUsageByFeatureCode = _extractUsageMap(snapshot.data());
+        }, onError: (_) {});
+  }
+
+  int? _readUsedCountFromRealtimeCache(String featureCode) {
+    if (_latestUsageByFeatureCode.isEmpty) {
+      return null;
+    }
+
+    final normalized = featureCode.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    return _latestUsageByFeatureCode[normalized];
+  }
+
+  Map<String, int> _extractUsageMap(Map<String, dynamic>? documentData) {
+    if (documentData == null) {
+      return const {};
+    }
+
+    final features = documentData['features'];
+    if (features is! Map) {
+      return const {};
+    }
+
+    final result = <String, int>{};
+    for (final entry in features.entries) {
+      final key = entry.key?.toString().trim().toLowerCase();
+      if (key == null || key.isEmpty) {
+        continue;
+      }
+
+      final value = entry.value;
+      if (value is! Map) {
+        continue;
+      }
+
+      final used = value['used'];
+      if (used is num) {
+        result[key] = used.toInt();
+      }
+    }
+
+    return result;
+  }
+
+  Future<void> _clearUsageTrackingListener() async {
+    await _usageTrackingSubscription?.cancel();
+    _usageTrackingSubscription = null;
+    _activeUsageTrackingDocId = null;
+    _latestUsageByFeatureCode = const {};
+  }
+
+  Future<void> dispose() async {
+    await _clearUsageTrackingListener();
   }
 
   /// Stream Firestore Usage Tracking Document
@@ -129,9 +225,7 @@ class SubscriptionRepository {
     });
   }
 
-  Future<String?> _prepareUsageTrackingDocId({
-    String? ownerProfileId,
-  }) async {
+  Future<String?> _prepareUsageTrackingDocId({String? ownerProfileId}) async {
     final currentProfileId = await _getCurrentProfileId();
     if (currentProfileId == null || currentProfileId.isEmpty) {
       return null;
@@ -148,7 +242,9 @@ class SubscriptionRepository {
     required String featureCode,
     String? ownerProfileId,
   }) async {
-    final docId = await _prepareUsageTrackingDocId(ownerProfileId: ownerProfileId);
+    final docId = await _prepareUsageTrackingDocId(
+      ownerProfileId: ownerProfileId,
+    );
     if (docId == null) return null;
 
     final snapshot = await FirebaseFirestore.instance

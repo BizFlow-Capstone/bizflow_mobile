@@ -248,18 +248,21 @@ class _MyAppState extends State<MyApp> {
       pushTokenApiService: _pushTokenApiService,
     );
     unawaited(_firebaseMessagingService.initialize());
-    
+
     _notificationRealtimeService = NotificationRealtimeService();
     unawaited(_notificationRealtimeService.initialize());
-    
+
     ConnectivityService().statusStream.listen((status) {
       if (status == ConnectivityStatus.online) {
         // Trigger generic data refresh when network is back
-        _locationRepository.refreshAndCacheAllLocations().then((locations) {
-          debugPrint(
-            'Main: Auto-refreshed and cached ${locations.length} locations after network recovery.',
-          );
-        }).catchError((_) {});
+        _locationRepository
+            .refreshAndCacheAllLocations()
+            .then((locations) {
+              debugPrint(
+                'Main: Auto-refreshed and cached ${locations.length} locations after network recovery.',
+              );
+            })
+            .catchError((_) {});
       }
     });
 
@@ -296,6 +299,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _deepLinkSubscription?.cancel();
+    unawaited(_subscriptionRepository.dispose());
     _firebaseMessagingService.dispose();
     _notificationRealtimeService.dispose();
     _localizationProvider.dispose();
@@ -371,7 +375,9 @@ class _MyAppState extends State<MyApp> {
               return BlocListener<AuthBloc, AuthState>(
                 listener: (context, state) {
                   if (state is AuthAuthenticated) {
-                    context.read<LocationBloc>().add(const LoadLocationsRequested());
+                    context.read<LocationBloc>().add(
+                      const LoadLocationsRequested(),
+                    );
                     context.read<ReferenceBloc>().add(
                       LoadAllReferencesRequested(),
                     );

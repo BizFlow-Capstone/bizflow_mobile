@@ -31,6 +31,9 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
     final messenger = ScaffoldMessenger.maybeOf(context);
 
     return BlocConsumer<AccountingPeriodBloc, AccountingPeriodState>(
+      listenWhen: (prev, curr) =>
+          curr.status == AccountingPeriodStatus.actionSuccess &&
+          prev.status != AccountingPeriodStatus.actionSuccess,
       listener: (context, state) {
         if (messenger == null) return;
         if (state.status == AccountingPeriodStatus.actionSuccess && state.actionSuccessKey != null) {

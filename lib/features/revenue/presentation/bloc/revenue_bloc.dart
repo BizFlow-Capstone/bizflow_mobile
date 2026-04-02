@@ -38,18 +38,22 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
         fromDate: event.fromDate,
         toDate: event.toDate,
         onData: (revenues, totalCount, isFromCache) {
-          emit(
-            RevenuesLoaded(
-              revenues: revenues,
-              totalCount: totalCount,
-              pageNumber: event.pageNumber,
-              pageSize: event.pageSize,
-              isFromCache: isFromCache,
-            ),
-          );
+          if (!emit.isDone) {
+            emit(
+              RevenuesLoaded(
+                revenues: revenues,
+                totalCount: totalCount,
+                pageNumber: event.pageNumber,
+                pageSize: event.pageSize,
+                isFromCache: isFromCache,
+              ),
+            );
+          }
         },
         onError: (error) {
-          emit(RevenueError(message: error.toString()));
+          if (!emit.isDone) {
+            emit(RevenueError(message: error.toString()));
+          }
         },
       );
     } catch (e) {
