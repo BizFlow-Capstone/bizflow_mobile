@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../domain/models/accounting_period.dart';
 import '../../domain/models/accounting_book.dart';
 import '../../data/repositories/accounting_repository.dart';
@@ -187,7 +188,9 @@ class AccountingPeriodState {
       suggestion: suggestion ?? this.suggestion,
       status: status ?? this.status,
       errorMessage: errorMessage, // Reset error if not provided
-      actionSuccessKey: clearAction ? null : (actionSuccessKey ?? this.actionSuccessKey),
+      actionSuccessKey: clearAction
+          ? null
+          : (actionSuccessKey ?? this.actionSuccessKey),
       isListLoading: isListLoading ?? this.isListLoading,
       isDetailLoading: isDetailLoading ?? this.isDetailLoading,
       isBooksLoading: isBooksLoading ?? this.isBooksLoading,
@@ -198,7 +201,6 @@ class AccountingPeriodState {
   }
 }
 
-
 // ─────────────────────────── BLOC ───────────────────────────
 
 class AccountingPeriodBloc
@@ -206,8 +208,8 @@ class AccountingPeriodBloc
   final AccountingRepository _repository;
 
   AccountingPeriodBloc({required AccountingRepository repository})
-      : _repository = repository,
-        super(AccountingPeriodState()) {
+    : _repository = repository,
+      super(AccountingPeriodState()) {
     on<LoadPeriodsRequested>(_onLoadPeriods);
     on<CreatePeriodRequested>(_onCreatePeriod);
     on<CreateCustomPeriodRequested>(_onCreateCustomPeriod);
@@ -224,30 +226,36 @@ class AccountingPeriodBloc
     LoadPeriodsRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(state.copyWith(
-      status: AccountingPeriodStatus.loading,
-      isListLoading: true,
-    ));
+    emit(
+      state.copyWith(
+        status: AccountingPeriodStatus.loading,
+        isListLoading: true,
+      ),
+    );
 
     await _repository.fetchPeriodsSWR(
       locationId: event.locationId,
       onData: (periods, fromCache) {
         if (!isClosed) {
-          emit(state.copyWith(
-            status: AccountingPeriodStatus.loaded,
-            periods: periods,
-            isListLoading: false,
-            isRefreshing: fromCache,
-          ));
+          emit(
+            state.copyWith(
+              status: AccountingPeriodStatus.loaded,
+              periods: periods,
+              isListLoading: false,
+              isRefreshing: fromCache,
+            ),
+          );
         }
       },
       onError: (error) {
         if (!isClosed) {
-          emit(state.copyWith(
-            status: AccountingPeriodStatus.error,
-            errorMessage: error.toString(),
-            isListLoading: false,
-          ));
+          emit(
+            state.copyWith(
+              status: AccountingPeriodStatus.error,
+              errorMessage: ApiErrorMessageParser.parse(error),
+              isListLoading: false,
+            ),
+          );
         }
       },
     );
@@ -257,11 +265,13 @@ class AccountingPeriodBloc
     CreatePeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(state.copyWith(
-      status: AccountingPeriodStatus.loading,
-      isActionLoading: true,
-      clearAction: true,
-    ));
+    emit(
+      state.copyWith(
+        status: AccountingPeriodStatus.loading,
+        isActionLoading: true,
+        clearAction: true,
+      ),
+    );
     try {
       await _repository.createPeriod(
         locationId: event.locationId,
@@ -272,20 +282,25 @@ class AccountingPeriodBloc
         openingBankBalance: event.openingBankBalance,
         useSuggestedOpeningBalances: event.useSuggestedOpeningBalances,
       );
-      final updated =
-          await _repository.fetchPeriodsFromServer(event.locationId);
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.actionSuccess,
-        actionSuccessKey: 'accounting.period_created_success',
-        periods: updated,
-        isActionLoading: false,
-      ));
+      final updated = await _repository.fetchPeriodsFromServer(
+        event.locationId,
+      );
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.actionSuccess,
+          actionSuccessKey: 'accounting.period_created_success',
+          periods: updated,
+          isActionLoading: false,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.error,
-        errorMessage: e.toString(),
-        isActionLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: ApiErrorMessageParser.parse(e),
+          isActionLoading: false,
+        ),
+      );
     }
   }
 
@@ -293,11 +308,13 @@ class AccountingPeriodBloc
     CreateCustomPeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(state.copyWith(
-      status: AccountingPeriodStatus.loading,
-      isActionLoading: true,
-      clearAction: true,
-    ));
+    emit(
+      state.copyWith(
+        status: AccountingPeriodStatus.loading,
+        isActionLoading: true,
+        clearAction: true,
+      ),
+    );
     try {
       await _repository.createCustomPeriod(
         locationId: event.locationId,
@@ -307,20 +324,25 @@ class AccountingPeriodBloc
         openingBankBalance: event.openingBankBalance,
         useSuggestedOpeningBalances: event.useSuggestedOpeningBalances,
       );
-      final updated =
-          await _repository.fetchPeriodsFromServer(event.locationId);
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.actionSuccess,
-        actionSuccessKey: 'accounting.period_created_success',
-        periods: updated,
-        isActionLoading: false,
-      ));
+      final updated = await _repository.fetchPeriodsFromServer(
+        event.locationId,
+      );
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.actionSuccess,
+          actionSuccessKey: 'accounting.period_created_success',
+          periods: updated,
+          isActionLoading: false,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.error,
-        errorMessage: e.toString(),
-        isActionLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: ApiErrorMessageParser.parse(e),
+          isActionLoading: false,
+        ),
+      );
     }
   }
 
@@ -339,10 +361,12 @@ class AccountingPeriodBloc
       );
       emit(state.copyWith(suggestion: suggestion));
     } catch (e) {
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.error,
-        errorMessage: e.toString(),
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: ApiErrorMessageParser.parse(e),
+        ),
+      );
     }
   }
 
@@ -350,18 +374,21 @@ class AccountingPeriodBloc
     FinalizePeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(state.copyWith(
-      status: AccountingPeriodStatus.loading,
-      isActionLoading: true,
-      clearAction: true,
-    ));
+    emit(
+      state.copyWith(
+        status: AccountingPeriodStatus.loading,
+        isActionLoading: true,
+        clearAction: true,
+      ),
+    );
     try {
       await _repository.finalizePeriod(
         locationId: event.locationId,
         periodId: event.periodId,
       );
-      final updated =
-          await _repository.fetchPeriodsFromServer(event.locationId);
+      final updated = await _repository.fetchPeriodsFromServer(
+        event.locationId,
+      );
 
       // Refresh period detail so bottom sheet reflects the new status
       AccountingPeriod? refreshedDetail;
@@ -372,19 +399,23 @@ class AccountingPeriodBloc
         );
       } catch (_) {}
 
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.actionSuccess,
-        actionSuccessKey: 'accounting.period_finalized_success',
-        periods: updated,
-        periodDetail: refreshedDetail,
-        isActionLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.actionSuccess,
+          actionSuccessKey: 'accounting.period_finalized_success',
+          periods: updated,
+          periodDetail: refreshedDetail,
+          isActionLoading: false,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.error,
-        errorMessage: e.toString(),
-        isActionLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: ApiErrorMessageParser.parse(e),
+          isActionLoading: false,
+        ),
+      );
     }
   }
 
@@ -392,19 +423,22 @@ class AccountingPeriodBloc
     ReopenPeriodRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(state.copyWith(
-      status: AccountingPeriodStatus.loading,
-      isActionLoading: true,
-      clearAction: true,
-    ));
+    emit(
+      state.copyWith(
+        status: AccountingPeriodStatus.loading,
+        isActionLoading: true,
+        clearAction: true,
+      ),
+    );
     try {
       await _repository.reopenPeriod(
         locationId: event.locationId,
         periodId: event.periodId,
         reason: event.reason,
       );
-      final updated =
-          await _repository.fetchPeriodsFromServer(event.locationId);
+      final updated = await _repository.fetchPeriodsFromServer(
+        event.locationId,
+      );
 
       // Also refresh period detail so the bottom sheet reflects the new status
       AccountingPeriod? refreshedDetail;
@@ -417,19 +451,23 @@ class AccountingPeriodBloc
         // Non-critical — the period list is enough to show success
       }
 
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.actionSuccess,
-        actionSuccessKey: 'accounting.period_reopened_success',
-        periods: updated,
-        periodDetail: refreshedDetail,
-        isActionLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.actionSuccess,
+          actionSuccessKey: 'accounting.period_reopened_success',
+          periods: updated,
+          periodDetail: refreshedDetail,
+          isActionLoading: false,
+        ),
+      );
     } catch (e) {
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.error,
-        errorMessage: e.toString(),
-        isActionLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: ApiErrorMessageParser.parse(e),
+          isActionLoading: false,
+        ),
+      );
     }
   }
 
@@ -443,16 +481,15 @@ class AccountingPeriodBloc
         locationId: event.locationId,
         periodId: event.periodId,
       );
-      emit(state.copyWith(
-        auditLogs: logs,
-        isLogsLoading: false,
-      ));
+      emit(state.copyWith(auditLogs: logs, isLogsLoading: false));
     } catch (e) {
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.error,
-        errorMessage: e.toString(),
-        isLogsLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: ApiErrorMessageParser.parse(e),
+          isLogsLoading: false,
+        ),
+      );
     }
   }
 
@@ -466,20 +503,24 @@ class AccountingPeriodBloc
       periodId: event.periodId,
       onData: (period, fromCache) {
         if (!isClosed) {
-          emit(state.copyWith(
-            periodDetail: period,
-            isDetailLoading: false,
-            isRefreshing: fromCache,
-          ));
+          emit(
+            state.copyWith(
+              periodDetail: period,
+              isDetailLoading: false,
+              isRefreshing: fromCache,
+            ),
+          );
         }
       },
       onError: (error) {
         if (!isClosed) {
-          emit(state.copyWith(
-            status: AccountingPeriodStatus.error,
-            errorMessage: error.toString(),
-            isDetailLoading: false,
-          ));
+          emit(
+            state.copyWith(
+              status: AccountingPeriodStatus.error,
+              errorMessage: ApiErrorMessageParser.parse(error),
+              isDetailLoading: false,
+            ),
+          );
         }
       },
     );
@@ -489,11 +530,13 @@ class AccountingPeriodBloc
     CreateBooksRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(state.copyWith(
-      status: AccountingPeriodStatus.loading,
-      isActionLoading: true,
-      clearAction: true,
-    ));
+    emit(
+      state.copyWith(
+        status: AccountingPeriodStatus.loading,
+        isActionLoading: true,
+        clearAction: true,
+      ),
+    );
     try {
       final response = await _repository.createBooksForPeriod(
         locationId: event.locationId,
@@ -506,27 +549,33 @@ class AccountingPeriodBloc
       );
 
       if (response.success && response.createdBooks.isNotEmpty) {
-        emit(state.copyWith(
-          status: AccountingPeriodStatus.actionSuccess,
-          actionSuccessKey: 'accounting.books_created_success',
-          books: response.createdBooks,
-          isActionLoading: false,
-        ));
+        emit(
+          state.copyWith(
+            status: AccountingPeriodStatus.actionSuccess,
+            actionSuccessKey: 'accounting.books_created_success',
+            books: response.createdBooks,
+            isActionLoading: false,
+          ),
+        );
         // Refresh period list after successful book creation
         await _repository.fetchPeriodsFromServer(event.locationId);
       } else {
-        emit(state.copyWith(
-          status: AccountingPeriodStatus.error,
-          errorMessage: 'Failed to create accounting books',
-          isActionLoading: false,
-        ));
+        emit(
+          state.copyWith(
+            status: AccountingPeriodStatus.error,
+            errorMessage: 'Failed to create accounting books',
+            isActionLoading: false,
+          ),
+        );
       }
     } catch (e) {
-      emit(state.copyWith(
-        status: AccountingPeriodStatus.error,
-        errorMessage: e.toString(),
-        isActionLoading: false,
-      ));
+      emit(
+        state.copyWith(
+          status: AccountingPeriodStatus.error,
+          errorMessage: ApiErrorMessageParser.parse(e),
+          isActionLoading: false,
+        ),
+      );
     }
   }
 
@@ -541,32 +590,37 @@ class AccountingPeriodBloc
         periodId: event.periodId.toString(),
         onData: (fetchedBooks, fromCache) {
           if (!isClosed) {
-            emit(state.copyWith(
-              books: fetchedBooks,
-              isBooksLoading: false,
-              isRefreshing: fromCache,
-            ));
+            emit(
+              state.copyWith(
+                books: fetchedBooks,
+                isBooksLoading: false,
+                isRefreshing: fromCache,
+              ),
+            );
           }
         },
         onError: (error) {
           if (!isClosed) {
-            emit(state.copyWith(
-              status: AccountingPeriodStatus.error,
-              errorMessage: error.toString(),
-              isBooksLoading: false,
-            ));
+            emit(
+              state.copyWith(
+                status: AccountingPeriodStatus.error,
+                errorMessage: ApiErrorMessageParser.parse(error),
+                isBooksLoading: false,
+              ),
+            );
           }
         },
       );
     } catch (e) {
       if (!isClosed) {
-        emit(state.copyWith(
-          status: AccountingPeriodStatus.error,
-          errorMessage: e.toString(),
-          isBooksLoading: false,
-        ));
+        emit(
+          state.copyWith(
+            status: AccountingPeriodStatus.error,
+            errorMessage: ApiErrorMessageParser.parse(e),
+            isBooksLoading: false,
+          ),
+        );
       }
     }
   }
 }
-

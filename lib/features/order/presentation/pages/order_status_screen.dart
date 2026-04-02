@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/storage/local_storage.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../domain/entities/order_entity.dart';
 import '../bloc/order_bloc.dart';
 import '../widgets/order_card.dart';
@@ -26,6 +27,8 @@ class OrderStatusScreen extends StatefulWidget {
 class _OrderStatusScreenState extends State<OrderStatusScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  final ActionGuard _publishOrderGuard = ActionGuard();
+  final ActionGuard _cancelOrderGuard = ActionGuard();
 
   @override
   void initState() {
@@ -51,10 +54,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => OrderFormScreen(
-          inputType: 'manual',
-          draftId: order.id,
-        ),
+        builder: (_) => OrderFormScreen(inputType: 'manual', draftId: order.id),
       ),
     );
     if (!mounted) return;
@@ -123,10 +123,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => OrderFormScreen(
-          inputType: 'manual',
-          draftId: draftId,
-        ),
+        builder: (_) => OrderFormScreen(inputType: 'manual', draftId: draftId),
       ),
     );
     if (!mounted) return;
@@ -158,9 +155,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
   void _openOrderDetail(OrderEntity order) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => OrderDetailScreen(orderId: order.id),
-      ),
+      MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: order.id)),
     );
   }
 
@@ -274,10 +269,11 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
               _openDraftForEditing(order);
             },
             onPublish: () {
-              SubscriptionFeatureGuard.ensureAllowed(
-                context,
-                featureCode: SubscriptionFeatureCodes.orderManagement,
-              ).then((allowed) {
+              _publishOrderGuard.run(() async {
+                final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                  context,
+                  featureCode: SubscriptionFeatureCodes.orderManagement,
+                );
                 if (!allowed || !context.mounted) return;
                 context.read<OrderBloc>().add(
                   PublishOrderRequested(orderId: order.id),
@@ -387,7 +383,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
             child: Text(l10n.translate('order.cancel_confirm_no')),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               final reason = reasonController.text.trim();
               if (reason.isEmpty) {
                 AppSnackBar.show(
@@ -397,10 +393,11 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
                 );
                 return;
               }
-              SubscriptionFeatureGuard.ensureAllowed(
-                context,
-                featureCode: SubscriptionFeatureCodes.orderManagement,
-              ).then((allowed) {
+              await _cancelOrderGuard.run(() async {
+                final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                  context,
+                  featureCode: SubscriptionFeatureCodes.orderManagement,
+                );
                 if (!allowed || !context.mounted) return;
                 context.read<OrderBloc>().add(
                   CancelOrderRequested(orderId: orderId, cancelReason: reason),

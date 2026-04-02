@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:record/record.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_bloc.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_event.dart';
@@ -20,6 +25,8 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
+import '../../../../shared/cache/sync_status_controller.dart';
+import '../../../../shared/context/user_profile_context.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../order/domain/entities/order_entity.dart';
@@ -32,9 +39,11 @@ import '../widgets/accounting_period_tab.dart';
 import '../bloc/accounting_book_bloc.dart';
 import '../../domain/models/accounting_book.dart';
 import '../../data/repositories/accounting_repository.dart';
-import '../../data/services/word_export_service.dart';
+import '../../data/services/excel_export_service.dart';
 import '../../../subscription/data/subscription_repository.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../location/presentation/bloc/location_bloc.dart';
+import '../../../location/presentation/bloc/location_state.dart';
 
 class AccountingHubPage extends StatefulWidget {
   const AccountingHubPage({super.key});
@@ -45,8 +54,7 @@ class AccountingHubPage extends StatefulWidget {
 
 class _AccountingHubPageState extends State<AccountingHubPage>
     with SingleTickerProviderStateMixin {
-  static const String _featureReportExport =
-      SubscriptionFeatureCodes.reportExport;
+  static const String _featureReportExport = SubscriptionFeatureCodes.export;
   static const String _featureManualRevenue =
       SubscriptionFeatureCodes.manualRevenue;
 
@@ -57,6 +65,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   DateTime _reportFromDate = DateTime(2026, 1, 1);
   DateTime _reportToDate = DateTime(2026, 3, 31);
   String _reportFormat = 'pdf';
+  final AudioRecorder _voiceRecorder = AudioRecorder();
+  final AudioPlayer _voicePlayer = AudioPlayer();
+  bool _isVoiceRecording = false;
+  String? _lastVoicePath;
+  String? _lastVoiceTranscript;
 
   final List<TaxPaymentItemModel> _taxPayments = [
     TaxPaymentItemModel(
@@ -73,6 +86,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
 
     _tabController.addListener(_handleTabSelection);
 
@@ -125,10 +139,208 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     }
   }
 
+  void _refreshCurrentTab() {
+    if (!mounted) return;
+    SyncStatusController().startSync();
+    try {
+      _loadReferences();
+      _loadTab(_tabController.index);
+      SyncStatusController().endSync(updatedAt: DateTime.now());
+    } catch (_) {
+      SyncStatusController().endSync(hasError: true);
+    }
+  }
+
   @override
   void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
+    _voiceRecorder.dispose();
+    _voicePlayer.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<String?> _toggleVoiceCapture() async {
+    if (_isVoiceRecording) {
+      final recordedPath = await _voiceRecorder.stop();
+      if (recordedPath == null || recordedPath.isEmpty) {
+        if (mounted) {
+          AppDialog.error(
+            context,
+            title: l10n.translate('common.error'),
+            message: l10n.translate('accounting.voice_no_record_found'),
+          );
+        }
+        setState(() => _isVoiceRecording = false);
+        return null;
+      }
+
+      setState(() {
+        _isVoiceRecording = false;
+        _lastVoicePath = recordedPath;
+      });
+
+      // Mock AI transcription to keep current business flow unchanged.
+      await Future.delayed(const Duration(milliseconds: 900));
+      final transcript = _mockTranscribeVoice();
+      setState(() => _lastVoiceTranscript = transcript);
+      return transcript;
+    }
+
+    final permission = await Permission.microphone.request();
+    if (permission != PermissionStatus.granted) {
+      if (mounted) {
+        AppDialog.error(
+          context,
+          title: l10n.translate('common.error'),
+          message: l10n.translate('common.microphone_permission_required'),
+        );
+      }
+      return null;
+    }
+
+    if (!await _voiceRecorder.hasPermission()) {
+      return null;
+    }
+
+    final tempDir = await getTemporaryDirectory();
+    final path =
+        '${tempDir.path}/accounting_voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    await _voiceRecorder.start(const RecordConfig(), path: path);
+    setState(() => _isVoiceRecording = true);
+    return null;
+  }
+
+  Future<void> _playLastVoiceRecord() async {
+    final path = _lastVoicePath;
+    if (path == null || path.isEmpty) {
+      if (!mounted) return;
+      AppDialog.error(
+        context,
+        title: l10n.translate('common.error'),
+        message: l10n.translate('accounting.voice_no_record_found'),
+      );
+      return;
+    }
+    await _voicePlayer.stop();
+    await _voicePlayer.play(DeviceFileSource(path));
+  }
+
+  String _mockTranscribeVoice() {
+    final sample = <String>[
+      'thu tien ban hang 1500000 tu khach le',
+      'chi tien van chuyen 350000 thanh toan tien mat',
+      'thu doanh thu don hang 2200000 qua chuyen khoan',
+    ];
+    return sample[DateTime.now().millisecond % sample.length];
+  }
+
+  double? _extractAmountFromTranscript(String transcript) {
+    final matches = RegExp(r'(\d[\d\.,]*)').allMatches(transcript);
+    if (matches.isEmpty) return null;
+    final raw = matches.last.group(0) ?? '';
+    final normalized = raw.replaceAll(RegExp(r'[\.,]'), '');
+    return double.tryParse(normalized);
+  }
+
+  void _applyRevenueTranscript({
+    required String transcript,
+    required TextEditingController amountController,
+    required TextEditingController descriptionController,
+  }) {
+    final amount = _extractAmountFromTranscript(transcript);
+    if (amount != null && amount > 0) {
+      amountController.text = CurrencyFormatter.formatNumber(amount);
+    }
+    if (descriptionController.text.trim().isEmpty) {
+      descriptionController.text = transcript;
+    }
+  }
+
+  void _applyCostTranscript({
+    required String transcript,
+    required TextEditingController amountController,
+    required TextEditingController descriptionController,
+  }) {
+    final amount = _extractAmountFromTranscript(transcript);
+    if (amount != null && amount > 0) {
+      amountController.text = CurrencyFormatter.formatNumber(amount);
+    }
+    if (descriptionController.text.trim().isEmpty) {
+      descriptionController.text = transcript;
+    }
+  }
+
+  Widget _buildVoiceAssistControls({
+    required AppLocalizations l10n,
+    required BuildContext dialogCtx,
+    required void Function(VoidCallback) setDialogState,
+    required void Function(String transcript) onTranscriptReady,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.translate('accounting.voice_fill_title'),
+            style: AppTextStyles.labelMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final transcript = await _toggleVoiceCapture();
+                    if (!dialogCtx.mounted) return;
+                    if (transcript != null && transcript.trim().isNotEmpty) {
+                      onTranscriptReady(transcript);
+                    }
+                    setDialogState(() {});
+                  },
+                  icon: Icon(
+                    _isVoiceRecording ? Icons.stop_circle : Icons.mic,
+                    color: _isVoiceRecording
+                        ? AppColors.error
+                        : AppColors.secondary,
+                  ),
+                  label: Text(
+                    _isVoiceRecording
+                        ? l10n.translate('accounting.voice_stop_record')
+                        : l10n.translate('accounting.voice_start_record'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              OutlinedButton.icon(
+                onPressed: _lastVoicePath == null ? null : _playLastVoiceRecord,
+                icon: const Icon(Icons.play_arrow),
+                label: Text(l10n.translate('accounting.voice_play_back')),
+              ),
+            ],
+          ),
+          if ((_lastVoiceTranscript ?? '').isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              '${l10n.translate('accounting.voice_last_result')}: ${_lastVoiceTranscript ?? ''}',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<bool> _confirmAction({
@@ -243,7 +455,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         ],
       ),
     );
-
   }
 
   Future<void> _exportBook(AccountingBook book) async {
@@ -258,32 +469,113 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     // Show loading
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đang tải dữ liệu và xuất file word...')),
+      const SnackBar(content: Text('Đang tải dữ liệu và xuất file Excel...')),
     );
 
     try {
       final locationId = context.read<BusinessContext>().currentBusinessId;
       if (locationId == null) return;
+      final repository = context.read<AccountingRepository>();
 
-      final rowsResponse = await context
-          .read<AccountingRepository>()
-          .getBookRows(locationId: locationId, bookId: book.bookId.toString());
-
-      final file = await WordExportService.exportToWord(
-        book,
-        rowsResponse.rows,
+      final rows = await _loadAllBookRows(
+        locationId: locationId,
+        bookId: book.bookId.toString(),
       );
-      if (file != null) {
-        await WordExportService.shareExportedFile(file);
+      final sectionsData = await repository.getBookSections(
+        locationId: locationId,
+        bookId: book.bookId.toString(),
+      );
+      final headerInfo = _buildExportHeaderInfo(
+        locationId: locationId,
+        sectionsData: sectionsData,
+      );
+
+      final files = await ExcelExportService.exportToExcelFiles(
+        book,
+        rows,
+        sectionsData: sectionsData,
+        headerInfo: headerInfo,
+      );
+      if (files.isNotEmpty) {
+        await ExcelExportService.shareExportedFiles(files);
         _showSuccess(l10n.translate('accounting.export_success'));
       } else {
-        throw Exception('Không thể tạo file word');
+        throw Exception('Không thể tạo file Excel');
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
+        SnackBar(
+          content: Text(ApiErrorMessageParser.parse(e)),
+          backgroundColor: AppColors.error,
+        ),
       );
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadAllBookRows({
+    required String locationId,
+    required String bookId,
+  }) async {
+    final repository = context.read<AccountingRepository>();
+    final allRows = <Map<String, dynamic>>[];
+    String? cursor;
+    bool hasMore = true;
+
+    while (hasMore) {
+      final response = await repository.getBookRows(
+        locationId: locationId,
+        bookId: bookId,
+        cursor: cursor,
+      );
+      allRows.addAll(response.rows);
+      hasMore = response.hasMore;
+      cursor = response.nextCursor;
+    }
+
+    return allRows;
+  }
+
+  ExcelExportHeaderInfo _buildExportHeaderInfo({
+    required String locationId,
+    required BookSectionsResponse sectionsData,
+  }) {
+    final businessContext = context.read<BusinessContext>();
+    final userProfile = UserProfileContext();
+
+    var businessName = '';
+    var locationName = '';
+    String address = '';
+    String taxCode = '';
+    final locationState = context.read<LocationBloc>().state;
+    if (locationState is LocationsLoaded) {
+      for (final loc in locationState.locations) {
+        if (loc.id == locationId) {
+          businessName = loc.ownerName.trim();
+          locationName = loc.name.trim();
+          address = loc.fullAddress;
+          taxCode = (loc.taxCode ?? '').trim();
+          break;
+        }
+      }
+    }
+
+    if (businessName.isEmpty) {
+      businessName = (userProfile.fullName ?? '').trim();
+    }
+    if (businessName.isEmpty) {
+      businessName = (businessContext.currentBusinessName ?? '').trim();
+    }
+
+    final periodLabel =
+        '${sectionsData.lastCalculatedAt.month.toString().padLeft(2, '0')}/${sectionsData.lastCalculatedAt.year}';
+
+    return ExcelExportHeaderInfo(
+      businessName: businessName,
+      taxCode: taxCode,
+      address: address,
+      locationName: locationName,
+      periodLabel: periodLabel,
+    );
   }
 
   Future<void> _generateReport() async {
@@ -462,7 +754,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   Tab(text: l10n.translate('accounting.tab_period')),
                   Tab(text: l10n.translate('accounting.tab_gl')),
                   Tab(text: l10n.translate('accounting.tab_cost_revenue')),
-                  // Tab(text: l10n.translate('accounting.tab_books_reports')),
+                  Tab(text: l10n.translate('accounting.tab_books_reports')),
                 ],
               ),
               Expanded(
@@ -532,29 +824,50 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                               .toList();
                         }
 
-                        return AccountingBooksReportsTab(
-                          books: bookModels,
-                          taxPayments: _taxPayments,
-                          fromDate: _reportFromDate,
-                          toDate: _reportToDate,
-                          reportFormat: _reportFormat,
-                          onExportBook: (bookModel) {
-                            // Find the original book from state
-                            if (state is AccountingBookLoaded) {
-                              final originalBook = state.books.firstWhere(
-                                (b) => b.bookCode == bookModel.code,
-                              );
-                              _exportBook(originalBook);
-                            }
+                        return FutureBuilder<List<bool>>(
+                          future: Future.wait([
+                            context
+                                .read<SubscriptionRepository>()
+                                .canUseFeatureCode(
+                                  featureCode: _featureReportExport,
+                                ),
+                            context
+                                .read<SubscriptionRepository>()
+                                .canUseFeatureCode(
+                                  featureCode: SubscriptionFeatureCodes.reports,
+                                ),
+                          ]),
+                          builder: (context, snapshot) {
+                            final access = snapshot.data ?? const [true, true];
+                            return AccountingBooksReportsTab(
+                              books: bookModels,
+                              taxPayments: _taxPayments,
+                              fromDate: _reportFromDate,
+                              toDate: _reportToDate,
+                              reportFormat: _reportFormat,
+                              onExportBook: (bookModel) {
+                                if (state is AccountingBookLoaded) {
+                                  final originalBook = state.books.firstWhere(
+                                    (b) => b.bookCode == bookModel.code,
+                                  );
+                                  _exportBook(originalBook);
+                                }
+                              },
+                              onEditTaxPayment: _editTaxPayment,
+                              onFromDateChanged: (value) =>
+                                  setState(() => _reportFromDate = value),
+                              onToDateChanged: (value) =>
+                                  setState(() => _reportToDate = value),
+                              onReportFormatChanged: (value) =>
+                                  setState(() => _reportFormat = value),
+                              onGenerateReport: _generateReport,
+                              canExportBooks: access[0],
+                              canGenerateReport: access[1],
+                              limitWarningText: l10n.translate(
+                                'subscription.limit_warning',
+                              ),
+                            );
                           },
-                          onEditTaxPayment: _editTaxPayment,
-                          onFromDateChanged: (value) =>
-                              setState(() => _reportFromDate = value),
-                          onToDateChanged: (value) =>
-                              setState(() => _reportToDate = value),
-                          onReportFormatChanged: (value) =>
-                              setState(() => _reportFormat = value),
-                          onGenerateReport: _generateReport,
                         );
                       },
                     ),
@@ -585,7 +898,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     List<BusinessTypeDto> businessTypes = [];
 
     try {
-      final result = await context.read<ProductBloc>().repository.getBusinessTypes();
+      final result = await context
+          .read<ProductBloc>()
+          .repository
+          .getBusinessTypes();
       if (result is List) {
         businessTypes = List<BusinessTypeDto>.from(result);
       }
@@ -610,6 +926,19 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _buildVoiceAssistControls(
+                  l10n: l10n,
+                  dialogCtx: dialogCtx,
+                  setDialogState: setDialogState,
+                  onTranscriptReady: (transcript) {
+                    _applyRevenueTranscript(
+                      transcript: transcript,
+                      amountController: amountController,
+                      descriptionController: descriptionController,
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
@@ -646,6 +975,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: selectedBusinessTypeId,
                   decoration: InputDecoration(
                     labelText: l10n.translate(
@@ -656,7 +986,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       .map(
                         (type) => DropdownMenuItem<String>(
                           value: type.businessTypeId,
-                          child: Text(type.name),
+                          child: Text(
+                            type.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
@@ -804,7 +1137,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         ),
       ),
     );
-
   }
 
   Future<OrderEntity?> _loadLinkedOrder(RevenueEntity revenue) async {
@@ -864,6 +1196,19 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                _buildVoiceAssistControls(
+                  l10n: l10n,
+                  dialogCtx: dialogCtx,
+                  setDialogState: setDialogState,
+                  onTranscriptReady: (transcript) {
+                    _applyCostTranscript(
+                      transcript: transcript,
+                      amountController: amountController,
+                      descriptionController: descriptionController,
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: descriptionController,
                   decoration: InputDecoration(
@@ -1014,7 +1359,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         ),
       ),
     );
-
   }
 
   Future<void> _showEditCostDialog(CostEntity item) async {
@@ -1219,7 +1563,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         ),
       ),
     );
-
   }
 
   void _showRevenueDetailDialog(RevenueEntity revenue) {
@@ -1339,7 +1682,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     List<BusinessTypeDto> businessTypes = [];
 
     try {
-      final result = await context.read<ProductBloc>().repository.getBusinessTypes();
+      final result = await context
+          .read<ProductBloc>()
+          .repository
+          .getBusinessTypes();
       if (result is List) {
         businessTypes = List<BusinessTypeDto>.from(result);
       }
@@ -1406,6 +1752,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: selectedBusinessTypeId,
                   decoration: InputDecoration(
                     labelText: l10n.translate(
@@ -1416,7 +1763,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       .map(
                         (type) => DropdownMenuItem<String>(
                           value: type.businessTypeId,
-                          child: Text(type.name),
+                          child: Text(
+                            type.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
@@ -1540,6 +1890,5 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         ),
       ),
     );
-
   }
 }

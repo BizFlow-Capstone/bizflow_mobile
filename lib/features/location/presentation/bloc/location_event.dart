@@ -10,7 +10,12 @@ abstract class LocationEvent extends Equatable {
 
 /// Load all locations
 class LoadLocationsRequested extends LocationEvent {
-  const LoadLocationsRequested();
+  final bool useCache;
+
+  const LoadLocationsRequested({this.useCache = true});
+
+  @override
+  List<Object?> get props => [useCache];
 }
 
 /// Reset locations state (on logout)

@@ -4,9 +4,11 @@ import '../mappers/order_local_mapper.dart';
 
 class OrderLocalDataSource {
   OrderLocalDataSource({AppDatabase? database})
-    : _database = database ?? AppDatabase();
+    : _databaseOverride = database;
 
-  final AppDatabase _database;
+  final AppDatabase? _databaseOverride;
+
+  AppDatabase get _database => _databaseOverride ?? AppDatabase();
 
   Future<List<OrderEntity>> getByScopeKey(String scopeKey) async {
     final rows = await _database.ordersDao.getByScopeKey(scopeKey);

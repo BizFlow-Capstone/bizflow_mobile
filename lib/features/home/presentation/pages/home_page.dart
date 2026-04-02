@@ -9,6 +9,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/services/permission_service.dart';
+import '../../../../shared/utils/formatters.dart';
 import '../../../employee/presentation/bloc/employee_bloc.dart';
 import '../../../employee/presentation/bloc/employee_event.dart';
 import '../../../employee/presentation/bloc/employee_state.dart';
@@ -18,6 +19,7 @@ import '../../../location/presentation/bloc/location_state.dart';
 import '../widgets/quick_actions.dart';
 import '../widgets/premium_banner.dart';
 import '../widgets/management_cards.dart';
+import '../widgets/stats_cards.dart';
 
 /// Home Page - Trang chủ của ứng dụng
 /// Hiển thị:
@@ -52,6 +54,9 @@ class _HomePageState extends State<HomePage> {
     final l10n = AppLocalizations.of(context);
     final businessContext = context.watch<BusinessContext>();
     final isOwner = businessContext.isOwner;
+    final todaysRevenueMock = CurrencyFormatter.formatVND(18500000);
+    final todaysCostMock = CurrencyFormatter.formatVND(7350000);
+    final todaysDebtMock = CurrencyFormatter.formatVND(4200000);
 
     if (isOwner && businessContext.currentBusinessId != null) {
       final businessId = businessContext.currentBusinessId!;
@@ -72,12 +77,18 @@ class _HomePageState extends State<HomePage> {
               AppRouter.navigateAndClearStack(AppRoutes.noLocation);
             });
           } else {
-            // Auto-select first location if context is empty
+            // Keep BusinessContext aligned with the latest location list.
+            // This also fixes account-switch flows where previous location id
+            // no longer exists in the current account.
             final businessContext = Provider.of<BusinessContext>(
               context,
               listen: false,
             );
-            if (businessContext.currentBusinessId == null) {
+            final selectedId = businessContext.currentBusinessId;
+            final isSelectedValid =
+                selectedId != null &&
+                state.locations.any((location) => location.id == selectedId);
+            if (!isSelectedValid) {
               final firstLocation = state.locations.first;
               businessContext.switchBusinessLocation(
                 firstLocation.id,
@@ -158,6 +169,15 @@ class _HomePageState extends State<HomePage> {
                     );
                   },
                 ),
+
+                // Daily Summary (mock data for now)
+                StatsCards(
+                  todaysOrders: 16,
+                  todaysRevenue: todaysRevenueMock,
+                  todaysCost: todaysCostMock,
+                  todaysDebt: todaysDebtMock,
+                ),
+                SizedBox(height: AppSpacing.md),
 
                 // Quick Actions
                 QuickActions(

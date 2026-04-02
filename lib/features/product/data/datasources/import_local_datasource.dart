@@ -4,9 +4,11 @@ import '../models/import_model.dart';
 
 class ImportLocalDataSource {
   ImportLocalDataSource({AppDatabase? database})
-    : _database = database ?? AppDatabase();
+    : _databaseOverride = database;
 
-  final AppDatabase _database;
+  final AppDatabase? _databaseOverride;
+
+  AppDatabase get _database => _databaseOverride ?? AppDatabase();
 
   Future<List<ImportHistoryItemModel>> getByScopeKey(String scopeKey) async {
     final rows = await _database.importsDao.getByScopeKey(scopeKey);

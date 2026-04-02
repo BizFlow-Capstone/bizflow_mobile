@@ -14,20 +14,17 @@ class PostAuthNavigation {
     final locationBloc = context.read<LocationBloc>();
 
     LocationState state;
-    final currentState = locationBloc.state;
-    if (currentState is LocationsLoaded) {
-      state = currentState;
-    } else {
-      locationBloc.add(const LoadLocationsRequested());
-      try {
-        state = await locationBloc.stream.firstWhere(
-          (s) => s is LocationsLoaded || s is LocationFailure,
-        ).timeout(const Duration(seconds: 5));
-      } catch (e) {
-        debugPrint('PostAuthNavigation: Timeout waiting for locations, proceeding to home.');
-        // Fallback to currently loaded state or empty
-        state = locationBloc.state;
-      }
+    // Always force a fresh fetch after auth/switch-account.
+    // This avoids using stale in-memory/cache location lists from a previous account.
+    locationBloc.add(const LoadLocationsRequested(useCache: false));
+    try {
+      state = await locationBloc.stream.firstWhere(
+        (s) => s is LocationsLoaded || s is LocationFailure,
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('PostAuthNavigation: Timeout waiting for locations, proceeding to home.');
+      // Fallback to currently loaded state or empty
+      state = locationBloc.state;
     }
 
     if (!context.mounted) {

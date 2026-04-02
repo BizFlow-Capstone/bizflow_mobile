@@ -346,22 +346,55 @@ class CurrentSubscriptionPage extends StatelessWidget {
 
   Widget _buildActions(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-           backgroundColor: const Color(0xFFE65100),
-           padding: const EdgeInsets.symmetric(vertical: 16),
-           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE65100),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: () {
+            AppRouter.navigateTo(AppRoutes.subscriptionPlans);
+          },
+          child: Text(
+            l10n.translate('subscription.manage_plan'),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
         ),
-        onPressed: () {
-          AppRouter.navigateTo(AppRoutes.subscriptionPlans);
-        },
-        child: Text(
-          l10n.translate('subscription.manage_plan'),
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            side: const BorderSide(color: Color(0xFFE65100)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: () {
+            AppRouter.navigateTo(AppRoutes.subscriptionTransactions);
+          },
+          icon: const Icon(
+            Icons.receipt_long_outlined,
+            color: Color(0xFFE65100),
+          ),
+          label: Text(
+            l10n.translate('subscription.transactions_title'),
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFE65100),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

@@ -91,14 +91,16 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     // if there is absolutely no cache.
     emit(const LocationLoading());
 
-    try {
-      final localCached = await repository.getCachedLocations();
-      if (localCached.isNotEmpty) {
-        _locations = localCached;
-        emit(LocationsLoaded(locations: localCached));
+    if (event.useCache) {
+      try {
+        final localCached = await repository.getCachedLocations();
+        if (localCached.isNotEmpty) {
+          _locations = localCached;
+          emit(LocationsLoaded(locations: localCached));
+        }
+      } catch (e) {
+        debugPrint('LocationBloc: Drift cache read failed: $e');
       }
-    } catch (e) {
-      debugPrint('LocationBloc: Drift cache read failed: $e');
     }
 
     try {

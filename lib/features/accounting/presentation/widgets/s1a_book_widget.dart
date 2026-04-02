@@ -21,10 +21,7 @@ class S1aBookWidget extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildHeader(context),
-          _buildTable(context),
-        ],
+        children: [_buildHeader(context), _buildTable(context)],
       ),
     );
   }
@@ -37,15 +34,17 @@ class S1aBookWidget extends StatelessWidget {
         children: [
           Text(
             'Mẫu số S1a-HKD',
-            style: AppTextStyles.bodySmall.copyWith(
+            style: AppTextStyles.bodyMedium.copyWith(
               fontStyle: FontStyle.italic,
-              color: AppColors.textSecondary,
+              color: AppColors.textPrimary,
+              fontSize: 15,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'SỔ DOANH THU BÁN HÀNG HÓA, DỊCH VỤ',
-            style: AppTextStyles.bodyLarge.copyWith(
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
@@ -81,12 +80,38 @@ class S1aBookWidget extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
+        border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
         columnSpacing: 24,
-        columns: const [
-          DataColumn(label: Text('Ngày tháng', style: TextStyle(fontWeight: FontWeight.bold))),
-          DataColumn(label: Text('Diễn giải', style: TextStyle(fontWeight: FontWeight.bold))),
+        columns: [
           DataColumn(
-            label: Text('Số tiền', style: TextStyle(fontWeight: FontWeight.bold)),
+            label: Text(
+              'Ngày tháng',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Diễn giải',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          DataColumn(
+            label: Text(
+              'Số tiền',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             numeric: true,
           ),
         ],
@@ -101,42 +126,52 @@ class S1aBookWidget extends StatelessWidget {
   DataRow _buildDataRow(SectionRowDto row) {
     final isSubtotal = row.lineType == 'subtotal' || row.lineType == 'total';
     final style = isSubtotal
-        ? AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold)
-        : AppTextStyles.bodySmall;
+        ? AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+          )
+        : AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textPrimary,
+            fontSize: 15,
+          );
 
     return DataRow(
       color: isSubtotal ? WidgetStateProperty.all(Colors.grey[50]) : null,
       cells: [
-        DataCell(Text(
-          _formatDate(row.values['date']),
-          style: style,
-        )),
-        DataCell(Text(
-          row.values['description']?.toString() ?? '',
-          style: style,
-        )),
-        DataCell(Text(
-          _formatAmount(row.values['revenue']),
-          style: style,
-        )),
+        DataCell(Text(_formatDate(row.values['ngay_thang'] ?? row.values['date']), style: style)),
+        DataCell(
+          Text(row.values['dien_giai']?.toString() ?? row.values['description']?.toString() ?? '', style: style),
+        ),
+        DataCell(Text(_formatAmount(row.values['so_tien'] ?? row.values['revenue']), style: style)),
       ],
     );
   }
 
   DataRow _buildFooterRow(SectionRowDto row) {
-    final style = AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.bold);
+    final style = AppTextStyles.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+      fontSize: 15,
+      fontWeight: FontWeight.bold,
+    );
     return DataRow(
       color: WidgetStateProperty.all(Colors.blue[50]),
       cells: [
         const DataCell(SizedBox.shrink()),
-        DataCell(Text(
-          row.values['dien_giai']?.toString() ?? row.values['description']?.toString() ?? 'Tổng cộng',
-          style: style,
-        )),
-        DataCell(Text(
-          _formatAmount(row.values['revenue'] ?? row.values['so_tien']),
-          style: style,
-        )),
+        DataCell(
+          Text(
+            row.values['dien_giai']?.toString() ??
+                row.values['description']?.toString() ??
+                'Tổng cộng',
+            style: style,
+          ),
+        ),
+        DataCell(
+          Text(
+            _formatAmount(row.values['revenue'] ?? row.values['so_tien']),
+            style: style,
+          ),
+        ),
       ],
     );
   }

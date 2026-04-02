@@ -9,6 +9,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
@@ -85,6 +86,8 @@ class _EditProductPageState extends State<EditProductPage> {
   String? _quantityError;
 
   final ImagePicker _imagePicker = ImagePicker();
+  final ActionGuard _submitGuard = ActionGuard();
+  final ActionGuard _deleteGuard = ActionGuard();
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -355,25 +358,31 @@ class _EditProductPageState extends State<EditProductPage> {
 
   /// Delete product
   Future<void> _deleteProduct() async {
-    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-      context,
-      featureCode: SubscriptionFeatureCodes.productManagement,
-    );
-    if (!allowed) return;
+    await _deleteGuard.run(() async {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.productManagement,
+      );
+      if (!allowed || !mounted) return;
 
-    context.read<ProductBloc>().add(
-      DeleteProductRequested(
-        locationId: widget.locationId,
-        productId: widget.productId,
-      ),
-    );
+      context.read<ProductBloc>().add(
+        DeleteProductRequested(
+          locationId: widget.locationId,
+          productId: widget.productId,
+        ),
+      );
+    });
   }
 
   /// Submit form to update product
   Future<void> _submitForm() async {
     final requiredMessage = l10n.translate('common.required_field');
-    final invalidCostPriceMessage = l10n.translate('product.invalid_cost_price');
-    final invalidSalePriceMessage = l10n.translate('product.invalid_sale_price');
+    final invalidCostPriceMessage = l10n.translate(
+      'product.invalid_cost_price',
+    );
+    final invalidSalePriceMessage = l10n.translate(
+      'product.invalid_sale_price',
+    );
     final invalidStockMessage = l10n.translate('product.invalid_stock');
 
     double? parseMoney(String value) {
@@ -423,55 +432,51 @@ class _EditProductPageState extends State<EditProductPage> {
       return;
     }
 
-    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-      context,
-      featureCode: SubscriptionFeatureCodes.productManagement,
-    );
-    if (!allowed) return;
-
-    if (widget.productId.isEmpty) {
-      AppSnackBar.show(
+    await _submitGuard.run(() async {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
-        message: l10n.translate('product.invalid_id'),
-        type: AppSnackBarType.error,
+        featureCode: SubscriptionFeatureCodes.productManagement,
       );
-      return;
-    }
-    debugPrint(
-      'EditProductPage: Updating product with ID: ${widget.productId}',
-    );
+      if (!allowed || !mounted) return;
 
-    context.read<ProductBloc>().add(
-      UpdateProductRequested(
-        productId: widget.productId,
-        locationId: widget.locationId,
-        productName: _productNameController.text,
-        barcode: _barcodeController.text.isNotEmpty
-            ? _barcodeController.text
-            : null,
-        costPrice: _costPriceController.text.isNotEmpty
-            ? costPrice
-            : null,
-        salePrice: _salePriceController.text.isNotEmpty
-            ? salePrice
-            : null,
-        quantity: _quantityController.text.isNotEmpty
-            ? quantity
-            : null,
-        unit: _unitController.text.isNotEmpty ? _unitController.text : null,
-        isActive: _isActive,
-        manufacturer: _manufacturerController.text.isNotEmpty
-            ? _manufacturerController.text
-            : null,
-        description: _descriptionController.text.isNotEmpty
-            ? _descriptionController.text
-            : null,
-        imagePath: _selectedImagePath,
-        priceTiers: _priceTiers.isNotEmpty ? _priceTiers : null,
-        removeImage: _removeImage,
-        businessTypeId: _selectedBusinessTypeId,
-      ),
-    );
+      if (widget.productId.isEmpty) {
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('product.invalid_id'),
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+      debugPrint(
+        'EditProductPage: Updating product with ID: ${widget.productId}',
+      );
+
+      context.read<ProductBloc>().add(
+        UpdateProductRequested(
+          productId: widget.productId,
+          locationId: widget.locationId,
+          productName: _productNameController.text,
+          barcode: _barcodeController.text.isNotEmpty
+              ? _barcodeController.text
+              : null,
+          costPrice: _costPriceController.text.isNotEmpty ? costPrice : null,
+          salePrice: _salePriceController.text.isNotEmpty ? salePrice : null,
+          quantity: _quantityController.text.isNotEmpty ? quantity : null,
+          unit: _unitController.text.isNotEmpty ? _unitController.text : null,
+          isActive: _isActive,
+          manufacturer: _manufacturerController.text.isNotEmpty
+              ? _manufacturerController.text
+              : null,
+          description: _descriptionController.text.isNotEmpty
+              ? _descriptionController.text
+              : null,
+          imagePath: _selectedImagePath,
+          priceTiers: _priceTiers.isNotEmpty ? _priceTiers : null,
+          removeImage: _removeImage,
+          businessTypeId: _selectedBusinessTypeId,
+        ),
+      );
+    });
   }
 
   @override
@@ -1055,7 +1060,9 @@ class _EditProductPageState extends State<EditProductPage> {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(
-                color: errorText != null ? AppColors.error : AppColors.secondary,
+                color: errorText != null
+                    ? AppColors.error
+                    : AppColors.secondary,
               ),
             ),
             errorBorder: OutlineInputBorder(
@@ -1161,10 +1168,9 @@ class _EditProductPageState extends State<EditProductPage> {
             Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color:
-                      _businessTypeError != null
-                          ? AppColors.error
-                          : AppColors.divider,
+                  color: _businessTypeError != null
+                      ? AppColors.error
+                      : AppColors.divider,
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -1195,9 +1201,7 @@ class _EditProductPageState extends State<EditProductPage> {
               SizedBox(height: AppSpacing.xs),
               Text(
                 _businessTypeError!,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.error,
-                ),
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
               ),
             ],
           ],

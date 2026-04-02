@@ -5,9 +5,11 @@ import 'package:drift/drift.dart';
 import '../../core/database/app_database.dart';
 
 class LocalApiCacheStore {
-  LocalApiCacheStore({AppDatabase? database}) : _database = database ?? AppDatabase();
+  LocalApiCacheStore({AppDatabase? database}) : _databaseOverride = database;
 
-  final AppDatabase _database;
+  final AppDatabase? _databaseOverride;
+
+  AppDatabase get _database => _databaseOverride ?? AppDatabase();
 
   Future<Map<String, dynamic>?> getMap(String cacheKey) async {
     final row = await _database.apiCacheDao.getByKey(cacheKey);

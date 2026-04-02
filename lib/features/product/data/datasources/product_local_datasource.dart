@@ -4,9 +4,11 @@ import '../mappers/product_local_mapper.dart';
 
 class ProductLocalDataSource {
   ProductLocalDataSource({AppDatabase? database})
-    : _database = database ?? AppDatabase();
+    : _databaseOverride = database;
 
-  final AppDatabase _database;
+  final AppDatabase? _databaseOverride;
+
+  AppDatabase get _database => _databaseOverride ?? AppDatabase();
 
   Future<List<ProductEntity>> getByScopeKey(String scopeKey) async {
     final rows = await _database.productsDao.getByScopeKey(scopeKey);

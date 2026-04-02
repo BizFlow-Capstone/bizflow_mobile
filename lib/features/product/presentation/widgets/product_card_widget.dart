@@ -5,6 +5,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/entities/product_entity.dart';
 import '../bloc/product_bloc.dart';
@@ -21,8 +22,9 @@ class ProductCardWidget extends StatelessWidget {
   final String locationId;
   final VoidCallback? onQuickAdjustStock;
   final bool canManageActions;
+  final ActionGuard _deleteGuard = ActionGuard();
 
-  const ProductCardWidget({
+  ProductCardWidget({
     super.key,
     required this.product,
     required this.locationId,
@@ -300,7 +302,9 @@ class ProductCardWidget extends StatelessWidget {
                               context: context,
                               builder: (context) => AlertDialog(
                                 title: Text(
-                                  l10n.translate('product.confirm_delete_title'),
+                                  l10n.translate(
+                                    'product.confirm_delete_title',
+                                  ),
                                 ),
                                 content: Text(
                                   l10n.translate(
@@ -310,23 +314,31 @@ class ProductCardWidget extends StatelessWidget {
                                 actions: [
                                   TextButton(
                                     onPressed: () => Navigator.pop(context),
-                                    child: Text(l10n.translate('common.cancel')),
+                                    child: Text(
+                                      l10n.translate('common.cancel'),
+                                    ),
                                   ),
                                   TextButton(
                                     onPressed: () async {
-                                      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-                                        context,
-                                        featureCode: SubscriptionFeatureCodes.productManagement,
-                                      );
-                                      if (!allowed || !context.mounted) return;
+                                      await _deleteGuard.run(() async {
+                                        final allowed =
+                                            await SubscriptionFeatureGuard.ensureAllowed(
+                                              context,
+                                              featureCode:
+                                                  SubscriptionFeatureCodes
+                                                      .productManagement,
+                                            );
+                                        if (!allowed || !context.mounted)
+                                          return;
 
-                                      Navigator.pop(context);
-                                      context.read<ProductBloc>().add(
-                                        DeleteProductRequested(
-                                          locationId: locationId,
-                                          productId: product.id,
-                                        ),
-                                      );
+                                        Navigator.pop(context);
+                                        context.read<ProductBloc>().add(
+                                          DeleteProductRequested(
+                                            locationId: locationId,
+                                            productId: product.id,
+                                          ),
+                                        );
+                                      });
                                     },
                                     child: Text(
                                       l10n.translate(

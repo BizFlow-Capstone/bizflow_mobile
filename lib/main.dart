@@ -15,7 +15,6 @@ import 'core/network/api_endpoints.dart';
 import 'core/providers/localization_provider.dart';
 import 'core/routing/app_router.dart';
 import 'core/storage/secure_storage.dart';
-import 'core/database/app_database.dart';
 import 'core/database/database_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
@@ -372,6 +371,7 @@ class _MyAppState extends State<MyApp> {
               return BlocListener<AuthBloc, AuthState>(
                 listener: (context, state) {
                   if (state is AuthAuthenticated) {
+                    context.read<LocationBloc>().add(const LoadLocationsRequested());
                     context.read<ReferenceBloc>().add(
                       LoadAllReferencesRequested(),
                     );

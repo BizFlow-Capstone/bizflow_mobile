@@ -11,6 +11,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/date_formatter.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -76,6 +77,9 @@ class _StockImportViewState extends State<_StockImportView> {
   bool _removeImage = false;
   bool _confirmAfterUpdate = false;
   final ImagePicker _imagePicker = ImagePicker();
+  final ActionGuard _saveDraftGuard = ActionGuard();
+  final ActionGuard _confirmGuard = ActionGuard();
+  final ActionGuard _deleteGuard = ActionGuard();
 
   late TextEditingController _noteController;
   late TextEditingController _supplierController;
@@ -138,46 +142,48 @@ class _StockImportViewState extends State<_StockImportView> {
       return;
     }
 
-    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-      context,
-      featureCode: SubscriptionFeatureCodes.inventoryImport,
-    );
-    if (!allowed) return;
+    await _saveDraftGuard.run(() async {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.inventoryImport,
+      );
+      if (!allowed || !mounted) return;
 
-    if (widget.importId == null) {
-      final req = CreateImportRequest(
-        importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
-        businessLocationId: int.parse(widget.locationId),
-        supplier: _supplierController.text,
-        note: _noteController.text,
-        receivedAt: null,
-        documentDate: _documentDate,
-        documentNumber: _documentNumberController.text.isNotEmpty
-            ? _documentNumberController.text
-            : null,
-        saveAsDraft: true,
-        imagePath: _selectedImagePath,
-        items: _selectedItems,
-      );
-      context.read<ImportActionBloc>().add(CreateImportEvent(req));
-    } else {
-      final req = UpdateImportRequest(
-        importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
-        supplier: _supplierController.text,
-        note: _noteController.text,
-        receivedAt: null,
-        documentDate: _documentDate,
-        documentNumber: _documentNumberController.text.isNotEmpty
-            ? _documentNumberController.text
-            : null,
-        imagePath: _selectedImagePath,
-        removeImage: _removeImage,
-        items: _selectedItems,
-      );
-      context.read<ImportActionBloc>().add(
-        UpdateImportEvent(widget.importId!, req),
-      );
-    }
+      if (widget.importId == null) {
+        final req = CreateImportRequest(
+          importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
+          businessLocationId: int.parse(widget.locationId),
+          supplier: _supplierController.text,
+          note: _noteController.text,
+          receivedAt: null,
+          documentDate: _documentDate,
+          documentNumber: _documentNumberController.text.isNotEmpty
+              ? _documentNumberController.text
+              : null,
+          saveAsDraft: true,
+          imagePath: _selectedImagePath,
+          items: _selectedItems,
+        );
+        context.read<ImportActionBloc>().add(CreateImportEvent(req));
+      } else {
+        final req = UpdateImportRequest(
+          importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
+          supplier: _supplierController.text,
+          note: _noteController.text,
+          receivedAt: null,
+          documentDate: _documentDate,
+          documentNumber: _documentNumberController.text.isNotEmpty
+              ? _documentNumberController.text
+              : null,
+          imagePath: _selectedImagePath,
+          removeImage: _removeImage,
+          items: _selectedItems,
+        );
+        context.read<ImportActionBloc>().add(
+          UpdateImportEvent(widget.importId!, req),
+        );
+      }
+    });
   }
 
   Future<void> _onConfirm() async {
@@ -208,43 +214,49 @@ class _StockImportViewState extends State<_StockImportView> {
             child: Text(l10n.translate('common.cancel')),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              if (widget.importId == null) {
-                final req = CreateImportRequest(
-                  importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
-                  businessLocationId: int.parse(widget.locationId),
-                  supplier: _supplierController.text,
-                  note: _noteController.text,
-                  receivedAt: DateTime.now(),
-                  documentDate: _documentDate,
-                  documentNumber: _documentNumberController.text.isNotEmpty
-                      ? _documentNumberController.text
-                      : null,
-                  saveAsDraft: false,
-                  imagePath: _selectedImagePath,
-                  items: _selectedItems,
-                );
-                context.read<ImportActionBloc>().add(CreateImportEvent(req));
-              } else {
-                _confirmAfterUpdate = true;
-                final req = UpdateImportRequest(
-                  importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
-                  supplier: _supplierController.text,
-                  note: _noteController.text,
-                  receivedAt: null,
-                  documentDate: _documentDate,
-                  documentNumber: _documentNumberController.text.isNotEmpty
-                      ? _documentNumberController.text
-                      : null,
-                  imagePath: _selectedImagePath,
-                  removeImage: _removeImage,
-                  items: _selectedItems,
-                );
-                context.read<ImportActionBloc>().add(
-                  UpdateImportEvent(widget.importId!, req),
-                );
-              }
+            onPressed: () async {
+              await _confirmGuard.run(() async {
+                Navigator.pop(dialogContext);
+                if (widget.importId == null) {
+                  final req = CreateImportRequest(
+                    importType: _hasInvoice
+                        ? 'INVOICE'
+                        : 'INVENTORY_ADJUSTMENT',
+                    businessLocationId: int.parse(widget.locationId),
+                    supplier: _supplierController.text,
+                    note: _noteController.text,
+                    receivedAt: DateTime.now(),
+                    documentDate: _documentDate,
+                    documentNumber: _documentNumberController.text.isNotEmpty
+                        ? _documentNumberController.text
+                        : null,
+                    saveAsDraft: false,
+                    imagePath: _selectedImagePath,
+                    items: _selectedItems,
+                  );
+                  context.read<ImportActionBloc>().add(CreateImportEvent(req));
+                } else {
+                  _confirmAfterUpdate = true;
+                  final req = UpdateImportRequest(
+                    importType: _hasInvoice
+                        ? 'INVOICE'
+                        : 'INVENTORY_ADJUSTMENT',
+                    supplier: _supplierController.text,
+                    note: _noteController.text,
+                    receivedAt: null,
+                    documentDate: _documentDate,
+                    documentNumber: _documentNumberController.text.isNotEmpty
+                        ? _documentNumberController.text
+                        : null,
+                    imagePath: _selectedImagePath,
+                    removeImage: _removeImage,
+                    items: _selectedItems,
+                  );
+                  context.read<ImportActionBloc>().add(
+                    UpdateImportEvent(widget.importId!, req),
+                  );
+                }
+              });
             },
             child: Text(l10n.translate('common.confirm')),
           ),
@@ -276,13 +288,15 @@ class _StockImportViewState extends State<_StockImportView> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              if (widget.importId != null) {
-                context.read<ImportActionBloc>().add(
-                  DeleteImportEvent(widget.importId!),
-                );
-              }
+            onPressed: () async {
+              await _deleteGuard.run(() async {
+                Navigator.pop(dialogContext);
+                if (widget.importId != null) {
+                  context.read<ImportActionBloc>().add(
+                    DeleteImportEvent(widget.importId!),
+                  );
+                }
+              });
             },
             child: Text(l10n.translate('common.confirm')),
           ),
@@ -292,19 +306,11 @@ class _StockImportViewState extends State<_StockImportView> {
   }
 
   void _showErrorSnackBar(String message) {
-    AppSnackBar.show(
-      context,
-      message: message,
-      type: AppSnackBarType.error,
-    );
+    AppSnackBar.show(context, message: message, type: AppSnackBarType.error);
   }
 
   void _showSuccessSnackBar(String message) {
-    AppSnackBar.show(
-      context,
-      message: message,
-      type: AppSnackBarType.success,
-    );
+    AppSnackBar.show(context, message: message, type: AppSnackBarType.success);
   }
 
   /// Show receipt template for MANUAL (no-invoice) import confirmation
@@ -517,10 +523,11 @@ class _StockImportViewState extends State<_StockImportView> {
         if (state.status == ImportActionStatus.success) {
           if (_confirmAfterUpdate && widget.importId != null) {
             _confirmAfterUpdate = false;
-            SubscriptionFeatureGuard.ensureAllowed(
-              context,
-              featureCode: SubscriptionFeatureCodes.inventoryImport,
-            ).then((allowed) {
+            _confirmGuard.run(() async {
+              final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                context,
+                featureCode: SubscriptionFeatureCodes.inventoryImport,
+              );
               if (!allowed || !context.mounted) return;
               final req = ConfirmImportRequest(receivedAt: DateTime.now());
               context.read<ImportActionBloc>().add(
@@ -603,8 +610,8 @@ class _StockImportViewState extends State<_StockImportView> {
                     const SizedBox(height: AppSpacing.md),
                     ElevatedButton(
                       onPressed: () => context.read<ImportActionBloc>().add(
-                            GetImportDetailEvent(widget.importId!),
-                          ),
+                        GetImportDetailEvent(widget.importId!),
+                      ),
                       child: Text(l10n.translate('common.retry')),
                     ),
                   ],

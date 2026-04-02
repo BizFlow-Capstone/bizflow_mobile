@@ -10,10 +10,14 @@ import '../utils/date_formatter.dart';
 class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
   final EdgeInsetsGeometry? padding;
 
+  /// When provided a refresh icon button is shown next to the status text.
+  /// Register [onRefresh] on the controller via
+  /// [SyncStatusController.setManualRefreshCallback] in your page's [initState]
+  /// instead of passing it here if the widget is declared as `const`.
   const AppSyncStatusText({super.key, this.padding});
 
   @override
-  Size get preferredSize => const Size.fromHeight(18);
+  Size get preferredSize => const Size.fromHeight(22);
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +40,9 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
           text = l10n.translate('sync.idle');
         }
 
+        final hasRefreshCallback =
+          SyncStatusController().hasManualRefreshCallback;
+
         return Container(
           alignment: Alignment.centerRight,
           color: AppColors.white,
@@ -44,12 +51,50 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
               padding ??
               const EdgeInsets.only(
                 left: AppSpacing.md,
-                right: AppSpacing.md,
+                right: AppSpacing.xs,
                 bottom: AppSpacing.xs,
               ),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
+              ...[
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    iconSize: 14,
+                    icon: state.isSyncing
+                        ? const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 1.5),
+                          )
+                        : const Icon(Icons.refresh_rounded),
+                    color: AppColors.textSecondary,
+                    tooltip: l10n.translate('sync.refresh'),
+                    onPressed: state.isSyncing
+                        ? null
+                        : () async {
+                            final controller = SyncStatusController();
+                            if (hasRefreshCallback) {
+                              controller.triggerManualRefresh();
+                              return;
+                            }
+
+                            // Fallback behavior: update global sync state even
+                            // when current page has not registered a callback.
+                            controller.startSync();
+                            await Future<void>.delayed(
+                              const Duration(milliseconds: 300),
+                            );
+                            controller.endSync(updatedAt: DateTime.now());
+                          },
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+              ],
               Container(
                 width: 6,
                 height: 6,

@@ -278,35 +278,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                     ),
                   ),
 
-                  // Logout Button
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: AppSpacing.md,
-                      right: AppSpacing.md,
-                      top: AppSpacing.xs,
-                      bottom: AppSpacing.md,
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onLogout();
-                        },
-                        icon: const Icon(Icons.logout),
-                        label: Text(l10n.translate('sidebar.logout')),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.danger,
-                          foregroundColor: AppColors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusXs,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: AppSpacing.md),
                 ],
               ),
             ),

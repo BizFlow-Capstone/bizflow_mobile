@@ -207,6 +207,7 @@ class CacheManager {
 
       if (_sequences[key] != sequence) {
         debugPrint('SWR Sequence mismatch for $key, discarding result');
+        SyncStatusController().endSync();
         if (completerToResolveIfNoCache?.isCompleted == false) {
           completerToResolveIfNoCache?.complete();
         }
@@ -236,10 +237,11 @@ class CacheManager {
     } catch (e) {
       if (e is DioException && CancelToken.isCancel(e)) {
         debugPrint('SWR request cancelled: $key');
+        SyncStatusController().endSync();
         if (completerToResolveIfNoCache?.isCompleted == false) {
           completerToResolveIfNoCache?.complete();
         }
-        return; 
+        return;
       }
 
       debugPrint('SWR Fetcher Error: $e');

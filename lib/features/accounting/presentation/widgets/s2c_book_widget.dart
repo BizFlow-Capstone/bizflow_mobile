@@ -1,0 +1,262 @@
+import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/formatters.dart';
+import '../../domain/models/accounting_book.dart';
+
+/// Widget hiển thị Sổ chi tiết doanh thu, chi phí mẫu S2c-HKD (TT152)
+/// 5 cột: STT | Số hiệu CT | Ngày tháng | Diễn giải | Số tiền
+/// Grouped by section (revenue / cost) with subtotals, chênh lệch, TNCN in footer
+class S2cBookWidget extends StatelessWidget {
+  final BookSectionsResponse sections;
+  final List<Map<String, dynamic>> dataRows;
+
+  const S2cBookWidget({
+    super.key,
+    required this.sections,
+    this.dataRows = const [],
+  });
+
+  static const _soTienAliases = [
+    'so_tien', 'revenue', 'cost', 'finalAmount', 'totalAmount', 'amount',
+    'planPrice',
+  ];
+  static const _soHieuAliases = [
+    'so_hieu', 'importCode', 'orderCode', 'bookCode', 'code', 'importId',
+  ];
+  static const _dateAliases = [
+    'ngay_thang', 'receivedAt', 'createdAt', 'updatedAt', 'documentDate', 'date',
+  ];
+  static const _descAliases = [
+    'dien_giai', 'description', 'note', 'planName', 'businessLocationName',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [_buildHeader(context), _buildTable(context)],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Mẫu số S2c-HKD',
+            style: AppTextStyles.bodyMedium.copyWith(
+              fontStyle: FontStyle.italic,
+              color: AppColors.textPrimary,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'SỔ CHI TIẾT DOANH THU, CHI PHÍ',
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTable(BuildContext context) {
+    final tableRows = <DataRow>[];
+
+    for (final section in sections.sections) {
+      // Section label row (e.g. "1. Doanh thu" / "2. Chi phí")
+      if (section.businessTypeName?.trim().isNotEmpty == true) {
+        final hasExplicit = section.rows.any(
+          (r) => r.lineType.toLowerCase() == 'industry_header',
+        );
+        if (!hasExplicit) {
+          tableRows.add(_buildSectionHeaderRow(
+            '${section.groupIndex}. ${section.businessTypeName}',
+          ));
+        }
+      }
+
+      for (final row in section.rows) {
+        switch (row.lineType) {
+          case 'industry_header':
+            tableRows.add(_buildSectionHeaderRow(
+              row.values['dien_giai']?.toString() ?? '',
+            ));
+          case 'data_placeholder':
+            final btFilter = row.businessTypeId ?? section.businessTypeId;
+            final sFilter = row.section;
+            final matching = dataRows.where((r) {
+              if (btFilter != null && btFilter.isNotEmpty) {
+                return r['businessTypeId']?.toString() == btFilter;
+              }
+              if (sFilter != null && sFilter.isNotEmpty) {
+                return r['section']?.toString() == sFilter;
+              }
+              return true;
+            });
+            for (final dataRow in matching) {
+              tableRows.add(_buildDataRow(
+                SectionRowDto(lineType: 'data', values: dataRow),
+              ));
+            }
+          case 'data':
+            tableRows.add(_buildDataRow(row));
+          case 'subtotal':
+          case 'total':
+          case 'formula':
+            tableRows.add(_buildSubtotalRow(row));
+          case 'tax_line':
+          case 'tax':
+            tableRows.add(_buildTaxRow(row));
+          default:
+            break;
+        }
+      }
+    }
+
+    for (final row in sections.footerRows) {
+      switch (row.lineType) {
+        case 'subtotal':
+        case 'total':
+        case 'formula':
+          tableRows.add(_buildSubtotalRow(row));
+        case 'tax_line':
+        case 'tax':
+          tableRows.add(_buildTaxRow(row));
+        default:
+          tableRows.add(_buildSubtotalRow(row));
+      }
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
+        border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
+        columnSpacing: 20,
+        columns: [
+          DataColumn(label: Text('Số hiệu CT', style: _headerStyle())),
+          DataColumn(label: Text('Ngày, tháng', style: _headerStyle())),
+          DataColumn(label: Text('Diễn giải', style: _headerStyle())),
+          DataColumn(label: Text('Số tiền', style: _headerStyle()), numeric: true),
+        ],
+        rows: tableRows,
+      ),
+    );
+  }
+
+  DataRow _buildSectionHeaderRow(String label) {
+    return DataRow(
+      color: WidgetStateProperty.all(Colors.amber[50]),
+      cells: [
+        const DataCell(SizedBox.shrink()),
+        const DataCell(SizedBox.shrink()),
+        DataCell(Text(label, style: _boldItalicStyle())),
+        const DataCell(SizedBox.shrink()),
+      ],
+    );
+  }
+
+  DataRow _buildDataRow(SectionRowDto row) {
+    final v = row.values;
+    return DataRow(
+      cells: [
+        DataCell(Text(_pick(v, _soHieuAliases), style: _normalStyle())),
+        DataCell(Text(_fmtDate(_pickDyn(v, _dateAliases)), style: _normalStyle())),
+        DataCell(Text(_pick(v, _descAliases), style: _normalStyle())),
+        DataCell(Text(_fmtAmount(_pickDyn(v, _soTienAliases)), style: _normalStyle())),
+      ],
+    );
+  }
+
+  DataRow _buildSubtotalRow(SectionRowDto row) {
+    final v = row.values;
+    return DataRow(
+      color: WidgetStateProperty.all(Colors.grey[50]),
+      cells: [
+        const DataCell(SizedBox.shrink()),
+        const DataCell(SizedBox.shrink()),
+        DataCell(Text(_pick(v, _descAliases), style: _boldStyle())),
+        DataCell(Text(_fmtAmount(_pickDyn(v, _soTienAliases)), style: _boldStyle())),
+      ],
+    );
+  }
+
+  DataRow _buildTaxRow(SectionRowDto row) {
+    final v = row.values;
+    final label = v['dien_giai']?.toString() ?? row.taxType ?? 'Thuế';
+    return DataRow(
+      color: WidgetStateProperty.all(Colors.orange[50]),
+      cells: [
+        const DataCell(SizedBox.shrink()),
+        const DataCell(SizedBox.shrink()),
+        DataCell(Text(label, style: _boldItalicStyle())),
+        DataCell(Text(_fmtAmount(_pickDyn(v, _soTienAliases)), style: _boldItalicStyle())),
+      ],
+    );
+  }
+
+  // ─── Style helpers ────────────────────────────────────────────────────────
+
+  TextStyle _headerStyle() => AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold);
+
+  TextStyle _normalStyle() => AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textPrimary, fontSize: 15);
+
+  TextStyle _boldStyle() => AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold);
+
+  TextStyle _boldItalicStyle() => AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textPrimary,
+        fontSize: 15,
+        fontWeight: FontWeight.bold,
+        fontStyle: FontStyle.italic,
+      );
+
+  // ─── Value helpers ────────────────────────────────────────────────────────
+
+  static dynamic _pickDyn(Map<String, dynamic> v, List<String> aliases) {
+    for (final key in aliases) {
+      final val = v[key];
+      if (val != null && val.toString().trim().isNotEmpty) return val;
+    }
+    return null;
+  }
+
+  static String _pick(Map<String, dynamic> v, List<String> aliases) =>
+      _pickDyn(v, aliases)?.toString() ?? '';
+
+  static String _fmtDate(dynamic value) {
+    if (value == null) return '';
+    if (value is String && value.isNotEmpty) {
+      try {
+        final d = DateTime.parse(value);
+        return '${d.day}/${d.month}';
+      } catch (_) {
+        return value;
+      }
+    }
+    return value.toString();
+  }
+
+  static String _fmtAmount(dynamic value) {
+    if (value == null) return '';
+    if (value is num) return CurrencyFormatter.formatVND(value);
+    if (value is String) {
+      final parsed = num.tryParse(value);
+      if (parsed != null) return CurrencyFormatter.formatVND(parsed);
+      return value;
+    }
+    return value.toString();
+  }
+}

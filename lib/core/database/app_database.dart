@@ -129,6 +129,7 @@ class AppDatabase extends _$AppDatabase {
     bool forceReopen = false,
   }) async {
     final targetFileName = DbConfig.databaseFileNameForUser(userScope);
+    final shouldUseBackup = forceReopen;
 
     if (!forceReopen && _instance != null && _activeDbFileName == targetFileName) {
       return;
@@ -143,7 +144,7 @@ class AppDatabase extends _$AppDatabase {
     final dbFile = await _resolveDatabaseFile(targetFileName);
     final backupFile = File('${dbFile.path}.bak');
 
-    if (await dbFile.exists()) {
+    if (shouldUseBackup && await dbFile.exists()) {
       await dbFile.copy(backupFile.path);
     }
 
@@ -151,7 +152,7 @@ class AppDatabase extends _$AppDatabase {
       final next = await _openAndVerify(targetFileName);
       _instance = next;
       _activeDbFileName = targetFileName;
-      if (await backupFile.exists()) {
+      if (shouldUseBackup && await backupFile.exists()) {
         await backupFile.delete();
       }
       return;
@@ -160,7 +161,7 @@ class AppDatabase extends _$AppDatabase {
     }
 
     // Rollback path: restore from backup and verify once again.
-    if (await backupFile.exists()) {
+    if (shouldUseBackup && await backupFile.exists()) {
       try {
         if (await dbFile.exists()) {
           await dbFile.delete();
@@ -181,7 +182,7 @@ class AppDatabase extends _$AppDatabase {
     if (await dbFile.exists()) {
       await dbFile.delete();
     }
-    if (await backupFile.exists()) {
+    if (shouldUseBackup && await backupFile.exists()) {
       await backupFile.delete();
     }
 

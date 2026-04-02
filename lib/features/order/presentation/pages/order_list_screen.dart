@@ -8,6 +8,7 @@ import '../../../../core/storage/local_storage.dart';
 import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
 import 'package:bizflow_mobile/features/order/domain/entities/order_entity.dart';
 import 'package:bizflow_mobile/shared/context/business_context.dart';
+import 'package:bizflow_mobile/shared/utils/action_guard.dart';
 import 'package:bizflow_mobile/shared/widgets/app_sync_status_text.dart';
 import 'package:bizflow_mobile/shared/dialogs/app_snackbar.dart';
 import '../widgets/order_card.dart';
@@ -31,6 +32,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   String? _currentStatusFilter;
   String? _currentLocationFilter;
   final Set<String> _publishingOrderIds = {};
+  final ActionGuard _cancelOrderGuard = ActionGuard();
 
   String? _resolveLocationId({String? preferred}) {
     final raw = (preferred ?? context.read<BusinessContext>().currentBusinessId)
@@ -102,10 +104,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
       );
       return;
     }
-    context.read<OrderBloc>().add(RefreshOrdersRequested(locationId: locationId));
+    context.read<OrderBloc>().add(
+      RefreshOrdersRequested(locationId: locationId),
+    );
   }
 
-  Future<void> _completeOrder(OrderEntity order, {bool confirmLowStock = false}) async {
+  Future<void> _completeOrder(
+    OrderEntity order, {
+    bool confirmLowStock = false,
+  }) async {
     if (_publishingOrderIds.contains(order.id)) return;
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
@@ -113,32 +120,36 @@ class _OrderListScreenState extends State<OrderListScreen> {
       featureCode: SubscriptionFeatureCodes.orderManagement,
     );
     if (!allowed) return;
-    
+
     final l10n = AppLocalizations.of(context);
     setState(() => _publishingOrderIds.add(order.id));
-    
+
     try {
       final repository = context.read<OrderBloc>().repository;
-      await repository.completeOrder(order.id, confirmLowStock: confirmLowStock);
-      
+      await repository.completeOrder(
+        order.id,
+        confirmLowStock: confirmLowStock,
+      );
+
       if (!mounted) return;
       AppSnackBar.show(
         context,
         message: 'Đơn hàng đã được hoàn thành thành công!',
         type: AppSnackBarType.success,
       );
-      
+
       _refreshOrders();
-      
     } catch (e) {
       if (!mounted) return;
-      
+
       if (e is OrderConfirmationRequiredException) {
         final confirm = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
-            content: Text('${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}'),
+            content: Text(
+              '${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -176,10 +187,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => OrderFormScreen(
-          inputType: 'manual',
-          draftId: order.id,
-        ),
+        builder: (_) => OrderFormScreen(inputType: 'manual', draftId: order.id),
       ),
     );
     if (!mounted) return;
@@ -303,9 +311,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   void _openOrderDetail(OrderEntity order) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => OrderDetailScreen(orderId: order.id),
-      ),
+      MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: order.id)),
     );
   }
 
@@ -369,10 +375,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
         elevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-            color: Colors.black,
-          ),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          color: Colors.black,
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         actions: [
@@ -470,7 +476,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
               _refreshOrders();
             },
             child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 120), // Increased bottom padding for FAB
+              padding: const EdgeInsets.only(
+                top: 8,
+                bottom: 120,
+              ), // Increased bottom padding for FAB
               itemCount: orders.length,
               itemBuilder: (context, index) {
                 final order = orders[index];
@@ -541,7 +550,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             child: Text(l10n.translate('order.cancel_confirm_no')),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               final reason = reasonController.text.trim();
               if (reason.isEmpty) {
                 AppSnackBar.show(
@@ -551,10 +560,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 );
                 return;
               }
-              SubscriptionFeatureGuard.ensureAllowed(
-                context,
-                featureCode: SubscriptionFeatureCodes.orderManagement,
-              ).then((allowed) {
+              await _cancelOrderGuard.run(() async {
+                final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                  context,
+                  featureCode: SubscriptionFeatureCodes.orderManagement,
+                );
                 if (!allowed || !context.mounted) return;
                 context.read<OrderBloc>().add(
                   CancelOrderRequested(orderId: orderId, cancelReason: reason),

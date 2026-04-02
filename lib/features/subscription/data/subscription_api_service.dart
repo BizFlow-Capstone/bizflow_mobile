@@ -74,4 +74,24 @@ class SubscriptionApiService {
 
     return customToken;
   }
+
+  /// Fetch paginated payment transaction history.
+  Future<PagedTransactionsDto> getTransactions({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.subscriptionTransactions,
+      queryParams: {'page': page, 'pageSize': pageSize},
+    );
+
+    final payload = response.data as Map<String, dynamic>;
+    final data = payload['data'];
+    if (data != null) {
+      return PagedTransactionsDto.fromUnknown(data);
+    }
+
+    // Fallback in case backend returns unwrapped page fields at root level.
+    return PagedTransactionsDto.fromUnknown(payload);
+  }
 }

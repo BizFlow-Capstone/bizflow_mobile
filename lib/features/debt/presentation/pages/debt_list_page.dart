@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,7 +14,9 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/services/permission_service.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../subscription/data/subscription_repository.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/debtor_entity.dart';
@@ -33,7 +37,10 @@ class DebtListPage extends StatefulWidget {
 class _DebtListPageState extends State<DebtListPage> {
   final Set<int> _expandedCards = {};
   final TextEditingController _searchController = TextEditingController();
+  final ActionGuard _debtorActionGuard = ActionGuard();
   int? _selectedLocationId;
+  Completer<void>? _debtorActionCompleter;
+  late final Future<bool> _canManageDebtFuture;
 
   @override
   void initState() {
@@ -42,6 +49,12 @@ class _DebtListPageState extends State<DebtListPage> {
     if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
       context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
     }
+    _canManageDebtFuture = context
+        .read<SubscriptionRepository>()
+        .canUseFeatureCode(
+          featureCode: SubscriptionFeatureCodes.debtManagement,
+          ownerProfileId: context.read<BusinessContext>().currentOwnerProfileId,
+        );
     _loadDebtors();
   }
 
@@ -59,8 +72,26 @@ class _DebtListPageState extends State<DebtListPage> {
 
   @override
   void dispose() {
+    _completeDebtorAction();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _completeDebtorAction() {
+    final completer = _debtorActionCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+    _debtorActionCompleter = null;
+  }
+
+  Future<void> _runDebtorAction(VoidCallback action) async {
+    await _debtorActionGuard.run(() async {
+      final completer = Completer<void>();
+      _debtorActionCompleter = completer;
+      action();
+      await completer.future;
+    });
   }
 
   void _loadDebtors({
@@ -243,287 +274,372 @@ class _DebtListPageState extends State<DebtListPage> {
     final canCreateDebtor = PermissionService.canCreateDebtor(isOwner);
     final canDeleteDebtor = PermissionService.canDeleteDebtor(isOwner);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.textPrimary,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        elevation: 0,
-        title: Text(
-          isVietnamese
-              ? l10n.translate('debt.title_vi')
-              : l10n.translate('debt.title'),
-          style: AppTextStyles.titleLarge.copyWith(fontWeight: FontWeight.bold),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-          color: Colors.black,
-        ),
-        actions: [
-          if (canCreateDebtor)
-            IconButton(
-              onPressed: () => _showDebtorForm(),
-              icon: const Icon(Icons.person_add_alt_1_outlined),
+    return FutureBuilder<bool>(
+      future: _canManageDebtFuture,
+      builder: (context, featureSnapshot) {
+        final canManageDebt = featureSnapshot.data ?? true;
+        final limitWarning = l10n.translate('subscription.limit_warning');
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            backgroundColor: AppColors.white,
+            foregroundColor: AppColors.textPrimary,
+            systemOverlayStyle: SystemUiOverlayStyle.dark,
+            elevation: 0,
+            title: Text(
+              isVietnamese
+                  ? l10n.translate('debt.title_vi')
+                  : l10n.translate('debt.title'),
+              style: AppTextStyles.titleLarge.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
             ),
-        ],
-      ),
-      body: SafeArea(
-        child: BlocConsumer<DebtorBloc, DebtorState>(
-          listener: (context, state) {
-            if (state.lastMessageCode == 'DEBTOR_DELETED') {
-              AppSnackBar.show(
-                context,
-                message: l10n.translate('debt.delete_success'),
-                type: AppSnackBarType.success,
-              );
-            }
-            if (state.lastMessageCode == 'DEBTOR_STATUS_ACTIVATED' ||
-                state.lastMessageCode == 'DEBTOR_STATUS_DEACTIVATED') {
-              AppSnackBar.show(
-                context,
-                message: l10n.translate('debt.status_updated'),
-                type: AppSnackBarType.success,
-              );
-            }
-            if (state.lastMessageCode == 'DEBTOR_CREATED') {
-              AppSnackBar.show(
-                context,
-                message: l10n.translate('debt.create_success'),
-                type: AppSnackBarType.success,
-              );
-            }
-            if (state.lastMessageCode == 'DEBTOR_UPDATED') {
-              AppSnackBar.show(
-                context,
-                message: l10n.translate('debt.update_success'),
-                type: AppSnackBarType.success,
-              );
-            }
-            if (state.lastMessageCode == 'DEBT_ADJUSTMENT_RECORDED') {
-              AppSnackBar.show(
-                context,
-                message: l10n.translate('debt.adjust_success'),
-                type: AppSnackBarType.success,
-              );
-            }
-            if (state.status == DebtorStatus.failure &&
-                state.errorMessage != null &&
-                state.errorMessage!.isNotEmpty) {
-              AppSnackBar.show(
-                context,
-                message: state.errorMessage!,
-                type: AppSnackBarType.error,
-              );
-            }
-          },
-          builder: (context, state) {
-            final customers = state.debtors;
-            final totalDebt = customers.fold<double>(
-              0,
-              (sum, c) => sum + c.currentBalance,
-            );
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.pop(context),
+              color: Colors.black,
+            ),
+            actions: [
+              if (canCreateDebtor)
+                IconButton(
+                  onPressed: canManageDebt ? () => _showDebtorForm() : null,
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
+                ),
+            ],
+          ),
+          body: SafeArea(
+            child: BlocConsumer<DebtorBloc, DebtorState>(
+              listener: (context, state) {
+                if (_debtorActionCompleter != null && !state.isSubmitting) {
+                  _completeDebtorAction();
+                }
+                if (state.lastMessageCode == 'DEBTOR_DELETED') {
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('debt.delete_success'),
+                    type: AppSnackBarType.success,
+                  );
+                }
+                if (state.lastMessageCode == 'DEBTOR_STATUS_ACTIVATED' ||
+                    state.lastMessageCode == 'DEBTOR_STATUS_DEACTIVATED') {
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('debt.status_updated'),
+                    type: AppSnackBarType.success,
+                  );
+                }
+                if (state.lastMessageCode == 'DEBTOR_CREATED') {
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('debt.create_success'),
+                    type: AppSnackBarType.success,
+                  );
+                }
+                if (state.lastMessageCode == 'DEBTOR_UPDATED') {
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('debt.update_success'),
+                    type: AppSnackBarType.success,
+                  );
+                }
+                if (state.lastMessageCode == 'DEBT_ADJUSTMENT_RECORDED') {
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('debt.adjust_success'),
+                    type: AppSnackBarType.success,
+                  );
+                }
+                if (state.status == DebtorStatus.failure &&
+                    state.errorMessage != null &&
+                    state.errorMessage!.isNotEmpty) {
+                  AppSnackBar.show(
+                    context,
+                    message: state.errorMessage!,
+                    type: AppSnackBarType.error,
+                  );
+                }
+              },
+              builder: (context, state) {
+                final customers = state.debtors;
+                final totalDebt = customers.fold<double>(
+                  0,
+                  (sum, c) => sum + c.currentBalance,
+                );
 
-            return Column(
-              children: [
-                // ---- Search + Filter button row ----
-                BlocBuilder<LocationBloc, LocationState>(
-                  builder: (context, locationState) {
-                    final locations =
-                        isOwner && locationState is LocationsLoaded
-                        ? locationState.locations
-                              .where((l) => l.isActive)
-                              .toList()
-                        : <dynamic>[];
+                return Column(
+                  children: [
+                    // ---- Search + Filter button row ----
+                    BlocBuilder<LocationBloc, LocationState>(
+                      builder: (context, locationState) {
+                        final locations =
+                            isOwner && locationState is LocationsLoaded
+                            ? locationState.locations
+                                  .where((l) => l.isActive)
+                                  .toList()
+                            : <dynamic>[];
 
-                    // Count active filters for badge
-                    final activeFilterCount =
-                        (state.isActive != null ? 1 : 0) +
-                        (_selectedLocationId != null ? 1 : 0);
+                        // Count active filters for badge
+                        final activeFilterCount =
+                            (state.isActive != null ? 1 : 0) +
+                            (_selectedLocationId != null ? 1 : 0);
 
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.sm,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _searchController,
-                              textInputAction: TextInputAction.search,
-                              onSubmitted: (value) =>
-                                  _loadDebtors(search: value),
-                              decoration: InputDecoration(
-                                prefixIcon: const Icon(Icons.search),
-                                hintText: l10n.translate('debt.search_hint'),
-                                suffixIcon: _searchController.text.isNotEmpty
-                                    ? IconButton(
-                                        onPressed: () {
-                                          _searchController.clear();
-                                          _loadDebtors();
-                                          setState(() {});
-                                        },
-                                        icon: const Icon(Icons.close),
-                                      )
-                                    : null,
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.md,
+                            AppSpacing.md,
+                            AppSpacing.md,
+                            AppSpacing.sm,
                           ),
-                          const SizedBox(width: AppSpacing.sm),
-                          // Filter button with badge
-                          Stack(
-                            clipBehavior: Clip.none,
+                          child: Row(
                             children: [
-                              IconButton.outlined(
-                                onPressed: () =>
-                                    _showFilterSheet(state, locations),
-                                icon: const Icon(Icons.tune_rounded),
-                                style: IconButton.styleFrom(
-                                  foregroundColor: activeFilterCount > 0
-                                      ? Theme.of(context).colorScheme.primary
-                                      : null,
-                                  side: activeFilterCount > 0
-                                      ? BorderSide(
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  textInputAction: TextInputAction.search,
+                                  onSubmitted: (value) =>
+                                      _loadDebtors(search: value),
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.search),
+                                    hintText: l10n.translate(
+                                      'debt.search_hint',
+                                    ),
+                                    suffixIcon:
+                                        _searchController.text.isNotEmpty
+                                        ? IconButton(
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              _loadDebtors();
+                                              setState(() {});
+                                            },
+                                            icon: const Icon(Icons.close),
+                                          )
+                                        : null,
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              // Filter button with badge
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  IconButton.outlined(
+                                    onPressed: () =>
+                                        _showFilterSheet(state, locations),
+                                    icon: const Icon(Icons.tune_rounded),
+                                    style: IconButton.styleFrom(
+                                      foregroundColor: activeFilterCount > 0
+                                          ? Theme.of(
+                                              context,
+                                            ).colorScheme.primary
+                                          : null,
+                                      side: activeFilterCount > 0
+                                          ? BorderSide(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              width: 1.5,
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                  if (activeFilterCount > 0)
+                                    Positioned(
+                                      right: -2,
+                                      top: -2,
+                                      child: Container(
+                                        width: 18,
+                                        height: 18,
+                                        decoration: BoxDecoration(
                                           color: Theme.of(
                                             context,
                                           ).colorScheme.primary,
-                                          width: 1.5,
-                                        )
-                                      : null,
-                                ),
-                              ),
-                              if (activeFilterCount > 0)
-                                Positioned(
-                                  right: -2,
-                                  top: -2,
-                                  child: Container(
-                                    width: 18,
-                                    height: 18,
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        '$activeFilterCount',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            '$activeFilterCount',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ),
+                                ],
+                              ),
                             ],
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildSummaryCard(
-                          title: l10n.translate('debt.total_debt'),
-                          value: CurrencyFormatter.formatVND(totalDebt),
-                          bgColor: AppColors.danger,
+                        );
+                      },
+                    ),
+                    if (!canManageDebt)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          0,
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                        ),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.sm,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
+                            border: Border.all(
+                              color: AppColors.warning.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Text(
+                            limitWarning,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: _buildSummaryCard(
-                          title: l10n.translate('debt.customer_count'),
-                          value:
-                              '${customers.length} ${l10n.translate('debt.customers')}',
-                          bgColor: const Color(0xFF2C2C2C),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (state.status == DebtorStatus.loading && customers.isEmpty)
-                  const Expanded(
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (customers.isEmpty)
-                  Expanded(
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Row(
                         children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: 64,
-                            color: AppColors.textHint,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            l10n.translate('debt.no_debt'),
-                            style: AppTextStyles.titleMedium.copyWith(
-                              color: AppColors.textSecondary,
+                          Expanded(
+                            child: _buildSummaryCard(
+                              title: l10n.translate('debt.total_debt'),
+                              value: CurrencyFormatter.formatVND(totalDebt),
+                              bgColor: AppColors.danger,
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            l10n.translate('debt.no_debt_sub'),
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.textHint,
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: _buildSummaryCard(
+                              title: l10n.translate('debt.customer_count'),
+                              value:
+                                  '${customers.length} ${l10n.translate('debt.customers')}',
+                              bgColor: const Color(0xFF2C2C2C),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  )
-                else
-                  Expanded(
-                    child: RefreshIndicator(
-                      onRefresh: () async => _loadDebtors(
-                        search: _searchController.text,
-                        isActive: state.isActive,
-                      ),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(
-                          left: AppSpacing.md,
-                          right: AppSpacing.md,
-                          bottom: 40,
+                    if (state.status == DebtorStatus.loading &&
+                        customers.isEmpty)
+                      const Expanded(
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (customers.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.people_outline,
+                                size: 64,
+                                color: AppColors.textHint,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                l10n.translate('debt.no_debt'),
+                                style: AppTextStyles.titleMedium.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              Text(
+                                l10n.translate('debt.no_debt_sub'),
+                                style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.textHint,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        itemCount: customers.length,
-                        itemBuilder: (context, index) {
-                          return _buildCustomerCard(
-                            context,
-                            customers[index],
-                            index,
-                            l10n,
-                            canDeleteDebtor,
-                          );
-                        },
+                      )
+                    else
+                      Expanded(
+                        child: RefreshIndicator(
+                          onRefresh: () async => _loadDebtors(
+                            search: _searchController.text,
+                            isActive: state.isActive,
+                          ),
+                          child: ListView.builder(
+                            padding: const EdgeInsets.only(
+                              left: AppSpacing.md,
+                              right: AppSpacing.md,
+                              bottom: 40,
+                            ),
+                            itemCount: customers.length,
+                            itemBuilder: (context, index) {
+                              return _buildCustomerCard(
+                                context,
+                                customers[index],
+                                index,
+                                l10n,
+                                canManageDebt,
+                                canDeleteDebtor,
+                              );
+                            },
+                          ),
+                        ),
                       ),
+                  ],
+                );
+              },
+            ),
+          ),
+          floatingActionButton: canCreateDebtor
+              ? Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (!canManageDebt)
+                      Positioned(
+                        right: 0,
+                        bottom: 72,
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.xs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusSm,
+                            ),
+                            border: Border.all(
+                              color: AppColors.warning.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Text(
+                            limitWarning,
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    FloatingActionButton(
+                      onPressed: canManageDebt ? () => _showDebtorForm() : null,
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      child: const Icon(Icons.add),
                     ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-      floatingActionButton: canCreateDebtor
-          ? FloatingActionButton(
-              onPressed: () => _showDebtorForm(),
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              child: const Icon(Icons.add),
-            )
-          : null,
+                  ],
+                )
+              : null,
+        );
+      },
     );
   }
 
@@ -565,6 +681,7 @@ class _DebtListPageState extends State<DebtListPage> {
     DebtorEntity customer,
     int index,
     AppLocalizations l10n,
+    bool canManageDebt,
     bool canDeleteDebtor,
   ) {
     final isExpanded = _expandedCards.contains(index);
@@ -724,7 +841,9 @@ class _DebtListPageState extends State<DebtListPage> {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () => _showDebtAdjustmentDialog(customer),
+                          onPressed: canManageDebt
+                              ? () => _showDebtAdjustmentDialog(customer)
+                              : null,
                           icon: const Icon(Icons.swap_vert_circle_outlined),
                           label: Text(l10n.translate('debt.adjust_debt')),
                         ),
@@ -741,8 +860,11 @@ class _DebtListPageState extends State<DebtListPage> {
                               children: [
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: () =>
-                                        _showDebtorForm(existing: customer),
+                                    onPressed: canManageDebt
+                                        ? () => _showDebtorForm(
+                                            existing: customer,
+                                          )
+                                        : null,
                                     icon: const Icon(Icons.edit_outlined),
                                     label: Text(l10n.translate('common.edit')),
                                   ),
@@ -750,14 +872,18 @@ class _DebtListPageState extends State<DebtListPage> {
                                 const SizedBox(width: AppSpacing.sm),
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      context.read<DebtorBloc>().add(
-                                        ToggleDebtorStatusRequested(
-                                          debtorId: customer.debtorId,
-                                          isActive: !customer.isActive,
-                                        ),
-                                      );
-                                    },
+                                    onPressed: canManageDebt
+                                        ? () {
+                                            _runDebtorAction(() {
+                                              context.read<DebtorBloc>().add(
+                                                ToggleDebtorStatusRequested(
+                                                  debtorId: customer.debtorId,
+                                                  isActive: !customer.isActive,
+                                                ),
+                                              );
+                                            });
+                                          }
+                                        : null,
                                     icon: Icon(
                                       customer.isActive
                                           ? Icons.visibility_off_outlined
@@ -777,7 +903,9 @@ class _DebtListPageState extends State<DebtListPage> {
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  onPressed: () => _confirmDelete(customer),
+                                  onPressed: (canManageDebt && canDeleteDebtor)
+                                      ? () => _confirmDelete(customer)
+                                      : null,
                                   icon: const Icon(Icons.delete_outline),
                                   label: Text(l10n.translate('common.delete')),
                                   style: ElevatedButton.styleFrom(
@@ -795,8 +923,9 @@ class _DebtListPageState extends State<DebtListPage> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () =>
-                                  _showDebtorForm(existing: customer),
+                              onPressed: canManageDebt
+                                  ? () => _showDebtorForm(existing: customer)
+                                  : null,
                               icon: const Icon(Icons.edit_outlined),
                               label: Text(l10n.translate('common.edit')),
                             ),
@@ -804,14 +933,18 @@ class _DebtListPageState extends State<DebtListPage> {
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: () {
-                                context.read<DebtorBloc>().add(
-                                  ToggleDebtorStatusRequested(
-                                    debtorId: customer.debtorId,
-                                    isActive: !customer.isActive,
-                                  ),
-                                );
-                              },
+                              onPressed: canManageDebt
+                                  ? () {
+                                      _runDebtorAction(() {
+                                        context.read<DebtorBloc>().add(
+                                          ToggleDebtorStatusRequested(
+                                            debtorId: customer.debtorId,
+                                            isActive: !customer.isActive,
+                                          ),
+                                        );
+                                      });
+                                    }
+                                  : null,
                               icon: Icon(
                                 customer.isActive
                                     ? Icons.visibility_off_outlined
@@ -828,7 +961,9 @@ class _DebtListPageState extends State<DebtListPage> {
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: () => _confirmDelete(customer),
+                                onPressed: (canManageDebt && canDeleteDebtor)
+                                    ? () => _confirmDelete(customer)
+                                    : null,
                                 icon: const Icon(Icons.delete_outline),
                                 label: Text(l10n.translate('common.delete')),
                                 style: ElevatedButton.styleFrom(
@@ -909,14 +1044,16 @@ class _DebtListPageState extends State<DebtListPage> {
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
-      featureCode: SubscriptionFeatureCodes.debtorManagement,
+      featureCode: SubscriptionFeatureCodes.debtManagement,
     );
     if (!allowed) return;
 
     try {
-      context.read<DebtorBloc>().add(
-        DeleteDebtorRequested(debtorId: customer.debtorId, force: false),
-      );
+      await _runDebtorAction(() {
+        context.read<DebtorBloc>().add(
+          DeleteDebtorRequested(debtorId: customer.debtorId, force: false),
+        );
+      });
     } catch (_) {
       if (!mounted) return;
     }
@@ -959,9 +1096,11 @@ class _DebtListPageState extends State<DebtListPage> {
     );
 
     if (forceDelete == true && mounted) {
-      context.read<DebtorBloc>().add(
-        DeleteDebtorRequested(debtorId: customer.debtorId, force: true),
-      );
+      await _runDebtorAction(() {
+        context.read<DebtorBloc>().add(
+          DeleteDebtorRequested(debtorId: customer.debtorId, force: true),
+        );
+      });
     }
   }
 
@@ -1075,7 +1214,7 @@ class _DebtListPageState extends State<DebtListPage> {
     if (existing == null) {
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
-        featureCode: SubscriptionFeatureCodes.debtorManagement,
+        featureCode: SubscriptionFeatureCodes.debtManagement,
       );
       if (!allowed) return;
 
@@ -1090,45 +1229,49 @@ class _DebtListPageState extends State<DebtListPage> {
         );
         return;
       }
-      context.read<DebtorBloc>().add(
-        CreateDebtorRequested(
-          businessLocationId: locationId,
-          name: name,
-          phone: phoneController.text.trim().isEmpty
-              ? null
-              : phoneController.text.trim(),
-          address: addressController.text.trim().isEmpty
-              ? null
-              : addressController.text.trim(),
-          notes: notesController.text.trim().isEmpty
-              ? null
-              : notesController.text.trim(),
-          creditLimit: creditLimit,
-        ),
-      );
+      await _runDebtorAction(() {
+        context.read<DebtorBloc>().add(
+          CreateDebtorRequested(
+            businessLocationId: locationId,
+            name: name,
+            phone: phoneController.text.trim().isEmpty
+                ? null
+                : phoneController.text.trim(),
+            address: addressController.text.trim().isEmpty
+                ? null
+                : addressController.text.trim(),
+            notes: notesController.text.trim().isEmpty
+                ? null
+                : notesController.text.trim(),
+            creditLimit: creditLimit,
+          ),
+        );
+      });
     } else {
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
-        featureCode: SubscriptionFeatureCodes.debtorManagement,
+        featureCode: SubscriptionFeatureCodes.debtManagement,
       );
       if (!allowed) return;
 
-      context.read<DebtorBloc>().add(
-        UpdateDebtorRequested(
-          debtorId: existing.debtorId,
-          name: name,
-          phone: phoneController.text.trim().isEmpty
-              ? null
-              : phoneController.text.trim(),
-          address: addressController.text.trim().isEmpty
-              ? null
-              : addressController.text.trim(),
-          notes: notesController.text.trim().isEmpty
-              ? null
-              : notesController.text.trim(),
-          creditLimit: creditLimit,
-        ),
-      );
+      await _runDebtorAction(() {
+        context.read<DebtorBloc>().add(
+          UpdateDebtorRequested(
+            debtorId: existing.debtorId,
+            name: name,
+            phone: phoneController.text.trim().isEmpty
+                ? null
+                : phoneController.text.trim(),
+            address: addressController.text.trim().isEmpty
+                ? null
+                : addressController.text.trim(),
+            notes: notesController.text.trim().isEmpty
+                ? null
+                : notesController.text.trim(),
+            creditLimit: creditLimit,
+          ),
+        );
+      });
     }
   }
 
@@ -1256,7 +1399,7 @@ class _DebtListPageState extends State<DebtListPage> {
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
-      featureCode: SubscriptionFeatureCodes.debtorManagement,
+      featureCode: SubscriptionFeatureCodes.debtManagement,
     );
     if (!allowed) return;
 
@@ -1291,15 +1434,17 @@ class _DebtListPageState extends State<DebtListPage> {
       if (confirmExceed != true || !mounted) return;
     }
 
-    context.read<DebtorBloc>().add(
-      RecordDebtAdjustmentRequested(
-        debtorId: customer.debtorId,
-        amount: signedAmount,
-        paymentMethod: paymentMethod,
-        notes: noteController.text.trim().isEmpty
-            ? null
-            : noteController.text.trim(),
-      ),
-    );
+    await _runDebtorAction(() {
+      context.read<DebtorBloc>().add(
+        RecordDebtAdjustmentRequested(
+          debtorId: customer.debtorId,
+          amount: signedAmount,
+          paymentMethod: paymentMethod,
+          notes: noteController.text.trim().isEmpty
+              ? null
+              : noteController.text.trim(),
+        ),
+      );
+    });
   }
 }

@@ -15,9 +15,11 @@ abstract class InvoiceTemplateRepository {
 class InvoiceTemplateRepositoryMock implements InvoiceTemplateRepository {
   InvoiceTemplateRepositoryMock({
     AppDatabase? database,
-  }) : _database = database ?? AppDatabase();
+  }) : _databaseOverride = database;
 
-  final AppDatabase _database;
+  final AppDatabase? _databaseOverride;
+
+  AppDatabase get _database => _databaseOverride ?? AppDatabase();
 
   static const InvoiceTemplateEntity _defaultTemplate = InvoiceTemplateEntity(
     id: 'tpl_001',

@@ -19,6 +19,9 @@ class AccountingBooksReportsTab extends StatelessWidget {
   final ValueChanged<DateTime> onToDateChanged;
   final ValueChanged<String> onReportFormatChanged;
   final VoidCallback onGenerateReport;
+  final bool canExportBooks;
+  final bool canGenerateReport;
+  final String? limitWarningText;
 
   const AccountingBooksReportsTab({
     super.key,
@@ -33,6 +36,9 @@ class AccountingBooksReportsTab extends StatelessWidget {
     required this.onToDateChanged,
     required this.onReportFormatChanged,
     required this.onGenerateReport,
+    required this.canExportBooks,
+    required this.canGenerateReport,
+    this.limitWarningText,
   });
 
   @override
@@ -59,6 +65,10 @@ class AccountingBooksReportsTab extends StatelessWidget {
             ],
           ),
         ),
+        if (!canExportBooks && limitWarningText != null) ...[
+          _buildLimitWarning(limitWarningText!),
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (books.isEmpty)
           Center(
             child: Padding(
@@ -91,6 +101,10 @@ class AccountingBooksReportsTab extends StatelessWidget {
           Icons.assessment_outlined,
         ),
         const SizedBox(height: AppSpacing.md),
+        if (!canGenerateReport && limitWarningText != null) ...[
+          _buildLimitWarning(limitWarningText!),
+          const SizedBox(height: AppSpacing.md),
+        ],
         _buildReportGenerator(context, l10n),
         const SizedBox(height: 100), // Padding for FAB
       ],
@@ -104,12 +118,45 @@ class AccountingBooksReportsTab extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Text(
           title,
-          style: AppTextStyles.titleSmall.copyWith(
+          style: AppTextStyles.titleMedium.copyWith(
             fontWeight: FontWeight.bold,
-            color: AppColors.textSecondary,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildLimitWarning(String warningText) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.workspace_premium_outlined,
+            size: 18,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              warningText,
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -136,21 +183,28 @@ class AccountingBooksReportsTab extends StatelessWidget {
             color: AppColors.secondary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
           ),
-          child: const Icon(Icons.description_outlined, color: AppColors.secondary),
+          child: const Icon(
+            Icons.description_outlined,
+            color: AppColors.secondary,
+          ),
         ),
         title: Text(
           '${book.code} - ${book.name}',
-          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+          style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w700),
         ),
         subtitle: Text(
           book.group,
-          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+          style: AppTextStyles.labelMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
         ),
         trailing: ElevatedButton(
-          onPressed: () => onExportBook(book),
+          onPressed: canExportBooks ? () => onExportBook(book) : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.secondary.withValues(alpha: 0.1),
             foregroundColor: AppColors.secondary,
+            disabledBackgroundColor: AppColors.divider,
+            disabledForegroundColor: AppColors.textSecondary,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
             minimumSize: const Size(0, 32),
@@ -160,7 +214,9 @@ class AccountingBooksReportsTab extends StatelessWidget {
           ),
           child: Text(
             l10n.translate('accounting.export'),
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            style: AppTextStyles.labelMedium.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
@@ -195,12 +251,19 @@ class AccountingBooksReportsTab extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
               ),
               child: ListTile(
-                dense: true,
                 title: Text(
                   '${item.taxType} • ${CurrencyFormatter.formatVND(item.amount)}',
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                subtitle: Text(item.reference),
+                subtitle: Text(
+                  item.reference,
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
                 trailing: IconButton(
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   onPressed: () => onEditTaxPayment(item),
@@ -271,12 +334,14 @@ class AccountingBooksReportsTab extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: onGenerateReport,
+              onPressed: canGenerateReport ? onGenerateReport : null,
               icon: const Icon(Icons.file_download_outlined, size: 18),
               label: Text(l10n.translate('accounting.generate_report')),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.white,
+                disabledBackgroundColor: AppColors.divider,
+                disabledForegroundColor: AppColors.textSecondary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
                 ),
@@ -310,7 +375,10 @@ class AccountingBooksReportsTab extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: AppTextStyles.labelMedium.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 4),
           Container(
@@ -328,7 +396,10 @@ class AccountingBooksReportsTab extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   '${date.day}/${date.month}/${date.year}',
-                  style: const TextStyle(fontSize: 13),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -338,4 +409,3 @@ class AccountingBooksReportsTab extends StatelessWidget {
     );
   }
 }
-

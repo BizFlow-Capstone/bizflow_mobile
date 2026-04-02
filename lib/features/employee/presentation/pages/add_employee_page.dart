@@ -46,7 +46,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
-      featureCode: SubscriptionFeatureCodes.employeeManagement,
+      featureCode: SubscriptionFeatureCodes.employees,
     );
     if (!allowed) return;
 

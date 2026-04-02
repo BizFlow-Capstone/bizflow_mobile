@@ -20,6 +20,22 @@ class SyncStatusController extends ChangeNotifier {
   int _activeRequests = 0;
   SyncStatusState _state = const SyncStatusState(isSyncing: false);
 
+  /// Callback registered by the current screen to trigger a full data refresh.
+  VoidCallback? _manualRefreshCallback;
+
+  /// Whether a manual refresh callback is currently registered.
+  bool get hasManualRefreshCallback => _manualRefreshCallback != null;
+
+  /// Register a callback that will be called when the user taps the refresh button.
+  void setManualRefreshCallback(VoidCallback? callback) {
+    _manualRefreshCallback = callback;
+  }
+
+  /// Called by the refresh button in [AppSyncStatusText] to trigger a reload.
+  void triggerManualRefresh() {
+    _manualRefreshCallback?.call();
+  }
+
   SyncStatusState get state => _state;
 
   void startSync() {

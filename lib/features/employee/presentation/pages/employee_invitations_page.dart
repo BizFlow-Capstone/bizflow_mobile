@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/services/notification_realtime_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -58,9 +59,7 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
   Future<void> _acceptInvitation(EmployeeInvitationDto invitation) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await context.read<EmployeeRepository>().acceptInvitation(
-        invitation,
-      );
+      await context.read<EmployeeRepository>().acceptInvitation(invitation);
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text(context.l10n.tr('invitation.accept_success'))),
@@ -70,7 +69,7 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(ApiErrorMessageParser.parse(e)),
           backgroundColor: AppColors.danger,
         ),
       );
@@ -80,9 +79,7 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
   Future<void> _rejectInvitation(EmployeeInvitationDto invitation) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await context.read<EmployeeRepository>().rejectInvitation(
-        invitation,
-      );
+      await context.read<EmployeeRepository>().rejectInvitation(invitation);
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text(context.l10n.tr('invitation.reject_success'))),
@@ -92,7 +89,7 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
       if (!mounted) return;
       messenger.showSnackBar(
         SnackBar(
-          content: Text(e.toString()),
+          content: Text(ApiErrorMessageParser.parse(e)),
           backgroundColor: AppColors.danger,
         ),
       );

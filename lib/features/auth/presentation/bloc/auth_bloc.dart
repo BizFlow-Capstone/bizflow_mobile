@@ -14,7 +14,6 @@ import '../../../../shared/context/user_profile_context.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/services/firebase_messaging_service.dart';
-import '../../../../core/database/app_database.dart';
 import '../../../../core/database/database_manager.dart';
 import '../../../location/data/location_repository.dart';
 import '../../data/auth_repository.dart';
@@ -153,14 +152,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken ?? '',
       );
-      await DatabaseManager().initialize();
-      await secureStorage.setNeedsSetPassword(false);
       await UserProfileContext().saveProfile(
         fullName: result.fullName,
         avatarUrl: result.avatarUrl,
         email: event.email,
         phone: result.phone ?? event.phone,
       );
+      await DatabaseManager().initialize();
+      await secureStorage.setNeedsSetPassword(false);
       AppRouter.globalAppBarState.updateProfile(
         name: result.fullName,
         avatarUrl: result.avatarUrl,
@@ -227,7 +226,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken ?? '',
       );
-      await DatabaseManager().initialize();
 
       await UserProfileContext().saveProfile(
         fullName: result.fullName,
@@ -235,6 +233,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         email: googleUser.email,
         phone: result.phone,
       );
+      await DatabaseManager().initialize();
       AppRouter.globalAppBarState.updateProfile(
         name: result.fullName,
         avatarUrl: result.avatarUrl,
@@ -765,20 +764,30 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(LogoutInProgress());
     try {
+      // Clear lightweight local context first so next login never sees stale profile/cache.
+      await BusinessContext().clear();
+      await UserProfileContext().clear();
+      await CacheManager().clearAll();
+      await secureStorage.clearNeedsSetPassword();
+      await secureStorage.clearCredentialTypes();
+      AppRouter.globalAppBarState.reset();
+
       await firebaseMessagingService.unregisterCurrentToken();
       await authRepository.logout();
       await _resetGoogleSessionForAccountPicker();
     } catch (e) {
       debugPrint('Logout error (ignored): $e');
     }
-    await BusinessContext().clear();
-    await UserProfileContext().clear();
-    await CacheManager().clearAll();
-    await DatabaseManager().clearForLogout();
-    await secureStorage.clearNeedsSetPassword();
-    await secureStorage.clearCredentialTypes();
-    AppRouter.globalAppBarState.reset();
+
+    // Notify UI first so current feature screens are disposed before DB cleanup.
     emit(LogoutSuccess());
+
+    // Run DB scope switch asynchronously to avoid blocking next auth events.
+    unawaited(
+      DatabaseManager().clearForLogout().catchError((Object e) {
+        debugPrint('Post-logout DB cleanup error (ignored): $e');
+      }),
+    );
   }
 
   Future<void> _addLinkedCredentialTypeToCache(String type) async {

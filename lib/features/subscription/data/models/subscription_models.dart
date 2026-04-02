@@ -196,3 +196,109 @@ class CheckoutSessionResponseDto {
         'transactionType': transactionType,
       };
 }
+
+/// Single payment transaction record from /api/subscriptions/transactions.
+class SubscriptionTransactionDto {
+  final String transactionId;
+  final String transactionType; // e.g. 'NEW', 'RENEWAL', 'UPGRADE'
+  final String status;          // e.g. 'PAID', 'PENDING', 'FAILED'
+  final double amount;
+  final String currency;
+  final String? planName;
+  final String? createdAt;
+  final String? paidAt;
+
+  SubscriptionTransactionDto({
+    required this.transactionId,
+    required this.transactionType,
+    required this.status,
+    required this.amount,
+    required this.currency,
+    this.planName,
+    this.createdAt,
+    this.paidAt,
+  });
+
+  factory SubscriptionTransactionDto.fromJson(Map<String, dynamic> json) {
+    final resolvedAmount =
+        (json['amount'] as num?)?.toDouble() ??
+        (json['finalAmount'] as num?)?.toDouble() ??
+        (json['planPrice'] as num?)?.toDouble() ??
+        0.0;
+
+    return SubscriptionTransactionDto(
+      transactionId: json['transactionId'] as String? ?? '',
+      transactionType: json['transactionType'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      amount: resolvedAmount,
+      currency: json['currency'] as String? ?? 'VND',
+      planName: json['planName'] as String?,
+      createdAt: json['createdAt'] as String?,
+      paidAt: json['paidAt'] as String?,
+    );
+  }
+}
+
+/// Paged response wrapper for transaction list.
+class PagedTransactionsDto {
+  final List<SubscriptionTransactionDto> items;
+  final int totalCount;
+  final int page;
+  final int pageSize;
+  final bool hasMore;
+
+  PagedTransactionsDto({
+    required this.items,
+    required this.totalCount,
+    required this.page,
+    required this.pageSize,
+    required this.hasMore,
+  });
+
+  factory PagedTransactionsDto.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'] as List<dynamic>? ?? [];
+    return PagedTransactionsDto(
+      items: rawItems
+          .map((e) =>
+              SubscriptionTransactionDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      totalCount: json['totalCount'] as int? ?? rawItems.length,
+      page: json['page'] as int? ?? 1,
+      pageSize: json['pageSize'] as int? ?? rawItems.length,
+      hasMore: json['hasMore'] as bool? ?? false,
+    );
+  }
+
+  factory PagedTransactionsDto.fromUnknown(dynamic raw) {
+    if (raw is List) {
+      final items = raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .map(SubscriptionTransactionDto.fromJson)
+          .toList();
+      return PagedTransactionsDto(
+        items: items,
+        totalCount: items.length,
+        page: 1,
+        pageSize: items.length,
+        hasMore: false,
+      );
+    }
+
+    if (raw is Map<String, dynamic>) {
+      return PagedTransactionsDto.fromJson(raw);
+    }
+
+    if (raw is Map) {
+      return PagedTransactionsDto.fromJson(Map<String, dynamic>.from(raw));
+    }
+
+    return PagedTransactionsDto(
+      items: const [],
+      totalCount: 0,
+      page: 1,
+      pageSize: 0,
+      hasMore: false,
+    );
+  }
+}

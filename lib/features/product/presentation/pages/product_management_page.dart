@@ -18,6 +18,8 @@ import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../subscription/data/subscription_repository.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../domain/entities/product_entity.dart';
 import '../widgets/product_filter_dialog.dart';
 import 'add_product_page.dart';
@@ -609,22 +611,44 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           if (!PermissionService.canCreateProduct(bCtx.isOwner)) {
             return const SizedBox.shrink();
           }
-          return ProductFabMenuWidget(
-            isOpen: _showFabMenu,
-            onToggle: _toggleFabMenu,
-            onAddProduct: _openAddProductPage,
-            onImportInventory: () {
-              _toggleFabMenu();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ImportHistoryPage(),
-                ),
-              ).then((result) {
-                if (result == true && mounted) {
-                  _loadProducts();
-                }
-              });
+          return FutureBuilder<List<bool>>(
+            future: Future.wait([
+              context.read<SubscriptionRepository>().canUseFeatureCode(
+                featureCode: SubscriptionFeatureCodes.products,
+                ownerProfileId: bCtx.currentOwnerProfileId,
+              ),
+              context.read<SubscriptionRepository>().canUseFeatureCode(
+                featureCode: SubscriptionFeatureCodes.imports,
+                ownerProfileId: bCtx.currentOwnerProfileId,
+              ),
+            ]),
+            builder: (context, snapshot) {
+              final permissions = snapshot.data ?? const [true, true];
+              final canAddProduct = permissions[0];
+              final canImportInventory = permissions[1];
+              final warning = l10n.translate('subscription.limit_warning');
+              return ProductFabMenuWidget(
+                isOpen: _showFabMenu,
+                onToggle: _toggleFabMenu,
+                onAddProduct: _openAddProductPage,
+                onImportInventory: () {
+                  _toggleFabMenu();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ImportHistoryPage(),
+                    ),
+                  ).then((result) {
+                    if (result == true && mounted) {
+                      _loadProducts();
+                    }
+                  });
+                },
+                canAddProduct: canAddProduct,
+                canImportInventory: canImportInventory,
+                addProductWarning: canAddProduct ? null : warning,
+                importWarning: canImportInventory ? null : warning,
+              );
             },
           );
         },

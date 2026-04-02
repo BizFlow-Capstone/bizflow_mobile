@@ -3,9 +3,12 @@ import '../../domain/entities/employee_entity.dart';
 import '../mappers/employee_local_mapper.dart';
 
 class EmployeeLocalDataSource {
-  EmployeeLocalDataSource({AppDatabase? database}) : _database = database ?? AppDatabase();
+  EmployeeLocalDataSource({AppDatabase? database})
+    : _databaseOverride = database;
 
-  final AppDatabase _database;
+  final AppDatabase? _databaseOverride;
+
+  AppDatabase get _database => _databaseOverride ?? AppDatabase();
 
   Future<List<EmployeeEntity>> getByBusinessId(String businessId) async {
     final rows = await _database.employeesDao.getByBusinessId(businessId);

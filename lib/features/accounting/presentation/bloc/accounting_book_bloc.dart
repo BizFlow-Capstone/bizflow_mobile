@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../data/repositories/accounting_repository.dart';
 import '../../domain/models/accounting_book.dart';
 
@@ -43,12 +44,13 @@ class AccountingBookError extends AccountingBookState {
 }
 
 // Bloc
-class AccountingBookBloc extends Bloc<AccountingBookEvent, AccountingBookState> {
+class AccountingBookBloc
+    extends Bloc<AccountingBookEvent, AccountingBookState> {
   final AccountingRepository _repository;
 
   AccountingBookBloc({required AccountingRepository repository})
-      : _repository = repository,
-        super(AccountingBookInitial()) {
+    : _repository = repository,
+      super(AccountingBookInitial()) {
     on<LoadBooksRequested>(_onLoadBooks);
     on<CreateBooksRequested>(_onCreateBooks);
   }
@@ -65,7 +67,7 @@ class AccountingBookBloc extends Bloc<AccountingBookEvent, AccountingBookState> 
       );
       emit(AccountingBookLoaded(books));
     } catch (e) {
-      emit(AccountingBookError(e.toString()));
+      emit(AccountingBookError(ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -79,17 +81,21 @@ class AccountingBookBloc extends Bloc<AccountingBookEvent, AccountingBookState> 
         locationId: event.locationId,
         body: event.body,
       );
-      emit(AccountingBookOperationSuccess(
-        response.message,
-        createdBooks: response.createdBooks,
-      ));
+      emit(
+        AccountingBookOperationSuccess(
+          response.message,
+          createdBooks: response.createdBooks,
+        ),
+      );
       // Reload books
-      add(LoadBooksRequested(
-        locationId: event.locationId,
-        periodId: event.body['periodId']?.toString(),
-      ));
+      add(
+        LoadBooksRequested(
+          locationId: event.locationId,
+          periodId: event.body['periodId']?.toString(),
+        ),
+      );
     } catch (e) {
-      emit(AccountingBookError(e.toString()));
+      emit(AccountingBookError(ApiErrorMessageParser.parse(e)));
     }
   }
 }

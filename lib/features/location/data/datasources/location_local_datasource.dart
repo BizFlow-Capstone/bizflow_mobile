@@ -3,9 +3,11 @@ import '../mappers/location_local_mapper.dart';
 import '../../domain/entities/location_entity.dart';
 
 class LocationLocalDataSource {
-  LocationLocalDataSource({AppDatabase? database}) : _database = database ?? AppDatabase();
+  LocationLocalDataSource({AppDatabase? database}) : _databaseOverride = database;
 
-  final AppDatabase _database;
+  final AppDatabase? _databaseOverride;
+
+  AppDatabase get _database => _databaseOverride ?? AppDatabase();
 
   Future<List<LocationEntity>> getByBusinessId(String? businessId) async {
     final rows = await _database.locationsDao.getByBusinessId(businessId);

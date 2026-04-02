@@ -29,6 +29,9 @@ import '../../features/subscription/presentation/pages/current_subscription_page
 import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
 import '../../features/subscription/presentation/pages/premium_payment_page.dart';
 import '../../features/subscription/presentation/pages/subscription_checkout_result_page.dart';
+import '../../features/subscription/presentation/pages/subscription_transactions_page.dart';
+import '../../features/subscription/data/subscription_repository.dart';
+import '../../features/subscription/domain/subscription_feature_codes.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notification/presentation/pages/notification_list_page.dart';
 import '../../features/notification/presentation/pages/notification_detail_page.dart';
@@ -78,6 +81,7 @@ class AppRoutes {
   static const String currentSubscription = '/current-subscription';
   static const String subscriptionPlans = '/subscription-plans';
   static const String premiumPayment = '/premium-payment';
+  static const String subscriptionTransactions = '/subscription-transactions';
   static const String paymentResultSuccess = '/payment-result-success';
   static const String paymentResultCancel = '/payment-result-cancel';
   static const String profile = '/profile';
@@ -232,6 +236,9 @@ class AppRouter {
 
       case AppRoutes.subscriptionPlans:
         return _buildRoute(settings, const SubscriptionPlansPage());
+
+      case AppRoutes.subscriptionTransactions:
+        return _buildRoute(settings, const SubscriptionTransactionsPage());
 
       case AppRoutes.premiumPayment:
         final args = settings.arguments as Map<String, dynamic>?;
@@ -580,6 +587,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                         .toList();
 
                     // Resolve selectedLocation from businessContext
+                    final selectedBusinessId = businessContext.currentBusinessId;
                     if (businessContext.currentBusinessId != null) {
                       try {
                         selectedLocation = locations.firstWhere(
@@ -588,9 +596,28 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                       } catch (_) {
                         // Safe fallback
                       }
-                    } else if (locations.isNotEmpty) {
-                      // Fallback if no context selected
-                      selectedLocation = locations.first;
+                    }
+
+                    final isSelectionValid =
+                        selectedBusinessId != null && selectedLocation != null;
+                    if (locations.isNotEmpty && !isSelectionValid) {
+                      // Keep sidebar selection and business context in sync,
+                      // including after account switch when old business id is stale.
+                      final fallbackLocation = locations.first;
+                      selectedLocation = fallbackLocation;
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        if (!context.mounted) return;
+                        if (businessContext.currentBusinessId ==
+                            fallbackLocation.id) {
+                          return;
+                        }
+                        await businessContext.switchBusinessLocation(
+                          fallbackLocation.id,
+                          fallbackLocation.name,
+                          isOwner: fallbackLocation.isOwner,
+                          ownerProfileId: fallbackLocation.ownerProfileId,
+                        );
+                      });
                     }
                   }
 
@@ -641,17 +668,57 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           // FAB - positioned at bottom-right; only visible for owners
           floatingActionButton: (widget.showAddLocationFab &&
                   context.watch<BusinessContext>().isOwner)
-              ? FloatingActionButton(
-                  backgroundColor: const Color(0xFF23C4C1),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AddEditLocationPage(),
-                      ),
+              ? FutureBuilder<bool>(
+                  future: context.read<SubscriptionRepository>().canUseFeatureCode(
+                    featureCode: SubscriptionFeatureCodes.locations,
+                    ownerProfileId: context.read<BusinessContext>().currentOwnerProfileId,
+                  ),
+                  builder: (context, snapshot) {
+                    final canCreateLocation = snapshot.data ?? true;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (!canCreateLocation)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3CD),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: const Color(0xFFFFE08A)),
+                            ),
+                            child: Text(
+                              AppLocalizations.of(context).translate('subscription.limit_warning'),
+                              style: const TextStyle(
+                                color: Color(0xFF8A6100),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        FloatingActionButton(
+                          backgroundColor: canCreateLocation
+                              ? const Color(0xFF23C4C1)
+                              : const Color(0xFFBDBDBD),
+                          onPressed: canCreateLocation
+                              ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const AddEditLocationPage(),
+                                    ),
+                                  );
+                                }
+                              : null,
+                          child: const Icon(Icons.add, color: Colors.white),
+                        ),
+                      ],
                     );
                   },
-                  child: const Icon(Icons.add, color: Colors.white),
                 )
               : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

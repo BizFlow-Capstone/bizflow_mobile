@@ -2,7 +2,8 @@
 class TemplateFieldDefinition {
   final String fieldCode; // 'stt', 'date', 'revenue', etc.
   final String fieldLabel; // Vietnamese label like 'STT', 'Ngày tháng'
-  final String fieldType; // 'auto_increment', 'text', 'date', 'decimal', 'formula'
+  final String
+  fieldType; // 'auto_increment', 'text', 'date', 'decimal', 'formula'
   final String exportColumn; // 'A', 'B', 'C', etc.
   final int sortOrder; // Order in table
   final bool isRequired; // Is required
@@ -53,16 +54,25 @@ class TemplateRegistry {
     'S2c': _createS2c(),
     'S2d': _createS2d(),
     'S2e': _createS2e(),
+    'S3a': _createS3a(),
   };
 
-  static TemplateDefinition? getTemplate(String templateCode) =>
-      templates[templateCode];
+  static TemplateDefinition? getTemplate(String templateCode) {
+    final normalized = templateCode.trim().toLowerCase();
+    for (final entry in templates.entries) {
+      if (entry.key.toLowerCase() == normalized) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
 
   // ═══ S1a — Sổ chi tiết bán hàng ═══
   static TemplateDefinition _createS1a() => TemplateDefinition(
     templateCode: 'S1a',
     templateName: 'Sổ chi tiết bán hàng',
-    description: 'Sổ chi tiết bán hàng cho Nhóm 1 (DT < 500 triệu/năm) — miễn thuế',
+    description:
+        'Sổ chi tiết bán hàng cho Nhóm 1 (DT < 500 triệu/năm) — miễn thuế',
     fields: [
       TemplateFieldDefinition(
         fieldCode: 'stt',
@@ -104,7 +114,8 @@ class TemplateRegistry {
   static TemplateDefinition _createS2a() => TemplateDefinition(
     templateCode: 'S2a',
     templateName: 'Sổ doanh thu bán hàng hóa, dịch vụ (Cách 1)',
-    description: 'Sổ doanh thu theo ngành — tính thuế GTGT + TNCN trực tiếp trên DT. Áp dụng Nhóm 2 Cách 1.',
+    description:
+        'Sổ doanh thu theo ngành — tính thuế GTGT + TNCN trực tiếp trên DT. Áp dụng Nhóm 2 Cách 1.',
     fields: [
       TemplateFieldDefinition(
         fieldCode: 'stt',
@@ -180,7 +191,8 @@ class TemplateRegistry {
   static TemplateDefinition _createS2b() => TemplateDefinition(
     templateCode: 'S2b',
     templateName: 'Sổ doanh thu bán hàng hóa, dịch vụ (Cách 2)',
-    description: 'Sổ doanh thu theo ngành — chỉ tính thuế GTGT (TNCN tính ở S2c). Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
+    description:
+        'Sổ doanh thu theo ngành — chỉ tính thuế GTGT (TNCN tính ở S2c). Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
     fields: [
       TemplateFieldDefinition(
         fieldCode: 'stt',
@@ -247,7 +259,8 @@ class TemplateRegistry {
   static TemplateDefinition _createS2c() => TemplateDefinition(
     templateCode: 'S2c',
     templateName: 'Sổ chi tiết doanh thu, chi phí',
-    description: 'Ghi doanh thu và chi phí hợp lý, tính chênh lệch = thu nhập chịu thuế TNCN. Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
+    description:
+        'Ghi doanh thu và chi phí hợp lý, tính chênh lệch = thu nhập chịu thuế TNCN. Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
     fields: [
       TemplateFieldDefinition(
         fieldCode: 'stt',
@@ -340,7 +353,8 @@ class TemplateRegistry {
   static TemplateDefinition _createS2d() => TemplateDefinition(
     templateCode: 'S2d',
     templateName: 'Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa',
-    description: 'Sổ kho XNT — nhập/xuất/tồn, bình quân gia quyền. Mỗi sản phẩm 1 trang. Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
+    description:
+        'Sổ kho XNT — nhập/xuất/tồn, bình quân gia quyền. Mỗi sản phẩm 1 trang. Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
     fields: [
       TemplateFieldDefinition(
         fieldCode: 'so_hieu',
@@ -437,7 +451,8 @@ class TemplateRegistry {
   static TemplateDefinition _createS2e() => TemplateDefinition(
     templateCode: 'S2e',
     templateName: 'Sổ chi tiết tiền',
-    description: 'Theo dõi tiền mặt + tiền gửi không kỳ hạn: thu/chi, gửi/rút, tồn quỹ. Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
+    description:
+        'Theo dõi tiền mặt + tiền gửi không kỳ hạn: thu/chi, gửi/rút, tồn quỹ. Áp dụng Nhóm 2 Cách 2, Nhóm 3-4.',
     fields: [
       TemplateFieldDefinition(
         fieldCode: 'stt',
@@ -493,6 +508,80 @@ class TemplateRegistry {
         fieldType: 'text',
         exportColumn: 'G',
         sortOrder: 7,
+        isRequired: false,
+      ),
+    ],
+  );
+
+  // ═══ S3a — Sổ tài sản cố định ═══
+  static TemplateDefinition _createS3a() => TemplateDefinition(
+    templateCode: 'S3a',
+    templateName: 'Sổ tài sản cố định',
+    description:
+        'Theo dõi tăng, giảm và giá trị còn lại của tài sản cố định theo kỳ.',
+    fields: [
+      TemplateFieldDefinition(
+        fieldCode: 'stt',
+        fieldLabel: 'STT',
+        fieldType: 'auto_increment',
+        exportColumn: 'A',
+        sortOrder: 1,
+        isRequired: true,
+      ),
+      TemplateFieldDefinition(
+        fieldCode: 'asset_name',
+        fieldLabel: 'Tên tài sản',
+        fieldType: 'text',
+        exportColumn: 'B',
+        sortOrder: 2,
+        isRequired: true,
+      ),
+      TemplateFieldDefinition(
+        fieldCode: 'voucher_no',
+        fieldLabel: 'Số chứng từ',
+        fieldType: 'text',
+        exportColumn: 'C',
+        sortOrder: 3,
+        isRequired: false,
+      ),
+      TemplateFieldDefinition(
+        fieldCode: 'recorded_date',
+        fieldLabel: 'Ngày ghi nhận',
+        fieldType: 'date',
+        exportColumn: 'D',
+        sortOrder: 4,
+        isRequired: true,
+      ),
+      TemplateFieldDefinition(
+        fieldCode: 'increase_amount',
+        fieldLabel: 'Giá trị tăng',
+        fieldType: 'decimal',
+        exportColumn: 'E',
+        sortOrder: 5,
+        isRequired: false,
+      ),
+      TemplateFieldDefinition(
+        fieldCode: 'decrease_amount',
+        fieldLabel: 'Giá trị giảm',
+        fieldType: 'decimal',
+        exportColumn: 'F',
+        sortOrder: 6,
+        isRequired: false,
+      ),
+      TemplateFieldDefinition(
+        fieldCode: 'remaining_amount',
+        fieldLabel: 'Giá trị còn lại',
+        fieldType: 'decimal',
+        exportColumn: 'G',
+        sortOrder: 7,
+        isRequired: true,
+      ),
+      TemplateFieldDefinition(
+        fieldCode: 'note',
+        fieldLabel: 'Ghi chú',
+        fieldType: 'text',
+        exportColumn: 'H',
+        sortOrder: 8,
         isRequired: false,
       ),
     ],

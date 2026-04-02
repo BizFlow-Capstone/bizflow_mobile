@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,8 +13,12 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/utils/action_guard.dart';
 
 import '../../domain/domain.dart';
+import '../../../subscription/data/subscription_repository.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../bloc/location_bloc.dart';
 import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
@@ -41,6 +47,9 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   late TextEditingController _phoneController;
   late TextEditingController _taxCodeController;
   String? _selectedManagerId;
+  final ActionGuard _submitGuard = ActionGuard();
+  Completer<void>? _submitCompleter;
+  Future<bool>? _canCreateLocationFuture;
 
   @override
   void initState() {
@@ -66,6 +75,14 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     _selectedManagerId = widget.location?.id;
 
     if (widget.location == null) {
+      _canCreateLocationFuture = context
+          .read<SubscriptionRepository>()
+          .canUseFeatureCode(
+            featureCode: SubscriptionFeatureCodes.locations,
+            ownerProfileId: context
+                .read<BusinessContext>()
+                .currentOwnerProfileId,
+          );
       _prefillTaxCodeFromRegister();
     }
 
@@ -93,6 +110,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
 
   @override
   void dispose() {
+    _completeSubmitGuard();
     _tabController.dispose();
     _nameController.dispose();
     _addressController.dispose();
@@ -104,7 +122,15 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     super.dispose();
   }
 
-  void _handleSubmit() {
+  void _completeSubmitGuard() {
+    final completer = _submitCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+    _submitCompleter = null;
+  }
+
+  Future<void> _handleSubmit() async {
     if (_nameController.text.isEmpty || _addressController.text.isEmpty) {
       final l10n = AppLocalizations.of(context);
       AppSnackBar.show(
@@ -115,38 +141,51 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
       return;
     }
 
-    if (widget.location != null) {
-      // Edit location - employee mgmt via Tab 2
-      context.read<LocationBloc>().add(
-        EditLocationRequested(
-          locationId: widget.location!.id,
-          name: _nameController.text,
-          address: _addressController.text,
-          district: _districtController.text,
-          city: _cityController.text,
-          phone: _phoneController.text,
-          taxCode: _taxCodeController.text,
-          managerId: _selectedManagerId ?? '',
-          managerName: _managerNameController.text,
-          employeeIds: widget.location!.employeeIds,
-        ),
-      );
-    } else {
-      // Add new location - no employees (assign via Tab 2 after creation)
-      context.read<LocationBloc>().add(
-        AddLocationRequested(
-          name: _nameController.text,
-          address: _addressController.text,
-          district: _districtController.text,
-          city: _cityController.text,
-          phone: _phoneController.text,
-          taxCode: _taxCodeController.text,
-          managerId: _selectedManagerId ?? '',
-          managerName: _managerNameController.text,
-          employeeIds: [],
-        ),
-      );
-    }
+    await _submitGuard.run(() async {
+      if (widget.location == null) {
+        final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+          context,
+          featureCode: SubscriptionFeatureCodes.locations,
+        );
+        if (!allowed || !mounted) return;
+      }
+
+      final completer = Completer<void>();
+      _submitCompleter = completer;
+
+      if (widget.location != null) {
+        context.read<LocationBloc>().add(
+          EditLocationRequested(
+            locationId: widget.location!.id,
+            name: _nameController.text,
+            address: _addressController.text,
+            district: _districtController.text,
+            city: _cityController.text,
+            phone: _phoneController.text,
+            taxCode: _taxCodeController.text,
+            managerId: _selectedManagerId ?? '',
+            managerName: _managerNameController.text,
+            employeeIds: widget.location!.employeeIds,
+          ),
+        );
+      } else {
+        context.read<LocationBloc>().add(
+          AddLocationRequested(
+            name: _nameController.text,
+            address: _addressController.text,
+            district: _districtController.text,
+            city: _cityController.text,
+            phone: _phoneController.text,
+            taxCode: _taxCodeController.text,
+            managerId: _selectedManagerId ?? '',
+            managerName: _managerNameController.text,
+            employeeIds: [],
+          ),
+        );
+      }
+
+      await completer.future;
+    });
   }
 
   @override
@@ -191,6 +230,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
       body: BlocListener<LocationBloc, LocationState>(
         listener: (context, state) async {
           if (state is LocationAddSuccess) {
+            _completeSubmitGuard();
             await BusinessContext().switchBusinessLocation(
               state.newLocation.id,
               state.newLocation.name,
@@ -201,13 +241,17 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
             }
             AppRouter.navigateAndClearStack(AppRoutes.home);
           } else if (state is LocationEditSuccess) {
-            final businessContext =
-                Provider.of<BusinessContext>(context, listen: false);
+            _completeSubmitGuard();
+            final businessContext = Provider.of<BusinessContext>(
+              context,
+              listen: false,
+            );
             if (businessContext.currentBusinessId == state.updatedLocation.id) {
               await businessContext.switchBusinessLocation(
                 state.updatedLocation.id,
                 state.updatedLocation.name,
-                isOwner: true, // Editing a location → must be owner to have reached this screen
+                isOwner:
+                    true, // Editing a location → must be owner to have reached this screen
               );
             }
             Navigator.pop(context);
@@ -218,6 +262,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
               type: AppSnackBarType.success,
             );
           } else if (state is LocationFailure) {
+            _completeSubmitGuard();
             AppSnackBar.show(
               context,
               message: state.message,
@@ -390,15 +435,74 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                     state is LocationAddInProgress ||
                     state is LocationEditInProgress;
 
-                return AppButton(
-                  label: isEditMode
-                      ? l10n.translate('location.update_button')
-                      : l10n.translate('location.create_button'),
-                  isFullWidth: true,
-                  isLoading: isLoading,
-                  onPressed: isLoading ? null : _handleSubmit,
-                  type: AppButtonType.secondary,
-                  size: AppButtonSize.large,
+                if (isEditMode) {
+                  return AppButton(
+                    label: l10n.translate('location.update_button'),
+                    isFullWidth: true,
+                    isLoading: isLoading,
+                    isDisabled: _submitGuard.isRunning,
+                    onPressed: (isLoading || _submitGuard.isRunning)
+                        ? null
+                        : _handleSubmit,
+                    type: AppButtonType.secondary,
+                    size: AppButtonSize.large,
+                  );
+                }
+
+                return FutureBuilder<bool>(
+                  future: _canCreateLocationFuture,
+                  builder: (context, snapshot) {
+                    final canCreateLocation = snapshot.data ?? true;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (!canCreateLocation)
+                          Container(
+                            margin: const EdgeInsets.only(
+                              bottom: AppSpacing.sm,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMd,
+                              ),
+                              border: Border.all(
+                                color: AppColors.warning.withValues(
+                                  alpha: 0.35,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              l10n.translate('subscription.limit_warning'),
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        AppButton(
+                          label: l10n.translate('location.create_button'),
+                          isFullWidth: true,
+                          isLoading: isLoading,
+                          isDisabled:
+                              !canCreateLocation || _submitGuard.isRunning,
+                          onPressed:
+                              (isLoading ||
+                                  !canCreateLocation ||
+                                  _submitGuard.isRunning)
+                              ? null
+                              : _handleSubmit,
+                          type: AppButtonType.secondary,
+                          size: AppButtonSize.large,
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             ),

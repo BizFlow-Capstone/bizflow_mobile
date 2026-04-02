@@ -222,7 +222,8 @@
     "syncing": "Syncing...",
     "updated_at": "Updated at {time}",
     "idle": "Ready to sync",
-    "failed": "Sync failed"
+    "failed": "Sync failed",
+    "refresh": "Refresh data"
   },
   "sidebar": {
     "add_location": "Add",
@@ -425,6 +426,8 @@
     "greeting": "Hello",
     "todays_orders": "Today's Orders",
     "todays_revenue": "Today's Revenue",
+    "todays_cost": "Today's Cost",
+    "todays_debt": "Today's Debt",
     "create_order": "Create Order",
     "orders": "Orders",
     "debt": "Debt",
@@ -514,7 +517,19 @@
     "renew_more": "Renew",
     "expires_soon": "Expires soon",
     "no_active_plan": "No active plan",
-    "plan_details": "Plan Details"
+    "plan_details": "Plan Details",
+    "transactions_title": "Payment History",
+    "no_transactions": "No transactions yet",
+    "limit_warning": "Feature limit reached for the current plan",
+    "tx_status_paid": "Paid",
+    "tx_status_pending": "Pending",
+    "tx_status_failed": "Failed",
+    "tx_status_cancelled": "Cancelled",
+    "tx_type_new": "New subscription",
+    "tx_type_renewal": "Renewal",
+    "tx_type_upgrade": "Upgrade",
+    "tx_type_downgrade": "Downgrade",
+    "tx_type_refund": "Refund"
   },
   "payment": {
     "appbar_title": "Premium Payment",
@@ -975,6 +990,12 @@
     "saved_success": "Saved successfully",
     "updated_success": "Updated successfully",
     "money_channel_required": "Please select a money channel",
+    "voice_fill_title": "Quick fill by voice (AI)",
+    "voice_start_record": "Start recording",
+    "voice_stop_record": "Stop recording",
+    "voice_play_back": "Playback",
+    "voice_last_result": "Recognized content",
+    "voice_no_record_found": "No recording available",
     "period_list_empty": "No accounting periods yet",
     "period_list_empty_sub": "Create your first accounting period to get started",
     "create_new_period": "Create Period",

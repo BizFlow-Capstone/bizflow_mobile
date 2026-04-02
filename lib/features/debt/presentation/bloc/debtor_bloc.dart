@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 
 import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/context/business_context.dart';
@@ -471,11 +472,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
   }
 
   String _parseErrorMessage(dynamic error) {
-    if (error is Exception) {
-      final text = error.toString();
-      return text.replaceFirst('Exception: ', '');
-    }
-    return error?.toString() ?? 'Unknown error';
+    return ApiErrorMessageParser.parse(error, fallback: 'Unknown error');
   }
 
   void _onResetDebtors(ResetDebtors event, Emitter<DebtorState> emit) {
