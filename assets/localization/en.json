@@ -25,7 +25,8 @@
     "required_field": "This field is required",
     "detail": "Detail",
     "error_occurred": "An error occurred, please try again",
-    "status": "Status"
+    "status": "Status",
+    "create": "Create"
   },
   "auth": {
     "login": "Login",

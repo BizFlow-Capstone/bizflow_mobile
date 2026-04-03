@@ -170,9 +170,25 @@ class SectionRowDto {
   factory SectionRowDto.fromJson(Map<String, dynamic> json) {
     final dataFilter = json['dataFilter'] as Map<String, dynamic>?;
     final taxMeta = json['taxMetadata'] as Map<String, dynamic>?;
+    final values = <String, dynamic>{
+      ...((json['values'] as Map<String, dynamic>?) ?? {}),
+    };
+
+    // Keep supplemental metadata in values for clients that need richer
+    // grouping/rendering (for example S2c industry breakdowns).
+    if (json['revenueBreakdown'] != null) {
+      values['revenueBreakdown'] = json['revenueBreakdown'];
+    }
+    if (json['taxBreakdown'] != null) {
+      values['taxBreakdown'] = json['taxBreakdown'];
+    }
+    if (json['explanation'] != null) {
+      values['explanation'] = json['explanation'];
+    }
+
     return SectionRowDto(
       lineType: json['lineType'] as String? ?? 'data',
-      values: (json['values'] as Map<String, dynamic>?) ?? {},
+      values: values,
       businessTypeId: dataFilter?['businessTypeId'] as String?,
       section: dataFilter?['section'] as String?,
       taxType: taxMeta?['taxType'] as String?,

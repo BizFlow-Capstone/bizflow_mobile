@@ -25,7 +25,8 @@
     "required_field": "Trường này là bắt buộc",
     "detail": "Chi tiết",
     "error_occurred": "Có lỗi xảy ra, vui lòng thử lại",
-    "status": "Trạng thái"
+    "status": "Trạng thái",
+    "create": "Tạo"
   },
   "auth": {
     "login": "Đăng nhập",

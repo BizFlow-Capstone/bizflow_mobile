@@ -113,7 +113,16 @@ class S2aExportService {
     BookSectionsResponse sectionsData,
   ) {
     if (sectionsData.sections.isEmpty) {
-      return dataRows
+      final sorted = List<Map<String, dynamic>>.from(dataRows)
+        ..sort((a, b) {
+          final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
+          final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+          if (da == null && db == null) return 0;
+          if (da == null) return 1;
+          if (db == null) return -1;
+          return da.compareTo(db);
+        });
+      return sorted
           .map((row) => _ExportRow(lineType: 'data', values: row))
           .toList();
     }
@@ -143,7 +152,15 @@ class S2aExportService {
           final matchingRows = dataRows.where((dataRow) {
             if (filter == null || filter.isEmpty) return true;
             return dataRow['businessTypeId']?.toString() == filter;
-          });
+          }).toList()
+            ..sort((a, b) {
+              final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
+              final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+              if (da == null && db == null) return 0;
+              if (da == null) return 1;
+              if (db == null) return -1;
+              return da.compareTo(db);
+            });
 
           for (final dataRow in matchingRows) {
             exportRows.add(_ExportRow(lineType: 'data', values: dataRow));
@@ -637,6 +654,13 @@ class S2aExportService {
       return double.tryParse(value.replaceAll(',', '').trim());
     }
     return double.tryParse(value.toString());
+  }
+
+  static DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    final s = val.toString().trim();
+    if (s.isEmpty) return null;
+    return DateTime.tryParse(s);
   }
 
   static String _fmtDate(dynamic value) {

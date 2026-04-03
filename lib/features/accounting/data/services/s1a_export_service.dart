@@ -73,17 +73,27 @@ class S1aExportService {
         value: periodLabel,
       );
 
-      final visibleDataRowCount = dataRows.isEmpty ? 1 : dataRows.length;
+      final sortedRows = List<Map<String, dynamic>>.from(dataRows)
+        ..sort((a, b) {
+          final da = _parseDate(_pick(a, 'date', _dateAliases));
+          final db = _parseDate(_pick(b, 'date', _dateAliases));
+          if (da == null && db == null) return 0;
+          if (da == null) return 1;
+          if (db == null) return -1;
+          return da.compareTo(db);
+        });
+
+      final visibleDataRowCount = sortedRows.isEmpty ? 1 : sortedRows.length;
       for (var i = 0; i < visibleDataRowCount; i++) {
         final targetRow = _dataStartRow + i;
         _applyDataRowStyle(sheet, rowIndex: targetRow);
 
-        if (i >= dataRows.length) {
+        if (i >= sortedRows.length) {
           _clearRow(sheet, rowIndex: targetRow, columnCount: _dataColumnCount);
           continue;
         }
 
-        final row = dataRows[i];
+        final row = sortedRows[i];
         _writeTextCell(
           sheet,
           row: targetRow,
@@ -110,7 +120,7 @@ class S1aExportService {
       _writeTextCell(sheet, row: footerRowIndex, col: 1, value: 'Tổng cộng');
 
       final totalAmount = _resolveTotalAmount(
-        dataRows: dataRows,
+        dataRows: sortedRows,
         sectionsData: sectionsData,
       );
       if (totalAmount != null) {
@@ -187,6 +197,7 @@ class S1aExportService {
 
     _writeTextCell(sheet, row: 9, col: 0, value: 'A');
     _writeTextCell(sheet, row: 9, col: 1, value: 'B');
+    _writeTextCell(sheet, row: 9, col: 2, value: '1');
 
     _applyHeaderRowStyle(sheet, rowIndex: 8);
     _applyHeaderRowStyle(sheet, rowIndex: 9);
@@ -430,6 +441,13 @@ class S1aExportService {
       if (v != null && v.toString().trim().isNotEmpty) return v;
     }
     return null;
+  }
+
+  static DateTime? _parseDate(dynamic val) {
+    if (val == null) return null;
+    final s = val.toString().trim();
+    if (s.isEmpty) return null;
+    return DateTime.tryParse(s);
   }
 
   static String _fmtDate(dynamic val) {
