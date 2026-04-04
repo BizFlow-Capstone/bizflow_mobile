@@ -5,8 +5,17 @@ import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_book.dart';
 
 /// Widget hiển thị Sổ chi tiết tiền mẫu S2e-HKD (TT152)
-/// 6 cột: STT | Số hiệu CT | Ngày tháng | Diễn giải | Thu/Gửi vào | Chi/Rút ra
-/// Sections: tiền mặt & tiền gửi, mỗi section có subtotal row
+/// Cấu trúc:
+///   I. Tiền mặt
+///      - Tiền mặt đầu kỳ
+///      - Data rows (thu/chi)
+///      - Tổng tiền thu vào, chi ra, tồn cuối kỳ
+///   II. Tiền gửi không kỳ hạn
+///      - Ngân hàng X
+///        - Tiền gửi đầu kỳ
+///        - Data rows (gửi/rút)
+///        - Tổng gửi vào, rút ra, cuối kỳ
+///      - Ngân hàng Y...
 class S2eBookWidget extends StatelessWidget {
   final BookSectionsResponse sections;
   final List<Map<String, dynamic>> dataRows;
@@ -38,7 +47,10 @@ class S2eBookWidget extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [_buildHeader(context), _buildTable(context)],
+        children: [
+          _buildHeader(context),
+          _buildTable(context),
+        ],
       ),
     );
   }
@@ -74,57 +86,105 @@ class S2eBookWidget extends StatelessWidget {
   Widget _buildTable(BuildContext context) {
     final tableRows = <DataRow>[];
 
-    for (final section in sections.sections) {
-      if (section.businessTypeName?.trim().isNotEmpty == true) {
-        final hasExplicit = section.rows.any(
-          (r) => r.lineType.toLowerCase() == 'industry_header',
-        );
-        if (!hasExplicit) {
-          tableRows.add(_buildSectionHeaderRow(
-            '${section.groupIndex}. ${section.businessTypeName}',
-          ));
+    if (sections.sections.isNotEmpty) {
+      // Process structured sections from backend
+      for (final section in sections.sections) {
+        // Section header (e.g., "Tiền mặt", "Tiền gửi không kỳ hạn")
+        if (section.businessTypeName?.trim().isNotEmpty == true) {
+          final hasExplicitHeader = section.rows.any(
+            (r) => r.lineType.toLowerCase() == 'industry_header' ||
+                r.lineType.toLowerCase() == 'section_header',
+          );
+          if (!hasExplicitHeader) {
+            tableRows.add(_buildSectionHeaderRow(
+              section.businessTypeName!,
+            ));
+          }
+        }
+
+        for (final row in section.rows) {
+          final lineType = row.lineType.trim().toLowerCase();
+          switch (lineType) {
+            case 'industry_header':
+            case 'section_header':
+              tableRows.add(_buildSectionHeaderRow(
+                row.values['dien_giai']?.toString() ?? section.businessTypeName ?? '',
+              ));
+            case 'bank_header':
+              tableRows.add(_buildBankHeaderRow(
+                row.values['dien_giai']?.toString() ?? '',
+              ));
+            case 'data_placeholder':
+              final btFilter = row.businessTypeId ?? section.businessTypeId;
+              final sFilter = row.section;
+              final matching = dataRows.where((r) {
+                if (btFilter != null && btFilter.isNotEmpty) {
+                    // Accept if businessTypeId matches OR section matches
+                    // (BE sends section=cash/bank on rows but businessTypeId=null)
+                    final btMatch = r['businessTypeId']?.toString() == btFilter;
+                    final sectionMatch = r['section']?.toString() == btFilter;
+                    if (!btMatch && !sectionMatch) return false;
+                }
+                if (sFilter != null && sFilter.isNotEmpty) {
+                  return r['section']?.toString() == sFilter;
+                }
+                return true;
+              });
+              for (final dataRow in matching) {
+                tableRows.add(_buildDataRow(
+                  SectionRowDto(lineType: 'data', values: dataRow),
+                ));
+              }
+            case 'data':
+              tableRows.add(_buildDataRow(row));
+            case 'subtotal':
+            case 'total':
+              tableRows.add(_buildSubtotalRow(row));
+            case 'tax_line':
+            case 'tax':
+              tableRows.add(_buildTaxRow(row));
+            default:
+              // Generic row - still display if it has content
+              if (_hasContent(row.values)) {
+                tableRows.add(_buildGenericRow(row));
+              }
+          }
         }
       }
 
-      for (final row in section.rows) {
-        switch (row.lineType) {
-          case 'industry_header':
-            tableRows.add(_buildSectionHeaderRow(
-              row.values['dien_giai']?.toString() ?? '',
-            ));
-          case 'data_placeholder':
-            final btFilter = row.businessTypeId ?? section.businessTypeId;
-            final sFilter = row.section;
-            final matching = dataRows.where((r) {
-              if (btFilter != null && btFilter.isNotEmpty) {
-                return r['businessTypeId']?.toString() == btFilter;
-              }
-              if (sFilter != null && sFilter.isNotEmpty) {
-                return r['section']?.toString() == sFilter;
-              }
-              return true;
-            });
-            for (final dataRow in matching) {
-              tableRows.add(_buildDataRow(
-                SectionRowDto(lineType: 'data', values: dataRow),
-              ));
-            }
-          case 'data':
-            tableRows.add(_buildDataRow(row));
-          case 'subtotal':
-          case 'total':
-            tableRows.add(_buildSubtotalRow(row));
-          case 'tax_line':
-          case 'tax':
-            tableRows.add(_buildTaxRow(row));
-          default:
-            break;
-        }
+      // Footer rows
+      for (final row in sections.footerRows) {
+        tableRows.add(_buildSubtotalRow(row));
+      }
+    } else if (dataRows.isNotEmpty) {
+      // Fallback: no sections, render raw data rows
+      for (final dataRow in dataRows) {
+        tableRows.add(_buildDataRow(
+          SectionRowDto(lineType: 'data', values: dataRow),
+        ));
       }
     }
 
-    for (final row in sections.footerRows) {
-      tableRows.add(_buildSubtotalRow(row));
+    // Empty state
+    if (tableRows.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined,
+                  size: 48, color: Colors.grey[400]),
+              const SizedBox(height: 12),
+              Text(
+                'Chưa có dữ liệu sổ chi tiết tiền',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return SingleChildScrollView(
@@ -145,9 +205,26 @@ class S2eBookWidget extends StatelessWidget {
     );
   }
 
+  // ─── Row Builders ───────────────────────────────────────────────────
+
+  /// Bold section header row (e.g., "Tiền mặt", "Tiền gửi không kỳ hạn")
   DataRow _buildSectionHeaderRow(String label) {
     return DataRow(
       color: WidgetStateProperty.all(Colors.amber[50]),
+      cells: [
+        const DataCell(SizedBox.shrink()),
+        const DataCell(SizedBox.shrink()),
+        DataCell(Text(label, style: _boldStyle())),
+        const DataCell(SizedBox.shrink()),
+        const DataCell(SizedBox.shrink()),
+      ],
+    );
+  }
+
+  /// Bold italic bank header row (e.g., "Ngân hàng...")
+  DataRow _buildBankHeaderRow(String label) {
+    return DataRow(
+      color: WidgetStateProperty.all(Colors.blue[50]),
       cells: [
         const DataCell(SizedBox.shrink()),
         const DataCell(SizedBox.shrink()),
@@ -158,6 +235,7 @@ class S2eBookWidget extends StatelessWidget {
     );
   }
 
+  /// Regular data row with all columns populated
   DataRow _buildDataRow(SectionRowDto row) {
     final v = row.values;
     return DataRow(
@@ -171,6 +249,7 @@ class S2eBookWidget extends StatelessWidget {
     );
   }
 
+  /// Bold subtotal / total row
   DataRow _buildSubtotalRow(SectionRowDto row) {
     final v = row.values;
     return DataRow(
@@ -185,6 +264,7 @@ class S2eBookWidget extends StatelessWidget {
     );
   }
 
+  /// Tax row (bold italic)
   DataRow _buildTaxRow(SectionRowDto row) {
     final v = row.values;
     final label = v['dien_giai']?.toString() ?? row.taxType ?? 'Thuế';
@@ -200,7 +280,21 @@ class S2eBookWidget extends StatelessWidget {
     );
   }
 
-  // ─── Style helpers ────────────────────────────────────────────────────────
+  /// Generic row for any unrecognized lineType that has content
+  DataRow _buildGenericRow(SectionRowDto row) {
+    final v = row.values;
+    return DataRow(
+      cells: [
+        DataCell(Text(_pick(v, _soHieuAliases), style: _normalStyle())),
+        DataCell(Text(_fmtDate(_pickDyn(v, _dateAliases)), style: _normalStyle())),
+        DataCell(Text(_pick(v, _descAliases), style: _normalStyle())),
+        DataCell(Text(_fmtAmount(_pickDyn(v, _thuVaoAliases)), style: _normalStyle())),
+        DataCell(Text(_fmtAmount(_pickDyn(v, _chiRaAliases)), style: _normalStyle())),
+      ],
+    );
+  }
+
+  // ─── Style helpers ────────────────────────────────────────────────
 
   TextStyle _headerStyle() => AppTextStyles.bodyMedium.copyWith(
         color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.bold);
@@ -218,7 +312,16 @@ class S2eBookWidget extends StatelessWidget {
         fontStyle: FontStyle.italic,
       );
 
-  // ─── Value helpers ────────────────────────────────────────────────────────
+  // ─── Value helpers ────────────────────────────────────────────────
+
+  static bool _hasContent(Map<String, dynamic> values) {
+    for (final value in values.values) {
+      if (value == null) continue;
+      final normalized = value.toString().trim();
+      if (normalized.isNotEmpty && normalized != '-') return true;
+    }
+    return false;
+  }
 
   static dynamic _pickDyn(Map<String, dynamic> v, List<String> aliases) {
     for (final key in aliases) {
@@ -246,10 +349,16 @@ class S2eBookWidget extends StatelessWidget {
 
   static String _fmtAmount(dynamic value) {
     if (value == null) return '';
-    if (value is num) return CurrencyFormatter.formatVND(value);
+    if (value is num) {
+      if (value == 0) return '';
+      return CurrencyFormatter.formatVND(value);
+    }
     if (value is String) {
       final parsed = num.tryParse(value);
-      if (parsed != null) return CurrencyFormatter.formatVND(parsed);
+      if (parsed != null) {
+        if (parsed == 0) return '';
+        return CurrencyFormatter.formatVND(parsed);
+      }
       return value;
     }
     return value.toString();

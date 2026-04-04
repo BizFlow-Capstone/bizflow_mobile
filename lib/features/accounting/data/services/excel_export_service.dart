@@ -110,6 +110,76 @@ class ExcelExportService {
     return null;
   }
 
+  static dynamic _extractS2dSection(Map<String, dynamic> row) {
+    const keys = ['section', 'Section', 'sectionId'];
+    for (final key in keys) {
+      if (row.containsKey(key) && row[key] != null) {
+        return row[key];
+      }
+    }
+    return null;
+  }
+
+  static dynamic _extractS2dBusinessTypeId(Map<String, dynamic> row) {
+    const keys = ['businessTypeId', 'BusinessTypeId', 'business_type_id'];
+    for (final key in keys) {
+      if (row.containsKey(key) && row[key] != null) {
+        return row[key];
+      }
+    }
+    return null;
+  }
+
+  static String? _extractS2dProductName(Map<String, dynamic> row) {
+    const keys = [
+      'productName',
+      'ProductName',
+      'itemName',
+      'inventoryName',
+      'ten_san_pham',
+      'ten_hang_hoa',
+      'name',
+      'businessTypeName',
+    ];
+    for (final key in keys) {
+      final value = row[key];
+      if (value == null) continue;
+      final text = value.toString().trim();
+      if (text.isNotEmpty) return text;
+    }
+    return null;
+  }
+
+  static Map<String, String> _buildS2dSectionNameMap(
+    BookSectionsResponse? sectionsData,
+  ) {
+    final map = <String, String>{};
+    if (sectionsData == null) return map;
+
+    for (final section in sectionsData.sections) {
+      final name = section.businessTypeName?.trim();
+      if (name == null || name.isEmpty) continue;
+
+      final businessTypeId = section.businessTypeId?.trim();
+      if (businessTypeId != null && businessTypeId.isNotEmpty) {
+        map[businessTypeId] = name;
+      }
+
+      for (final row in section.rows) {
+        final sectionKey = row.section?.trim();
+        if (sectionKey != null && sectionKey.isNotEmpty) {
+          map[sectionKey] = name;
+        }
+        final rowBusinessTypeId = row.businessTypeId?.trim();
+        if (rowBusinessTypeId != null && rowBusinessTypeId.isNotEmpty) {
+          map[rowBusinessTypeId] = name;
+        }
+      }
+    }
+
+    return map;
+  }
+
   /// Export [book] data to one or more Excel files.
   ///
   /// This service only dispatches to dedicated template exporters.
@@ -131,7 +201,9 @@ class ExcelExportService {
         periodLabel: headerInfo?.periodLabel ?? '',
       );
       if (file != null) return <File>[file];
-      throw Exception('Không thể xuất S1a. Vui lòng kiểm tra dữ liệu sổ và thử lại.');
+      throw Exception(
+        'Không thể xuất S1a. Vui lòng kiểm tra dữ liệu sổ và thử lại.',
+      );
     }
 
     if (_isS2aTemplate(book.templateCode) && sectionsData != null) {
@@ -150,49 +222,35 @@ class ExcelExportService {
     }
 
     if (_isS2dTemplate(book.templateCode)) {
-      if (sectionsData != null && sectionsData.sections.isNotEmpty) {
-        final files = <File>[];
-        for (final section in sectionsData.sections) {
-          final sectionRows = section.rows
-              .where((r) => r.lineType == 'data')
-              .map((r) => r.values)
-              .toList();
-          if (sectionRows.isEmpty) continue;
-
-          final suffix = section.businessTypeName?.trim().isNotEmpty == true
-              ? section.businessTypeName!.trim()
-              : 'Loai_${section.groupIndex}';
-
-          final file = await S2dExportService.export(
-            book: book,
-            dataRows: sectionRows,
-            categoryName: suffix,
-            sectionsData: sectionsData,
-            businessName: headerInfo?.businessName ?? '',
-            taxCode: headerInfo?.taxCode ?? '',
-            address: headerInfo?.address ?? '',
-            locationName: headerInfo?.locationName ?? '',
-            periodLabel: headerInfo?.periodLabel ?? '',
-          );
-          if (file != null) files.add(file);
-        }
-        return files;
-      }
+      final sectionNameMap = _buildS2dSectionNameMap(sectionsData);
 
       final grouped = <String, List<Map<String, dynamic>>>{};
       for (final row in rows) {
-        final category = _normalizeS2dCategory(_extractS2dCategory(row));
-        grouped.putIfAbsent(category, () => <Map<String, dynamic>>[]).add(row);
+        final rowSectionKey = _extractS2dSection(row)?.toString().trim();
+        final rowBusinessTypeKey = _extractS2dBusinessTypeId(
+          row,
+        )?.toString().trim();
+        final productName = _extractS2dProductName(row);
+        final key = productName?.trim().isNotEmpty == true
+            ? productName!.trim()
+            : (rowSectionKey != null ? sectionNameMap[rowSectionKey] : null) ??
+                  (rowBusinessTypeKey != null
+                      ? sectionNameMap[rowBusinessTypeKey]
+                      : null) ??
+                  (_s2dCategoryDisplay[_normalizeS2dCategory(
+                        _extractS2dCategory(row),
+                      )] ??
+                      'Khac');
+        grouped.putIfAbsent(key, () => <Map<String, dynamic>>[]).add(row);
       }
 
       final files = <File>[];
       for (final entry in grouped.entries) {
         if (entry.value.isEmpty) continue;
-        final display = _s2dCategoryDisplay[entry.key] ?? entry.key;
         final file = await S2dExportService.export(
           book: book,
           dataRows: entry.value,
-          categoryName: display,
+          categoryName: entry.key,
           sectionsData: sectionsData,
           businessName: headerInfo?.businessName ?? '',
           taxCode: headerInfo?.taxCode ?? '',
@@ -312,7 +370,9 @@ class ExcelExportService {
     }
   }
 
-  static Future<List<File>> saveExportedFilesToDownloads(List<File> files) async {
+  static Future<List<File>> saveExportedFilesToDownloads(
+    List<File> files,
+  ) async {
     if (files.isEmpty) return const <File>[];
     if (!Platform.isAndroid) return files;
 
