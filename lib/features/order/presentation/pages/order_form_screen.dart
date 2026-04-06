@@ -10,6 +10,7 @@ import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/date_formatter.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../debt/domain/entities/debtor_entity.dart';
 import '../../../debt/presentation/bloc/debtor_bloc.dart';
@@ -50,7 +51,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   final TextEditingController _customerPhoneController =
       TextEditingController();
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _documentNumberController = TextEditingController();
+  final TextEditingController _documentNumberController =
+      TextEditingController();
   DateTime? _documentDate;
   bool _isCreatingDebtorProfile = false;
 
@@ -64,7 +66,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   void initState() {
     super.initState();
     final timestampStr = DateTime.now().millisecondsSinceEpoch.toString();
-    _draftId = widget.draftId ?? 'draft_${timestampStr.substring(timestampStr.length - 6)}';
+    _draftId =
+        widget.draftId ??
+        'draft_${timestampStr.substring(timestampStr.length - 6)}';
 
     if (widget.initialOrder != null) {
       final order = widget.initialOrder!;
@@ -72,7 +76,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _customerNameController.text = order.customerName ?? '';
       _customerPhoneController.text = order.customerPhone ?? '';
       _notesController.text = order.note ?? '';
-      
+
       if (order.debtorId != null && order.debtorId! > 0) {
         _customerType = 'debtor';
         _selectedDebtor = DebtorEntity(
@@ -88,14 +92,13 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       } else {
         _customerType = 'walkin';
       }
-
     }
 
     final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
     if (locationId != null && locationId > 0) {
       context.read<DebtorBloc>().add(
-            LoadActiveDebtorsByLocationRequested(locationId: locationId),
-          );
+        LoadActiveDebtorsByLocationRequested(locationId: locationId),
+      );
     }
     _loadDraftIfNeeded();
   }
@@ -124,518 +127,553 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       0,
       (sum, item) => sum + item.discount,
     );
-    final double amountAfterDiscount =
-      (subTotal - totalDiscount).clamp(0, double.infinity).toDouble();
+    final double amountAfterDiscount = (subTotal - totalDiscount)
+        .clamp(0, double.infinity)
+        .toDouble();
     final double total = amountAfterDiscount;
 
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) async {
         if (!didPop) {
-           await _saveLocalDraft(showFeedback: false);
+          await _saveLocalDraft(showFeedback: false);
         }
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.translate('order_create.form_title')),
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () async {
-            await _saveLocalDraft(showFeedback: false);
-            if (mounted) {
-              Navigator.pop(context);
-            }
-          },
-          color: Colors.black,
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        actions: [
-          TextButton(
+        appBar: AppBar(
+          title: Text(l10n.translate('order_create.form_title')),
+          elevation: 0,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
             onPressed: () async {
-              await _saveLocalDraft(showFeedback: true);
+              await _saveLocalDraft(showFeedback: false);
               if (mounted) {
-                Navigator.popUntil(context, ModalRoute.withName('/home'));
+                Navigator.pop(context);
               }
             },
-            child: Text(
-              l10n.translate('order_create.save_draft'),
-              style: const TextStyle(color: Colors.black),
-            ),
+            color: Colors.black,
           ),
-        ],
-        bottom: const AppSyncStatusText(),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Business Location
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.store, color: Colors.blue),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.translate('order_create.business_location'),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue[800],
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await _saveLocalDraft(showFeedback: true);
+                if (mounted) {
+                  Navigator.popUntil(context, ModalRoute.withName('/home'));
+                }
+              },
+              child: Text(
+                l10n.translate('order_create.save_draft'),
+                style: const TextStyle(color: Colors.black),
+              ),
+            ),
+          ],
+          bottom: const AppSyncStatusText(),
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Business Location
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.store, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l10n.translate(
+                                  'order_create.business_location',
+                                ),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue[800],
+                                ),
                               ),
+                              Text(
+                                currentLocationName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Customer Info Section
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.grey[200]!),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.translate('order_create.customer_type'),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
-                            Text(
-                              currentLocationName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ChoiceChip(
+                                  label: Text(
+                                    l10n.translate(
+                                      'order_create.customer_walkin',
+                                    ),
+                                  ),
+                                  selected: _customerType == 'walkin',
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _customerType = 'walkin';
+                                      _selectedDebtor = null;
+                                      _customerNameController.clear();
+                                      _customerPhoneController.clear();
+                                    });
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ChoiceChip(
+                                  label: Text(
+                                    l10n.translate(
+                                      'order_create.customer_loyal',
+                                    ),
+                                  ),
+                                  selected: _customerType == 'debtor',
+                                  onSelected: (_) {
+                                    setState(() {
+                                      _customerType = 'debtor';
+                                    });
+
+                                    final locationId = int.tryParse(
+                                      BusinessContext().currentBusinessId ?? '',
+                                    );
+                                    if (locationId != null && locationId > 0) {
+                                      context.read<DebtorBloc>().add(
+                                        LoadActiveDebtorsByLocationRequested(
+                                          locationId: locationId,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          if (_customerType == 'debtor')
+                            BlocBuilder<DebtorBloc, DebtorState>(
+                              builder: (context, debtState) {
+                                final debtors =
+                                    debtState.activeDebtorsByLocation;
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(12),
+                                      onTap: () => _openDebtorPicker(debtors),
+                                      child: InputDecorator(
+                                        decoration: InputDecoration(
+                                          labelText: l10n.translate(
+                                            'debt.select_debtor',
+                                          ),
+                                          prefixIcon: const Icon(
+                                            Icons.person_search,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                _selectedDebtor == null
+                                                    ? l10n.translate(
+                                                        'debt.select_debtor',
+                                                      )
+                                                    : '${_selectedDebtor!.name} - ${_selectedDebtor!.phone}',
+                                                style: TextStyle(
+                                                  color: _selectedDebtor == null
+                                                      ? Colors.grey[600]
+                                                      : Colors.black,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const Icon(Icons.arrow_drop_down),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    if (_selectedDebtor != null) ...[
+                                      const SizedBox(height: 12),
+                                      _buildReadOnlyCustomerField(
+                                        label: l10n.translate(
+                                          'order_create.customer_name',
+                                        ),
+                                        icon: Icons.person,
+                                        value: _selectedDebtor!.name,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _buildReadOnlyCustomerField(
+                                        label: l10n.translate(
+                                          'order_create.customer_phone',
+                                        ),
+                                        icon: Icons.phone,
+                                        value: _selectedDebtor!.phone,
+                                      ),
+                                    ],
+                                  ],
+                                );
+                              },
+                            ),
+                          if (_customerType == 'walkin') ...[
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _isCreatingDebtorProfile
+                                    ? null
+                                    : _showCreateDebtProfileDialog,
+                                icon: _isCreatingDebtorProfile
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.person_add_alt_1),
+                                label: Text(
+                                  l10n.translate(
+                                    'order_create.create_debt_profile',
+                                  ),
+                                ),
                               ),
                             ),
                           ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Product Info Section
+                  Text(
+                    l10n.translate('order_create.form_title'),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (_items.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        l10n.translate('common.no_data'),
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    )
+                  else
+                    ..._items.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final p = entry.value;
+                      final lineTotal = p.price * p.quantity;
+                      final lineAfterDiscount = (lineTotal - p.discount).clamp(
+                        0,
+                        double.infinity,
+                      );
+                      final unitName = (p.unitName ?? '').trim();
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p.productName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${CurrencyFormatter.formatVND(p.price)}${unitName.isNotEmpty ? ' / $unitName' : ''} x ${p.quantity}',
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${l10n.translate('order_create.discount')}: ${CurrencyFormatter.formatVND(p.discount)}',
+                                    style: TextStyle(color: Colors.grey[700]),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: 170,
+                                    child: TextFormField(
+                                      key: ValueKey(
+                                        'discount_${p.productId}_$index',
+                                      ),
+                                      initialValue:
+                                          CurrencyFormatter.formatNumber(
+                                            p.discount,
+                                          ),
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters:
+                                          AppInputFormatters.withSqlInjectionGuard(
+                                            inputFormatters: [
+                                              CurrencyInputFormatter(),
+                                            ],
+                                          ),
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        hintText: l10n.translate(
+                                          'order_create.discount',
+                                        ),
+                                        prefixText: '₫ ',
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 12,
+                                            ),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: Colors.grey[300]!,
+                                          ),
+                                        ),
+                                      ),
+                                      onChanged: (value) {
+                                        _updateItemDiscount(
+                                          index,
+                                          value,
+                                          lineTotal,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  CurrencyFormatter.formatVND(
+                                    lineAfterDiscount,
+                                  ),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  tooltip: l10n.translate('common.delete'),
+                                  onPressed: () {
+                                    setState(() {
+                                      _items.removeAt(index);
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+
+                  OutlinedButton.icon(
+                    onPressed: _openProductPicker,
+                    icon: const Icon(Icons.add),
+                    label: Text(l10n.translate('order_create.add_product')),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Document Number
+                  TextField(
+                    controller: _documentNumberController,
+                    decoration: InputDecoration(
+                      labelText: 'Số chứng từ',
+                      hintText: 'Nhập số chứng từ (nếu có)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Document Date
+                  InkWell(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _documentDate ?? DateTime.now(),
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setState(() => _documentDate = picked);
+                      }
+                    },
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'Ngày chứng từ',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        suffixIcon: const Icon(Icons.calendar_today, size: 20),
+                      ),
+                      child: Text(
+                        _documentDate != null
+                            ? DateFormatter.formatDate(_documentDate)
+                            : 'Chọn ngày chứng từ (nếu có)',
+                        style: _documentDate != null
+                            ? null
+                            : TextStyle(color: Colors.grey[500]),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Summary Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(l10n.translate('order_create.sub_total')),
+                      Text(CurrencyFormatter.formatVND(subTotal)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(l10n.translate('order_create.discount')),
+                      Text('-${CurrencyFormatter.formatVND(totalDiscount)}'),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        l10n.translate('order_create.total'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        CurrencyFormatter.formatVND(total),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              onPressed: _items.isEmpty
+                  ? null
+                  : () {
+                      final locationId = BusinessContext().currentBusinessId;
 
-                // Customer Info Section
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(color: Colors.grey[200]!),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.translate('order_create.customer_type'),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OrderPaymentScreen(
+                            totalAmount: total,
+                            items: List.from(_items),
+                            locationId: locationId,
+                            locationName: BusinessContext().currentBusinessName,
+                            pendingOrderId:
+                                widget.pendingOrderId ??
+                                widget.initialOrder?.id,
+                            initialDebtorId: _customerType == 'debtor'
+                                ? _selectedDebtor?.debtorId
+                                : null,
+                            initialDebtorName: _customerType == 'debtor'
+                                ? _selectedDebtor?.name
+                                : null,
+                            customerName: _customerNameController.text.trim(),
+                            customerPhone: _customerPhoneController.text.trim(),
+                            note: _notesController.text.trim().isNotEmpty
+                                ? _notesController.text.trim()
+                                : null,
+                            documentDate: _documentDate,
+                            documentNumber:
+                                _documentNumberController.text.trim().isNotEmpty
+                                ? _documentNumberController.text.trim()
+                                : null,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ChoiceChip(
-                                label: Text(
-                                  l10n.translate(
-                                    'order_create.customer_walkin',
-                                  ),
-                                ),
-                                selected: _customerType == 'walkin',
-                                onSelected: (_) {
-                                  setState(() {
-                                    _customerType = 'walkin';
-                                    _selectedDebtor = null;
-                                    _customerNameController.clear();
-                                    _customerPhoneController.clear();
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: ChoiceChip(
-                                label: Text(
-                                  l10n.translate('order_create.customer_loyal'),
-                                ),
-                                selected: _customerType == 'debtor',
-                                onSelected: (_) {
-                                  setState(() {
-                                    _customerType = 'debtor';
-                                  });
-
-                                  final locationId = int.tryParse(
-                                    BusinessContext().currentBusinessId ?? '',
-                                  );
-                                  if (locationId != null && locationId > 0) {
-                                    context.read<DebtorBloc>().add(
-                                      LoadActiveDebtorsByLocationRequested(
-                                        locationId: locationId,
-                                      ),
-                                    );
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (_customerType == 'debtor')
-                          BlocBuilder<DebtorBloc, DebtorState>(
-                            builder: (context, debtState) {
-                              final debtors = debtState.activeDebtorsByLocation;
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: () => _openDebtorPicker(debtors),
-                                    child: InputDecorator(
-                                      decoration: InputDecoration(
-                                        labelText: l10n.translate(
-                                          'debt.select_debtor',
-                                        ),
-                                        prefixIcon: const Icon(
-                                          Icons.person_search,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              _selectedDebtor == null
-                                                  ? l10n.translate(
-                                                      'debt.select_debtor',
-                                                    )
-                                                  : '${_selectedDebtor!.name} - ${_selectedDebtor!.phone}',
-                                              style: TextStyle(
-                                                color: _selectedDebtor == null
-                                                    ? Colors.grey[600]
-                                                    : Colors.black,
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          const Icon(Icons.arrow_drop_down),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (_selectedDebtor != null) ...[
-                                    const SizedBox(height: 12),
-                                    _buildReadOnlyCustomerField(
-                                      label: l10n.translate(
-                                        'order_create.customer_name',
-                                      ),
-                                      icon: Icons.person,
-                                      value: _selectedDebtor!.name,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    _buildReadOnlyCustomerField(
-                                      label: l10n.translate(
-                                        'order_create.customer_phone',
-                                      ),
-                                      icon: Icons.phone,
-                                      value: _selectedDebtor!.phone,
-                                    ),
-                                  ],
-                                ],
-                              );
-                            },
-                          ),
-                        if (_customerType == 'walkin') ...[
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _isCreatingDebtorProfile
-                                  ? null
-                                  : _showCreateDebtProfileDialog,
-                              icon: _isCreatingDebtorProfile
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.person_add_alt_1),
-                              label: Text(
-                                l10n.translate(
-                                  'order_create.create_debt_profile',
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+                      );
+                    },
+              child: Text(
+                l10n.translate('order_create.proceed_payment'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 16),
-
-                // Product Info Section
-                Text(
-                  l10n.translate('order_create.form_title'),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                if (_items.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text(
-                      l10n.translate('common.no_data'),
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  )
-                else
-                  ..._items.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final p = entry.value;
-                    final lineTotal = p.price * p.quantity;
-                    final lineAfterDiscount = (lineTotal - p.discount).clamp(
-                      0,
-                      double.infinity,
-                    );
-                    final unitName = (p.unitName ?? '').trim();
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  p.productName,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${CurrencyFormatter.formatVND(p.price)}${unitName.isNotEmpty ? ' / $unitName' : ''} x ${p.quantity}',
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${l10n.translate('order_create.discount')}: ${CurrencyFormatter.formatVND(p.discount)}',
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  width: 170,
-                                  child: TextFormField(
-                                    key: ValueKey('discount_${p.productId}_$index'),
-                                    initialValue: CurrencyFormatter.formatNumber(
-                                      p.discount,
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      CurrencyInputFormatter(),
-                                    ],
-                                    decoration: InputDecoration(
-                                      isDense: true,
-                                      hintText: l10n.translate('order_create.discount'),
-                                      prefixText: '₫ ',
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 12,
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                        borderSide: BorderSide(color: Colors.grey[300]!),
-                                      ),
-                                    ),
-                                    onChanged: (value) {
-                                      _updateItemDiscount(index, value, lineTotal);
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                CurrencyFormatter.formatVND(lineAfterDiscount),
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                tooltip: l10n.translate('common.delete'),
-                                onPressed: () {
-                                  setState(() {
-                                    _items.removeAt(index);
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-
-                OutlinedButton.icon(
-                  onPressed: _openProductPicker,
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n.translate('order_create.add_product')),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Document Number
-                TextField(
-                  controller: _documentNumberController,
-                  decoration: InputDecoration(
-                    labelText: 'Số chứng từ',
-                    hintText: 'Nhập số chứng từ (nếu có)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Document Date
-                InkWell(
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _documentDate ?? DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setState(() => _documentDate = picked);
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: 'Ngày chứng từ',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      suffixIcon: const Icon(Icons.calendar_today, size: 20),
-                    ),
-                    child: Text(
-                      _documentDate != null
-                          ? DateFormatter.formatDate(_documentDate)
-                          : 'Chọn ngày chứng từ (nếu có)',
-                      style: _documentDate != null
-                          ? null
-                          : TextStyle(color: Colors.grey[500]),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Summary Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(l10n.translate('order_create.sub_total')),
-                    Text(CurrencyFormatter.formatVND(subTotal)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(l10n.translate('order_create.discount')),
-                    Text('-${CurrencyFormatter.formatVND(totalDiscount)}'),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      l10n.translate('order_create.total'),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      CurrencyFormatter.formatVND(total),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-
-              ],
+              ),
             ),
           ),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            onPressed: _items.isEmpty
-                ? null
-                : () {
-                    final locationId = BusinessContext().currentBusinessId;
-                    
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => OrderPaymentScreen(
-                          totalAmount: total,
-                          items: List.from(_items),
-                          locationId: locationId,
-                          locationName: BusinessContext().currentBusinessName,
-                          pendingOrderId: widget.pendingOrderId ?? widget.initialOrder?.id,
-                          initialDebtorId: _customerType == 'debtor'
-                              ? _selectedDebtor?.debtorId
-                              : null,
-                          initialDebtorName: _customerType == 'debtor'
-                              ? _selectedDebtor?.name
-                              : null,
-                          customerName: _customerNameController.text.trim(),
-                          customerPhone: _customerPhoneController.text.trim(),
-                          note: _notesController.text.trim().isNotEmpty
-                              ? _notesController.text.trim()
-                              : null,
-                          documentDate: _documentDate,
-                          documentNumber: _documentNumberController.text.trim().isNotEmpty
-                              ? _documentNumberController.text.trim()
-                              : null,
-                        ),
-                      ),
-                    );
-                  },
-            child: Text(
-              l10n.translate('order_create.proceed_payment'),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
+    );
+  }
 
   bool _hasDraftData() {
     if (_items.isNotEmpty) return true;
@@ -680,35 +718,33 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
 
     final itemsNode = draft['items'];
     final loadedItems = itemsNode is List
-        ? itemsNode
-            .whereType<Map>()
-            .map((rawItem) {
-              final item = Map<String, dynamic>.from(rawItem);
-              final saleItemRaw = item['saleItemId'];
-              int? saleItemId;
-              if (saleItemRaw is num) {
-                saleItemId = saleItemRaw.toInt();
-              } else if (saleItemRaw is String) {
-                saleItemId = int.tryParse(saleItemRaw);
-              }
+        ? itemsNode.whereType<Map>().map((rawItem) {
+            final item = Map<String, dynamic>.from(rawItem);
+            final saleItemRaw = item['saleItemId'];
+            int? saleItemId;
+            if (saleItemRaw is num) {
+              saleItemId = saleItemRaw.toInt();
+            } else if (saleItemRaw is String) {
+              saleItemId = int.tryParse(saleItemRaw);
+            }
 
-              return OrderItemEntity(
-                id: item['id']?.toString(),
-                productId: item['productId']?.toString() ?? '',
-                saleItemId: saleItemId,
-                unitName: item['unitName']?.toString(),
-                productName: item['productName']?.toString() ?? '',
-                price: asDouble(item['price']),
-                quantity: asInt(item['quantity'], fallback: 1),
-                discount: asDouble(item['discount']),
-                note: item['note']?.toString(),
-              );
-            })
-            .toList()
+            return OrderItemEntity(
+              id: item['id']?.toString(),
+              productId: item['productId']?.toString() ?? '',
+              saleItemId: saleItemId,
+              unitName: item['unitName']?.toString(),
+              productName: item['productName']?.toString() ?? '',
+              price: asDouble(item['price']),
+              quantity: asInt(item['quantity'], fallback: 1),
+              discount: asDouble(item['discount']),
+              note: item['note']?.toString(),
+            );
+          }).toList()
         : <OrderItemEntity>[];
 
     setState(() {
-      _customerType = (draft?['customerType']?.toString().trim().isNotEmpty ?? false)
+      _customerType =
+          (draft?['customerType']?.toString().trim().isNotEmpty ?? false)
           ? draft!['customerType'].toString()
           : 'walkin';
       _customerNameController.text = draft?['customerName']?.toString() ?? '';
@@ -723,15 +759,21 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   Map<String, dynamic> _buildDraftPayload() {
     final locationId = (BusinessContext().currentBusinessId ?? '').trim();
     final locationName = (BusinessContext().currentBusinessName ?? '').trim();
-    final createdAt = _draftCreatedAtIso ?? DateTime.now().toUtc().toIso8601String();
+    final createdAt =
+        _draftCreatedAtIso ?? DateTime.now().toUtc().toIso8601String();
     final updatedAt = DateTime.now().toUtc().toIso8601String();
 
     final subtotal = _items.fold<double>(
       0,
       (sum, item) => sum + (item.price * item.quantity),
     );
-    final totalDiscount = _items.fold<double>(0, (sum, item) => sum + item.discount);
-    final totalAmount = (subtotal - totalDiscount).clamp(0, double.infinity).toDouble();
+    final totalDiscount = _items.fold<double>(
+      0,
+      (sum, item) => sum + item.discount,
+    );
+    final totalAmount = (subtotal - totalDiscount)
+        .clamp(0, double.infinity)
+        .toDouble();
 
     return {
       'id': _draftId,
@@ -797,7 +839,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     if (!mounted || !showFeedback) return;
     AppSnackBar.show(
       context,
-      message: AppLocalizations.of(context).translate('order_create.save_draft'),
+      message: AppLocalizations.of(
+        context,
+      ).translate('order_create.save_draft'),
       type: AppSnackBarType.success,
     );
   }
@@ -888,10 +932,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 TextField(
                   controller: phoneController,
                   keyboardType: TextInputType.phone,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(_phoneLength),
-                  ],
+                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(_phoneLength),
+                    ],
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('order_create.customer_phone'),
                   ),
@@ -914,7 +960,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                 TextField(
                   controller: creditLimitController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [CurrencyInputFormatter()],
+                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                    inputFormatters: [CurrencyInputFormatter()],
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('debt.credit_limit'),
                     suffixText: 'đ',
@@ -1098,9 +1146,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                       TextField(
                         controller: searchController,
                         keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
+                        inputFormatters:
+                            AppInputFormatters.withSqlInjectionGuard(
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                            ),
                         onChanged: (_) => setSheetState(() {}),
                         decoration: InputDecoration(
                           hintText: l10n.translate(
@@ -1260,7 +1311,9 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: _openBarcodeAddPanel,
-                      tooltip: l10n.translate('order_create.barcode_add_tooltip'),
+                      tooltip: l10n.translate(
+                        'order_create.barcode_add_tooltip',
+                      ),
                       icon: const Icon(Icons.qr_code_scanner),
                     ),
                   ],
@@ -1276,10 +1329,7 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
 
                     if (state is ProductFailure) {
                       return Center(
-                        child: Text(
-                          state.message,
-                          textAlign: TextAlign.center,
-                        ),
+                        child: Text(state.message, textAlign: TextAlign.center),
                       );
                     }
 
@@ -1315,8 +1365,8 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                           saleItems,
                         );
                         final quantity = _selectedQuantities[productId] ?? 0;
-                        final unitPrice =
-                            (selectedSaleItem['price'] as num).toDouble();
+                        final unitPrice = (selectedSaleItem['price'] as num)
+                            .toDouble();
                         final selectedUnit =
                             (selectedSaleItem['unit'] as String?) ?? '';
 
@@ -1344,14 +1394,19 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                                       child: DropdownButton<String>(
                                         isDense: true,
                                         isExpanded: true,
-                                        value: selectedSaleItem['key'] as String,
+                                        value:
+                                            selectedSaleItem['key'] as String,
                                         items: saleItems
                                             .map(
-                                              (saleItem) => DropdownMenuItem<String>(
-                                                value: saleItem['key'] as String,
+                                              (
+                                                saleItem,
+                                              ) => DropdownMenuItem<String>(
+                                                value:
+                                                    saleItem['key'] as String,
                                                 child: Text(
                                                   '${_displayUnitName(saleItem['unit'] as String?)} x${saleItem['quantity']} (${CurrencyFormatter.formatVND((saleItem['price'] as num).toDouble())})',
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             )
@@ -1360,7 +1415,10 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                                             ? null
                                             : (value) {
                                                 if (value == null) return;
-                                                _setSaleItemKey(productId, value);
+                                                _setSaleItemKey(
+                                                  productId,
+                                                  value,
+                                                );
                                               },
                                       ),
                                     ),
@@ -1376,7 +1434,8 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                                 icon: const Icon(Icons.remove_circle_outline),
                                 onPressed: quantity <= 0
                                     ? null
-                                    : () => _setQuantity(productId, quantity - 1),
+                                    : () =>
+                                          _setQuantity(productId, quantity - 1),
                               ),
                               SizedBox(
                                 width: 24,
@@ -1387,7 +1446,8 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                               ),
                               IconButton(
                                 icon: const Icon(Icons.add_circle_outline),
-                                onPressed: () => _setQuantity(productId, quantity + 1),
+                                onPressed: () =>
+                                    _setQuantity(productId, quantity + 1),
                               ),
                             ],
                           ),
@@ -1419,7 +1479,9 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
   Future<void> _openBarcodeAddPanel() async {
     final l10n = AppLocalizations.of(context);
     final state = context.read<ProductBloc>().state;
-    final products = state is ProductsLoaded ? state.products : const <ProductEntity>[];
+    final products = state is ProductsLoaded
+        ? state.products
+        : const <ProductEntity>[];
 
     if (products.isEmpty) {
       AppSnackBar.show(
@@ -1438,15 +1500,16 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
           heightFactor: 0.92,
           child: _BarcodeOrderAddPanel(
             products: products,
-            onAdd: ({
-              required String productId,
-              required String saleItemKey,
-              required int quantity,
-            }) {
-              final current = _selectedQuantities[productId] ?? 0;
-              _setSaleItemKey(productId, saleItemKey);
-              _setQuantity(productId, current + quantity);
-            },
+            onAdd:
+                ({
+                  required String productId,
+                  required String saleItemKey,
+                  required int quantity,
+                }) {
+                  final current = _selectedQuantities[productId] ?? 0;
+                  _setSaleItemKey(productId, saleItemKey);
+                  _setQuantity(productId, current + quantity);
+                },
           ),
         );
       },
@@ -1461,7 +1524,9 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
 
   void _onDone() {
     final state = context.read<ProductBloc>().state;
-    final products = state is ProductsLoaded ? state.products : const <ProductEntity>[];
+    final products = state is ProductsLoaded
+        ? state.products
+        : const <ProductEntity>[];
 
     final items = <OrderItemEntity>[];
     for (final product in products) {
@@ -1469,10 +1534,7 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
       if (quantity <= 0) continue;
 
       final saleItems = _normalizedSaleItems(product);
-      final selectedSaleItem = _resolveSelectedSaleItem(
-        product.id,
-        saleItems,
-      );
+      final selectedSaleItem = _resolveSelectedSaleItem(product.id, saleItems);
       final unitPrice = (selectedSaleItem['price'] as num).toDouble();
       final saleItemId = selectedSaleItem['saleItemId'] as int?;
       final unitName = selectedSaleItem['unit'] as String?;
@@ -1523,15 +1585,19 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                 (product.salePrice ?? product.price);
 
       final dynamic rawQty = item['quantity'] ?? item['Quantity'];
-      final qty = rawQty is num ? rawQty.toInt() : int.tryParse('${rawQty ?? 1}') ?? 1;
+      final qty = rawQty is num
+          ? rawQty.toInt()
+          : int.tryParse('${rawQty ?? 1}') ?? 1;
 
-        final rawUnit = (item['unit'] ?? item['Unit'] ?? '').toString().trim();
-        final fallbackUnit = (product.unit ?? '').trim();
-        final unit = rawUnit.isNotEmpty
+      final rawUnit = (item['unit'] ?? item['Unit'] ?? '').toString().trim();
+      final fallbackUnit = (product.unit ?? '').trim();
+      final unit = rawUnit.isNotEmpty
           ? rawUnit
           : (fallbackUnit.isNotEmpty
                 ? fallbackUnit
-                : AppLocalizations.of(context).translate('order_create.default_unit'));
+                : AppLocalizations.of(
+                    context,
+                  ).translate('order_create.default_unit'));
 
       return {
         'key': saleItemId?.toString() ?? '__default__',
@@ -1572,7 +1638,8 @@ class _BarcodeOrderAddPanel extends StatefulWidget {
     required String productId,
     required String saleItemKey,
     required int quantity,
-  }) onAdd;
+  })
+  onAdd;
 
   const _BarcodeOrderAddPanel({required this.products, required this.onAdd});
 
@@ -1653,10 +1720,9 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          l10n.translate('order_create.barcode_scanned_title').replaceAll(
-                            '{count}',
-                            '${_pendingItems.length}',
-                          ),
+                          l10n
+                              .translate('order_create.barcode_scanned_title')
+                              .replaceAll('{count}', '${_pendingItems.length}'),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -1666,9 +1732,12 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
                         Expanded(
                           child: ListView.separated(
                             itemCount: _pendingItems.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
                             itemBuilder: (context, index) {
-                              final item = _pendingItems.values.elementAt(index);
+                              final item = _pendingItems.values.elementAt(
+                                index,
+                              );
                               return _buildPendingItemCard(item);
                             },
                           ),
@@ -1693,8 +1762,13 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
                               AppSnackBar.show(
                                 context,
                                 message: l10n
-                                    .translate('order_create.barcode_added_to_order')
-                                    .replaceAll('{productCount}', '${_pendingItems.length}')
+                                    .translate(
+                                      'order_create.barcode_added_to_order',
+                                    )
+                                    .replaceAll(
+                                      '{productCount}',
+                                      '${_pendingItems.length}',
+                                    )
                                     .replaceAll('{itemCount}', '$totalQty'),
                                 type: AppSnackBarType.success,
                               );
@@ -1702,7 +1776,9 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
                             },
                             icon: const Icon(Icons.add_shopping_cart),
                             label: Text(
-                              l10n.translate('order_create.barcode_add_and_close'),
+                              l10n.translate(
+                                'order_create.barcode_add_and_close',
+                              ),
                             ),
                           ),
                         ),
@@ -1887,7 +1963,9 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
           'key': '__default__',
           'saleItemId': null,
           'unit': (product.unit ?? '').trim().isEmpty
-              ? AppLocalizations.of(context).translate('order_create.default_unit')
+              ? AppLocalizations.of(
+                  context,
+                ).translate('order_create.default_unit')
               : (product.unit ?? '').trim(),
           'price': product.salePrice ?? product.price,
           'quantity': 1,
@@ -1921,8 +1999,10 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
       final unit = rawUnit.isNotEmpty
           ? rawUnit
           : (fallbackUnit.isNotEmpty
-            ? fallbackUnit
-            : AppLocalizations.of(context).translate('order_create.default_unit'));
+                ? fallbackUnit
+                : AppLocalizations.of(
+                    context,
+                  ).translate('order_create.default_unit'));
 
       return {
         'key': saleItemId?.toString() ?? '__default__',

@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import '../../../core/config/app_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_error_message_parser.dart';
@@ -17,8 +16,6 @@ class LocationApiService {
   final ApiClient _apiClient;
 
   LocationApiService({required ApiClient apiClient}) : _apiClient = apiClient;
-
-  String get _currentBaseUrl => AppConfig.baseUrl;
 
   /// Get business locations owned by current user
   ///

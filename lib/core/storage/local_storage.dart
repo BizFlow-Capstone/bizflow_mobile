@@ -111,6 +111,7 @@ class StorageKeys {
   static const String currentUserAvatarUrl = 'current_user_avatar_url';
   static const String currentUserEmail = 'current_user_email';
   static const String currentUserPhone = 'current_user_phone';
+  static const String currentUserTaxCode = 'current_user_tax_code';
 
   // Settings
   static const String locale = 'locale';

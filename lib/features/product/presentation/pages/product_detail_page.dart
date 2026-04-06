@@ -9,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/services/permission_service.dart';
 import '../../domain/entities/product_entity.dart';
@@ -251,7 +252,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
 
     return Container(
-      height: 200,
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -302,7 +302,8 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           IconButton(
             icon: const Icon(Icons.inventory_2_outlined),
             tooltip:
-                l10n?.translate('product.stock_adjust.title') ?? 'Chỉnh tồn kho',
+                l10n?.translate('product.stock_adjust.title') ??
+                'Chỉnh tồn kho',
             onPressed: () => _showAdjustStockDialog(l10n),
           ),
         if (canEditProduct)
@@ -380,7 +381,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     TextField(
                       controller: stockController,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                      ),
                       decoration: InputDecoration(
                         labelText:
                             l10n?.translate('product.stock_adjust.stock') ??
@@ -391,7 +396,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     TextField(
                       controller: costPriceController,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyInputFormatter()],
+                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                        inputFormatters: [CurrencyInputFormatter()],
+                      ),
                       decoration: InputDecoration(
                         labelText:
                             l10n?.translate(
@@ -471,7 +478,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                               );
                             }
 
-                             if (mounted) {
+                            if (mounted) {
                               context.read<ProductBloc>().add(
                                 LoadProductDetailRequested(
                                   productId: _currentProduct.id,
@@ -488,9 +495,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             if (!mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text(
-                                  ApiErrorMessageParser.parse(e),
-                                ),
+                                content: Text(ApiErrorMessageParser.parse(e)),
                                 backgroundColor: AppColors.error,
                               ),
                             );
@@ -864,8 +869,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                     ],
                   ),
                 );
-              })
-              ,
+              }),
         ],
       ),
     );
@@ -894,9 +898,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          Center(
-            child: _buildBarcodeCard(barcodeValue),
-          ),
+          Center(child: _buildBarcodeCard(barcodeValue)),
           SizedBox(height: AppSpacing.sm),
         ],
       ),

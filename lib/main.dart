@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'core/config/app_config.dart';
+import 'core/config/remote_config_service.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/services/firebase_messaging_service.dart';
 import 'core/services/notification_realtime_service.dart';
@@ -29,6 +31,7 @@ import 'features/employee/data/employee_management_repository.dart';
 import 'features/employee/presentation/bloc/employee_bloc.dart';
 import 'features/location/presentation/bloc/location_event.dart';
 import 'features/auth/presentation/bloc/auth_state.dart';
+import 'features/auth/presentation/bloc/auth_event.dart';
 import 'features/product/presentation/bloc/product_event.dart';
 import 'features/debt/presentation/bloc/debtor_event.dart';
 import 'features/location/data/location_api_service.dart';
@@ -77,6 +80,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await Firebase.initializeApp();
+  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
   await ConnectivityService().initialize();
   await CacheManager().init();
   await DatabaseManager().initialize();
@@ -92,7 +96,7 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final AppLinks _appLinks = AppLinks();
   StreamSubscription<Uri>? _deepLinkSubscription;
 
@@ -132,11 +136,15 @@ class _MyAppState extends State<MyApp> {
   late CostRepository _costRepository;
   late NotificationApiService _notificationApiService;
   late NotificationRepository _notificationRepository;
+  late RemoteConfigService _remoteConfigService;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _localizationProvider = LocalizationProvider();
+    _remoteConfigService = RemoteConfigService();
+    unawaited(_initializeRemoteConfig());
 
     // Secure storage (token management)
     _secureStorage = SecureStorage();
@@ -174,6 +182,7 @@ class _MyAppState extends State<MyApp> {
           await BusinessContext().clear();
           await UserProfileContext().clear();
           await CacheManager().clearAll();
+          await _secureStorage.clearGoogleOnboardingStep();
           await DatabaseManager().clearForLogout();
           AppRouter.globalAppBarState.reset();
           AppRouter.navigateAndClearStack(AppRoutes.login);
@@ -281,6 +290,22 @@ class _MyAppState extends State<MyApp> {
     Future.microtask(_initializeDeepLinks);
   }
 
+  Future<void> _initializeRemoteConfig() async {
+    try {
+      await _remoteConfigService.initialize();
+      await _remoteConfigService.fetchAndActivate();
+    } catch (e) {
+      debugPrint('Main: Remote config initialization failed: $e');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_remoteConfigService.fetchAndActivate());
+    }
+  }
+
   Future<void> _initializeDeepLinks() async {
     try {
       final initialUri = await _appLinks.getInitialLink();
@@ -298,6 +323,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _deepLinkSubscription?.cancel();
     unawaited(_subscriptionRepository.dispose());
     _firebaseMessagingService.dispose();
@@ -315,12 +341,13 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider.value(value: BusinessContext()),
         ChangeNotifierProvider.value(value: NotificationContext()),
         BlocProvider(
-          create: (context) => AuthBloc(
-            locationRepository: _locationRepository,
-            authRepository: _authRepository,
-            secureStorage: _secureStorage,
-            firebaseMessagingService: _firebaseMessagingService,
-          ),
+          create: (context) =>
+              AuthBloc(
+                locationRepository: _locationRepository,
+                authRepository: _authRepository,
+                secureStorage: _secureStorage,
+                firebaseMessagingService: _firebaseMessagingService,
+              )..add(const AppStarted()),
         ),
         BlocProvider(
           create: (context) => LocationBloc(
@@ -381,6 +408,7 @@ class _MyAppState extends State<MyApp> {
                     context.read<ReferenceBloc>().add(
                       LoadAllReferencesRequested(),
                     );
+                    context.read<AuthBloc>().add(const LoadProfileRequested());
                     NotificationContext().refreshUnreadCount();
                     _notificationRealtimeService.connect();
                   }
@@ -411,6 +439,7 @@ class _MyAppState extends State<MyApp> {
                   supportedLocales: AppLocalizations.supportedLocales,
                   locale: localizationProvider.currentLocale,
                   navigatorKey: AppRouter.navigatorKey,
+                  navigatorObservers: [AppRouter.routeObserver],
                   onGenerateRoute: AppRouter.generateRoute,
                   initialRoute: AppRoutes.splash,
                 ),

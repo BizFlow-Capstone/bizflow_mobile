@@ -7,10 +7,11 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/providers/localization_provider.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
-import '../../../../shared/widgets/language_switcher.dart';
 import '../../../../shared/widgets/google_icon.dart';
+import '../../../../shared/widgets/language_switcher.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -26,7 +27,6 @@ export '../bloc/auth_bloc.dart' show AuthErrorCode;
 /// Hỗ trợ đăng nhập bằng:
 /// - Email + mật khẩu
 /// - Số điện thoại + mật khẩu
-/// - Google sign-in
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -96,10 +96,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void _handleGoogleLogin() {
-    context.read<AuthBloc>().add(const GoogleLoginRequested());
-  }
-
   void _handleForgotPassword(AppLocalizations l10n) {
     Navigator.pushNamed(context, AppRoutes.forgotPassword);
   }
@@ -119,12 +115,11 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-        duration: const Duration(seconds: 2),
-      ),
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: AppSnackBarType.error,
+      duration: const Duration(seconds: 2),
     );
   }
 
@@ -170,7 +165,6 @@ class _LoginPageState extends State<LoginPage> {
         },
         onLogin: () => _handleLogin(l10n),
         onForgotPassword: () => _handleForgotPassword(l10n),
-        onGoogleLogin: _handleGoogleLogin,
       ),
     );
   }
@@ -189,7 +183,6 @@ class _LoginPageContent extends StatelessWidget {
   final Function(bool) onRememberMeChanged;
   final VoidCallback onLogin;
   final VoidCallback onForgotPassword;
-  final VoidCallback onGoogleLogin;
 
   const _LoginPageContent({
     required this.l10n,
@@ -203,7 +196,6 @@ class _LoginPageContent extends StatelessWidget {
     required this.onRememberMeChanged,
     required this.onLogin,
     required this.onForgotPassword,
-    required this.onGoogleLogin,
   });
 
   @override
@@ -344,29 +336,49 @@ class _LoginPageContent extends StatelessWidget {
                   },
                 ),
                 SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Divider(color: AppColors.divider, thickness: 1),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md,
-                      ),
-                      child: Text(
-                        l10n.translate('auth.or_divider'),
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textSecondary,
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) {
+                    final isLoading = state is LoginInProgress;
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton(
+                        onPressed: isLoading
+                            ? null
+                            : () {
+                                context.read<AuthBloc>().add(
+                                  const GoogleLoginRequested(),
+                                );
+                              },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: isLoading
+                                ? AppColors.disabled
+                                : AppColors.divider,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppSpacing.borderRadiusSm,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const GoogleIcon(size: 20),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(
+                              l10n.translate('auth.or_login_google'),
+                              style: AppTextStyles.titleSmall.copyWith(
+                                color: isLoading
+                                    ? AppColors.textDisabled
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    Expanded(
-                      child: Divider(color: AppColors.divider, thickness: 1),
-                    ),
-                  ],
+                    );
+                  },
                 ),
-                SizedBox(height: AppSpacing.md),
-                _buildGoogleButton(context),
                 SizedBox(height: AppSpacing.lg),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -416,60 +428,12 @@ class _LoginPageContent extends StatelessWidget {
     );
   }
 
-  Widget _buildGoogleButton(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
-      builder: (context, state) {
-        final isLoading = state is LoginInProgress;
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isLoading
-                  ? AppColors.divider.withOpacity(0.5)
-                  : AppColors.divider,
-            ),
-            borderRadius: AppSpacing.borderRadiusMd,
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: isLoading ? null : onGoogleLogin,
-              borderRadius: AppSpacing.borderRadiusMd,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.md,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Google Icon - inline branded widget
-                    const GoogleIcon(),
-                    SizedBox(width: AppSpacing.md),
-                    Text(
-                      l10n.translate('auth.or_login_google'),
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   void _showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppColors.danger,
-        duration: const Duration(seconds: 2),
-      ),
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: AppSnackBarType.error,
+      duration: const Duration(seconds: 2),
     );
   }
 

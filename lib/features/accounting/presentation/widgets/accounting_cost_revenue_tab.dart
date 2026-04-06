@@ -8,9 +8,12 @@ import '../../../../shared/utils/formatters.dart';
 import '../../../revenue/domain/entities/revenue_entity.dart';
 import '../../../cost/domain/entities/cost_entity.dart';
 
+enum AccountingCostRevenueMode { revenue, cost, both }
+
 class AccountingCostRevenueTab extends StatelessWidget {
   final List<RevenueEntity> revenues;
   final List<CostEntity> costs;
+  final AccountingCostRevenueMode mode;
   final VoidCallback onAddRevenue;
   final VoidCallback onAddCost;
   final ValueChanged<RevenueEntity> onEditRevenue;
@@ -23,6 +26,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     super.key,
     required this.revenues,
     required this.costs,
+    this.mode = AccountingCostRevenueMode.both,
     required this.onAddRevenue,
     required this.onAddCost,
     required this.onEditRevenue,
@@ -35,47 +39,76 @@ class AccountingCostRevenueTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final showRevenue =
+        mode == AccountingCostRevenueMode.both ||
+        mode == AccountingCostRevenueMode.revenue;
+    final showCost =
+        mode == AccountingCostRevenueMode.both ||
+        mode == AccountingCostRevenueMode.cost;
+
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
-        _card(
-          title: l10n.translate('accounting.revenue_list'),
-          onAdd: onAddRevenue,
-          child: Column(
-            children: revenues
-                .map(
-                  (item) => _itemTile(
+        if (showRevenue)
+          _card(
+            title: l10n.translate('accounting.revenue_list'),
+            onAdd: onAddRevenue,
+            child: revenues.isEmpty
+                ? _buildEmptyState(
                     context,
-                    item: item,
-                    isRevenue: true,
-                    onTap: () => onTapRevenue(item),
-                    onEdit: () => onEditRevenue(item),
-                    onDelete: () => onDeleteRevenue(item),
+                    l10n.translate('accounting.revenue_list'),
+                  )
+                : Column(
+                    children: revenues
+                        .map(
+                          (item) => _itemTile(
+                            context,
+                            item: item,
+                            isRevenue: true,
+                            onTap: () => onTapRevenue(item),
+                            onEdit: () => onEditRevenue(item),
+                            onDelete: () => onDeleteRevenue(item),
+                          ),
+                        )
+                        .toList(),
                   ),
-                )
-                .toList(),
           ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _card(
-          title: l10n.translate('accounting.cost_list'),
-          onAdd: onAddCost,
-          child: Column(
-            children: costs
-                .map(
-                  (item) => _itemTile(
+        if (showRevenue && showCost) const SizedBox(height: AppSpacing.md),
+        if (showCost)
+          _card(
+            title: l10n.translate('accounting.cost_list'),
+            onAdd: onAddCost,
+            child: costs.isEmpty
+                ? _buildEmptyState(
                     context,
-                    item: item,
-                    isRevenue: false,
-                    onTap: null,
-                    onEdit: () => onEditCost(item),
-                    onDelete: () => onDeleteCost(item),
+                    l10n.translate('accounting.cost_list'),
+                  )
+                : Column(
+                    children: costs
+                        .map(
+                          (item) => _itemTile(
+                            context,
+                            item: item,
+                            isRevenue: false,
+                            onTap: null,
+                            onEdit: () => onEditCost(item),
+                            onDelete: () => onDeleteCost(item),
+                          ),
+                        )
+                        .toList(),
                   ),
-                )
-                .toList(),
           ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Text(
+        '$title: 0',
+        style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+      ),
     );
   }
 
@@ -158,7 +191,10 @@ class AccountingCostRevenueTab extends StatelessWidget {
               ),
               if (onAdd != null)
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+                  icon: const Icon(
+                    Icons.add_circle_outline,
+                    color: AppColors.primary,
+                  ),
                   onPressed: onAdd,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),

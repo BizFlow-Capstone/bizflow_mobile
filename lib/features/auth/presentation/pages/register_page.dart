@@ -9,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/providers/localization_provider.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
@@ -16,8 +17,6 @@ import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
 import 'phone_register_otp_page.dart';
-
-enum _RegisterMode { email, phone }
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -28,27 +27,37 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _taxCodeController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  final FocusNode _fullNameFocusNode = FocusNode();
+  final FocusNode _phoneFocusNode = FocusNode();
+  final FocusNode _taxCodeFocusNode = FocusNode();
+  final FocusNode _passwordFocusNode = FocusNode();
+  final FocusNode _confirmPasswordFocusNode = FocusNode();
 
-  _RegisterMode _registerMode = _RegisterMode.email;
+  String? _fullNameError;
+  String? _phoneError;
+  String? _taxCodeError;
+  String? _passwordError;
+  String? _confirmPasswordError;
 
   @override
   void dispose() {
     _fullNameController.dispose();
-    _emailController.dispose();
     _phoneController.dispose();
     _taxCodeController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _fullNameFocusNode.dispose();
+    _phoneFocusNode.dispose();
+    _taxCodeFocusNode.dispose();
+    _passwordFocusNode.dispose();
+    _confirmPasswordFocusNode.dispose();
     super.dispose();
   }
-
-  bool get _isPhoneMode => _registerMode == _RegisterMode.phone;
 
   Future<void> _saveRegisterTaxCode() async {
     final taxCode = _taxCodeController.text.trim();
@@ -59,27 +68,56 @@ class _RegisterPageState extends State<RegisterPage> {
 
   bool _validateCommonForm(AppLocalizations l10n) {
     final fullName = _fullNameController.text.trim();
+    final phone = _phoneController.text.trim();
     final taxCode = _taxCodeController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    if (fullName.isEmpty || taxCode.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('common.required_field')),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-      return false;
+    FocusNode? firstInvalidFocus;
+
+    String? fullNameError;
+    String? phoneError;
+    String? taxCodeError;
+    String? passwordError;
+    String? confirmPasswordError;
+
+    if (fullName.isEmpty) {
+      fullNameError = l10n.translate('common.required_field');
+      firstInvalidFocus ??= _fullNameFocusNode;
+    }
+    if (phone.isEmpty) {
+      phoneError = l10n.translate('auth.phone_required');
+      firstInvalidFocus ??= _phoneFocusNode;
+    }
+    if (taxCode.isEmpty) {
+      taxCodeError = l10n.translate('common.required_field');
+      firstInvalidFocus ??= _taxCodeFocusNode;
+    }
+    if (password.isEmpty) {
+      passwordError = l10n.translate('auth.password_required');
+      firstInvalidFocus ??= _passwordFocusNode;
+    } else if (password.length < 8) {
+      passwordError = l10n.translate('auth.password_min_length_8');
+      firstInvalidFocus ??= _passwordFocusNode;
+    }
+    if (confirmPassword.isEmpty) {
+      confirmPasswordError = l10n.translate('auth.password_required');
+      firstInvalidFocus ??= _confirmPasswordFocusNode;
+    } else if (confirmPassword != password) {
+      confirmPasswordError = l10n.translate('auth.passwords_not_match');
+      firstInvalidFocus ??= _confirmPasswordFocusNode;
     }
 
-    if (confirmPassword != password) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('auth.passwords_not_match')),
-          backgroundColor: AppColors.warning,
-        ),
-      );
+    setState(() {
+      _fullNameError = fullNameError;
+      _phoneError = phoneError;
+      _taxCodeError = taxCodeError;
+      _passwordError = passwordError;
+      _confirmPasswordError = confirmPasswordError;
+    });
+
+    if (firstInvalidFocus != null) {
+      FocusScope.of(context).requestFocus(firstInvalidFocus);
       return false;
     }
 
@@ -89,49 +127,15 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _submit(AppLocalizations l10n) async {
     if (!_validateCommonForm(l10n)) return;
 
-    if (_isPhoneMode) {
-      final phone = _phoneController.text.trim();
-      if (phone.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.translate('auth.phone_required')),
-            backgroundColor: AppColors.warning,
-          ),
-        );
-        return;
-      }
-
-      await _saveRegisterTaxCode();
-      if (!mounted) return;
-      context.read<AuthBloc>().add(
-        RegisterWithPhoneRequested(
-          phone: phone,
-          password: _passwordController.text.trim(),
-          fullName: _fullNameController.text.trim(),
-        ),
-      );
-      return;
-    }
-
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('auth.email_required')),
-          backgroundColor: AppColors.warning,
-        ),
-      );
-      return;
-    }
+    final phone = _phoneController.text.trim();
 
     await _saveRegisterTaxCode();
     if (!mounted) return;
     context.read<AuthBloc>().add(
-      SignupRequested(
-        name: _fullNameController.text.trim(),
-        phone: '',
-        email: email,
+      RegisterWithPhoneRequested(
+        phone: phone,
         password: _passwordController.text.trim(),
+        fullName: _fullNameController.text.trim(),
       ),
     );
   }
@@ -143,11 +147,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is LoginSuccess) {
+        if (state is GoogleLoginPhoneLinkRequired) {
           FocusScope.of(context).unfocus();
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
-            AppRouter.navigateAndClearStack(AppRoutes.home);
+            AppRouter.navigateAndClearStack(AppRoutes.googlePhoneLink);
           });
         } else if (state is GoogleLoginSetPasswordRequired) {
           FocusScope.of(context).unfocus();
@@ -167,18 +171,11 @@ class _RegisterPageState extends State<RegisterPage> {
             );
           });
         } else if (state is PhoneRegisterFailure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppColors.danger,
-            ),
-          );
+          AppSnackBar.error(context, state.message);
         } else if (state is LoginFailure) {
           final msg =
               state.serverMessage ?? l10n.translate('auth.register_failed');
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: AppColors.danger),
-          );
+          AppSnackBar.error(context, msg);
         }
       },
       child: Scaffold(
@@ -241,44 +238,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: AppButton(
-                          label: l10n.translate('auth.register_with_email'),
-                          onPressed: () {
-                            setState(() {
-                              _registerMode = _RegisterMode.email;
-                            });
-                          },
-                          type: _isPhoneMode
-                              ? AppButtonType.outlined
-                              : AppButtonType.primary,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      SizedBox(
-                        width: double.infinity,
-                        child: AppButton(
-                          label: l10n.translate('auth.register_with_phone'),
-                          onPressed: () {
-                            setState(() {
-                              _registerMode = _RegisterMode.phone;
-                            });
-                          },
-                          type: _isPhoneMode
-                              ? AppButtonType.primary
-                              : AppButtonType.outlined,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
                   Text(
-                    _isPhoneMode
-                        ? l10n.translate('auth.phone_register_subtitle')
-                        : l10n.translate('auth.email_register_subtitle'),
+                    l10n.translate('auth.phone_register_subtitle'),
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textSecondary,
                     ),
@@ -297,43 +258,80 @@ class _RegisterPageState extends State<RegisterPage> {
                         children: [
                           AppTextField(
                             controller: _fullNameController,
+                            focusNode: _fullNameFocusNode,
                             label: l10n.translate('auth.name'),
                             hintText: l10n.translate('auth.enter_name'),
+                            errorText: _fullNameError,
+                            onChanged: (_) {
+                              if (_fullNameError != null) {
+                                setState(() {
+                                  _fullNameError = null;
+                                });
+                              }
+                            },
                           ),
                           const SizedBox(height: AppSpacing.md),
-                          if (_isPhoneMode)
-                            AppTextField(
-                              controller: _phoneController,
-                              label: l10n.translate('auth.phone'),
-                              hintText: l10n.translate('auth.enter_phone'),
-                              keyboardType: TextInputType.phone,
-                            )
-                          else
-                            AppTextField(
-                              controller: _emailController,
-                              label: l10n.translate('auth.email'),
-                              hintText: l10n.translate('auth.enter_email'),
-                              keyboardType: TextInputType.emailAddress,
-                            ),
+                          AppTextField(
+                            controller: _phoneController,
+                            focusNode: _phoneFocusNode,
+                            label: l10n.translate('auth.phone'),
+                            hintText: l10n.translate('auth.enter_phone'),
+                            keyboardType: TextInputType.phone,
+                            errorText: _phoneError,
+                            onChanged: (_) {
+                              if (_phoneError != null) {
+                                setState(() {
+                                  _phoneError = null;
+                                });
+                              }
+                            },
+                          ),
                           const SizedBox(height: AppSpacing.md),
                           AppTextField(
                             controller: _taxCodeController,
+                            focusNode: _taxCodeFocusNode,
                             label: l10n.translate('location.location_tax_code'),
                             hintText: l10n.translate(
                               'location.location_tax_code_hint',
                             ),
+                            errorText: _taxCodeError,
+                            onChanged: (_) {
+                              if (_taxCodeError != null) {
+                                setState(() {
+                                  _taxCodeError = null;
+                                });
+                              }
+                            },
                           ),
                           const SizedBox(height: AppSpacing.md),
                           AppPasswordField(
                             controller: _passwordController,
+                            focusNode: _passwordFocusNode,
                             label: l10n.translate('auth.password'),
                             hintText: l10n.translate('auth.enter_password'),
+                            errorText: _passwordError,
+                            onChanged: (_) {
+                              if (_passwordError != null) {
+                                setState(() {
+                                  _passwordError = null;
+                                });
+                              }
+                            },
                           ),
                           const SizedBox(height: AppSpacing.md),
                           AppPasswordField(
                             controller: _confirmPasswordController,
+                            focusNode: _confirmPasswordFocusNode,
                             label: l10n.translate('auth.confirm_password'),
                             hintText: l10n.translate('auth.confirm_password'),
+                            errorText: _confirmPasswordError,
+                            onChanged: (_) {
+                              if (_confirmPasswordError != null) {
+                                setState(() {
+                                  _confirmPasswordError = null;
+                                });
+                              }
+                            },
                           ),
                           const SizedBox(height: AppSpacing.lg),
                           AppButton(

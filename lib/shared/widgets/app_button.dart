@@ -104,14 +104,22 @@ class AppButton extends StatelessWidget {
     final textColor = _getTextColor();
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (prefixIcon != null) ...[
           Icon(prefixIcon, size: iconSize),
           SizedBox(width: AppSpacing.sm),
         ],
-        Text(label, style: textStyle.copyWith(color: textColor)),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: textStyle.copyWith(color: textColor),
+          ),
+        ),
         if (suffixIcon != null) ...[
           SizedBox(width: AppSpacing.sm),
           Icon(suffixIcon, size: iconSize),

@@ -15,6 +15,15 @@ class ApiEndpoints {
   static const String linkEmail = '/api/auth/link/email';
   static const String linkGoogle = '/api/auth/link/google';
     static const String firebaseCustomToken = '/api/auth/firebase/custom-token';
+    static const String forgotPasswordSendOtp =
+            '/api/auth/forgot-password/send-otp';
+    static const String forgotPasswordVerifyOtp =
+            '/api/auth/forgot-password/verify-otp';
+    static const String forgotPasswordReset = '/api/auth/forgot-password/reset';
+    static const String authProfile = '/api/auth/profile';
+    static const String authProfileAvatar = '/api/auth/profile/avatar';
+    static const String authChangePassword = '/api/auth/change-password';
+    static const String authDeleteAccount = '/api/auth/delete-account';
 
   // Legacy aliases (kept for compatibility if any file references them)
   static const String login = '/api/auth/login/email';

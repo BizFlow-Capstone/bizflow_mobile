@@ -35,6 +35,8 @@
     "email": "Email",
     "password": "Password",
     "confirm_password": "Confirm Password",
+    "current_password": "Current password",
+    "new_password": "New password",
     "forgot_password": "Forgot Password?",
     "remember_me": "Remember me",
     "login_success": "Login successful",
@@ -109,7 +111,15 @@
     "checking_auth": "Checking...",
     "welcome_new_user": "Welcome! Please set your password",
     "passwords_not_match": "Passwords do not match",
-    "password_min_length_8": "Password must be at least 8 characters"
+    "password_min_length_8": "Password must be at least 8 characters",
+    "send_otp": "Send OTP",
+    "otp_sent_generic": "OTP sent. Please check your email",
+    "otp_sent_to_email": "OTP has been sent to {email}",
+    "forgot_password_step": "Step {step}/3",
+    "reset_password_button": "Reset Password",
+    "reset_password_success": "Password reset successful",
+    "link_phone_required_title": "Link Phone Number",
+    "link_phone_required_subtitle": "New Google accounts must link a phone number before setting password"
   },
   "validation": {
     "required": "This field is required",
@@ -139,7 +149,20 @@
     "link_now": "Link",
     "link_email": "Link email",
     "link_phone": "Link phone number",
-    "link_success": "Linked successfully"
+    "link_success": "Linked successfully",
+    "tax_code": "Tax code",
+    "tax_code_hint": "Enter tax code (optional)",
+    "remove_avatar": "Remove avatar",
+    "security": "Security",
+    "delete_account": "Delete account",
+    "delete_account_password_note": "Enter your password to continue the permanent account deletion flow.",
+    "delete_account_confirm_title": "Delete account permanently",
+    "delete_account_confirm_body": "This action cannot be undone. All data related to your account will be permanently deleted.",
+    "delete_account_confirm_action": "I understand, continue",
+    "delete_account_phrase_title": "Final confirmation",
+    "delete_account_phrase_hint": "Type the exact phrase: {phrase}",
+    "delete_account_final_action": "Delete account permanently",
+    "delete_account_phrase_invalid": "Confirmation phrase does not match"
   },
   "settings": {
     "title": "Settings",

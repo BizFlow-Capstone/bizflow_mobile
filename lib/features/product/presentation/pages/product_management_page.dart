@@ -16,6 +16,7 @@ import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
 import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../subscription/data/subscription_repository.dart';
@@ -184,7 +185,9 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       );
 
       if (mounted) {
-        productBloc.add(RefreshProductsRequested(locationId: widget.locationId));
+        productBloc.add(
+          RefreshProductsRequested(locationId: widget.locationId),
+        );
       }
     } catch (e) {
       if (!mounted) return;
@@ -224,7 +227,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             Text(
               widget.locationName,
               style: AppTextStyles.titleLarge.copyWith(
-                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
               ),
             ),
             Text(
@@ -243,50 +246,48 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (isOwner) ...
-                    [
-                      IconButton(
-                        icon: const Icon(Icons.price_change_outlined),
-                        tooltip: l10n.translate('product.bulk_adjust.title'),
-                        color: AppColors.textPrimary,
-                        onPressed: () {
-                          Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  BulkAdjustSellingPricePage(
-                                    locationId: widget.locationId,
-                                  ),
+                  if (isOwner) ...[
+                    IconButton(
+                      icon: const Icon(Icons.price_change_outlined),
+                      tooltip: l10n.translate('product.bulk_adjust.title'),
+                      color: AppColors.textPrimary,
+                      onPressed: () {
+                        Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BulkAdjustSellingPricePage(
+                              locationId: widget.locationId,
                             ),
-                          ).then((updated) {
-                            if (updated == true && mounted) {
-                              context.read<ProductBloc>().add(
-                                RefreshProductsRequested(
-                                  locationId: widget.locationId,
-                                ),
-                              );
-                            }
-                          });
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.history),
-                        tooltip: 'Lịch sử nhập kho',
-                        color: AppColors.textPrimary,
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ImportHistoryPage(),
-                            ),
-                          ).then((result) {
-                            if (result == true && mounted) {
-                              _loadProducts();
-                            }
-                          });
-                        },
-                      ),
-                    ],
+                          ),
+                        ).then((updated) {
+                          if (updated == true && mounted) {
+                            context.read<ProductBloc>().add(
+                              RefreshProductsRequested(
+                                locationId: widget.locationId,
+                              ),
+                            );
+                          }
+                        });
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.history),
+                      tooltip: 'Lịch sử nhập kho',
+                      color: AppColors.textPrimary,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ImportHistoryPage(),
+                          ),
+                        ).then((result) {
+                          if (result == true && mounted) {
+                            _loadProducts();
+                          }
+                        });
+                      },
+                    ),
+                  ],
                 ],
               );
             },
@@ -723,7 +724,9 @@ class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
             TextField(
               controller: _stockController,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              ),
               decoration: InputDecoration(
                 labelText: l10n.translate('product.stock_adjust.stock'),
               ),
@@ -732,7 +735,9 @@ class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
             TextField(
               controller: _costPriceController,
               keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyInputFormatter()],
+              inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                inputFormatters: [CurrencyInputFormatter()],
+              ),
               decoration: InputDecoration(
                 labelText: l10n.translate('product.stock_adjust.cost_price'),
               ),

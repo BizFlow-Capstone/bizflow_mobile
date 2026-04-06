@@ -21,6 +21,7 @@ class AppTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final List<TextInputFormatter>? inputFormatters;
+  final bool enableSqlInjectionGuard;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onTap;
   final ValueChanged<String>? onSubmitted;
@@ -47,6 +48,7 @@ class AppTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.inputFormatters,
+    this.enableSqlInjectionGuard = true,
     this.onChanged,
     this.onTap,
     this.onSubmitted,
@@ -60,12 +62,22 @@ class AppTextField extends StatelessWidget {
 
   bool _isControllerUsable(TextEditingController? target) {
     if (target == null) return false;
+    void noop() {}
     try {
-      target.value;
+      // addListener/removeListener will assert in debug if controller is disposed.
+      target.addListener(noop);
+      target.removeListener(noop);
       return true;
     } catch (_) {
       return false;
     }
+  }
+
+  List<TextInputFormatter>? _buildInputFormatters() {
+    return AppInputFormatters.withSqlInjectionGuard(
+      inputFormatters: inputFormatters,
+      enabled: enableSqlInjectionGuard,
+    );
   }
 
   @override
@@ -92,7 +104,7 @@ class AppTextField extends StatelessWidget {
           maxLength: maxLength,
           keyboardType: keyboardType,
           textInputAction: textInputAction,
-          inputFormatters: inputFormatters,
+          inputFormatters: _buildInputFormatters(),
           onChanged: onChanged,
           onTap: onTap,
           onFieldSubmitted: onSubmitted,
@@ -145,6 +157,63 @@ class AppTextField extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _SqlInjectionGuardFormatter extends TextInputFormatter {
+  _SqlInjectionGuardFormatter._();
+
+  static final _SqlInjectionGuardFormatter instance =
+      _SqlInjectionGuardFormatter._();
+
+  static final RegExp _blockedChars = RegExp("[\"';`\\\\]");
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final sanitized = newValue.text.replaceAll(_blockedChars, '');
+    if (sanitized == newValue.text) {
+      return newValue;
+    }
+
+    final baseOffset = newValue.selection.baseOffset;
+    final extentOffset = newValue.selection.extentOffset;
+    final removedCount = newValue.text.length - sanitized.length;
+
+    return TextEditingValue(
+      text: sanitized,
+      selection: TextSelection(
+        baseOffset: (baseOffset - removedCount).clamp(0, sanitized.length),
+        extentOffset: (extentOffset - removedCount).clamp(0, sanitized.length),
+      ),
+      composing: TextRange.empty,
+    );
+  }
+}
+
+class AppInputFormatters {
+  AppInputFormatters._();
+
+  static TextInputFormatter get sqlInjectionGuard =>
+      _SqlInjectionGuardFormatter.instance;
+
+  static List<TextInputFormatter>? withSqlInjectionGuard({
+    List<TextInputFormatter>? inputFormatters,
+    bool enabled = true,
+  }) {
+    final formatters = <TextInputFormatter>[];
+
+    if (enabled) {
+      formatters.add(sqlInjectionGuard);
+    }
+
+    if (inputFormatters != null && inputFormatters.isNotEmpty) {
+      formatters.addAll(inputFormatters);
+    }
+
+    return formatters.isEmpty ? null : formatters;
   }
 }
 

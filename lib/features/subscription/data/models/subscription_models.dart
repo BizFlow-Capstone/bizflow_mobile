@@ -59,7 +59,7 @@ class PlanFeatureDto {
 
   factory PlanFeatureDto.fromJson(Map<String, dynamic> json) {
     return PlanFeatureDto(
-      featureId: json['featureId'] as int,
+      featureId: json['featureId'] as int? ?? 0,
       featureCode: json['featureCode'] as String? ?? '',
       featureName: json['featureName'] as String? ?? '',
       usageLimit: json['usageLimit'] as int? ?? 0,
@@ -93,7 +93,7 @@ class SubscriptionPlanDto {
 
   factory SubscriptionPlanDto.fromJson(Map<String, dynamic> json) {
     return SubscriptionPlanDto(
-      subscriptionPlanId: json['subscriptionPlanId'] as int,
+      subscriptionPlanId: json['subscriptionPlanId'] as int? ?? 0,
       name: json['name'] as String? ?? '',
       description: json['description'] as String?,
       durationDays: json['durationDays'] as int? ?? 0,

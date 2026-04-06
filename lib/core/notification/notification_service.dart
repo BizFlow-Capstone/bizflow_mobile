@@ -87,9 +87,10 @@ class NotificationService {
     required DateTime scheduledTime,
     String? payload,
   }) async {
-    // TODO: Implement schedule notification
     debugPrint(
-      'NotificationService: Schedule notification at $scheduledTime - $title: $body',
+      'NotificationService: scheduleNotification is disabled on mobile. '
+      'Admin/backend is the source of truth for notification scheduling. '
+      'Request ignored for id=$id, title=$title, at=$scheduledTime',
     );
   }
 

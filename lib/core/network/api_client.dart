@@ -232,6 +232,10 @@ class ApiClient {
 
   late final HttpClient _client;
 
+  static const Set<String> _nonRefreshable401MessageCodes = {
+    'AUTH_CURRENT_PASSWORD_INCORRECT',
+  };
+
   ApiClient({
     required this.baseUrl,
     this.timeout = const Duration(seconds: 30),
@@ -530,6 +534,7 @@ class ApiClient {
           .whereType<TokenRefreshInterceptor>()
           .firstOrNull;
       if (e.statusCode == 401 &&
+          !_shouldSkipRefreshFor401(e) &&
           refreshInterceptor != null &&
           refreshInterceptor.shouldRefresh(e.statusCode)) {
         final newToken = await refreshInterceptor.attemptRefresh();
@@ -758,6 +763,19 @@ class ApiClient {
     }
   }
 
+  bool _shouldSkipRefreshFor401(ApiException error) {
+    final data = error.data;
+    if (data is Map) {
+      final rawCode = data['messageCode'];
+      final messageCode = rawCode?.toString().trim();
+      if (messageCode != null &&
+          _nonRefreshable401MessageCodes.contains(messageCode)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   String _getErrorMessage(int statusCode, dynamic body) {
     if (body is Map && body.containsKey('message')) {
       return body['message'].toString();
@@ -765,17 +783,17 @@ class ApiClient {
 
     switch (statusCode) {
       case 400:
-        return 'Bad request';
+        return 'Yeu cau khong hop le';
       case 401:
-        return 'Unauthorized';
+        return 'Ban chua dang nhap';
       case 403:
-        return 'Forbidden';
+        return 'Ban khong co quyen truy cap';
       case 404:
-        return 'Not found';
+        return 'Khong tim thay du lieu';
       case 500:
-        return 'Internal server error';
+        return 'Loi he thong, vui long thu lai sau';
       default:
-        return 'Unknown error';
+        return 'Da xay ra loi khong xac dinh';
     }
   }
 

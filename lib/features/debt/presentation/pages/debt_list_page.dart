@@ -16,6 +16,7 @@ import '../../../../shared/context/business_context.dart';
 import '../../../../shared/services/permission_service.dart';
 import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../subscription/data/subscription_repository.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
@@ -1172,7 +1173,9 @@ class _DebtListPageState extends State<DebtListPage> {
                 TextField(
                   controller: creditLimitController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [CurrencyInputFormatter()],
+                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                    inputFormatters: [CurrencyInputFormatter()],
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('debt.credit_limit'),
                     suffixText: 'đ',
@@ -1329,7 +1332,9 @@ class _DebtListPageState extends State<DebtListPage> {
                     TextField(
                       controller: amountController,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [CurrencyInputFormatter()],
+                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                        inputFormatters: [CurrencyInputFormatter()],
+                      ),
                       decoration: InputDecoration(
                         labelText: l10n.translate('debt.adjust_amount'),
                         suffixText: 'đ',

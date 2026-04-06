@@ -6,7 +6,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
-import '../../../../core/network/api_error_message_parser.dart';
 
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_bloc.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_event.dart';
@@ -25,25 +24,18 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/cache/sync_status_controller.dart';
-import '../../../../shared/context/user_profile_context.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../bloc/accounting_period_bloc.dart';
-import '../models/accounting_mock_models.dart';
-import '../widgets/accounting_books_reports_tab.dart';
 import '../widgets/accounting_cost_revenue_tab.dart';
 import '../widgets/accounting_gl_tab.dart';
 import '../widgets/accounting_period_tab.dart';
-import '../bloc/accounting_book_bloc.dart';
-import '../../domain/models/accounting_book.dart';
-import '../../data/repositories/accounting_repository.dart';
-import '../../data/services/excel_export_service.dart';
 import '../../../subscription/data/subscription_repository.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
-import '../../../location/presentation/bloc/location_bloc.dart';
-import '../../../location/presentation/bloc/location_state.dart';
 
 class AccountingHubPage extends StatefulWidget {
   const AccountingHubPage({super.key});
@@ -54,7 +46,6 @@ class AccountingHubPage extends StatefulWidget {
 
 class _AccountingHubPageState extends State<AccountingHubPage>
     with SingleTickerProviderStateMixin {
-  static const String _featureReportExport = SubscriptionFeatureCodes.export;
   static const String _featureManualRevenue =
       SubscriptionFeatureCodes.manualRevenue;
 
@@ -62,23 +53,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
   // Period BLoC data is managed by AccountingPeriodBloc
   // Other tabs still use local/mock state for now
-  DateTime _reportFromDate = DateTime(2026, 1, 1);
-  DateTime _reportToDate = DateTime(2026, 3, 31);
-  String _reportFormat = 'pdf';
   final AudioRecorder _voiceRecorder = AudioRecorder();
   final AudioPlayer _voicePlayer = AudioPlayer();
   bool _isVoiceRecording = false;
   String? _lastVoicePath;
   String? _lastVoiceTranscript;
-
-  final List<TaxPaymentItemModel> _taxPayments = [
-    TaxPaymentItemModel(
-      taxType: 'VAT',
-      amount: 6200000,
-      date: DateTime(2026, 2, 28),
-      reference: 'NSNN-2026-0012',
-    ),
-  ];
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -113,20 +92,17 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           LoadPeriodsRequested(locationId),
         );
         break;
-      case 2: // Doanh thu & Chi phí
+      case 2: // Doanh thu
         context.read<RevenueBloc>().add(
           LoadRevenuesRequested(businessLocationId: locationId),
         );
+        break;
+      case 3: // Chi phí
         if (context.mounted) {
           context.read<CostBloc>().add(
             LoadCostsRequested(businessLocationId: locationId),
           );
         }
-        break;
-      case 3: // Sổ kế toán
-        context.read<AccountingBookBloc>().add(
-          LoadBooksRequested(locationId: locationId),
-        );
         break;
       // Tab 1 (Nhật ký/Sổ cái) is handled by AccountingGlTab internally or we could add triggering logic here later
     }
@@ -385,207 +361,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.success),
-    );
-  }
-
-  Future<void> _editTaxPayment(TaxPaymentItemModel item) async {
-    final amountController = TextEditingController(
-      text: CurrencyFormatter.formatNumber(item.amount),
-    );
-    final refController = TextEditingController(text: item.reference);
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(l10n.translate('accounting.edit_tax_payment')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyInputFormatter()],
-              decoration: InputDecoration(
-                labelText: l10n.translate('accounting.amount'),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: refController,
-              decoration: InputDecoration(
-                labelText: l10n.translate('accounting.reference_number'),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.translate('common.cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final amount =
-                  (CurrencyFormatter.parse(amountController.text) ?? 0)
-                      .toDouble();
-              if (amount <= 0 || refController.text.trim().isEmpty) return;
-
-              final ok = await _confirmAction(
-                title: l10n.translate('accounting.confirm_title'),
-                message: l10n.translate(
-                  'accounting.confirm_update_tax_payment',
-                ),
-              );
-              if (!ok) return;
-
-              setState(() {
-                // // item.amount = amount;
-                item.reference = refController.text.trim();
-              });
-
-              if (context.mounted) {
-                Navigator.pop(ctx);
-                _showSuccess(l10n.translate('accounting.updated_success'));
-              }
-            },
-            child: Text(l10n.translate('common.save')),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _exportBook(AccountingBook book) async {
-    final ok = await _confirmAction(
-      title: l10n.translate('accounting.confirm_title'),
-      message: l10n.translate('accounting.confirm_export_book'),
-    );
-    if (!ok) return;
-
-    final allowed = await _checkFeatureAccess(_featureReportExport);
-    if (!allowed) return;
-
-    // Show loading
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đang tải dữ liệu và xuất file Excel...')),
-    );
-
-    try {
-      final locationId = context.read<BusinessContext>().currentBusinessId;
-      if (locationId == null) return;
-      final repository = context.read<AccountingRepository>();
-
-      final rows = await _loadAllBookRows(
-        locationId: locationId,
-        bookId: book.bookId.toString(),
-      );
-      final sectionsData = await repository.getBookSections(
-        locationId: locationId,
-        bookId: book.bookId.toString(),
-      );
-      final headerInfo = _buildExportHeaderInfo(
-        locationId: locationId,
-        sectionsData: sectionsData,
-      );
-
-      final files = await ExcelExportService.exportToExcelFiles(
-        book,
-        rows,
-        sectionsData: sectionsData,
-        headerInfo: headerInfo,
-      );
-      if (files.isNotEmpty) {
-        await ExcelExportService.shareExportedFiles(files);
-        _showSuccess(l10n.translate('accounting.export_success'));
-      } else {
-        throw Exception('Không thể tạo file Excel');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ApiErrorMessageParser.parse(e)),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _loadAllBookRows({
-    required String locationId,
-    required String bookId,
-  }) async {
-    final repository = context.read<AccountingRepository>();
-    final allRows = <Map<String, dynamic>>[];
-    String? cursor;
-    bool hasMore = true;
-
-    while (hasMore) {
-      final response = await repository.getBookRows(
-        locationId: locationId,
-        bookId: bookId,
-        cursor: cursor,
-      );
-      allRows.addAll(response.rows);
-      hasMore = response.hasMore;
-      cursor = response.nextCursor;
-    }
-
-    return allRows;
-  }
-
-  ExcelExportHeaderInfo _buildExportHeaderInfo({
-    required String locationId,
-    required BookSectionsResponse sectionsData,
-  }) {
-    final businessContext = context.read<BusinessContext>();
-    final userProfile = UserProfileContext();
-
-    var businessName = '';
-    var locationName = '';
-    String address = '';
-    String taxCode = '';
-    final locationState = context.read<LocationBloc>().state;
-    if (locationState is LocationsLoaded) {
-      for (final loc in locationState.locations) {
-        if (loc.id == locationId) {
-          businessName = loc.ownerName.trim();
-          locationName = loc.name.trim();
-          address = loc.fullAddress;
-          taxCode = (loc.taxCode ?? '').trim();
-          break;
-        }
-      }
-    }
-
-    if (businessName.isEmpty) {
-      businessName = (userProfile.fullName ?? '').trim();
-    }
-    if (businessName.isEmpty) {
-      businessName = (businessContext.currentBusinessName ?? '').trim();
-    }
-
-    final periodLabel =
-        '${sectionsData.lastCalculatedAt.month.toString().padLeft(2, '0')}/${sectionsData.lastCalculatedAt.year}';
-
-    return ExcelExportHeaderInfo(
-      businessName: businessName,
-      taxCode: taxCode,
-      address: address,
-      locationName: locationName,
-      periodLabel: periodLabel,
-    );
-  }
-
-  Future<void> _generateReport() async {
-    final ok = await _confirmAction(
-      title: l10n.translate('accounting.confirm_title'),
-      message: l10n.translate('accounting.confirm_generate_report'),
-    );
-    if (!ok) return;
-
-    _showSuccess(l10n.translate('accounting.report_generated_success'));
+    AppSnackBar.success(context, message);
   }
 
   Future<bool> _checkFeatureAccess(String featureCode) async {
@@ -603,16 +379,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           );
 
       if (!allowed && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.translate('subscription.feature_blocked')),
-            action: SnackBarAction(
-              label: l10n.translate('settings_page.upgrade'),
-              onPressed: () {
-                AppRouter.navigateTo(AppRoutes.subscriptionPlans);
-              },
-            ),
-          ),
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('subscription.feature_blocked'),
+          type: AppSnackBarType.warning,
+          actionLabel: l10n.translate('settings_page.upgrade'),
+          onAction: () {
+            AppRouter.navigateTo(AppRoutes.subscriptionPlans);
+          },
         );
       }
 
@@ -627,30 +401,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   Widget build(BuildContext context) {
     final locationId = context.watch<BusinessContext>().currentBusinessId;
 
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider<AccountingBookBloc>(
-          create: (context) => AccountingBookBloc(
-            repository: context.read<AccountingRepository>(),
-          ),
-        ),
-      ],
-      child: BlocListener<AccountingBookBloc, AccountingBookState>(
-        listener: (context, state) {
-          if (state is AccountingBookOperationSuccess) {
-            _showSuccess(state.message);
-          } else if (state is AccountingBookError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
-            );
-          }
-        },
-        child: _buildScaffold(context, locationId),
-      ),
-    );
+    return _buildScaffold(context, locationId);
   }
 
   Widget _buildScaffold(BuildContext context, String? locationId) {
@@ -687,12 +438,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 l10n.translate('accounting.revenue_deleted_success'),
               );
             } else if (state is RevenueError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: AppColors.error,
-                ),
-              );
+              AppSnackBar.error(context, state.message);
             }
           },
         ),
@@ -709,12 +455,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 );
               }
             } else if (state is CostOperationFailure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: AppColors.error,
-                ),
-              );
+              AppSnackBar.error(context, state.message);
             }
           },
         ),
@@ -753,8 +494,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 tabs: [
                   Tab(text: l10n.translate('accounting.tab_period')),
                   Tab(text: l10n.translate('accounting.tab_gl')),
-                  Tab(text: l10n.translate('accounting.tab_cost_revenue')),
-                  Tab(text: l10n.translate('accounting.tab_books_reports')),
+                  Tab(text: l10n.translate('accounting.revenue_list')),
+                  Tab(text: l10n.translate('accounting.cost_list')),
                 ],
               ),
               Expanded(
@@ -785,89 +526,38 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           revenueEntities = revenueState.revenues;
                         }
 
-                        return BlocBuilder<CostBloc, CostState>(
-                          builder: (context, costState) {
-                            List<CostEntity> costEntities = [];
-                            if (costState is CostsLoaded) {
-                              costEntities = costState.costs;
-                            }
-
-                            return AccountingCostRevenueTab(
-                              revenues: revenueEntities,
-                              costs: costEntities,
-                              onAddRevenue: _showAddRevenueDialog,
-                              onAddCost: _showAddCostDialog,
-                              onEditRevenue: _showEditRevenueDialog,
-                              onTapRevenue: _showRevenueDetailDialog,
-                              onDeleteRevenue: _onDeleteRevenue,
-                              onEditCost: _showEditCostDialog,
-                              onDeleteCost: _onDeleteCost,
-                            );
-                          },
+                        return AccountingCostRevenueTab(
+                          mode: AccountingCostRevenueMode.revenue,
+                          revenues: revenueEntities,
+                          costs: const <CostEntity>[],
+                          onAddRevenue: _showAddRevenueDialog,
+                          onAddCost: _showAddCostDialog,
+                          onEditRevenue: _showEditRevenueDialog,
+                          onTapRevenue: _showRevenueDetailDialog,
+                          onDeleteRevenue: _onDeleteRevenue,
+                          onEditCost: _showEditCostDialog,
+                          onDeleteCost: _onDeleteCost,
                         );
                       },
                     ),
-                    BlocBuilder<AccountingBookBloc, AccountingBookState>(
-                      builder: (context, state) {
-                        List<BookItemModel> bookModels = [];
-                        if (state is AccountingBookLoaded) {
-                          bookModels = state.books
-                              .map(
-                                (b) => BookItemModel(
-                                  code: b.bookCode,
-                                  name: b
-                                      .templateCode, // Template code as name for now
-                                  group: 'Nhóm ${b.groupNumber}',
-                                  // Store the original book object if needed, but here we just map to model
-                                ),
-                              )
-                              .toList();
+                    BlocBuilder<CostBloc, CostState>(
+                      builder: (context, costState) {
+                        List<CostEntity> costEntities = [];
+                        if (costState is CostsLoaded) {
+                          costEntities = costState.costs;
                         }
 
-                        return FutureBuilder<List<bool>>(
-                          future: Future.wait([
-                            context
-                                .read<SubscriptionRepository>()
-                                .canUseFeatureCode(
-                                  featureCode: _featureReportExport,
-                                ),
-                            context
-                                .read<SubscriptionRepository>()
-                                .canUseFeatureCode(
-                                  featureCode: SubscriptionFeatureCodes.reports,
-                                ),
-                          ]),
-                          builder: (context, snapshot) {
-                            final access = snapshot.data ?? const [true, true];
-                            return AccountingBooksReportsTab(
-                              books: bookModels,
-                              taxPayments: _taxPayments,
-                              fromDate: _reportFromDate,
-                              toDate: _reportToDate,
-                              reportFormat: _reportFormat,
-                              onExportBook: (bookModel) {
-                                if (state is AccountingBookLoaded) {
-                                  final originalBook = state.books.firstWhere(
-                                    (b) => b.bookCode == bookModel.code,
-                                  );
-                                  _exportBook(originalBook);
-                                }
-                              },
-                              onEditTaxPayment: _editTaxPayment,
-                              onFromDateChanged: (value) =>
-                                  setState(() => _reportFromDate = value),
-                              onToDateChanged: (value) =>
-                                  setState(() => _reportToDate = value),
-                              onReportFormatChanged: (value) =>
-                                  setState(() => _reportFormat = value),
-                              onGenerateReport: _generateReport,
-                              canExportBooks: access[0],
-                              canGenerateReport: access[1],
-                              limitWarningText: l10n.translate(
-                                'subscription.limit_warning',
-                              ),
-                            );
-                          },
+                        return AccountingCostRevenueTab(
+                          mode: AccountingCostRevenueMode.cost,
+                          revenues: const <RevenueEntity>[],
+                          costs: costEntities,
+                          onAddRevenue: _showAddRevenueDialog,
+                          onAddCost: _showAddCostDialog,
+                          onEditRevenue: _showEditRevenueDialog,
+                          onTapRevenue: _showRevenueDetailDialog,
+                          onDeleteRevenue: _onDeleteRevenue,
+                          onEditCost: _showEditCostDialog,
+                          onDeleteCost: _onDeleteCost,
                         );
                       },
                     ),
@@ -902,12 +592,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           .read<ProductBloc>()
           .repository
           .getBusinessTypes();
-      if (result is List) {
-        businessTypes = List<BusinessTypeDto>.from(result);
-      }
+      businessTypes = List<BusinessTypeDto>.from(result);
     } catch (_) {
       businessTypes = [];
     }
+
+    if (!mounted) return;
 
     List<String> getMoneyChannels() {
       final state = context.read<ReferenceBloc>().state;
@@ -1099,6 +789,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 );
                 if (!allowed) return;
 
+                if (!mounted) return;
+                if (!dialogCtx.mounted) return;
+
                 // Use outer page context — dialog ctx has no Providers
                 final locationId = context
                     .read<BusinessContext>()
@@ -1129,7 +822,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     },
                   ),
                 );
-                Navigator.pop(dialogCtx);
+                Navigator.of(dialogCtx).pop();
               },
               child: Text(l10n.translate('common.save')),
             ),
@@ -1219,7 +912,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [CurrencyInputFormatter()],
+                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                    inputFormatters: [CurrencyInputFormatter()],
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('accounting.amount'),
                   ),
@@ -1416,7 +1111,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [CurrencyInputFormatter()],
+                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                    inputFormatters: [CurrencyInputFormatter()],
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('accounting.amount'),
                   ),
@@ -1533,6 +1230,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 );
                 if (!ok) return;
 
+                if (!mounted) return;
                 if (!dialogCtx.mounted) return;
 
                 // Use outer context to read BLoC safely
@@ -1555,7 +1253,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     },
                   ),
                 );
-                Navigator.pop(dialogCtx);
+                Navigator.of(dialogCtx).pop();
               },
               child: Text(l10n.translate('common.save')),
             ),
@@ -1686,12 +1384,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           .read<ProductBloc>()
           .repository
           .getBusinessTypes();
-      if (result is List) {
-        businessTypes = List<BusinessTypeDto>.from(result);
-      }
+      businessTypes = List<BusinessTypeDto>.from(result);
     } catch (_) {
       businessTypes = [];
     }
+
+    if (!mounted) return;
 
     String? selectedMoneyChannel = item.moneyChannel;
     final channels = getMoneyChannels();
@@ -1718,7 +1416,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 TextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: [CurrencyInputFormatter()],
+                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                    inputFormatters: [CurrencyInputFormatter()],
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('accounting.revenue_amount'),
                   ),
@@ -1855,6 +1555,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 );
                 if (!allowed) return;
 
+                if (!mounted) return;
                 if (!dialogCtx.mounted) return;
 
                 final locationId = context
@@ -1882,7 +1583,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     },
                   ),
                 );
-                Navigator.pop(dialogCtx);
+                Navigator.of(dialogCtx).pop();
               },
               child: Text(l10n.translate('common.save')),
             ),

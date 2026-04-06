@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../data/employee_management_repository.dart';
 import '../../../../core/network/api_error_message_parser.dart';
@@ -12,13 +11,13 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
   final EmployeeManagementRepository _repository;
 
   EmployeeBloc({required EmployeeManagementRepository repository})
-      : _repository = repository,
-        super(EmployeeInitial()) {
+    : _repository = repository,
+      super(EmployeeInitial()) {
     on<LoadEmployeesRequested>(_onLoadEmployees);
     on<EmployeesNetworkDataReceived>(_onEmployeesNetworkDataReceived);
     on<SelectEmployeeTabRequested>(_onSelectTab);
-      on<SearchEmployeeKeywordChanged>(_onSearchKeywordChanged);
-      on<SearchEmployeesRequested>(_onSearchEmployees);
+    on<SearchEmployeeKeywordChanged>(_onSearchKeywordChanged);
+    on<SearchEmployeesRequested>(_onSearchEmployees);
     on<AddEmployeeRequested>(_onAddEmployee);
     on<AddMultipleEmployeesRequested>(_onAddMultipleEmployees);
     on<UpdateEmployeeRequested>(_onUpdateEmployee);
@@ -130,13 +129,12 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
 
     try {
       await _repository.addEmployee(event.businessId, event.employeeId);
-      
+
       emit(const EmployeeActionSuccess('Gửi lời mời thành công'));
       emit(currentState); // Phục hồi state để list page không bị trắng màn
 
       // Request a reload from network since the employee is pending
       add(LoadEmployeesRequested(businessId: event.businessId));
-
     } catch (e) {
       emit(EmployeeFailure(ApiErrorMessageParser.parse(e)));
       emit(currentState);
@@ -157,7 +155,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       for (final id in event.employeeIds) {
         await _repository.addEmployee(event.businessId, id);
       }
-      
+
       emit(const EmployeeActionSuccess('Gửi lời mời thành công'));
       emit(currentState); // Phục hồi state để list page không bị trắng màn
 
@@ -205,7 +203,9 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     try {
       await _repository.deleteEmployee(event.employeeId);
 
-      emit(const EmployeeActionSuccess('Cập nhật trạng thái nhân viên thành công'));
+      emit(
+        const EmployeeActionSuccess('Cập nhật trạng thái nhân viên thành công'),
+      );
       await _reloadEmployeesFromServer(currentState, emit);
     } catch (e) {
       emit(EmployeeFailure(ApiErrorMessageParser.parse(e)));
@@ -217,10 +217,12 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     EmployeeLoaded currentState,
     Emitter<EmployeeState> emit,
   ) async {
-    final businessId = currentState.allEmployees.firstWhere(
-      (e) => e.assignedBusinessId.trim().isNotEmpty,
-      orElse: () => const EmployeeEntity(id: '', name: ''),
-    ).assignedBusinessId;
+    final businessId = currentState.allEmployees
+        .firstWhere(
+          (e) => e.assignedBusinessId.trim().isNotEmpty,
+          orElse: () => const EmployeeEntity(id: '', name: ''),
+        )
+        .assignedBusinessId;
 
     if (businessId.isEmpty) {
       emit(
@@ -255,13 +257,17 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     final safeTabIndex = tabIndex.clamp(0, 3);
 
     if (safeTabIndex == 0) {
-      filtered = employees.where((e) => e.isActive).toList(); // All (active only)
+      filtered = employees
+          .where((e) => e.isActive)
+          .toList(); // All (active only)
     } else if (safeTabIndex == 1) {
       filtered = employees
           .where((e) => e.isActive && e.status == EmployeeStatus.active)
           .toList(); // Active
     } else if (safeTabIndex == 2) {
-      filtered = employees.where((e) => e.status == EmployeeStatus.pending).toList(); // Pending
+      filtered = employees
+          .where((e) => e.status == EmployeeStatus.pending)
+          .toList(); // Pending
     } else if (safeTabIndex == 3) {
       filtered = employees.where((e) => !e.isActive).toList(); // History
     }
@@ -277,8 +283,14 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
 
     if (safeTabIndex == 3) {
       filtered.sort((a, b) {
-        final aTime = a.endedAt ?? a.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
-        final bTime = b.endedAt ?? b.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+        final aTime =
+            a.endedAt ??
+            a.startedAt ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+        final bTime =
+            b.endedAt ??
+            b.startedAt ??
+            DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
         final cmp = bTime.compareTo(aTime);
         if (cmp != 0) return cmp;
         return b.name.toLowerCase().compareTo(a.name.toLowerCase());
@@ -288,7 +300,9 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     final activeCount = employees
         .where((e) => e.isActive && e.status == EmployeeStatus.active)
         .length;
-    final pendingCount = employees.where((e) => e.status == EmployeeStatus.pending).length;
+    final pendingCount = employees
+        .where((e) => e.status == EmployeeStatus.pending)
+        .length;
     final historyCount = employees.where((e) => !e.isActive).length;
     final totalCount = employees.length;
 

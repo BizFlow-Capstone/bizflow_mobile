@@ -35,6 +35,8 @@
     "email": "Email",
     "password": "Mật khẩu",
     "confirm_password": "Xác nhận mật khẩu",
+    "current_password": "Mật khẩu hiện tại",
+    "new_password": "Mật khẩu mới",
     "forgot_password": "Quên mật khẩu?",
     "remember_me": "Ghi nhớ đăng nhập",
     "login_success": "Đăng nhập thành công",
@@ -109,7 +111,15 @@
     "checking_auth": "Đang kiểm tra...",
     "welcome_new_user": "Chào mừng! Vui lòng thiết lập mật khẩu",
     "passwords_not_match": "Mật khẩu không khớp",
-    "password_min_length_8": "Mật khẩu phải có ít nhất 8 ký tự"
+    "password_min_length_8": "Mật khẩu phải có ít nhất 8 ký tự",
+    "send_otp": "Gửi mã OTP",
+    "otp_sent_generic": "Đã gửi mã OTP, vui lòng kiểm tra email",
+    "otp_sent_to_email": "Mã OTP đã gửi đến {email}",
+    "forgot_password_step": "Bước {step}/3",
+    "reset_password_button": "Đặt lại mật khẩu",
+    "reset_password_success": "Đặt lại mật khẩu thành công",
+    "link_phone_required_title": "Liên kết số điện thoại",
+    "link_phone_required_subtitle": "Tài khoản Google mới cần liên kết số điện thoại trước khi đặt mật khẩu"
   },
   "validation": {
     "required": "Trường này bắt buộc",
@@ -143,7 +153,20 @@
     "link_now": "Liên kết",
     "link_email": "Liên kết email",
     "link_phone": "Liên kết số điện thoại",
-    "link_success": "Liên kết thành công"
+    "link_success": "Liên kết thành công",
+    "tax_code": "Mã số thuế",
+    "tax_code_hint": "Nhập mã số thuế (nếu có)",
+    "remove_avatar": "Xóa ảnh đại diện",
+    "security": "Bảo mật",
+    "delete_account": "Xóa tài khoản",
+    "delete_account_password_note": "Nhập mật khẩu để tiếp tục quy trình xóa tài khoản vĩnh viễn.",
+    "delete_account_confirm_title": "Xóa tài khoản vĩnh viễn",
+    "delete_account_confirm_body": "Hành động này không thể hoàn tác. Tất cả dữ liệu liên quan đến tài khoản của bạn sẽ bị xóa vĩnh viễn.",
+    "delete_account_confirm_action": "Tôi hiểu, tiếp tục",
+    "delete_account_phrase_title": "Xác nhận lần cuối",
+    "delete_account_phrase_hint": "Nhập chính xác cụm: {phrase}",
+    "delete_account_final_action": "Xóa tài khoản vĩnh viễn",
+    "delete_account_phrase_invalid": "Cụm xác nhận không chính xác"
   },
   "settings": {
     "title": "Cài đặt",

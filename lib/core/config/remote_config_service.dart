@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 
 /// Remote Config Service - Feature flags & remote configuration
 class RemoteConfigService {
@@ -7,6 +8,7 @@ class RemoteConfigService {
   RemoteConfigService._internal();
 
   bool _isInitialized = false;
+  final FirebaseRemoteConfig _remoteConfig = FirebaseRemoteConfig.instance;
 
   // Default values
   final Map<String, dynamic> _defaults = {
@@ -24,23 +26,25 @@ class RemoteConfigService {
     'max_upload_size_mb': 10,
   };
 
-  // Cached values (simulate remote config)
+  // Cached values used as safe fallback if fetch/read fails.
   final Map<String, dynamic> _values = {};
 
   /// Initialize remote config
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // TODO: Initialize Firebase Remote Config
-    // final remoteConfig = FirebaseRemoteConfig.instance;
-    // await remoteConfig.setDefaults(_defaults);
-    // await remoteConfig.setConfigSettings(RemoteConfigSettings(
-    //   fetchTimeout: const Duration(minutes: 1),
-    //   minimumFetchInterval: const Duration(hours: 1),
-    // ));
+    await _remoteConfig.setDefaults(_defaults);
+    await _remoteConfig.setConfigSettings(
+      RemoteConfigSettings(
+        fetchTimeout: const Duration(minutes: 1),
+        minimumFetchInterval: const Duration(hours: 1),
+      ),
+    );
 
-    // Load defaults
-    _values.addAll(_defaults);
+    // Keep defaults as local fallback for resilience.
+    _values
+      ..clear()
+      ..addAll(_defaults);
 
     _isInitialized = true;
     debugPrint('RemoteConfigService: Initialized');
@@ -49,9 +53,7 @@ class RemoteConfigService {
   /// Fetch and activate
   Future<bool> fetchAndActivate() async {
     try {
-      // TODO: Implement with Firebase Remote Config
-      // final remoteConfig = FirebaseRemoteConfig.instance;
-      // await remoteConfig.fetchAndActivate();
+      await _remoteConfig.fetchAndActivate();
 
       debugPrint('RemoteConfigService: Fetched and activated');
       return true;
@@ -63,25 +65,49 @@ class RemoteConfigService {
 
   /// Get bool value
   bool getBool(String key) {
-    // TODO: return FirebaseRemoteConfig.instance.getBool(key);
+    if (_isInitialized) {
+      try {
+        return _remoteConfig.getBool(key);
+      } catch (_) {
+        // Fall through to local defaults.
+      }
+    }
     return _values[key] as bool? ?? _defaults[key] as bool? ?? false;
   }
 
   /// Get string value
   String getString(String key) {
-    // TODO: return FirebaseRemoteConfig.instance.getString(key);
+    if (_isInitialized) {
+      try {
+        return _remoteConfig.getString(key);
+      } catch (_) {
+        // Fall through to local defaults.
+      }
+    }
     return _values[key] as String? ?? _defaults[key] as String? ?? '';
   }
 
   /// Get int value
   int getInt(String key) {
-    // TODO: return FirebaseRemoteConfig.instance.getInt(key);
+    if (_isInitialized) {
+      try {
+        return _remoteConfig.getInt(key);
+      } catch (_) {
+        // Fall through to local defaults.
+      }
+    }
     return _values[key] as int? ?? _defaults[key] as int? ?? 0;
   }
 
   /// Get double value
   double getDouble(String key) {
-    // TODO: return FirebaseRemoteConfig.instance.getDouble(key);
+    if (_isInitialized) {
+      try {
+        return _remoteConfig.getDouble(key);
+      } catch (_) {
+        // Fall through to local defaults.
+      }
+    }
     return (_values[key] as num?)?.toDouble() ??
         (_defaults[key] as num?)?.toDouble() ??
         0.0;

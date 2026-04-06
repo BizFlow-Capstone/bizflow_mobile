@@ -10,7 +10,6 @@ import '../bloc/order_bloc.dart';
 import '../widgets/order_card.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
-import 'order_detail_screen.dart';
 import 'order_form_screen.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
@@ -152,13 +151,6 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
     await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
   }
 
-  void _openOrderDetail(OrderEntity order) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => OrderDetailScreen(orderId: order.id)),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -224,8 +216,15 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigate to create order screen
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const OrderFormScreen(inputType: 'manual'),
+            ),
+          );
+          if (!mounted) return;
+          context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
         },
         child: const Icon(Icons.add),
       ),

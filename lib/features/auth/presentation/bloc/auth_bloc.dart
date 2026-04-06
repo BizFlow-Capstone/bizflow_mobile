@@ -62,6 +62,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   String? _pendingLinkPhonePassword;
   String? _pendingLinkPhoneVerificationId;
 
+  static const String _googleOnboardingStepLinkPhone = 'link_phone';
+  static const String _googleOnboardingStepSetPassword = 'set_password';
+
   AuthBloc({
     required this.locationRepository,
     required this.authRepository,
@@ -85,6 +88,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<StartLinkPhoneRequested>(_onStartLinkPhoneRequested);
     on<SubmitLinkPhoneOtpRequested>(_onSubmitLinkPhoneOtpRequested);
     on<ResendLinkPhoneOtpRequested>(_onResendLinkPhoneOtpRequested);
+    on<ForgotPasswordSendOtpRequested>(_onForgotPasswordSendOtpRequested);
+    on<ForgotPasswordVerifyOtpRequested>(_onForgotPasswordVerifyOtpRequested);
+    on<ForgotPasswordResetRequested>(_onForgotPasswordResetRequested);
+    on<LoadProfileRequested>(_onLoadProfileRequested);
+    on<UpdateProfileRequested>(_onUpdateProfileRequested);
+    on<UpdateAvatarRequested>(_onUpdateAvatarRequested);
+    on<RemoveAvatarRequested>(_onRemoveAvatarRequested);
+    on<ChangePasswordRequested>(_onChangePasswordRequested);
+    on<DeleteAccountRequested>(_onDeleteAccountRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<ClearAuthError>(_onClearAuthError);
   }
@@ -96,17 +108,28 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final loggedIn = await authRepository.isLoggedIn();
       if (loggedIn) {
         await DatabaseManager().initialize();
+        final onboardingStep = await secureStorage.getGoogleOnboardingStep();
+        if (onboardingStep == _googleOnboardingStepLinkPhone) {
+          emit(const NeedsGooglePhoneLinkOnResume());
+          return;
+        }
+        if (onboardingStep == _googleOnboardingStepSetPassword) {
+          emit(const NeedsSetPasswordOnResume());
+          return;
+        }
         final needsSetPassword = await secureStorage.getNeedsSetPassword();
         if (needsSetPassword) {
           emit(const NeedsSetPasswordOnResume());
           return;
         }
         try {
-          await firebaseMessagingService
-              .registerCurrentToken()
-              .timeout(const Duration(seconds: 2));
+          await firebaseMessagingService.registerCurrentToken().timeout(
+            const Duration(seconds: 2),
+          );
         } catch (e) {
-          debugPrint('AuthBloc: Token registration timed out or failed, proceeding...');
+          debugPrint(
+            'AuthBloc: Token registration timed out or failed, proceeding...',
+          );
         }
         final token = await authRepository.getStoredAccessToken();
         emit(AuthAuthenticated(accessToken: token ?? ''));
@@ -240,16 +263,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
 
       if (result.isNewAccount == true) {
-        await secureStorage.setNeedsSetPassword(true);
-        // New account — must set password before accessing the app
-        emit(
-          GoogleLoginSetPasswordRequired(
-            accessToken: result.accessToken!,
-            refreshToken: result.refreshToken ?? '',
-          ),
+        await secureStorage.setNeedsSetPassword(false);
+        await secureStorage.setGoogleOnboardingStep(
+          _googleOnboardingStepLinkPhone,
         );
+        emit(const GoogleLoginPhoneLinkRequired());
       } else {
         await secureStorage.setNeedsSetPassword(false);
+        await secureStorage.clearGoogleOnboardingStep();
         await firebaseMessagingService.registerCurrentToken();
         emit(LoginSuccess(accessToken: result.accessToken!, user: const {}));
       }
@@ -273,6 +294,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final result = await authRepository.setPassword(password: event.password);
       if (result.success) {
         await secureStorage.setNeedsSetPassword(false);
+        await secureStorage.clearGoogleOnboardingStep();
         await firebaseMessagingService.registerCurrentToken();
         emit(const SetPasswordSuccess());
       } else {
@@ -349,9 +371,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         },
         verificationFailed: (FirebaseAuthException e) {
           if (!completer.isCompleted) {
-            completer.completeError(
-              Exception('${e.code}: ${e.message ?? 'OTP send failed'}'),
-            );
+            completer.completeError(e);
           }
         },
         codeSent: (String verificationId, int? resendToken) {
@@ -386,7 +406,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       emit(
         PhoneRegisterFailure(
-          message: e.toString().replaceAll('Exception: ', ''),
+          message: _mapPhoneAuthError(e),
         ),
       );
     }
@@ -417,7 +437,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       emit(
         PhoneRegisterFailure(
-          message: e.toString().replaceAll('Exception: ', ''),
+          message: _mapPhoneAuthError(e),
         ),
       );
     }
@@ -520,11 +540,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(const LinkCredentialSuccess(linkedType: 'google'));
       add(const LoadCredentialsRequested());
     } catch (e) {
-      emit(
-        LinkCredentialFailure(
-          message: _mapGoogleSignInError(e),
-        ),
-      );
+      emit(LinkCredentialFailure(message: _mapGoogleSignInError(e)));
     }
   }
 
@@ -561,9 +577,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         },
         verificationFailed: (FirebaseAuthException e) {
           if (!completer.isCompleted) {
-            completer.completeError(
-              Exception('${e.code}: ${e.message ?? 'OTP send failed'}'),
-            );
+            completer.completeError(e);
           }
         },
         codeSent: (String verificationId, int? resendToken) {
@@ -598,7 +612,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       emit(
         LinkCredentialFailure(
-          message: e.toString().replaceAll('Exception: ', ''),
+          message: _mapPhoneAuthError(e),
         ),
       );
     }
@@ -630,7 +644,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       emit(
         LinkCredentialFailure(
-          message: e.toString().replaceAll('Exception: ', ''),
+          message: _mapPhoneAuthError(e),
         ),
       );
     }
@@ -652,6 +666,231 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         password: _pendingLinkPhonePassword,
       ),
     );
+  }
+
+  Future<void> _onForgotPasswordSendOtpRequested(
+    ForgotPasswordSendOtpRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ForgotPasswordInProgress());
+    final result = await authRepository.forgotPasswordSendOtp(
+      email: event.email,
+    );
+    if (!result.success) {
+      emit(ForgotPasswordFailure(message: result.message));
+      return;
+    }
+    emit(ForgotPasswordOtpSent(email: event.email));
+  }
+
+  Future<void> _onForgotPasswordVerifyOtpRequested(
+    ForgotPasswordVerifyOtpRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ForgotPasswordInProgress());
+    final result = await authRepository.forgotPasswordVerifyOtp(
+      email: event.email,
+      otpCode: event.otpCode,
+    );
+    if (!result.success || result.accessToken == null) {
+      emit(ForgotPasswordFailure(message: result.message));
+      return;
+    }
+
+    await secureStorage.write(
+      key: SecureStorageKeys.accessToken,
+      value: result.accessToken!,
+    );
+    emit(const ForgotPasswordOtpVerified());
+  }
+
+  Future<void> _onForgotPasswordResetRequested(
+    ForgotPasswordResetRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ForgotPasswordInProgress());
+    final result = await authRepository.forgotPasswordReset(
+      password: event.password,
+    );
+    if (!result.success) {
+      emit(ForgotPasswordFailure(message: result.message));
+      return;
+    }
+
+    await secureStorage.clearAuthTokens();
+    emit(const ForgotPasswordResetSuccess());
+  }
+
+  Future<void> _onLoadProfileRequested(
+    LoadProfileRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ProfileLoading());
+    final result = await authRepository.getProfile();
+    if (!result.success) {
+      emit(ProfileUpdateFailure(message: result.message));
+      return;
+    }
+
+    await UserProfileContext().saveProfile(
+      fullName: result.fullName,
+      avatarUrl: result.avatarUrl,
+      email: UserProfileContext().email,
+      phone: UserProfileContext().phone,
+    );
+    AppRouter.globalAppBarState.updateProfile(
+      name: result.fullName,
+      avatarUrl: result.avatarUrl,
+    );
+    emit(
+      ProfileLoaded(
+        fullName: result.fullName,
+        avatarUrl: result.avatarUrl,
+        taxCode: result.taxCode,
+      ),
+    );
+  }
+
+  Future<void> _onUpdateProfileRequested(
+    UpdateProfileRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ProfileLoading());
+    final result = await authRepository.updateProfile(
+      fullName: event.fullName,
+      taxCode: event.taxCode,
+    );
+    if (!result.success) {
+      emit(ProfileUpdateFailure(message: result.message));
+      return;
+    }
+
+    await UserProfileContext().saveProfile(
+      fullName: result.fullName,
+      avatarUrl: result.avatarUrl,
+      email: UserProfileContext().email,
+      phone: UserProfileContext().phone,
+      taxCode: result.taxCode,
+    );
+    AppRouter.globalAppBarState.updateProfile(
+      name: result.fullName,
+      avatarUrl: result.avatarUrl,
+    );
+    emit(ProfileUpdateSuccess(message: result.message));
+    emit(
+      ProfileLoaded(
+        fullName: result.fullName,
+        avatarUrl: result.avatarUrl,
+        taxCode: result.taxCode,
+      ),
+    );
+  }
+
+  Future<void> _onUpdateAvatarRequested(
+    UpdateAvatarRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ProfileLoading());
+    final result = await authRepository.updateAvatar(avatarPath: event.avatarPath);
+    if (!result.success) {
+      emit(ProfileUpdateFailure(message: result.message));
+      return;
+    }
+
+    await UserProfileContext().saveProfile(
+      fullName: result.fullName,
+      avatarUrl: result.avatarUrl,
+      email: UserProfileContext().email,
+      phone: UserProfileContext().phone,
+      taxCode: result.taxCode,
+    );
+    AppRouter.globalAppBarState.updateProfile(
+      name: result.fullName,
+      avatarUrl: result.avatarUrl,
+    );
+    emit(ProfileUpdateSuccess(message: result.message));
+    emit(
+      ProfileLoaded(
+        fullName: result.fullName,
+        avatarUrl: result.avatarUrl,
+        taxCode: result.taxCode,
+      ),
+    );
+  }
+
+  Future<void> _onRemoveAvatarRequested(
+    RemoveAvatarRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ProfileLoading());
+    final result = await authRepository.removeAvatar();
+    if (!result.success) {
+      emit(ProfileUpdateFailure(message: result.message));
+      return;
+    }
+
+    await UserProfileContext().saveProfile(
+      fullName: result.fullName,
+      avatarUrl: null,
+      email: UserProfileContext().email,
+      phone: UserProfileContext().phone,
+      taxCode: result.taxCode,
+    );
+    AppRouter.globalAppBarState.updateProfile(
+      name: result.fullName,
+      avatarUrl: null,
+    );
+    emit(ProfileUpdateSuccess(message: result.message));
+    emit(
+      ProfileLoaded(
+        fullName: result.fullName,
+        avatarUrl: null,
+        taxCode: result.taxCode,
+      ),
+    );
+  }
+
+  Future<void> _onChangePasswordRequested(
+    ChangePasswordRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const ChangePasswordInProgress());
+    final result = await authRepository.changePassword(
+      currentPassword: event.currentPassword,
+      newPassword: event.newPassword,
+    );
+
+    if (!result.success) {
+      emit(ChangePasswordFailure(message: result.message));
+      return;
+    }
+
+    emit(ChangePasswordSuccess(message: result.message));
+  }
+
+  Future<void> _onDeleteAccountRequested(
+    DeleteAccountRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const DeleteAccountInProgress());
+    final result = await authRepository.deleteAccount(password: event.password);
+
+    if (!result.success) {
+      emit(DeleteAccountFailure(message: result.message));
+      return;
+    }
+
+    await secureStorage.clearAuthTokens();
+    await secureStorage.clearGoogleOnboardingStep();
+    await secureStorage.setNeedsSetPassword(false);
+    await secureStorage.clearRegisterTaxCode();
+    await UserProfileContext().clear();
+    await BusinessContext().clear();
+    await CacheManager().clearAll();
+    await DatabaseManager().clearForLogout();
+
+    emit(DeleteAccountSuccess(message: result.message));
+    emit(const LogoutSuccess());
   }
 
   Future<void> _completePhoneRegisterWithCredential({
@@ -753,6 +992,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     await _addLinkedCredentialTypeToCache('phone');
+
+    final onboardingStep = await secureStorage.getGoogleOnboardingStep();
+    if (onboardingStep == _googleOnboardingStepLinkPhone) {
+      await secureStorage.setGoogleOnboardingStep(
+        _googleOnboardingStepSetPassword,
+      );
+      await secureStorage.setNeedsSetPassword(true);
+      emit(
+        const GoogleLoginSetPasswordRequired(accessToken: '', refreshToken: ''),
+      );
+      return;
+    }
+
     emit(const LinkCredentialSuccess(linkedType: 'phone'));
     add(const LoadCredentialsRequested());
   }
@@ -769,6 +1021,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await UserProfileContext().clear();
       await CacheManager().clearAll();
       await secureStorage.clearNeedsSetPassword();
+      await secureStorage.clearGoogleOnboardingStep();
       await secureStorage.clearCredentialTypes();
       AppRouter.globalAppBarState.reset();
 
@@ -830,13 +1083,66 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     if (error is PlatformException) {
       final code = error.code.toLowerCase();
-      final details = '${error.message ?? ''} ${error.details ?? ''}'.toLowerCase();
-      if (code.contains('sign_in_failed') || details.contains('developer_error')) {
+      final details = '${error.message ?? ''} ${error.details ?? ''}'
+          .toLowerCase();
+      if (code.contains('sign_in_failed') ||
+          details.contains('developer_error')) {
         return 'Google Sign-In configuration is invalid on this device build. Please check Firebase Android app config and Play Services.';
       }
     }
 
     return ApiErrorMessageParser.parse(error);
+  }
+
+  String _mapPhoneAuthError(Object error) {
+    final languageCode = PlatformDispatcher.instance.locale.languageCode
+        .toLowerCase();
+    final isVietnamese = languageCode.startsWith('vi');
+
+    String vi(String fallback) => fallback;
+    String en(String fallback) => fallback;
+
+    if (error is FirebaseAuthException) {
+      final code = error.code.toLowerCase();
+
+      if (code == 'invalid-phone-number') {
+        return isVietnamese
+            ? vi('Số điện thoại không đúng định dạng E.164. Vui lòng nhập lại.')
+            : en('Invalid phone number format. Please enter a valid E.164 phone number.');
+      }
+      if (code == 'too-many-requests' || code == 'quota-exceeded') {
+        return isVietnamese
+            ? vi('Bạn đã gửi yêu cầu OTP quá nhiều lần. Vui lòng thử lại sau.')
+            : en('Too many OTP requests. Please try again later.');
+      }
+      if (code == 'network-request-failed') {
+        return isVietnamese
+            ? vi('Kết nối mạng không ổn định. Vui lòng kiểm tra mạng và thử lại.')
+            : en('Network error. Please check your connection and try again.');
+      }
+      if (code == 'session-expired' || code == 'invalid-verification-code') {
+        return isVietnamese
+            ? vi('Mã OTP không hợp lệ hoặc đã hết hạn.')
+            : en('The OTP code is invalid or has expired.');
+      }
+
+      final rawMessage = (error.message ?? '').toLowerCase();
+      if (rawMessage.contains('too_long') || rawMessage.contains('too long')) {
+        return isVietnamese
+            ? vi('Số điện thoại quá dài, vui lòng kiểm tra lại.')
+            : en('The phone number is too long. Please check and try again.');
+      }
+    }
+
+    final fallback = ApiErrorMessageParser.parse(error);
+    if (fallback.toLowerCase().contains('too_long') ||
+        fallback.toLowerCase().contains('too long')) {
+      return isVietnamese
+          ? vi('Số điện thoại quá dài, vui lòng kiểm tra lại.')
+          : en('The phone number is too long. Please check and try again.');
+    }
+
+    return fallback;
   }
 
   String _extractTokenMetadata(String token) {

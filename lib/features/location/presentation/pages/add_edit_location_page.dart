@@ -13,6 +13,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/context/user_profile_context.dart';
 import '../../../../shared/utils/action_guard.dart';
 
 import '../../domain/domain.dart';
@@ -98,14 +99,23 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   }
 
   Future<void> _prefillTaxCodeFromRegister() async {
+    if (_taxCodeController.text.trim().isNotEmpty) return;
+
+    final profileTaxCode = UserProfileContext().taxCode?.trim();
+    if ((profileTaxCode ?? '').isNotEmpty && mounted) {
+      setState(() {
+        _taxCodeController.text = profileTaxCode!;
+      });
+      return;
+    }
+
     final savedTaxCode = await SecureStorage().getRegisterTaxCode();
     if (!mounted) return;
     if ((savedTaxCode ?? '').isEmpty) return;
-    if (_taxCodeController.text.trim().isEmpty) {
-      setState(() {
-        _taxCodeController.text = savedTaxCode!.trim();
-      });
-    }
+
+    setState(() {
+      _taxCodeController.text = savedTaxCode!.trim();
+    });
   }
 
   @override
@@ -246,6 +256,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
               context,
               listen: false,
             );
+            final navigator = Navigator.of(context);
             if (businessContext.currentBusinessId == state.updatedLocation.id) {
               await businessContext.switchBusinessLocation(
                 state.updatedLocation.id,
@@ -254,7 +265,8 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                     true, // Editing a location → must be owner to have reached this screen
               );
             }
-            Navigator.pop(context);
+            if (!mounted) return;
+            navigator.pop();
           } else if (state is AddEmployeeToLocationSuccess) {
             AppSnackBar.show(
               context,

@@ -54,7 +54,9 @@ class CurrentSubscriptionPage extends StatelessWidget {
           ),
         ),
       ),
-      body: SwrBuilder<CurrentSubscriptionDto?>(
+      body: SafeArea(
+        top: false,
+        child: SwrBuilder<CurrentSubscriptionDto?>(
         cacheKey: 'current_subscription',
         fetcher: ({cancelToken}) => apiService.getCurrentSubscription(
           cancelToken: cancelToken,
@@ -99,6 +101,7 @@ class CurrentSubscriptionPage extends StatelessWidget {
           );
         },
       ),
+    ),
     );
   }
 

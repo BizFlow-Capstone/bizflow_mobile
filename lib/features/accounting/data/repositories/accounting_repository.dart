@@ -18,8 +18,8 @@ class AccountingRepository {
   String _periodsKey(String locationId) => 'periods_$locationId';
   String _periodDetailKey(String locationId, String periodId) =>
       'period_detail_${locationId}_$periodId';
-    String _booksKey(String locationId, String periodId) =>
-      'books_${locationId}_$periodId';
+    String _booksKey(String locationId, String? periodId) =>
+      'books_${locationId}_${periodId ?? 'all'}';
 
     static const String _periodsSyncResourceKey = 'accounting_periods_list';
     static const String _booksSyncResourceKey = 'accounting_books_list';
@@ -267,12 +267,12 @@ class AccountingRepository {
   /// Get books for specific period with SWR pattern
   Future<void> fetchBooksForPeriodSWR({
     required String locationId,
-    required String periodId,
+    String? periodId,
     required void Function(List<AccountingBook> books, bool fromCache) onData,
     void Function(dynamic error)? onError,
   }) async {
     final cacheKey = _booksKey(locationId, periodId);
-    final booksScopeKey = '${locationId}_$periodId';
+    final booksScopeKey = '${locationId}_${periodId ?? 'all'}';
     var hasLocalData = false;
     final localCached = await _localApiCache.getMap(cacheKey);
     if (localCached != null) {

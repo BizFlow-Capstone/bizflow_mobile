@@ -11,6 +11,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
@@ -232,7 +233,9 @@ class _EditProductPageState extends State<EditProductPage> {
               TextField(
                 controller: quantityController,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
                 decoration: InputDecoration(
                   labelText: l10n.translate('product.quantity'),
                   hintText: '12',
@@ -242,7 +245,9 @@ class _EditProductPageState extends State<EditProductPage> {
               TextField(
                 controller: priceController,
                 keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
+                inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                  inputFormatters: [CurrencyInputFormatter()],
+                ),
                 decoration: InputDecoration(
                   labelText: l10n.translate('product.price'),
                   hintText: '120,000',
@@ -756,7 +761,10 @@ class _EditProductPageState extends State<EditProductPage> {
                           setState(() => _costPriceError = null);
                         },
                         keyboardType: TextInputType.number,
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters:
+                            AppInputFormatters.withSqlInjectionGuard(
+                              inputFormatters: [CurrencyInputFormatter()],
+                            ),
                       ),
                     ),
                     SizedBox(width: AppSpacing.md),
@@ -771,7 +779,10 @@ class _EditProductPageState extends State<EditProductPage> {
                           setState(() => _salePriceError = null);
                         },
                         keyboardType: TextInputType.number,
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters:
+                            AppInputFormatters.withSqlInjectionGuard(
+                              inputFormatters: [CurrencyInputFormatter()],
+                            ),
                       ),
                     ),
                   ],
@@ -1043,7 +1054,9 @@ class _EditProductPageState extends State<EditProductPage> {
           onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,
-          inputFormatters: inputFormatters,
+          inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+            inputFormatters: inputFormatters,
+          ),
           decoration: InputDecoration(
             hintText: hint,
             errorText: errorText,

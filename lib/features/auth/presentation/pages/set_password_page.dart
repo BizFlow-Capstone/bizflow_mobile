@@ -5,6 +5,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../bloc/auth_bloc.dart';
@@ -25,6 +26,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
   final _confirmController = TextEditingController();
   final _passwordFocus = FocusNode();
   final _confirmFocus = FocusNode();
+  String? _confirmPasswordError;
 
   @override
   void dispose() {
@@ -45,17 +47,20 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
       return;
     }
     if (password != confirm) {
-      _showError(l10n.translate('auth.passwords_not_match'));
+      setState(() {
+        _confirmPasswordError = l10n.translate('auth.passwords_not_match');
+      });
       return;
     }
+    setState(() {
+      _confirmPasswordError = null;
+    });
 
     context.read<AuthBloc>().add(SetPasswordRequested(password: password));
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
-    );
+    AppSnackBar.error(context, message);
   }
 
   @override
@@ -136,6 +141,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                     label: l10n.translate('auth.confirm_password'),
                     hintText: l10n.translate('auth.enter_password'),
                     textInputAction: TextInputAction.done,
+                    errorText: _confirmPasswordError,
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   BlocBuilder<AuthBloc, AuthState>(

@@ -5,10 +5,13 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/language_switcher.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
+import '../navigation/post_auth_navigation.dart';
 import '../bloc/auth_state.dart';
 
 /// SC-AUT-02: Verify OTP Page
@@ -117,9 +120,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
-    );
+    AppSnackBar.error(context, message);
   }
 
   @override
@@ -135,7 +136,7 @@ class _VerifyOtpPageState extends State<VerifyOtpPage> {
         surfaceTintColor: AppColors.white,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(l10n.translate('auth.verify_otp_title')),
@@ -198,8 +199,7 @@ class _VerifyOtpPageContent extends StatelessWidget {
       listener: (context, state) {
         if (state is OtpVerificationSuccess) {
           _showSuccess(context, l10n.translate('auth.verify_success'));
-          // TODO: Navigate to home screen
-          // Navigator.pushReplacementNamed(context, '/home');
+          PostAuthNavigation.route(context);
         } else if (state is OtpVerificationFailure) {
           final errorMessage = _mapErrorCodeToLocalization(state.errorCode);
           _showError(context, errorMessage);
@@ -233,7 +233,7 @@ class _VerifyOtpPageContent extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -257,9 +257,23 @@ class _VerifyOtpPageContent extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: AppSpacing.xl),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(6, (index) => _buildOtpBox(index)),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const gap = 8.0;
+                    final rawWidth = (constraints.maxWidth - (5 * gap)) / 6;
+                    final boxWidth = rawWidth.clamp(44.0, 56.0);
+
+                    return Row(
+                      children: List.generate(6, (index) {
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            right: index == 5 ? 0 : gap,
+                          ),
+                          child: _buildOtpBox(index, boxWidth),
+                        );
+                      }),
+                    );
+                  },
                 ),
                 SizedBox(height: AppSpacing.xl),
                 BlocBuilder<AuthBloc, AuthState>(
@@ -337,11 +351,10 @@ class _VerifyOtpPageContent extends StatelessWidget {
     );
   }
 
-  Widget _buildOtpBox(int index) {
+  Widget _buildOtpBox(int index, double boxWidth) {
     return Container(
-      width: 50,
-      height: 60,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: boxWidth,
+      height: 76,
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.divider, width: 2),
         borderRadius: AppSpacing.borderRadiusMd,
@@ -350,32 +363,34 @@ class _VerifyOtpPageContent extends StatelessWidget {
         controller: otpControllers[index],
         focusNode: otpFocusNodes[index],
         textAlign: TextAlign.center,
+        textAlignVertical: TextAlignVertical.center,
         keyboardType: TextInputType.number,
+        inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        ),
         maxLength: 1,
         onChanged: (value) => onOtpInput(index, value),
         decoration: const InputDecoration(
           counterText: '',
           border: InputBorder.none,
           contentPadding: EdgeInsets.zero,
+          isCollapsed: true,
         ),
-        style: AppTextStyles.headlineMedium.copyWith(
+        style: AppTextStyles.titleLarge.copyWith(
           color: AppColors.textPrimary,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          height: 1.0,
         ),
       ),
     );
   }
 
   void _showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.danger),
-    );
+    AppSnackBar.error(context, message);
   }
 
   void _showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.success),
-    );
+    AppSnackBar.success(context, message);
   }
 
   String _mapErrorCodeToLocalization(AuthErrorCode errorCode) {

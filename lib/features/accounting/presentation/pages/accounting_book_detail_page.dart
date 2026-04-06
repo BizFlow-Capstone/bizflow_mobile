@@ -22,6 +22,7 @@ import '../../../location/presentation/bloc/location_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/context/user_profile_context.dart';
@@ -44,6 +45,7 @@ class AccountingBookDetailPage extends StatefulWidget {
 class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
   late Future<BookSectionsResponse?> _sectionsFuture;
   late Future<List<Map<String, dynamic>>> _rowsFuture;
+  bool _isShowingLoadErrorDialog = false;
 
   @override
   void initState() {
@@ -82,6 +84,26 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
     return allRows;
   }
 
+  void _showLoadErrorDialog(String message) {
+    if (!mounted || _isShowingLoadErrorDialog) return;
+    _isShowingLoadErrorDialog = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _isShowingLoadErrorDialog = false;
+        return;
+      }
+
+      await AppDialog.error(
+        context,
+        title: AppLocalizations.of(context).translate('common.error'),
+        message: message,
+      );
+
+      _isShowingLoadErrorDialog = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,17 +129,30 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
           }
 
           if (snapshot.hasError) {
+            final errorMessage = ApiErrorMessageParser.parse(snapshot.error!);
+            _showLoadErrorDialog(errorMessage);
+
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
+                  Icon(
+                    Icons.error_outline,
+                    color: AppColors.error,
+                    size: 36,
+                  ),
+                  SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Error: ${snapshot.error}',
-                    style: TextStyle(color: AppColors.error),
+                    'Không thể tải dữ liệu sổ kế toán',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   SizedBox(height: AppSpacing.md),
                   ElevatedButton(
                     onPressed: () => setState(() {
+                      _isShowingLoadErrorDialog = false;
                       _sectionsFuture = _loadSections();
                       _rowsFuture = _loadAllRows();
                     }),

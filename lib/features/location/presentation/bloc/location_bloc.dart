@@ -443,7 +443,11 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   ) async {
     _locations = [];
     _currentLocationEmployeeIds = [];
-    await repository.clearCachedLocations();
+    try {
+      await repository.clearCachedLocations();
+    } catch (_) {
+      // Database may already be closing during logout — safe to ignore.
+    }
     emit(const LocationInitial());
   }
 }

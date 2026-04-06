@@ -85,6 +85,10 @@ class GoogleLoginSetPasswordRequired extends AuthState {
   });
 }
 
+class GoogleLoginPhoneLinkRequired extends AuthState {
+  const GoogleLoginPhoneLinkRequired();
+}
+
 // Set Password States
 class SetPasswordInProgress extends AuthState {
   const SetPasswordInProgress();
@@ -109,6 +113,10 @@ class AuthAuthenticated extends AuthState {
 
 class NeedsSetPasswordOnResume extends AuthState {
   const NeedsSetPasswordOnResume();
+}
+
+class NeedsGooglePhoneLinkOnResume extends AuthState {
+  const NeedsGooglePhoneLinkOnResume();
 }
 
 // Unauthenticated State
@@ -171,6 +179,86 @@ class PhoneOtpCodeSent extends AuthState {
   final String phone;
 
   const PhoneOtpCodeSent({required this.phone});
+}
+
+class ForgotPasswordInProgress extends AuthState {
+  const ForgotPasswordInProgress();
+}
+
+class ForgotPasswordOtpSent extends AuthState {
+  final String email;
+
+  const ForgotPasswordOtpSent({required this.email});
+}
+
+class ForgotPasswordOtpVerified extends AuthState {
+  const ForgotPasswordOtpVerified();
+}
+
+class ForgotPasswordResetSuccess extends AuthState {
+  const ForgotPasswordResetSuccess();
+}
+
+class ForgotPasswordFailure extends AuthState {
+  final String message;
+
+  const ForgotPasswordFailure({required this.message});
+}
+
+class ProfileLoading extends AuthState {
+  const ProfileLoading();
+}
+
+class ProfileLoaded extends AuthState {
+  final String? fullName;
+  final String? avatarUrl;
+  final String? taxCode;
+
+  const ProfileLoaded({this.fullName, this.avatarUrl, this.taxCode});
+}
+
+class ProfileUpdateSuccess extends AuthState {
+  final String message;
+
+  const ProfileUpdateSuccess({required this.message});
+}
+
+class ProfileUpdateFailure extends AuthState {
+  final String message;
+
+  const ProfileUpdateFailure({required this.message});
+}
+
+class ChangePasswordInProgress extends AuthState {
+  const ChangePasswordInProgress();
+}
+
+class ChangePasswordSuccess extends AuthState {
+  final String message;
+
+  const ChangePasswordSuccess({required this.message});
+}
+
+class ChangePasswordFailure extends AuthState {
+  final String message;
+
+  const ChangePasswordFailure({required this.message});
+}
+
+class DeleteAccountInProgress extends AuthState {
+  const DeleteAccountInProgress();
+}
+
+class DeleteAccountSuccess extends AuthState {
+  final String message;
+
+  const DeleteAccountSuccess({required this.message});
+}
+
+class DeleteAccountFailure extends AuthState {
+  final String message;
+
+  const DeleteAccountFailure({required this.message});
 }
 
 class PhoneRegisterFailure extends AuthState {

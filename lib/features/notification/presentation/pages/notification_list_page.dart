@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
 import 'dart:async';
 
 import '../../../../core/localization/app_localizations.dart';
@@ -76,17 +75,19 @@ class _NotificationListPageState extends State<NotificationListPage> {
         if (!mounted) return;
         setState(() {
           if (_currentPage == 1) {
-             _notifications.clear();
+            _notifications.clear();
           }
           final ids = _notifications.map((e) => e.userNotificationId).toSet();
           for (var item in page.items) {
-             if (!ids.contains(item.userNotificationId)) {
-                _notifications.add(item);
-                ids.add(item.userNotificationId);
-             } else {
-                final idx = _notifications.indexWhere((n) => n.userNotificationId == item.userNotificationId);
-                if (idx != -1) _notifications[idx] = item;
-             }
+            if (!ids.contains(item.userNotificationId)) {
+              _notifications.add(item);
+              ids.add(item.userNotificationId);
+            } else {
+              final idx = _notifications.indexWhere(
+                (n) => n.userNotificationId == item.userNotificationId,
+              );
+              if (idx != -1) _notifications[idx] = item;
+            }
           }
           _hasNextPage = page.hasNextPage;
           _isInitialLoading = false;

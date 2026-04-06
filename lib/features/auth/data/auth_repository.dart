@@ -1,6 +1,8 @@
 ﻿import 'auth_api_service.dart';
 import 'models/auth_response.dart';
 import 'models/credentials_response.dart';
+import 'models/user_profile_response.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_storage.dart';
 
 abstract class AuthRepository {
@@ -43,6 +45,33 @@ abstract class AuthRepository {
   });
 
   Future<AuthResponse> refreshToken();
+
+  Future<AuthResponse> forgotPasswordSendOtp({required String email});
+
+  Future<AuthResponse> forgotPasswordVerifyOtp({
+    required String email,
+    required String otpCode,
+  });
+
+  Future<AuthResponse> forgotPasswordReset({required String password});
+
+  Future<UserProfileResponse> getProfile();
+
+  Future<UserProfileResponse> updateProfile({
+    String? fullName,
+    String? taxCode,
+  });
+
+  Future<UserProfileResponse> updateAvatar({required String avatarPath});
+
+  Future<UserProfileResponse> removeAvatar();
+
+  Future<AuthResponse> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
+  Future<AuthResponse> deleteAccount({required String password});
 
   Future<void> logout();
 
@@ -163,7 +192,7 @@ class AuthRepositoryImpl implements AuthRepository {
     } catch (e) {
       return CredentialsResponse(
         success: false,
-        message: e.toString().replaceAll('Exception: ', ''),
+        message: e is ApiException ? e.message : e.toString().replaceAll('Exception: ', ''),
         credentialTypes: const [],
       );
     }
@@ -230,6 +259,128 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AuthResponse> forgotPasswordSendOtp({required String email}) async {
+    try {
+      final response = await _apiService.forgotPasswordSendOtp(email: email);
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<AuthResponse> forgotPasswordVerifyOtp({
+    required String email,
+    required String otpCode,
+  }) async {
+    try {
+      final response = await _apiService.forgotPasswordVerifyOtp(
+        email: email,
+        otpCode: otpCode,
+      );
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<AuthResponse> forgotPasswordReset({required String password}) async {
+    try {
+      final response = await _apiService.forgotPasswordReset(
+        password: password,
+      );
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<UserProfileResponse> getProfile() async {
+    try {
+      final response = await _apiService.getProfile();
+      return UserProfileResponse.fromJson(response);
+    } catch (e) {
+      return UserProfileResponse(
+        success: false,
+        message: e is ApiException ? e.message : e.toString().replaceAll('Exception: ', ''),
+      );
+    }
+  }
+
+  @override
+  Future<UserProfileResponse> updateProfile({
+    String? fullName,
+    String? taxCode,
+  }) async {
+    try {
+      final response = await _apiService.updateProfile(
+        fullName: fullName,
+        taxCode: taxCode,
+      );
+      return UserProfileResponse.fromJson(response);
+    } catch (e) {
+      return UserProfileResponse(
+        success: false,
+        message: e is ApiException ? e.message : e.toString().replaceAll('Exception: ', ''),
+      );
+    }
+  }
+
+  @override
+  Future<UserProfileResponse> updateAvatar({required String avatarPath}) async {
+    try {
+      final response = await _apiService.updateAvatar(avatarPath: avatarPath);
+      return UserProfileResponse.fromJson(response);
+    } catch (e) {
+      return UserProfileResponse(
+        success: false,
+        message: e is ApiException ? e.message : e.toString().replaceAll('Exception: ', ''),
+      );
+    }
+  }
+
+  @override
+  Future<UserProfileResponse> removeAvatar() async {
+    try {
+      final response = await _apiService.removeAvatar();
+      return UserProfileResponse.fromJson(response);
+    } catch (e) {
+      return UserProfileResponse(
+        success: false,
+        message: e is ApiException ? e.message : e.toString().replaceAll('Exception: ', ''),
+      );
+    }
+  }
+
+  @override
+  Future<AuthResponse> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _apiService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
+  Future<AuthResponse> deleteAccount({required String password}) async {
+    try {
+      final response = await _apiService.deleteAccount(password: password);
+      return AuthResponse.fromJson(response);
+    } catch (e) {
+      return _errorResponse(e);
+    }
+  }
+
+  @override
   Future<void> logout() async {
     try {
       final storedRefreshToken = await _secureStorage.getRefreshToken();
@@ -283,7 +434,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   AuthResponse _errorResponse(Object e) {
-    final msg = e.toString().replaceAll('Exception: ', '');
-    return AuthResponse(success: false, message: msg);
+    if (e is ApiException) return AuthResponse(success: false, message: e.message);
+    return AuthResponse(success: false, message: e.toString().replaceAll('Exception: ', ''));
   }
 }

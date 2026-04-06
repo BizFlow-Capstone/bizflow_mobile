@@ -59,16 +59,26 @@ class AccountingBookBloc
     LoadBooksRequested event,
     Emitter<AccountingBookState> emit,
   ) async {
-    emit(AccountingBookLoading());
-    try {
-      final books = await _repository.listBooks(
-        locationId: event.locationId,
-        periodId: event.periodId,
-      );
-      emit(AccountingBookLoaded(books));
-    } catch (e) {
-      emit(AccountingBookError(ApiErrorMessageParser.parse(e)));
+    var emittedData = false;
+    if (state is! AccountingBookLoaded) {
+      emit(AccountingBookLoading());
     }
+
+    await _repository.fetchBooksForPeriodSWR(
+      locationId: event.locationId,
+      periodId: event.periodId,
+      onData: (books, fromCache) {
+        emittedData = true;
+        if (!isClosed) {
+          emit(AccountingBookLoaded(books));
+        }
+      },
+      onError: (error) {
+        if (!isClosed && !emittedData) {
+          emit(AccountingBookError(ApiErrorMessageParser.parse(error)));
+        }
+      },
+    );
   }
 
   Future<void> _onCreateBooks(

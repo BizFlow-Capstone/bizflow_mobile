@@ -60,6 +60,7 @@ class SecureStorageKeys {
   static const String registerTaxCode = 'register_tax_code';
   static const String credentialTypes = 'secure_credential_types';
   static const String pendingNotificationAction = 'pending_notification_action';
+  static const String googleOnboardingStep = 'secure_google_onboarding_step';
 }
 
 /// Token management helpers
@@ -119,6 +120,10 @@ extension SecureStorageTokenExtension on SecureStorage {
     return read(key: SecureStorageKeys.registerTaxCode);
   }
 
+  Future<void> clearRegisterTaxCode() async {
+    await delete(key: SecureStorageKeys.registerTaxCode);
+  }
+
   Future<void> setCredentialTypes(List<String> credentialTypes) async {
     final normalized = credentialTypes
         .map((e) => e.trim().toLowerCase())
@@ -168,5 +173,17 @@ extension SecureStorageTokenExtension on SecureStorage {
 
   Future<void> clearPendingNotificationAction() async {
     await delete(key: SecureStorageKeys.pendingNotificationAction);
+  }
+
+  Future<void> setGoogleOnboardingStep(String step) async {
+    await write(key: SecureStorageKeys.googleOnboardingStep, value: step);
+  }
+
+  Future<String?> getGoogleOnboardingStep() async {
+    return read(key: SecureStorageKeys.googleOnboardingStep);
+  }
+
+  Future<void> clearGoogleOnboardingStep() async {
+    await delete(key: SecureStorageKeys.googleOnboardingStep);
   }
 }

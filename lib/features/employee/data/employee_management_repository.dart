@@ -1,6 +1,6 @@
-
 import '../domain/entities/employee_entity.dart';
 import '../../../core/database/app_database.dart';
+import '../../../shared/cache/local_api_cache_store.dart';
 import 'datasources/employee_local_datasource.dart';
 import 'employee_api_service.dart';
 import 'models/employee_dto.dart';
@@ -10,7 +10,10 @@ abstract class EmployeeManagementRepository {
   Future<List<EmployeeEntity>> getEmployees(String businessId);
   Future<List<EmployeeEntity>> searchEmployees(String query);
   Future<void> addEmployee(String businessId, String employeeId);
-  Future<EmployeeEntity> updateEmployee(String employeeId, EmployeeEntity updateData);
+  Future<EmployeeEntity> updateEmployee(
+    String employeeId,
+    EmployeeEntity updateData,
+  );
   Future<void> deleteEmployee(String employeeId);
 }
 
@@ -18,6 +21,7 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
   final EmployeeApiService _apiService;
   final LocationApiService _locationApiService;
   final EmployeeLocalDataSource _localDataSource;
+  final LocalApiCacheStore _localApiCache;
   _EmployeeAssignmentMap? _assignmentMemoryCache;
 
   static const String _employeesSyncResourceKey = 'employees_list';
@@ -26,9 +30,11 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
     required EmployeeApiService apiService,
     required LocationApiService locationApiService,
     EmployeeLocalDataSource? localDataSource,
-  })  : _apiService = apiService,
-        _locationApiService = locationApiService,
-        _localDataSource = localDataSource ?? EmployeeLocalDataSource();
+    LocalApiCacheStore? localApiCacheStore,
+  }) : _apiService = apiService,
+       _locationApiService = locationApiService,
+       _localDataSource = localDataSource ?? EmployeeLocalDataSource(),
+       _localApiCache = localApiCacheStore ?? LocalApiCacheStore();
 
   Future<List<EmployeeEntity>> getCachedEmployees(String businessId) {
     return _localDataSource.getByBusinessId(businessId);
@@ -65,59 +71,132 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       forceRefresh: true,
     );
 
-    final resolved = employees
-        .map(
-          (employee) {
-            final employeeId = employee.profileId;
-            return EmployeeEntity(
-            id: employee.profileId,
-            name: employee.userName,
-            phone: employee.phone,
-            email: employee.email,
-            status: _toEmployeeStatus(employee),
-            isActive: employee.isActive,
-            employmentStatus: employee.status,
-            startedAt: employee.startAt,
-            endedAt: employee.endAt,
-            assignedBusinessId: businessId,
-            assignedLocationIds:
-                assignmentMap.locationIdsByEmployee[employeeId] ?? const [],
-            assignedLocationNames:
-                assignmentMap.locationNamesByEmployee[employeeId] ?? const [],
-          );
-          },
-        )
-        .toList();
+    final resolved = employees.map((employee) {
+      final employeeId = employee.profileId;
+      return EmployeeEntity(
+        id: employee.profileId,
+        name: employee.userName,
+        phone: employee.phone,
+        email: employee.email,
+        status: _toEmployeeStatus(employee),
+        isActive: employee.isActive,
+        employmentStatus: employee.status,
+        startedAt: employee.startAt,
+        endedAt: employee.endAt,
+        assignedBusinessId: businessId,
+        assignedLocationIds:
+            assignmentMap.locationIdsByEmployee[employeeId] ?? const [],
+        assignedLocationNames:
+            assignmentMap.locationNamesByEmployee[employeeId] ?? const [],
+      );
+    }).toList();
 
-            await saveCachedEmployees(businessId, resolved);
-            return resolved;
+    await saveCachedEmployees(businessId, resolved);
+    return resolved;
   }
 
   @override
   Future<List<EmployeeEntity>> searchEmployees(String query) async {
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isEmpty) {
+      return const <EmployeeEntity>[];
+    }
+
+    final cacheKey = 'employee_search_${normalizedQuery.toLowerCase()}';
+    final localCached = await _localApiCache.getMap(cacheKey);
+    if (localCached != null) {
+      final rawItems = localCached['items'] as List<dynamic>? ?? const [];
+      final cached = rawItems
+          .whereType<Map<String, dynamic>>()
+          .map(_employeeFromCachedMap)
+          .toList();
+
+      // Sync-implicit: refresh in background to keep cache fresh.
+      _refreshEmployeeSearchCache(cacheKey: cacheKey, query: normalizedQuery);
+      return cached;
+    }
+
+    return _refreshEmployeeSearchCache(
+      cacheKey: cacheKey,
+      query: normalizedQuery,
+    );
+  }
+
+  Future<List<EmployeeEntity>> _refreshEmployeeSearchCache({
+    required String cacheKey,
+    required String query,
+  }) async {
     final employees = await _apiService.searchEmployees(query);
-    return employees
-        .map(
-          (employee) => EmployeeEntity(
-            id: employee.profileId,
-            name: employee.userName,
-            phone: employee.phone,
-            email: employee.email,
-            status: _toEmployeeStatus(employee),
-            isActive: employee.isActive,
-            employmentStatus: employee.status,
-            startedAt: employee.startAt,
-            endedAt: employee.endAt,
-          ),
-        )
-        .toList();
+    final mapped = employees.map(_mapEmployeeDtoToEntity).toList();
+
+    await _localApiCache.setMap(
+      cacheKey,
+      {
+        'items': mapped
+            .map(
+              (employee) => {
+                'id': employee.id,
+                'name': employee.name,
+                'phone': employee.phone,
+                'email': employee.email,
+                'status': employee.status.name,
+                'isActive': employee.isActive,
+                'employmentStatus': employee.employmentStatus,
+                'startedAt': employee.startedAt?.toIso8601String(),
+                'endedAt': employee.endedAt?.toIso8601String(),
+              },
+            )
+            .toList(),
+      },
+      groupKey: 'employee_search',
+      cacheType: 'list',
+    );
+
+    return mapped;
+  }
+
+  EmployeeEntity _mapEmployeeDtoToEntity(EmployeeDto employee) {
+    return EmployeeEntity(
+      id: employee.profileId,
+      name: employee.userName,
+      phone: employee.phone,
+      email: employee.email,
+      status: _toEmployeeStatus(employee),
+      isActive: employee.isActive,
+      employmentStatus: employee.status,
+      startedAt: employee.startAt,
+      endedAt: employee.endAt,
+    );
+  }
+
+  EmployeeEntity _employeeFromCachedMap(Map<String, dynamic> json) {
+    final statusText = (json['status'] as String? ?? '').toLowerCase();
+    final status = EmployeeStatus.values.firstWhere(
+      (value) => value.name == statusText,
+      orElse: () => EmployeeStatus.pending,
+    );
+
+    DateTime? parseDate(String key) {
+      final raw = json[key] as String?;
+      if (raw == null || raw.isEmpty) return null;
+      return DateTime.tryParse(raw);
+    }
+
+    return EmployeeEntity(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      status: status,
+      isActive: json['isActive'] as bool? ?? false,
+      employmentStatus: json['employmentStatus'] as String? ?? '',
+      startedAt: parseDate('startedAt'),
+      endedAt: parseDate('endedAt'),
+    );
   }
 
   @override
-  Future<void> addEmployee(
-    String businessId,
-    String employeeId,
-  ) async {
+  Future<void> addEmployee(String businessId, String employeeId) async {
     await _apiService.inviteEmployee(employeeId);
   }
 
@@ -158,7 +237,8 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       assignedLocationIds:
           refreshedAssignmentMap.locationIdsByEmployee[employeeId] ?? const [],
       assignedLocationNames:
-          refreshedAssignmentMap.locationNamesByEmployee[employeeId] ?? const [],
+          refreshedAssignmentMap.locationNamesByEmployee[employeeId] ??
+          const [],
     );
   }
 
@@ -179,11 +259,15 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
         return EmployeeStatus.inactive;
       case 'accepted':
       case 'active':
-        return employee.isActive ? EmployeeStatus.active : EmployeeStatus.inactive;
+        return employee.isActive
+            ? EmployeeStatus.active
+            : EmployeeStatus.inactive;
       default:
         // if status is empty but isAlreadyHired is true, check isActive
         if (employee.status.isEmpty && employee.isAlreadyHired) {
-          return employee.isActive ? EmployeeStatus.active : EmployeeStatus.inactive;
+          return employee.isActive
+              ? EmployeeStatus.active
+              : EmployeeStatus.inactive;
         }
         return EmployeeStatus.pending;
     }
@@ -201,7 +285,8 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
     return freshMap;
   }
 
-  Future<_EmployeeAssignmentMap> _loadEmployeeLocationAssignmentsFromApi() async {
+  Future<_EmployeeAssignmentMap>
+  _loadEmployeeLocationAssignmentsFromApi() async {
     final ownedLocations = await _locationApiService.getMyOwnedLocations();
     final locationIdsByEmployee = <String, Set<String>>{};
     final locationNamesByEmployee = <String, Set<String>>{};
@@ -253,7 +338,6 @@ class _EmployeeAssignmentMap {
 }
 
 class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
-  
   final List<EmployeeEntity> _mockEmployees = [
     const EmployeeEntity(
       id: 'emp_01',
@@ -342,11 +426,21 @@ class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
 
   @override
   Future<List<EmployeeEntity>> getEmployees(String businessId) async {
-    await Future.delayed(const Duration(milliseconds: 800)); // Simulate network latency
+    await Future.delayed(
+      const Duration(milliseconds: 800),
+    ); // Simulate network latency
     if (businessId.isEmpty) {
-      return List.unmodifiable(_mockEmployees); // For safety, return all if no context
+      return List.unmodifiable(
+        _mockEmployees,
+      ); // For safety, return all if no context
     }
-    return _mockEmployees.where((e) => e.assignedBusinessId == businessId || e.assignedBusinessId == 'biz_01').toList(); // Fake filtering
+    return _mockEmployees
+        .where(
+          (e) =>
+              e.assignedBusinessId == businessId ||
+              e.assignedBusinessId == 'biz_01',
+        )
+        .toList(); // Fake filtering
   }
 
   @override
@@ -368,11 +462,14 @@ class EmployeeManagementRepositoryMock implements EmployeeManagementRepository {
   }
 
   @override
-  Future<EmployeeEntity> updateEmployee(String employeeId, EmployeeEntity updateData) async {
+  Future<EmployeeEntity> updateEmployee(
+    String employeeId,
+    EmployeeEntity updateData,
+  ) async {
     await Future.delayed(const Duration(milliseconds: 600));
     final index = _mockEmployees.indexWhere((e) => e.id == employeeId);
     if (index == -1) throw Exception('Employee not found');
-    
+
     _mockEmployees[index] = updateData;
     return updateData;
   }

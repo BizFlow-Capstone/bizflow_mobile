@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/context/user_profile_context.dart';
+import '../../../../shared/dialogs/app_dialog.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -21,12 +24,29 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  static const String _deleteAccountPhrase = 'DELETE ACCOUNT';
   Set<String> _credentialTypes = <String>{};
+  final TextEditingController _fullNameController = TextEditingController();
+  final TextEditingController _taxCodeController = TextEditingController();
+  String? _avatarUrl;
+  bool _isEditingProfile = false;
+  bool _isUploadingAvatar = false;
 
   @override
   void initState() {
     super.initState();
     context.read<AuthBloc>().add(const LoadCredentialsRequested());
+    context.read<AuthBloc>().add(const LoadProfileRequested());
+    final profile = UserProfileContext();
+    _fullNameController.text = profile.fullName ?? '';
+    _avatarUrl = profile.avatarUrl;
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _taxCodeController.dispose();
+    super.dispose();
   }
 
   @override
@@ -40,26 +60,43 @@ class _ProfilePageState extends State<ProfilePage> {
           setState(() {
             _credentialTypes = state.credentialTypes.toSet();
           });
+        } else if (state is ProfileLoaded) {
+          setState(() {
+            if (!_isEditingProfile) {
+              _fullNameController.text = state.fullName ?? '';
+              _taxCodeController.text = state.taxCode ?? '';
+            }
+            _avatarUrl = state.avatarUrl;
+          });
+        } else if (state is ProfileUpdateSuccess) {
+          setState(() {
+            _isEditingProfile = false;
+            _isUploadingAvatar = false;
+          });
+          AppSnackBar.success(context, state.message);
+        } else if (state is ProfileUpdateFailure) {
+          setState(() {
+            _isUploadingAvatar = false;
+          });
+          AppSnackBar.error(context, state.message);
         } else if (state is LinkCredentialSuccess) {
           setState(() {
             _credentialTypes = {..._credentialTypes, state.linkedType};
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.translate('profile.link_success')),
-              backgroundColor: AppColors.success,
-            ),
-          );
+          AppSnackBar.success(context, l10n.translate('profile.link_success'));
           context.read<AuthBloc>().add(const LoadCredentialsRequested());
         } else if (state is LinkPhoneOtpCodeSent) {
           _showPhoneOtpDialog(context, state.phone);
         } else if (state is LinkCredentialFailure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppColors.danger,
-            ),
-          );
+          AppSnackBar.error(context, state.message);
+        } else if (state is ChangePasswordSuccess) {
+          AppSnackBar.success(context, state.message);
+        } else if (state is ChangePasswordFailure) {
+          AppSnackBar.error(context, state.message);
+        } else if (state is DeleteAccountSuccess) {
+          AppSnackBar.success(context, state.message);
+        } else if (state is DeleteAccountFailure) {
+          AppSnackBar.error(context, state.message);
         }
       },
       child: Scaffold(
@@ -82,7 +119,6 @@ class _ProfilePageState extends State<ProfilePage> {
               final credentialTypes = _credentialTypes;
 
               final hasGoogle = credentialTypes.contains('google');
-              final hasEmail = credentialTypes.contains('email');
               final hasPhone = credentialTypes.contains('phone');
 
               return ListView(
@@ -101,26 +137,147 @@ class _ProfilePageState extends State<ProfilePage> {
                           backgroundColor: AppColors.secondary.withValues(
                             alpha: 0.1,
                           ),
-                          child: Text(
-                            (profile.fullName?.isNotEmpty == true
-                                    ? profile.fullName!
-                                    : 'U')
-                                .substring(0, 1)
-                                .toUpperCase(),
-                            style: AppTextStyles.titleLarge.copyWith(
-                              color: AppColors.secondary,
-                            ),
-                          ),
+                          backgroundImage:
+                              (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                              ? NetworkImage(_avatarUrl!)
+                              : null,
+                          child: (_avatarUrl == null || _avatarUrl!.isEmpty)
+                              ? Text(
+                                  ((_fullNameController.text.trim().isNotEmpty
+                                              ? _fullNameController.text.trim()
+                                              : (profile.fullName ?? 'U'))
+                                          .substring(0, 1))
+                                      .toUpperCase(),
+                                  style: AppTextStyles.titleLarge.copyWith(
+                                    color: AppColors.secondary,
+                                  ),
+                                )
+                              : null,
                         ),
                         const SizedBox(height: AppSpacing.md),
                         Text(
-                          profile.fullName ??
-                              l10n.translate('profile.unknown_user'),
+                          _fullNameController.text.trim().isEmpty
+                              ? (profile.fullName ??
+                                    l10n.translate('profile.unknown_user'))
+                              : _fullNameController.text.trim(),
                           style: AppTextStyles.titleLarge,
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppButton(
+                          label: 'Cập nhật ảnh đại diện',
+                          type: AppButtonType.outlined,
+                          isFullWidth: true,
+                          isLoading: _isUploadingAvatar,
+                          onPressed: _isUploadingAvatar
+                              ? null
+                              : () => _pickAndUploadAvatar(context),
+                        ),
+                      ),
+                      if ((_avatarUrl ?? '').isNotEmpty) ...[
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: AppButton(
+                            label: l10n.translate('profile.remove_avatar'),
+                            type: AppButtonType.outlined,
+                            isFullWidth: true,
+                            onPressed: () {
+                              context.read<AuthBloc>().add(
+                                const RemoveAvatarRequested(),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.translate('profile.edit_profile'),
+                          style: AppTextStyles.titleMedium,
+                        ),
+                      ),
+                      if (!_isEditingProfile)
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _isEditingProfile = true;
+                            });
+                          },
+                          child: Text(l10n.translate('common.edit')),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (_isEditingProfile) ...[
+                    AppTextField(
+                      controller: _fullNameController,
+                      label: l10n.translate('auth.name'),
+                      hintText: l10n.translate('auth.enter_name'),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    AppTextField(
+                      controller: _taxCodeController,
+                      label: l10n.translate('profile.tax_code'),
+                      hintText: l10n.translate('profile.tax_code_hint'),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AppButton(
+                            label: l10n.translate('common.cancel'),
+                            type: AppButtonType.outlined,
+                            isFullWidth: true,
+                            onPressed: () {
+                              setState(() {
+                                _isEditingProfile = false;
+                                _fullNameController.text = profile.fullName ?? '';
+                                _taxCodeController.text = profile.taxCode ?? '';
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: AppButton(
+                            label: l10n.translate('common.save'),
+                            isFullWidth: true,
+                            onPressed: () {
+                              context.read<AuthBloc>().add(
+                                UpdateProfileRequested(
+                                  fullName: _fullNameController.text.trim(),
+                                  taxCode: _taxCodeController.text.trim(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    _buildInfoView(
+                      label: l10n.translate('auth.name'),
+                      value: _fullNameController.text.trim().isEmpty
+                          ? l10n.translate('profile.unknown_user')
+                          : _fullNameController.text.trim(),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _buildInfoView(
+                      label: l10n.translate('profile.tax_code'),
+                      value: _taxCodeController.text.trim().isEmpty
+                          ? l10n.translate('common.no_data')
+                          : _taxCodeController.text.trim(),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   Text(
                     l10n.translate('profile.linked_credentials'),
@@ -140,22 +297,36 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   _CredentialTile(
-                    title: l10n.translate('profile.credential_email'),
-                    isLinked: hasEmail,
-                    onLink: hasEmail
-                        ? null
-                        : () => _showLinkEmailSheet(context),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _CredentialTile(
                     title: l10n.translate('profile.credential_phone'),
                     isLinked: hasPhone,
                     onLink: hasPhone
                         ? null
                         : () => _showLinkPhoneSheet(context),
                   ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    l10n.translate('profile.security'),
+                    style: AppTextStyles.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  AppButton(
+                    label: l10n.translate('profile.change_password'),
+                    isFullWidth: true,
+                    type: AppButtonType.outlined,
+                    onPressed: () => _showChangePasswordSheet(context),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppButton(
+                    label: l10n.translate('profile.delete_account'),
+                    isFullWidth: true,
+                    type: AppButtonType.danger,
+                    onPressed: () => _showDeleteAccountFlow(context),
+                  ),
                   if (state is CredentialsLoading ||
-                      state is LinkCredentialInProgress)
+                      state is ProfileLoading ||
+                      state is LinkCredentialInProgress ||
+                      state is ChangePasswordInProgress ||
+                      state is DeleteAccountInProgress)
                     const Padding(
                       padding: EdgeInsets.only(top: AppSpacing.lg),
                       child: Center(child: CircularProgressIndicator()),
@@ -169,10 +340,59 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showLinkEmailSheet(BuildContext context) {
+  Future<void> _pickAndUploadAvatar(BuildContext context) async {
+    final picker = ImagePicker();
+    final selected = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+
+    if (selected == null || !context.mounted) return;
+
+    setState(() {
+      _isUploadingAvatar = true;
+    });
+
+    context.read<AuthBloc>().add(
+      UpdateAvatarRequested(avatarPath: selected.path),
+    );
+  }
+
+  Widget _buildInfoView({required String label, required String value}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: AppSpacing.borderRadiusSm,
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.labelMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(value, style: AppTextStyles.bodyMedium),
+        ],
+      ),
+    );
+  }
+
+  void _showChangePasswordSheet(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final emailController = TextEditingController();
-    final passwordController = TextEditingController();
+    final currentController = TextEditingController();
+    final newController = TextEditingController();
+    final confirmController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var autoValidate = false;
+    var isSubmitting = false;
+    String? serverError;
 
     showModalBottomSheet<void>(
       context: context,
@@ -182,68 +402,358 @@ class _ProfilePageState extends State<ProfilePage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            top: AppSpacing.lg,
-            bottom:
-                MediaQuery.of(sheetContext).viewInsets.bottom + AppSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                l10n.translate('profile.link_email'),
-                style: AppTextStyles.titleMedium,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AppTextField(
-                controller: emailController,
-                label: l10n.translate('auth.email'),
-                hintText: l10n.translate('auth.enter_email'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AppTextField(
-                controller: passwordController,
-                label: l10n.translate('auth.password'),
-                hintText: l10n.translate('auth.enter_password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              AppButton(
-                label: l10n.translate('common.confirm'),
-                isFullWidth: true,
-                onPressed: () {
-                  final email = emailController.text.trim();
-                  final password = passwordController.text.trim();
-                  if (email.isEmpty || password.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n.translate('common.required_field')),
-                        backgroundColor: AppColors.warning,
-                      ),
-                    );
-                    return;
-                  }
-
-                  context.read<AuthBloc>().add(
-                    LinkEmailRequested(email: email, password: password),
-                  );
+        final mediaQuery = MediaQuery.of(sheetContext);
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return BlocListener<AuthBloc, AuthState>(
+              listenWhen: (previous, current) =>
+                  current is ChangePasswordSuccess ||
+                  current is ChangePasswordFailure,
+              listener: (context, state) {
+                if (state is ChangePasswordSuccess) {
+                  if (!sheetContext.mounted) return;
                   Navigator.of(sheetContext).pop();
-                },
+                  return;
+                }
+
+                if (state is ChangePasswordFailure) {
+                  if (!sheetContext.mounted) return;
+                  setSheetState(() {
+                    isSubmitting = false;
+                    serverError = state.message;
+                  });
+                }
+              },
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(
+                    left: AppSpacing.lg,
+                    right: AppSpacing.lg,
+                    top: AppSpacing.lg,
+                    bottom:
+                        mediaQuery.viewInsets.bottom +
+                        mediaQuery.padding.bottom +
+                        AppSpacing.xl,
+                  ),
+                  child: Form(
+                    key: formKey,
+                    autovalidateMode: autoValidate
+                        ? AutovalidateMode.onUserInteraction
+                        : AutovalidateMode.disabled,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.translate('profile.change_password'),
+                          style: AppTextStyles.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        AppPasswordField(
+                          controller: currentController,
+                          label: l10n.translate('auth.current_password'),
+                          hintText: l10n.translate('auth.enter_password'),
+                          onChanged: (_) {
+                            if (serverError != null) {
+                              setSheetState(() {
+                                serverError = null;
+                              });
+                            }
+                          },
+                          validator: (value) {
+                            if ((value ?? '').trim().isEmpty) {
+                              return l10n.translate('auth.password_required');
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        AppPasswordField(
+                          controller: newController,
+                          label: l10n.translate('auth.new_password'),
+                          hintText: l10n.translate('auth.enter_password'),
+                          onChanged: (_) {
+                            if (serverError != null) {
+                              setSheetState(() {
+                                serverError = null;
+                              });
+                            }
+                            if (autoValidate) {
+                              formKey.currentState?.validate();
+                            }
+                          },
+                          validator: (value) {
+                            final trimmed = (value ?? '').trim();
+                            if (trimmed.isEmpty) {
+                              return l10n.translate('auth.password_required');
+                            }
+                            if (trimmed.length < 8) {
+                              return l10n.translate('auth.password_min_length_8');
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        AppPasswordField(
+                          controller: confirmController,
+                          label: l10n.translate('auth.confirm_password'),
+                          hintText: l10n.translate('auth.confirm_password'),
+                          onChanged: (_) {
+                            if (serverError != null) {
+                              setSheetState(() {
+                                serverError = null;
+                              });
+                            }
+                            if (autoValidate) {
+                              formKey.currentState?.validate();
+                            }
+                          },
+                          validator: (value) {
+                            final confirm = (value ?? '').trim();
+                            if (confirm.isEmpty) {
+                              return l10n.translate('auth.password_required');
+                            }
+                            if (confirm != newController.text.trim()) {
+                              return l10n.translate('auth.passwords_not_match');
+                            }
+                            return null;
+                          },
+                        ),
+                        if (serverError != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            serverError!,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.danger,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                        const SizedBox(height: AppSpacing.lg),
+                        AppButton(
+                          label: l10n.translate('common.confirm'),
+                          isFullWidth: true,
+                          isLoading: isSubmitting,
+                          onPressed: isSubmitting
+                              ? null
+                              : () {
+                                  setSheetState(() {
+                                    autoValidate = true;
+                                    serverError = null;
+                                  });
+                                  final valid =
+                                      formKey.currentState?.validate() ?? false;
+                                  if (!valid) return;
+
+                                  final current = currentController.text.trim();
+                                  final next = newController.text.trim();
+
+                                  setSheetState(() {
+                                    isSubmitting = true;
+                                  });
+
+                                  context.read<AuthBloc>().add(
+                                    ChangePasswordRequested(
+                                      currentPassword: current,
+                                      newPassword: next,
+                                    ),
+                                  );
+                                },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     ).whenComplete(() {
-      Future<void>.delayed(const Duration(milliseconds: 350), () {
-        emailController.dispose();
-        passwordController.dispose();
+      // Delay dispose to next frame so TextFormField listeners are fully detached.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        currentController.dispose();
+        newController.dispose();
+        confirmController.dispose();
       });
     });
+  }
+
+  Future<void> _showDeleteAccountFlow(BuildContext context) async {
+    final l10n = AppLocalizations.of(context);
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var autoValidate = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        final mediaQuery = MediaQuery.of(sheetContext);
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                  left: AppSpacing.lg,
+                  right: AppSpacing.lg,
+                  top: AppSpacing.lg,
+                  bottom:
+                      mediaQuery.viewInsets.bottom +
+                      mediaQuery.padding.bottom +
+                      AppSpacing.xl,
+                ),
+                child: Form(
+                  key: formKey,
+                  autovalidateMode: autoValidate
+                      ? AutovalidateMode.onUserInteraction
+                      : AutovalidateMode.disabled,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.translate('profile.delete_account'),
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: AppColors.danger,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        l10n.translate('profile.delete_account_password_note'),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      AppPasswordField(
+                        controller: passwordController,
+                        label: l10n.translate('auth.password'),
+                        hintText: l10n.translate('auth.enter_password'),
+                        onChanged: (_) {
+                          if (autoValidate) {
+                            formKey.currentState?.validate();
+                          }
+                        },
+                        validator: (value) {
+                          if ((value ?? '').trim().isEmpty) {
+                            return l10n.translate('auth.password_required');
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      AppPasswordField(
+                        controller: confirmPasswordController,
+                        label: l10n.translate('auth.confirm_password'),
+                        hintText: l10n.translate('auth.confirm_password'),
+                        onChanged: (_) {
+                          if (autoValidate) {
+                            formKey.currentState?.validate();
+                          }
+                        },
+                        validator: (value) {
+                          final confirm = (value ?? '').trim();
+                          if (confirm.isEmpty) {
+                            return l10n.translate('auth.password_required');
+                          }
+                          if (confirm != passwordController.text.trim()) {
+                            return l10n.translate('auth.passwords_not_match');
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      AppButton(
+                        label: l10n.translate('common.confirm'),
+                        isFullWidth: true,
+                        type: AppButtonType.danger,
+                        onPressed: () {
+                          setSheetState(() {
+                            autoValidate = true;
+                          });
+                          final valid =
+                              formKey.currentState?.validate() ?? false;
+                          if (!valid) return;
+
+                          Navigator.of(sheetContext).pop();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    final password = passwordController.text.trim();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    if (password.isEmpty || !context.mounted) return;
+
+    final confirmDelete = await AppDialog.delete(
+      context,
+      title: l10n.translate('profile.delete_account_confirm_title'),
+      message: l10n.translate('profile.delete_account_confirm_body'),
+      confirmText: l10n.translate('profile.delete_account_confirm_action'),
+      cancelText: l10n.translate('common.cancel'),
+    );
+    if (confirmDelete != true || !context.mounted) return;
+
+    final phraseController = TextEditingController();
+    final phraseAccepted = await AppDialog.show(
+      context,
+      title: l10n.translate('profile.delete_account_phrase_title'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n
+                .translate('profile.delete_account_phrase_hint')
+                .replaceAll('{phrase}', _deleteAccountPhrase),
+            style: AppTextStyles.bodyMedium,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: phraseController,
+            inputFormatters: AppInputFormatters.withSqlInjectionGuard(),
+            decoration: InputDecoration(
+              hintText: _deleteAccountPhrase,
+              border: OutlineInputBorder(
+                borderRadius: AppSpacing.borderRadiusMd,
+              ),
+            ),
+          ),
+        ],
+      ),
+      type: AppDialogType.error,
+      confirmText: l10n.translate('profile.delete_account_final_action'),
+      cancelText: l10n.translate('common.cancel'),
+    );
+
+    final phrase = phraseController.text.trim();
+    phraseController.dispose();
+
+    if (phraseAccepted != true || !context.mounted) return;
+    if (phrase.toUpperCase() != _deleteAccountPhrase) {
+      AppSnackBar.warning(
+        context,
+        l10n.translate('profile.delete_account_phrase_invalid'),
+      );
+      return;
+    }
+
+    context.read<AuthBloc>().add(DeleteAccountRequested(password: password));
   }
 
   void _showLinkPhoneSheet(BuildContext context) {
@@ -301,14 +811,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     final phone = phoneController.text.trim();
                     final password = passwordController.text.trim();
                     if (phone.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            l10n.translate('common.required_field'),
-                          ),
-                          backgroundColor: AppColors.warning,
-                        ),
-                      );
+                        AppSnackBar.warning(
+                          context,
+                          l10n.translate('common.required_field'),
+                        );
                       return;
                     }
 
@@ -327,10 +833,8 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       },
     ).whenComplete(() {
-      Future<void>.delayed(const Duration(milliseconds: 350), () {
-        phoneController.dispose();
-        passwordController.dispose();
-      });
+      phoneController.dispose();
+      passwordController.dispose();
     });
   }
 
@@ -395,7 +899,11 @@ class _ProfilePageState extends State<ProfilePage> {
                           fontWeight: FontWeight.w700,
                         ),
                         inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
+                          ...?AppInputFormatters.withSqlInjectionGuard(
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                          ),
                         ],
                         decoration: const InputDecoration(counterText: ''),
                         onChanged: (value) {
@@ -416,11 +924,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   onPressed: () {
                     final otp = controllers.map((e) => e.text).join().trim();
                     if (otp.length != 6) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(l10n.translate('auth.otp_incomplete')),
-                          backgroundColor: AppColors.warning,
-                        ),
+                      AppSnackBar.warning(
+                        context,
+                        l10n.translate('auth.otp_incomplete'),
                       );
                       return;
                     }
@@ -446,14 +952,12 @@ class _ProfilePageState extends State<ProfilePage> {
         );
       },
     ).whenComplete(() {
-      Future<void>.delayed(const Duration(milliseconds: 350), () {
-        for (final c in controllers) {
-          c.dispose();
-        }
-        for (final node in focusNodes) {
-          node.dispose();
-        }
-      });
+      for (final c in controllers) {
+        c.dispose();
+      }
+      for (final node in focusNodes) {
+        node.dispose();
+      }
     });
   }
 }

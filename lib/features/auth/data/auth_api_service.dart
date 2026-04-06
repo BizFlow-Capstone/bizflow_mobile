@@ -250,6 +250,241 @@ class AuthApiService {
     return response.data ?? {'success': true, 'message': response.message};
   }
 
+  Future<Map<String, dynamic>> forgotPasswordSendOtp({
+    required String email,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.forgotPasswordSendOtp,
+      body: {'email': email.trim()},
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Send OTP failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
+  Future<Map<String, dynamic>> forgotPasswordVerifyOtp({
+    required String email,
+    required String otpCode,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.forgotPasswordVerifyOtp,
+      body: {'email': email.trim(), 'otpCode': otpCode.trim()},
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Verify OTP failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
+  Future<Map<String, dynamic>> forgotPasswordReset({
+    required String password,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.forgotPasswordReset,
+      body: {'password': password},
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Reset password failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
+  Future<Map<String, dynamic>> getProfile() async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      ApiEndpoints.authProfile,
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess || response.data == null) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Get profile failed',
+      );
+    }
+    return response.data!;
+  }
+
+  Future<Map<String, dynamic>> updateProfile({
+    String? fullName,
+    String? taxCode,
+  }) async {
+    final body = <String, dynamic>{};
+    if (fullName != null) {
+      body['fullName'] = fullName;
+    }
+    if (taxCode != null) {
+      body['taxCode'] = taxCode;
+    }
+
+    final response = await _apiClient.put<Map<String, dynamic>>(
+      ApiEndpoints.authProfile,
+      body: body,
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Update profile failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
+  Future<Map<String, dynamic>> updateAvatar({
+    required String avatarPath,
+  }) async {
+    final avatarFile = File(avatarPath);
+    if (!await avatarFile.exists()) {
+      throw ApiException(statusCode: -2, message: 'Avatar file not found');
+    }
+
+    final response = await _apiClient.putMultipart<Map<String, dynamic>>(
+      ApiEndpoints.authProfileAvatar,
+      fields: const {'removeAvatar': 'false'},
+      files: {'avatar': avatarFile},
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Update avatar failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
+  Future<Map<String, dynamic>> removeAvatar() async {
+    final response = await _apiClient.put<Map<String, dynamic>>(
+      ApiEndpoints.authProfileAvatar,
+      body: {'removeAvatar': true},
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Remove avatar failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
+  Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.authChangePassword,
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Change password failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
+  Future<Map<String, dynamic>> deleteAccount({required String password}) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      ApiEndpoints.authDeleteAccount,
+      body: {'password': password},
+      parser: (data) {
+        if (data is Map<String, dynamic>) {
+          return data;
+        }
+        if (data is Map) {
+          return Map<String, dynamic>.from(data);
+        }
+        return <String, dynamic>{'success': true, 'data': data};
+      },
+    );
+    if (!response.isSuccess) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: response.message ?? 'Delete account failed',
+      );
+    }
+    return response.data ?? {'success': true, 'message': response.message};
+  }
+
   /// Logout - revokes refresh token on server
   Future<void> logout({required String refreshToken}) async {
     await _apiClient.post<void>(

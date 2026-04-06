@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_error_message_parser.dart';
 import '../../../core/network/api_endpoints.dart';
 import 'models/employee_dto.dart';
 import 'models/employee_invitation_dto.dart';
@@ -95,10 +96,7 @@ class EmployeeApiService {
         return _dedupeEmployees(employees);
       }
     } on ApiException catch (e) {
-      if (e.statusCode == 401) {
-        throw Exception('Session expired');
-      }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.getMyEmployees error: $e');
       rethrow;
@@ -137,10 +135,7 @@ class EmployeeApiService {
             .toList();
       }
     } on ApiException catch (e) {
-      if (e.statusCode == 401) {
-        throw Exception('Session expired');
-      }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.getAssignableEmployees error: $e');
       rethrow;
@@ -168,7 +163,7 @@ class EmployeeApiService {
 
       throw Exception(response.message ?? 'Failed to search employees');
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.searchEmployees error: $e');
       rethrow;
@@ -186,7 +181,7 @@ class EmployeeApiService {
         throw Exception(response.message ?? 'Failed to invite employee');
       }
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.inviteEmployee error: $e');
       rethrow;
@@ -212,7 +207,7 @@ class EmployeeApiService {
 
       throw Exception(response.message ?? 'Failed to load invitations');
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.getPendingInvitations error: $e');
       rethrow;
@@ -244,7 +239,7 @@ class EmployeeApiService {
         throw Exception(response.message ?? 'Failed to accept invitation');
       }
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.acceptInvitation error: $e');
       rethrow;
@@ -261,7 +256,7 @@ class EmployeeApiService {
         throw Exception(response.message ?? 'Failed to reject invitation');
       }
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.rejectInvitation error: $e');
       rethrow;
@@ -278,7 +273,7 @@ class EmployeeApiService {
         throw Exception(response.message ?? 'Failed to update employee status');
       }
     } on ApiException catch (e) {
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('EmployeeApiService.deleteEmployee error: $e');
       rethrow;

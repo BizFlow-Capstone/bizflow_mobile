@@ -39,15 +39,6 @@ class S2dExportService {
     'planName',
     'businessLocationName',
   ];
-  static const _productNameAliases = [
-    'ProductName',
-    'productName',
-    'itemName',
-    'inventoryName',
-    'ten_san_pham',
-    'ten_hang_hoa',
-    'name',
-  ];
   static const _ghiChuAliases = ['ghi_chu', 'ghiChu', 'note', 'Memo'];
   static const _dvtAliases = ['unit', 'unitName'];
   static const _donGiaAliases = ['unitPrice', 'price'];
@@ -195,7 +186,8 @@ class S2dExportService {
     _setText(sheet, 3, 0, 'Tên vật liệu, dụng cụ, sản phẩm, hàng hóa:');
     _setText(sheet, 4, 0, 'Kỳ kê khai:');
 
-    _setText(sheet, 5, 0, 'Chứng từ');    _setText(sheet, 5, 2, 'Diễn giải');
+    _setText(sheet, 5, 0, 'Chứng từ');
+    _setText(sheet, 5, 2, 'Diễn giải');
     _setText(sheet, 5, 3, 'Đơn vị tính');
     _setText(sheet, 5, 4, 'Đơn giá');
     _setText(sheet, 5, 5, 'Nhập');
@@ -457,12 +449,6 @@ class S2dExportService {
     return total;
   }
 
-  static void _clearRow(xlsio.Worksheet sheet, int row) {
-    for (var c = 0; c < _columns; c++) {
-      _setText(sheet, row, c, '');
-    }
-  }
-
   static xlsio.Range _cell(xlsio.Worksheet sheet, int row, int col) {
     return sheet.getRangeByIndex(row + 1, col + 1);
   }
@@ -598,7 +584,11 @@ class S2dExportService {
       if (!replaced) return xlsxBytes;
 
       final updatedBytes = utf8.encode(xml);
-      final updatedFile = ArchiveFile(file.name, updatedBytes.length, updatedBytes);
+      final updatedFile = ArchiveFile(
+        file.name,
+        updatedBytes.length,
+        updatedBytes,
+      );
 
       final updated = Archive();
       for (var i = 0; i < archive.files.length; i++) {

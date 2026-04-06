@@ -14,6 +14,7 @@ import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_loading.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/import_repository.dart';
 import '../../data/models/import_model.dart';
@@ -961,9 +962,12 @@ class _StockImportViewState extends State<_StockImportView> {
                                               cost,
                                             ),
                                         keyboardType: TextInputType.number,
-                                        inputFormatters: [
-                                          CurrencyInputFormatter(),
-                                        ],
+                                        inputFormatters:
+                                            AppInputFormatters.withSqlInjectionGuard(
+                                              inputFormatters: [
+                                                CurrencyInputFormatter(),
+                                              ],
+                                            ),
                                         decoration: InputDecoration(
                                           isDense: true,
                                           labelText: l10n.translate(
@@ -1038,9 +1042,13 @@ class _StockImportViewState extends State<_StockImportView> {
                                       initialValue: item.quantity.toString(),
                                       textAlign: TextAlign.center,
                                       keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                      ],
+                                      inputFormatters:
+                                          AppInputFormatters.withSqlInjectionGuard(
+                                            inputFormatters: [
+                                              FilteringTextInputFormatter
+                                                  .digitsOnly,
+                                            ],
+                                          ),
                                       decoration: const InputDecoration(
                                         isDense: true,
                                         contentPadding: EdgeInsets.symmetric(
@@ -1601,10 +1609,13 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                                           initialValue: qty.toString(),
                                           textAlign: TextAlign.center,
                                           keyboardType: TextInputType.number,
-                                          inputFormatters: [
-                                            FilteringTextInputFormatter
-                                                .digitsOnly,
-                                          ],
+                                          inputFormatters:
+                                              AppInputFormatters.withSqlInjectionGuard(
+                                                inputFormatters: [
+                                                  FilteringTextInputFormatter
+                                                      .digitsOnly,
+                                                ],
+                                              ),
                                           decoration: const InputDecoration(
                                             isDense: true,
                                             counterText: '',

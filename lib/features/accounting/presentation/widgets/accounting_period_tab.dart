@@ -9,6 +9,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../domain/models/accounting_period.dart';
 import '../bloc/accounting_period_bloc.dart';
 import 'accounting_books_list_widget.dart';
@@ -36,14 +37,16 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
           prev.status != AccountingPeriodStatus.actionSuccess,
       listener: (context, state) {
         if (messenger == null) return;
-        if (state.status == AccountingPeriodStatus.actionSuccess && state.actionSuccessKey != null) {
+        if (state.status == AccountingPeriodStatus.actionSuccess &&
+            state.actionSuccessKey != null) {
           messenger.showSnackBar(
             SnackBar(
               content: Text(l10n.translate(state.actionSuccessKey!)),
               backgroundColor: AppColors.success,
             ),
           );
-        } else if (state.status == AccountingPeriodStatus.error && state.errorMessage != null) {
+        } else if (state.status == AccountingPeriodStatus.error &&
+            state.errorMessage != null) {
           _showErrorSnack(messenger, state.errorMessage!, l10n);
         }
       },
@@ -53,17 +56,20 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
         bool isLoading = state.isListLoading && _cachedPeriods.isEmpty;
         bool isRefreshing = state.isRefreshing;
 
-        if (state.status == AccountingPeriodStatus.loaded || state.status == AccountingPeriodStatus.actionSuccess) {
+        if (state.status == AccountingPeriodStatus.loaded ||
+            state.status == AccountingPeriodStatus.actionSuccess) {
           periods = state.periods;
           _cachedPeriods = state.periods;
         }
 
-        if (state.status == AccountingPeriodStatus.error && _cachedPeriods.isEmpty) {
+        if (state.status == AccountingPeriodStatus.error &&
+            _cachedPeriods.isEmpty) {
           return _ErrorView(
-            message: state.errorMessage ?? l10n.translate('common.unknown_error'),
+            message:
+                state.errorMessage ?? l10n.translate('common.unknown_error'),
             onRetry: () => context.read<AccountingPeriodBloc>().add(
-                  LoadPeriodsRequested(widget.locationId),
-                ),
+              LoadPeriodsRequested(widget.locationId),
+            ),
           );
         }
 
@@ -71,18 +77,17 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
           children: [
             Column(
               children: [
-                if (isRefreshing)
-                  const LinearProgressIndicator(minHeight: 2),
+                if (isRefreshing) const LinearProgressIndicator(minHeight: 2),
                 Expanded(
                   child: isLoading
                       ? _LoadingView(l10n: l10n)
                       : periods.isEmpty
-                          ? _EmptyView(l10n: l10n)
-                          : _PeriodList(
-                              periods: periods,
-                              locationId: widget.locationId,
-                              l10n: l10n,
-                            ),
+                      ? _EmptyView(l10n: l10n)
+                      : _PeriodList(
+                          periods: periods,
+                          locationId: widget.locationId,
+                          l10n: l10n,
+                        ),
                 ),
               ],
             ),
@@ -127,8 +132,9 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
       userMessage = l10n.translate('accounting.period_status_finalized');
     } else if (rawMessage.contains('PERIOD_OPENING_BALANCE_REQUIRED') ||
         rawMessage.contains('Kỳ đầu tiên bắt buộc')) {
-      userMessage =
-          l10n.translate('accounting.first_period_opening_balance_required');
+      userMessage = l10n.translate(
+        'accounting.first_period_opening_balance_required',
+      );
     } else {
       userMessage = rawMessage;
     }
@@ -140,10 +146,10 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
   Future<void> _showCreatePeriodSheet(
     BuildContext context,
     String locationId,
-    AppLocalizations l10n,
-    {required ScaffoldMessengerState? messenger,
-    required bool isFirstPeriod}
-  ) async {
+    AppLocalizations l10n, {
+    required ScaffoldMessengerState? messenger,
+    required bool isFirstPeriod,
+  }) async {
     if (!context.mounted) return;
     final bloc = context.read<AccountingPeriodBloc>();
     await showModalBottomSheet<void>(
@@ -180,9 +186,9 @@ class _PeriodList extends StatelessWidget {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: () async {
-        context
-            .read<AccountingPeriodBloc>()
-            .add(LoadPeriodsRequested(locationId));
+        context.read<AccountingPeriodBloc>().add(
+          LoadPeriodsRequested(locationId),
+        );
       },
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(
@@ -192,8 +198,7 @@ class _PeriodList extends StatelessWidget {
           100,
         ),
         itemCount: periods.length,
-        separatorBuilder: (_, __) =>
-            const SizedBox(height: AppSpacing.sm),
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
         itemBuilder: (context, index) {
           return _PeriodCard(
             period: periods[index],
@@ -279,8 +284,7 @@ class _PeriodCard extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: _statusColor().withValues(alpha: 0.12),
-                      borderRadius:
-                          BorderRadius.circular(AppSpacing.radiusSm),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     ),
                     child: Text(
                       _statusLabel(),
@@ -395,11 +399,11 @@ class _PeriodCard extends StatelessWidget {
     );
     if (confirmed == true && context.mounted) {
       context.read<AccountingPeriodBloc>().add(
-            FinalizePeriodRequested(
-              locationId: locationId,
-              periodId: period.periodId.toString(),
-            ),
-          );
+        FinalizePeriodRequested(
+          locationId: locationId,
+          periodId: period.periodId.toString(),
+        ),
+      );
     }
   }
 
@@ -443,8 +447,9 @@ class _PeriodCard extends StatelessWidget {
               onPressed: () {
                 if (reasonController.text.trim().isEmpty) {
                   setStateDialog(() {
-                    validationError =
-                        l10n.translate('accounting.reopen_reason_required');
+                    validationError = l10n.translate(
+                      'accounting.reopen_reason_required',
+                    );
                   });
                   return;
                 }
@@ -459,12 +464,12 @@ class _PeriodCard extends StatelessWidget {
 
     if (confirmed == true && context.mounted) {
       context.read<AccountingPeriodBloc>().add(
-            ReopenPeriodRequested(
-              locationId: locationId,
-              periodId: period.periodId.toString(),
-              reason: reasonController.text.trim(),
-            ),
-          );
+        ReopenPeriodRequested(
+          locationId: locationId,
+          periodId: period.periodId.toString(),
+          reason: reasonController.text.trim(),
+        ),
+      );
     }
     reasonController.dispose();
   }
@@ -474,11 +479,11 @@ class _PeriodCard extends StatelessWidget {
     final bloc = context.read<AccountingPeriodBloc>();
 
     bloc.add(
-          LoadAuditLogsRequested(
-            locationId: locationId,
-            periodId: period.periodId.toString(),
-          ),
-        );
+      LoadAuditLogsRequested(
+        locationId: locationId,
+        periodId: period.periodId.toString(),
+      ),
+    );
 
     if (!context.mounted) return;
     await showModalBottomSheet<void>(
@@ -487,10 +492,7 @@ class _PeriodCard extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: bloc,
-        child: _AuditLogSheet(
-          periodLabel: period.displayLabel,
-          l10n: l10n,
-        ),
+        child: _AuditLogSheet(periodLabel: period.displayLabel, l10n: l10n),
       ),
     );
   }
@@ -599,7 +601,8 @@ class _PeriodCard extends StatelessWidget {
                           templateCodes = ['S2a'];
                           break;
                         case 'group234_m2':
-                          groupNumber = 2; // default group 2; user adjust if needed
+                          groupNumber =
+                              2; // default group 2; user adjust if needed
                           taxMethod = 'method_2';
                           templateCodes = ['S2b', 'S2c', 'S2d', 'S2e'];
                           break;
@@ -615,14 +618,14 @@ class _PeriodCard extends StatelessWidget {
 
     if (confirmed == true && context.mounted) {
       context.read<AccountingPeriodBloc>().add(
-            CreateBooksRequested(
-              locationId: locationId,
-              periodId: period.periodId,
-              groupNumber: groupNumber,
-              taxMethod: taxMethod,
-              templateCodes: templateCodes,
-            ),
-          );
+        CreateBooksRequested(
+          locationId: locationId,
+          periodId: period.periodId,
+          groupNumber: groupNumber,
+          taxMethod: taxMethod,
+          templateCodes: templateCodes,
+        ),
+      );
     }
   }
 }
@@ -743,10 +746,7 @@ class _AuditLogItem extends StatelessWidget {
                   ),
                 ),
                 if (log.reason != null && log.reason!.isNotEmpty)
-                  Text(
-                    log.reason!,
-                    style: AppTextStyles.bodySmall,
-                  ),
+                  Text(log.reason!, style: AppTextStyles.bodySmall),
                 Text(
                   dateStr,
                   style: AppTextStyles.bodySmall.copyWith(
@@ -787,7 +787,8 @@ class _PeriodDetailSheet extends StatefulWidget {
   State<_PeriodDetailSheet> createState() => _PeriodDetailSheetState();
 }
 
-class _PeriodDetailSheetState extends State<_PeriodDetailSheet> with TickerProviderStateMixin {
+class _PeriodDetailSheetState extends State<_PeriodDetailSheet>
+    with TickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -926,12 +927,14 @@ class _PeriodDetailSheetState extends State<_PeriodDetailSheet> with TickerProvi
           );
         }
 
-        if (state.status == AccountingPeriodStatus.error && state.periodDetail == null) {
+        if (state.status == AccountingPeriodStatus.error &&
+            state.periodDetail == null) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Text(
-                state.errorMessage ?? widget.l10n.translate('common.unknown_error'),
+                state.errorMessage ??
+                    widget.l10n.translate('common.unknown_error'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.error),
               ),
@@ -965,12 +968,14 @@ class _PeriodDetailSheetState extends State<_PeriodDetailSheet> with TickerProvi
           );
         }
 
-        if (state.status == AccountingPeriodStatus.error && state.books.isEmpty) {
+        if (state.status == AccountingPeriodStatus.error &&
+            state.books.isEmpty) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Text(
-                state.errorMessage ?? widget.l10n.translate('common.unknown_error'),
+                state.errorMessage ??
+                    widget.l10n.translate('common.unknown_error'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.error),
               ),
@@ -1031,11 +1036,7 @@ class _DetailRow extends StatelessWidget {
   final String value;
   final Color? valueColor;
 
-  const _DetailRow({
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
+  const _DetailRow({required this.label, required this.value, this.valueColor});
 
   @override
   Widget build(BuildContext context) {
@@ -1117,16 +1118,16 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
   Future<void> _fetchSuggestion() async {
     setState(() => _loadingSuggestion = true);
     context.read<AccountingPeriodBloc>().add(
-          FetchSuggestionRequested(
-            locationId: widget.locationId,
-            periodType: _periodType,
-            year: _periodType != 'custom' ? _year : null,
-            quarter: _periodType == 'quarter' ? _quarter : null,
-            startDate: _periodType == 'custom'
-                ? DateFormatter.formatIso(_startDate)
-                : null,
-          ),
-        );
+      FetchSuggestionRequested(
+        locationId: widget.locationId,
+        periodType: _periodType,
+        year: _periodType != 'custom' ? _year : null,
+        quarter: _periodType == 'quarter' ? _quarter : null,
+        startDate: _periodType == 'custom'
+            ? DateFormatter.formatIso(_startDate)
+            : null,
+      ),
+    );
   }
 
   Future<void> _pickDate({required bool isStart}) async {
@@ -1184,24 +1185,28 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
     final bloc = context.read<AccountingPeriodBloc>();
 
     if (_periodType == 'custom') {
-      bloc.add(CreateCustomPeriodRequested(
-        locationId: widget.locationId,
-        startDate: DateFormatter.formatIso(_startDate),
-        endDate: DateFormatter.formatIso(_endDate),
-        openingCashBalance: cash,
-        openingBankBalance: bank,
-        useSuggestedOpeningBalances: _useSuggestion,
-      ));
+      bloc.add(
+        CreateCustomPeriodRequested(
+          locationId: widget.locationId,
+          startDate: DateFormatter.formatIso(_startDate),
+          endDate: DateFormatter.formatIso(_endDate),
+          openingCashBalance: cash,
+          openingBankBalance: bank,
+          useSuggestedOpeningBalances: _useSuggestion,
+        ),
+      );
     } else {
-      bloc.add(CreatePeriodRequested(
-        locationId: widget.locationId,
-        periodType: _periodType == 'quarter' ? 'quarter' : 'year',
-        year: _year,
-        quarter: _periodType == 'quarter' ? _quarter : null,
-        openingCashBalance: cash,
-        openingBankBalance: bank,
-        useSuggestedOpeningBalances: _useSuggestion,
-      ));
+      bloc.add(
+        CreatePeriodRequested(
+          locationId: widget.locationId,
+          periodType: _periodType == 'quarter' ? 'quarter' : 'year',
+          year: _year,
+          quarter: _periodType == 'quarter' ? _quarter : null,
+          openingCashBalance: cash,
+          openingBankBalance: bank,
+          useSuggestedOpeningBalances: _useSuggestion,
+        ),
+      );
     }
 
     Navigator.pop(context);
@@ -1313,14 +1318,12 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
                           _TypeChip(
                             label: l10n.translate('accounting.period_year'),
                             selected: _periodType == 'year',
-                            onTap: () =>
-                                setState(() => _periodType = 'year'),
+                            onTap: () => setState(() => _periodType = 'year'),
                           ),
                           _TypeChip(
                             label: l10n.translate('accounting.period_custom'),
                             selected: _periodType == 'custom',
-                            onTap: () =>
-                                setState(() => _periodType = 'custom'),
+                            onTap: () => setState(() => _periodType = 'custom'),
                           ),
                         ],
                       ),
@@ -1468,10 +1471,14 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
                       TextField(
                         controller: _cashController,
                         keyboardType: TextInputType.number,
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters:
+                            AppInputFormatters.withSqlInjectionGuard(
+                              inputFormatters: [CurrencyInputFormatter()],
+                            ),
                         decoration: InputDecoration(
-                          labelText:
-                              l10n.translate('accounting.opening_cash_balance'),
+                          labelText: l10n.translate(
+                            'accounting.opening_cash_balance',
+                          ),
                           border: const OutlineInputBorder(),
                         ),
                       ),
@@ -1479,10 +1486,14 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
                       TextField(
                         controller: _bankController,
                         keyboardType: TextInputType.number,
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters:
+                            AppInputFormatters.withSqlInjectionGuard(
+                              inputFormatters: [CurrencyInputFormatter()],
+                            ),
                         decoration: InputDecoration(
-                          labelText:
-                              l10n.translate('accounting.opening_bank_balance'),
+                          labelText: l10n.translate(
+                            'accounting.opening_bank_balance',
+                          ),
                           border: const OutlineInputBorder(),
                         ),
                       ),
@@ -1495,7 +1506,9 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.auto_fix_high, size: 18),
                         label: Text(
@@ -1543,8 +1556,9 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
                           vertical: AppSpacing.md,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                       child: Text(

@@ -5,7 +5,9 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -53,12 +55,7 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
         if (state is LoginSuccess) {
           PostAuthNavigation.route(context);
         } else if (state is PhoneRegisterFailure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppColors.danger,
-            ),
-          );
+          AppSnackBar.error(context, state.message);
         }
       },
       child: Scaffold(
@@ -68,6 +65,10 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
           backgroundColor: AppColors.surface,
           foregroundColor: AppColors.textPrimary,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -104,36 +105,59 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(6, (index) {
-                      return SizedBox(
-                        width: 46,
-                        child: TextField(
-                          controller: _controllers[index],
-                          focusNode: _focusNodes[index],
-                          maxLength: 1,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          textDirection: TextDirection.ltr,
-                          style: AppTextStyles.titleLarge.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          decoration: const InputDecoration(counterText: ''),
-                          onChanged: (value) {
-                            if (value.isNotEmpty && index < 5) {
-                              _focusNodes[index + 1].requestFocus();
-                            } else if (value.isEmpty && index > 0) {
-                              _focusNodes[index - 1].requestFocus();
-                            }
-                          },
-                        ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      const gap = 8.0;
+                      final rawWidth = (constraints.maxWidth - (5 * gap)) / 6;
+                      final boxWidth = rawWidth.clamp(44.0, 56.0);
+
+                      return Row(
+                        children: List.generate(6, (index) {
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: index == 5 ? 0 : gap,
+                            ),
+                            child: SizedBox(
+                              width: boxWidth,
+                              height: 76,
+                              child: TextField(
+                                controller: _controllers[index],
+                                focusNode: _focusNodes[index],
+                                maxLength: 1,
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                textAlignVertical: TextAlignVertical.center,
+                                textDirection: TextDirection.ltr,
+                                style: AppTextStyles.titleLarge.copyWith(
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.0,
+                                ),
+                                inputFormatters: [
+                                  ...?AppInputFormatters.withSqlInjectionGuard(
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                    ],
+                                  ),
+                                ],
+                                decoration: const InputDecoration(
+                                  counterText: '',
+                                  isCollapsed: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onChanged: (value) {
+                                  if (value.isNotEmpty && index < 5) {
+                                    _focusNodes[index + 1].requestFocus();
+                                  } else if (value.isEmpty && index > 0) {
+                                    _focusNodes[index - 1].requestFocus();
+                                  }
+                                },
+                              ),
+                            ),
+                          );
+                        }),
                       );
-                    }),
+                    },
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   BlocBuilder<AuthBloc, AuthState>(
@@ -147,13 +171,9 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
                             ? null
                             : () {
                                 if (_otp.length != 6) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        l10n.translate('auth.otp_incomplete'),
-                                      ),
-                                      backgroundColor: AppColors.warning,
-                                    ),
+                                  AppSnackBar.warning(
+                                    context,
+                                    l10n.translate('auth.otp_incomplete'),
                                   );
                                   return;
                                 }

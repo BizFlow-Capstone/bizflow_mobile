@@ -13,7 +13,7 @@ class AppSnackBar {
   static String? _lastMessage;
   static AppSnackBarType? _lastType;
   static DateTime? _lastShownAt;
-  static const Duration _dedupeWindow = Duration(milliseconds: 900);
+  static const Duration _dedupeWindow = Duration(seconds: 2);
 
   /// Show snackbar
   static void show(
@@ -29,14 +29,15 @@ class AppSnackBar {
     if (message.trim().isEmpty) return;
 
     final now = DateTime.now();
+    final normalizedMessage = message.trim().replaceAll(RegExp(r'\s+'), ' ');
     final shouldSkip =
-        _lastMessage == message &&
+      _lastMessage == normalizedMessage &&
         _lastType == type &&
         _lastShownAt != null &&
         now.difference(_lastShownAt!) < _dedupeWindow;
     if (shouldSkip) return;
 
-    _lastMessage = message;
+    _lastMessage = normalizedMessage;
     _lastType = type;
     _lastShownAt = now;
 
@@ -47,6 +48,8 @@ class AppSnackBar {
         16;
 
     final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.removeCurrentSnackBar(reason: SnackBarClosedReason.remove);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
@@ -143,6 +146,8 @@ class AppToast {
     if (message.trim().isEmpty) return;
 
     final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.removeCurrentSnackBar(reason: SnackBarClosedReason.remove);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(

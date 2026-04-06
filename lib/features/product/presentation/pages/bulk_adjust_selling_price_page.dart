@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
 import '../bloc/product_bloc.dart';
@@ -320,7 +321,10 @@ class _BulkAdjustSellingPricePageState
                         child: TextField(
                           controller: _increaseController,
                           keyboardType: TextInputType.number,
-                          inputFormatters: [CurrencyInputFormatter()],
+                          inputFormatters:
+                              AppInputFormatters.withSqlInjectionGuard(
+                                inputFormatters: [CurrencyInputFormatter()],
+                              ),
                           decoration: InputDecoration(
                             labelText: l10n.translate(
                               'product.bulk_adjust.increase_label',
@@ -334,7 +338,10 @@ class _BulkAdjustSellingPricePageState
                         child: TextField(
                           controller: _decreaseController,
                           keyboardType: TextInputType.number,
-                          inputFormatters: [CurrencyInputFormatter()],
+                          inputFormatters:
+                              AppInputFormatters.withSqlInjectionGuard(
+                                inputFormatters: [CurrencyInputFormatter()],
+                              ),
                           decoration: InputDecoration(
                             labelText: l10n.translate(
                               'product.bulk_adjust.decrease_label',

@@ -983,7 +983,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     _searchQuery = null;
     _filterStatus = null;
     _filterBusinessTypeId = null;
-    unawaited(repository.clearCachedProducts());
+    unawaited(
+      repository.clearCachedProducts().catchError((_) {
+        // Database may already be closing during logout — safe to ignore.
+      }),
+    );
     emit(const ProductInitial());
   }
 

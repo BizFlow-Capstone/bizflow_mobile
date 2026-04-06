@@ -127,6 +127,65 @@ class SetPasswordRequested extends AuthEvent {
   const SetPasswordRequested({required this.password});
 }
 
+class ForgotPasswordSendOtpRequested extends AuthEvent {
+  final String email;
+
+  const ForgotPasswordSendOtpRequested({required this.email});
+}
+
+class ForgotPasswordVerifyOtpRequested extends AuthEvent {
+  final String email;
+  final String otpCode;
+
+  const ForgotPasswordVerifyOtpRequested({
+    required this.email,
+    required this.otpCode,
+  });
+}
+
+class ForgotPasswordResetRequested extends AuthEvent {
+  final String password;
+
+  const ForgotPasswordResetRequested({required this.password});
+}
+
+class LoadProfileRequested extends AuthEvent {
+  const LoadProfileRequested();
+}
+
+class UpdateProfileRequested extends AuthEvent {
+  final String? fullName;
+  final String? taxCode;
+
+  const UpdateProfileRequested({this.fullName, this.taxCode});
+}
+
+class UpdateAvatarRequested extends AuthEvent {
+  final String avatarPath;
+
+  const UpdateAvatarRequested({required this.avatarPath});
+}
+
+class RemoveAvatarRequested extends AuthEvent {
+  const RemoveAvatarRequested();
+}
+
+class ChangePasswordRequested extends AuthEvent {
+  final String currentPassword;
+  final String newPassword;
+
+  const ChangePasswordRequested({
+    required this.currentPassword,
+    required this.newPassword,
+  });
+}
+
+class DeleteAccountRequested extends AuthEvent {
+  final String password;
+
+  const DeleteAccountRequested({required this.password});
+}
+
 // General Auth Events
 class LogoutRequested extends AuthEvent {
   const LogoutRequested();

@@ -29,6 +29,8 @@ class _SplashPageState extends State<SplashPage> {
       listener: (context, state) {
         if (state is NeedsSetPasswordOnResume) {
           AppRouter.navigateAndClearStack(AppRoutes.setPassword);
+        } else if (state is NeedsGooglePhoneLinkOnResume) {
+          AppRouter.navigateAndClearStack(AppRoutes.googlePhoneLink);
         } else if (state is AuthAuthenticated) {
           PostAuthNavigation.route(context);
         } else if (state is AuthUnauthenticated) {

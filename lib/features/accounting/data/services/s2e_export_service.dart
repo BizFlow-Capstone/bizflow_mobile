@@ -10,30 +10,52 @@ import '../../domain/models/accounting_book.dart';
 class S2eExportService {
   const S2eExportService._();
 
-  static const _columns = 5; // A(Số hiệu), B(Ngày tháng), C(Diễn giải), D(Thu/Gửi vào), E(Chi/Rút ra)
+  static const _columns =
+      5; // A(Số hiệu), B(Ngày tháng), C(Diễn giải), D(Thu/Gửi vào), E(Chi/Rút ra)
   static const _fontName = 'Times New Roman';
   static const _headerFontSize = 12.0;
   static const _dataFontSize = 10.0;
 
   static const _soHieuAliases = [
     'so_hieu',
-    'importCode', 'orderCode', 'bookCode', 'code', 'importId',
+    'importCode',
+    'orderCode',
+    'bookCode',
+    'code',
+    'importId',
   ];
   static const _dateAliases = [
     'ngay_thang',
-    'receivedAt', 'createdAt', 'updatedAt', 'documentDate', 'date',
+    'receivedAt',
+    'createdAt',
+    'updatedAt',
+    'documentDate',
+    'date',
   ];
   static const _descAliases = [
     'dien_giai',
-    'description', 'note', 'planName', 'businessLocationName',
+    'description',
+    'note',
+    'planName',
+    'businessLocationName',
   ];
   static const _thuVaoAliases = [
     'thu_vao',
-    'thuVao', 'income', 'amountIn', 'deposit', 'revenue', 'finalAmount',
+    'thuVao',
+    'income',
+    'amountIn',
+    'deposit',
+    'revenue',
+    'finalAmount',
   ];
   static const _chiRaAliases = [
     'chi_ra',
-    'chiRa', 'expense', 'amountOut', 'withdrawal', 'cost', 'amount',
+    'chiRa',
+    'expense',
+    'amountOut',
+    'withdrawal',
+    'cost',
+    'amount',
   ];
 
   static Future<File?> export({
@@ -56,11 +78,22 @@ class S2eExportService {
         taxCode: taxCode,
         address: address,
       );
-      _writeLabel(sheet, row: 3, col: 0, label: 'Kỳ kê khai', value: periodLabel);
+      _writeLabel(
+        sheet,
+        row: 3,
+        col: 0,
+        label: 'Kỳ kê khai',
+        value: periodLabel,
+      );
 
       // Build rows based on sections data
       int currentRow = 8; // 0-indexed, row 9 in Excel (1-indexed)
-      currentRow = _writeSectionsData(sheet, currentRow, dataRows, sectionsData);
+      currentRow = _writeSectionsData(
+        sheet,
+        currentRow,
+        dataRows,
+        sectionsData,
+      );
 
       // Signature block
       _writeSignatureBlock(sheet, currentRow + 2);
@@ -92,12 +125,22 @@ class S2eExportService {
             case 'industry_header':
             case 'section_header':
               // Bold section title like "Tiền mặt" or "Tiền gửi không kỳ hạn"
-              _writeSectionHeader(sheet, r, row.values['dien_giai']?.toString() ?? section.businessTypeName ?? '');
+              _writeSectionHeader(
+                sheet,
+                r,
+                row.values['dien_giai']?.toString() ??
+                    section.businessTypeName ??
+                    '',
+              );
               r++;
               break;
             case 'bank_header':
               // Italic bank name like "Ngân hàng..."
-              _writeBankHeader(sheet, r, row.values['dien_giai']?.toString() ?? '');
+              _writeBankHeader(
+                sheet,
+                r,
+                row.values['dien_giai']?.toString() ?? '',
+              );
               r++;
               break;
             case 'data_placeholder':
@@ -196,19 +239,50 @@ class S2eExportService {
     sheet.getRangeByIndex(1, 4, 1, 5).merge();
     sheet.getRangeByIndex(1, 1).rowHeight = 72;
 
-    _writeText(sheet, 0, 0, 'HỘ, CÁ NHÂN KINH DOANH:......\nMã số thuế:.......................................\nĐịa chỉ:...........................................');
-    _styleCell(sheet, 0, 0, bold: true, wrapText: true, hAlign: xlsio.HAlignType.left);
+    _writeText(
+      sheet,
+      0,
+      0,
+      'HỘ, CÁ NHÂN KINH DOANH:......\nMã số thuế:.......................................\nĐịa chỉ:...........................................',
+    );
+    _styleCell(
+      sheet,
+      0,
+      0,
+      bold: true,
+      wrapText: true,
+      hAlign: xlsio.HAlignType.left,
+    );
 
-    _writeText(sheet, 0, 3,
-        'Mẫu số S2e-HKD\n(Kèm theo Thông tư số\n152/2025/TT-BTC ngày 31 tháng\n12 năm 2025 của Bộ trưởng Bộ Tài\nchính)');
-    _styleCell(sheet, 0, 3, bold: false, italic: true, wrapText: true, hAlign: xlsio.HAlignType.center);
+    _writeText(
+      sheet,
+      0,
+      3,
+      'Mẫu số S2e-HKD\n(Kèm theo Thông tư số\n152/2025/TT-BTC ngày 31 tháng\n12 năm 2025 của Bộ trưởng Bộ Tài\nchính)',
+    );
+    _styleCell(
+      sheet,
+      0,
+      3,
+      bold: false,
+      italic: true,
+      wrapText: true,
+      hAlign: xlsio.HAlignType.center,
+    );
 
     // Row 2: empty
 
     // Row 3: Title "SỔ CHI TIẾT TIỀN" (merged A-E)
     sheet.getRangeByIndex(3, 1, 3, 5).merge();
     _writeText(sheet, 2, 0, 'SỔ CHI TIẾT TIỀN');
-    _styleCell(sheet, 2, 0, bold: true, hAlign: xlsio.HAlignType.center, fontSize: 14);
+    _styleCell(
+      sheet,
+      2,
+      0,
+      bold: true,
+      hAlign: xlsio.HAlignType.center,
+      fontSize: 14,
+    );
 
     // Row 4: "Kỳ kê khai: ..." (merged A-E)
     sheet.getRangeByIndex(4, 1, 4, 5).merge();
@@ -268,7 +342,14 @@ class S2eExportService {
       0,
       'HỘ, CÁ NHÂN KINH DOANH: ${businessName.trim()}\nMã số thuế: ${taxCode.trim()}\nĐịa chỉ: ${address.trim()}',
     );
-    _styleCell(sheet, 0, 0, bold: true, wrapText: true, hAlign: xlsio.HAlignType.left);
+    _styleCell(
+      sheet,
+      0,
+      0,
+      bold: true,
+      wrapText: true,
+      hAlign: xlsio.HAlignType.left,
+    );
   }
 
   static void _writeLabel(
@@ -293,7 +374,11 @@ class S2eExportService {
   // ─── Section / Row Writers ──────────────────────────────────────────
 
   /// Write a bold section header like "Tiền mặt" or "Tiền gửi không kỳ hạn"
-  static void _writeSectionHeader(xlsio.Worksheet sheet, int row, String label) {
+  static void _writeSectionHeader(
+    xlsio.Worksheet sheet,
+    int row,
+    String label,
+  ) {
     _applyRowBorders(sheet, row);
     _writeText(sheet, row, 2, label);
     final style = _cell(sheet, row, 2).cellStyle;
@@ -314,11 +399,30 @@ class S2eExportService {
   }
 
   /// Write a data row with all columns
-  static void _writeDataRow(xlsio.Worksheet sheet, int row, Map<String, dynamic> data) {
+  static void _writeDataRow(
+    xlsio.Worksheet sheet,
+    int row,
+    Map<String, dynamic> data,
+  ) {
     _applyRowBorders(sheet, row);
-    _writeText(sheet, row, 0, _pick(data, 'so_hieu', _soHieuAliases)?.toString() ?? '');
-    _writeText(sheet, row, 1, _fmtDate(_pick(data, 'ngay_thang', _dateAliases)));
-    _writeText(sheet, row, 2, _pick(data, 'dien_giai', _descAliases)?.toString() ?? '');
+    _writeText(
+      sheet,
+      row,
+      0,
+      _pick(data, 'so_hieu', _soHieuAliases)?.toString() ?? '',
+    );
+    _writeText(
+      sheet,
+      row,
+      1,
+      _fmtDate(_pick(data, 'ngay_thang', _dateAliases)),
+    );
+    _writeText(
+      sheet,
+      row,
+      2,
+      _pick(data, 'dien_giai', _descAliases)?.toString() ?? '',
+    );
     _setAmount(sheet, row, 3, _pick(data, 'thu_vao', _thuVaoAliases));
     _setAmount(sheet, row, 4, _pick(data, 'chi_ra', _chiRaAliases));
 
@@ -333,7 +437,11 @@ class S2eExportService {
   }
 
   /// Write a summary/subtotal/total row
-  static void _writeSummaryRow(xlsio.Worksheet sheet, int row, Map<String, dynamic> values) {
+  static void _writeSummaryRow(
+    xlsio.Worksheet sheet,
+    int row,
+    Map<String, dynamic> values,
+  ) {
     _applyRowBorders(sheet, row);
     final desc = _pick(values, 'dien_giai', _descAliases)?.toString() ?? '';
     _writeText(sheet, row, 2, desc);
@@ -366,7 +474,11 @@ class S2eExportService {
   }
 
   /// Write generic row (description + amounts if present)
-  static void _writeGenericRow(xlsio.Worksheet sheet, int row, Map<String, dynamic> values) {
+  static void _writeGenericRow(
+    xlsio.Worksheet sheet,
+    int row,
+    Map<String, dynamic> values,
+  ) {
     _applyRowBorders(sheet, row);
     final desc = values['dien_giai']?.toString() ?? '';
     _writeText(sheet, row, 2, desc);
@@ -381,17 +493,6 @@ class S2eExportService {
     }
   }
 
-  /// Write a "....." placeholder row
-  static void _writePlaceholderDots(xlsio.Worksheet sheet, int row) {
-    _applyRowBorders(sheet, row);
-    _writeText(sheet, row, 2, '.....');
-    for (var c = 0; c < _columns; c++) {
-      final style = _cell(sheet, row, c).cellStyle;
-      style.fontName = _fontName;
-      style.fontSize = _dataFontSize;
-    }
-  }
-
   // ─── Signature Block ────────────────────────────────────────────────
 
   static void _writeSignatureBlock(xlsio.Worksheet sheet, int startRow) {
@@ -401,16 +502,40 @@ class S2eExportService {
     }
 
     _writeText(sheet, startRow, 3, 'Ngày ... tháng ... năm ...');
-    _styleCell(sheet, startRow, 3, italic: true, hAlign: xlsio.HAlignType.center);
+    _styleCell(
+      sheet,
+      startRow,
+      3,
+      italic: true,
+      hAlign: xlsio.HAlignType.center,
+    );
 
     _writeText(sheet, startRow + 1, 3, 'NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/');
-    _styleCell(sheet, startRow + 1, 3, bold: true, hAlign: xlsio.HAlignType.center);
+    _styleCell(
+      sheet,
+      startRow + 1,
+      3,
+      bold: true,
+      hAlign: xlsio.HAlignType.center,
+    );
 
     _writeText(sheet, startRow + 2, 3, 'CÁ NHÂN KINH DOANH');
-    _styleCell(sheet, startRow + 2, 3, bold: true, hAlign: xlsio.HAlignType.center);
+    _styleCell(
+      sheet,
+      startRow + 2,
+      3,
+      bold: true,
+      hAlign: xlsio.HAlignType.center,
+    );
 
     _writeText(sheet, startRow + 3, 3, '(Ký, họ tên, đóng dấu)');
-    _styleCell(sheet, startRow + 3, 3, italic: true, hAlign: xlsio.HAlignType.center);
+    _styleCell(
+      sheet,
+      startRow + 3,
+      3,
+      italic: true,
+      hAlign: xlsio.HAlignType.center,
+    );
   }
 
   // ─── Cell Helpers ────────────────────────────────────────────────────
@@ -426,7 +551,12 @@ class S2eExportService {
     cell.cellStyle.fontSize = _dataFontSize;
   }
 
-  static void _setAmount(xlsio.Worksheet sheet, int row, int col, dynamic value) {
+  static void _setAmount(
+    xlsio.Worksheet sheet,
+    int row,
+    int col,
+    dynamic value,
+  ) {
     final n = _toNum(value);
     if (n == null) {
       if (value != null && value.toString().trim().isNotEmpty) {
@@ -488,7 +618,11 @@ class S2eExportService {
 
   // ─── Value Helpers ──────────────────────────────────────────────────
 
-  static dynamic _pick(Map<String, dynamic> row, String primary, List<String> aliases) {
+  static dynamic _pick(
+    Map<String, dynamic> row,
+    String primary,
+    List<String> aliases,
+  ) {
     final v = row[primary];
     if (v != null && v.toString().trim().isNotEmpty) return v;
     for (final a in aliases) {
@@ -531,7 +665,10 @@ class S2eExportService {
 
   // ─── Save ───────────────────────────────────────────────────────────
 
-  static Future<File?> _save(xlsio.Workbook workbook, String displayName) async {
+  static Future<File?> _save(
+    xlsio.Workbook workbook,
+    String displayName,
+  ) async {
     final dir = await getApplicationDocumentsDirectory();
     final safe = displayName
         .replaceAll(RegExp(r'[\\/:*?"<>|]'), ' ')

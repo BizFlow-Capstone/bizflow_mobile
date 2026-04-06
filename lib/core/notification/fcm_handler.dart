@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 /// FCM Message type
 enum FcmMessageType { notification, data, both }
@@ -42,6 +44,9 @@ class FcmHandler {
 
   bool _isInitialized = false;
   String? _fcmToken;
+  StreamSubscription<String>? _tokenRefreshSubscription;
+  StreamSubscription<RemoteMessage>? _onMessageSubscription;
+  StreamSubscription<RemoteMessage>? _onMessageOpenedAppSubscription;
 
   /// Get FCM token
   String? get fcmToken => _fcmToken;
@@ -59,44 +64,34 @@ class FcmHandler {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    // TODO: Initialize Firebase Messaging
-    // final messaging = FirebaseMessaging.instance;
-    //
-    // // Request permission
-    // await messaging.requestPermission(
-    //   alert: true,
-    //   badge: true,
-    //   sound: true,
-    // );
-    //
-    // // Get token
-    // _fcmToken = await messaging.getToken();
-    // debugPrint('FCM Token: $_fcmToken');
-    //
-    // // Listen to token refresh
-    // messaging.onTokenRefresh.listen((token) {
-    //   _fcmToken = token;
-    //   onTokenRefresh?.call(token);
-    // });
-    //
-    // // Foreground messages
-    // FirebaseMessaging.onMessage.listen((message) {
-    //   final fcmMessage = FcmMessage.fromMap(message.toMap());
-    //   onMessage?.call(fcmMessage);
-    // });
-    //
-    // // Background/Terminated messages opened
-    // FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    //   final fcmMessage = FcmMessage.fromMap(message.toMap());
-    //   onMessageOpenedApp?.call(fcmMessage);
-    // });
-    //
-    // // Check if app opened from terminated state
-    // final initialMessage = await messaging.getInitialMessage();
-    // if (initialMessage != null) {
-    //   final fcmMessage = FcmMessage.fromMap(initialMessage.toMap());
-    //   onMessageOpenedApp?.call(fcmMessage);
-    // }
+    final messaging = FirebaseMessaging.instance;
+
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
+
+    _fcmToken = await messaging.getToken();
+    debugPrint('FcmHandler: Current FCM token: $_fcmToken');
+
+    _tokenRefreshSubscription = messaging.onTokenRefresh.listen((token) {
+      _fcmToken = token;
+      onTokenRefresh?.call(token);
+    });
+
+    _onMessageSubscription = FirebaseMessaging.onMessage.listen((message) {
+      final fcmMessage = _fromRemoteMessage(message);
+      onMessage?.call(fcmMessage);
+    });
+
+    _onMessageOpenedAppSubscription = FirebaseMessaging.onMessageOpenedApp
+        .listen((message) {
+          final fcmMessage = _fromRemoteMessage(message);
+          onMessageOpenedApp?.call(fcmMessage);
+        });
+
+    final initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      final fcmMessage = _fromRemoteMessage(initialMessage);
+      onMessageOpenedApp?.call(fcmMessage);
+    }
 
     _isInitialized = true;
     debugPrint('FcmHandler: Initialized');
@@ -112,20 +107,45 @@ class FcmHandler {
 
   /// Subscribe to topic
   Future<void> subscribeToTopic(String topic) async {
-    // TODO: await FirebaseMessaging.instance.subscribeToTopic(topic);
+    await FirebaseMessaging.instance.subscribeToTopic(topic);
     debugPrint('FcmHandler: Subscribed to topic - $topic');
   }
 
   /// Unsubscribe from topic
   Future<void> unsubscribeFromTopic(String topic) async {
-    // TODO: await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
+    await FirebaseMessaging.instance.unsubscribeFromTopic(topic);
     debugPrint('FcmHandler: Unsubscribed from topic - $topic');
   }
 
   /// Delete token
   Future<void> deleteToken() async {
-    // TODO: await FirebaseMessaging.instance.deleteToken();
+    await FirebaseMessaging.instance.deleteToken();
     _fcmToken = null;
     debugPrint('FcmHandler: Token deleted');
+  }
+
+  Future<void> dispose() async {
+    await _tokenRefreshSubscription?.cancel();
+    await _onMessageSubscription?.cancel();
+    await _onMessageOpenedAppSubscription?.cancel();
+  }
+
+  FcmMessage _fromRemoteMessage(RemoteMessage message) {
+    final notification = message.notification;
+    final hasNotification = notification != null;
+    final hasData = message.data.isNotEmpty;
+
+    final type = hasNotification && hasData
+        ? FcmMessageType.both
+        : hasNotification
+        ? FcmMessageType.notification
+        : FcmMessageType.data;
+
+    return FcmMessage(
+      title: notification?.title,
+      body: notification?.body,
+      data: hasData ? Map<String, dynamic>.from(message.data) : null,
+      type: type,
+    );
   }
 }

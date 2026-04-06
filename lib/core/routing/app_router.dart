@@ -11,6 +11,7 @@ import '../../features/auth/presentation/pages/verify_otp_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/set_password_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/pages/google_phone_link_page.dart';
 import '../../core/services/firebase_messaging_service.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_event.dart';
@@ -61,6 +62,7 @@ class AppRoutes {
   AppRoutes._();
 
   static const String setPassword = '/set-password';
+  static const String googlePhoneLink = '/google-phone-link';
 
   // Auth
   static const String splash = '/';
@@ -154,7 +156,12 @@ class AppRouter {
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
+  static final AppRouteObserver routeObserver = AppRouteObserver();
   static final GlobalAppBarState globalAppBarState = GlobalAppBarState();
+  static bool _clearStackNavigationInProgress = false;
+  static String? _clearStackRouteInProgress;
+  static String? _lastClearedRoute;
+  static DateTime? _lastClearedAt;
 
   /// Lấy context hiện tại
   static BuildContext? get context => navigatorKey.currentContext;
@@ -180,6 +187,9 @@ class AppRouter {
 
       case AppRoutes.setPassword:
         return _buildRoute(settings, const SetPasswordPage());
+
+      case AppRoutes.googlePhoneLink:
+        return _buildRoute(settings, const GooglePhoneLinkPage());
 
       case AppRoutes.forgotPassword:
         return _buildRoute(settings, const ForgotPasswordPage());
@@ -424,11 +434,40 @@ class AppRouter {
     String routeName, {
     Object? arguments,
   }) {
-    return navigatorKey.currentState!.pushNamedAndRemoveUntil<T>(
-      routeName,
-      (route) => false,
-      arguments: arguments,
-    );
+    if (routeObserver.currentRouteName == routeName) {
+      return Future<T?>.value(null);
+    }
+
+    if (_clearStackNavigationInProgress &&
+        _clearStackRouteInProgress == routeName) {
+      return Future<T?>.value(null);
+    }
+
+    final now = DateTime.now();
+    final recentlyClearedSameRoute =
+        _lastClearedRoute == routeName &&
+        _lastClearedAt != null &&
+        now.difference(_lastClearedAt!) < const Duration(milliseconds: 1200);
+
+    if (recentlyClearedSameRoute) {
+      return Future<T?>.value(null);
+    }
+
+    _clearStackNavigationInProgress = true;
+    _clearStackRouteInProgress = routeName;
+    _lastClearedRoute = routeName;
+    _lastClearedAt = now;
+
+    return navigatorKey.currentState!
+        .pushNamedAndRemoveUntil<T>(
+          routeName,
+          (route) => false,
+          arguments: arguments,
+        )
+        .whenComplete(() {
+          _clearStackNavigationInProgress = false;
+          _clearStackRouteInProgress = null;
+        });
   }
 
   /// Pop current route
@@ -498,6 +537,38 @@ class AppRouter {
       );
       return;
     }
+  }
+}
+
+class AppRouteObserver extends NavigatorObserver {
+  String? currentRouteName;
+
+  String? _routeName(Route<dynamic>? route) {
+    return route?.settings.name;
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    currentRouteName = _routeName(route);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    currentRouteName = _routeName(previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    currentRouteName = _routeName(newRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didRemove(route, previousRoute);
+    currentRouteName = _routeName(previousRoute);
   }
 }
 
