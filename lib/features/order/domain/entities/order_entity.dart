@@ -20,6 +20,7 @@ class OrderEntity extends Equatable {
   final double debtAmount;
   final int? debtorId;
   final String? note;
+  final String? aiConfidence; // 'high', 'medium', 'low' from AI draft
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
@@ -46,6 +47,7 @@ class OrderEntity extends Equatable {
     this.debtAmount = 0,
     this.debtorId,
     this.note,
+    this.aiConfidence,
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
@@ -105,6 +107,7 @@ class OrderEntity extends Equatable {
       debtAmount: debtAmount ?? this.debtAmount,
       debtorId: debtorId ?? this.debtorId,
       note: note ?? this.note,
+      aiConfidence: aiConfidence ?? this.aiConfidence,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
@@ -134,6 +137,7 @@ class OrderEntity extends Equatable {
     debtAmount,
     debtorId,
     note,
+    aiConfidence,
     createdAt,
     updatedAt,
     completedAt,

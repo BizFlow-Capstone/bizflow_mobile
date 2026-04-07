@@ -57,10 +57,13 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   bool _isCreatingDebtorProfile = false;
   bool _isSavingDraft = false;
   bool _isProceedingPayment = false;
+  bool _hasAttemptedDebtorAutoMatch = false;
 
   static const int _phoneLength = 10;
   late final String _draftId;
   String? _draftCreatedAtIso;
+  String? _aiRawTranscript;
+  String? _aiConfidence;
 
   final List<OrderItemEntity> _items = [];
 
@@ -77,7 +80,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _items.addAll(order.items);
       _customerNameController.text = order.customerName ?? '';
       _customerPhoneController.text = order.customerPhone ?? '';
-      _notesController.text = order.note ?? '';
+      if (widget.inputType != 'manual') {
+        final note = (order.note ?? '').trim();
+        _aiRawTranscript = note.isNotEmpty ? note : null;
+        _aiConfidence = order.aiConfidence;
+        // Don't pre-fill notes with AI transcript
+      } else {
+        _notesController.text = order.note ?? '';
+      }
 
       if (order.debtorId != null && order.debtorId! > 0) {
         _customerType = 'debtor';
@@ -91,6 +101,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
           currentBalance: 0,
           isActive: true,
         );
+      } else if (order.debtAmount > 0) {
+        // Auto-select debtor type if AI indicated debt
+        _customerType = 'debtor';
       } else {
         _customerType = 'walkin';
       }
@@ -112,6 +125,158 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     _notesController.dispose();
     _documentNumberController.dispose();
     super.dispose();
+  }
+
+  Color _confidenceBackgroundColor(String? confidence) {
+    switch (confidence?.toLowerCase()) {
+      case 'high':
+        return Colors.green.withValues(alpha: 0.1);
+      case 'medium':
+        return Colors.orange.withValues(alpha: 0.1);
+      case 'low':
+        return Colors.red.withValues(alpha: 0.1);
+      default:
+        return Colors.grey.withValues(alpha: 0.1);
+    }
+  }
+
+  Color _confidenceTextColor(String? confidence) {
+    switch (confidence?.toLowerCase()) {
+      case 'high':
+        return Colors.green[700]!;
+      case 'medium':
+        return Colors.orange[700]!;
+      case 'low':
+        return Colors.red[700]!;
+      default:
+        return Colors.grey[700]!;
+    }
+  }
+
+  String _confidenceLabel(AppLocalizations l10n, String? confidence) {
+    switch (confidence?.toLowerCase()) {
+      case 'high':
+        return l10n.translate('accounting.ai_confidence_high');
+      case 'medium':
+        return l10n.translate('accounting.ai_confidence_medium');
+      case 'low':
+        return l10n.translate('accounting.ai_confidence_low');
+      default:
+        return confidence ?? '';
+    }
+  }
+
+  String _normalizePersonName(String input) {
+    const vietnameseMap = {
+      'a': 'a',
+      'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+      'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+      'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+      'b': 'b',
+      'c': 'c',
+      'd': 'd', 'đ': 'd',
+      'e': 'e',
+      'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+      'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+      'g': 'g', 'h': 'h', 'i': 'i',
+      'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+      'k': 'k', 'l': 'l', 'm': 'm', 'n': 'n',
+      'o': 'o',
+      'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+      'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+      'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+      'p': 'p', 'q': 'q', 'r': 'r', 's': 's', 't': 't',
+      'u': 'u',
+      'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+      'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+      'v': 'v', 'x': 'x', 'y': 'y',
+      'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    };
+
+    final lower = input.trim().toLowerCase();
+    final buffer = StringBuffer();
+
+    for (final rune in lower.runes) {
+      final char = String.fromCharCode(rune);
+      final mapped = vietnameseMap[char] ?? char;
+      if (RegExp(r'[a-z0-9 ]').hasMatch(mapped)) {
+        buffer.write(mapped);
+      } else {
+        buffer.write(' ');
+      }
+    }
+
+    return buffer.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  int _levenshteinDistance(String s1, String s2) {
+    if (s1 == s2) return 0;
+    if (s1.isEmpty) return s2.length;
+    if (s2.isEmpty) return s1.length;
+
+    var previous = List<int>.generate(s2.length + 1, (i) => i);
+
+    for (var i = 0; i < s1.length; i++) {
+      final current = List<int>.filled(s2.length + 1, 0);
+      current[0] = i + 1;
+      for (var j = 0; j < s2.length; j++) {
+        final cost = s1[i] == s2[j] ? 0 : 1;
+        current[j + 1] = [
+          current[j] + 1,
+          previous[j + 1] + 1,
+          previous[j] + cost,
+        ].reduce((a, b) => a < b ? a : b);
+      }
+      previous = current;
+    }
+
+    return previous.last;
+  }
+
+  double _nameSimilarityScore(String sourceName, String targetName) {
+    final source = _normalizePersonName(sourceName);
+    final target = _normalizePersonName(targetName);
+    if (source.isEmpty || target.isEmpty) return 0;
+    if (source == target) return 1;
+
+    final maxLength = source.length > target.length
+        ? source.length
+        : target.length;
+    final distance = _levenshteinDistance(source, target);
+    final editSimilarity = 1 - (distance / maxLength);
+
+    final sourceTokens = source.split(' ').where((e) => e.isNotEmpty).toSet();
+    final targetTokens = target.split(' ').where((e) => e.isNotEmpty).toSet();
+    final intersectionCount = sourceTokens.intersection(targetTokens).length;
+    final unionCount = sourceTokens.union(targetTokens).length;
+    final tokenSimilarity = unionCount == 0 ? 0 : intersectionCount / unionCount;
+
+    return (editSimilarity * 0.7) + (tokenSimilarity * 0.3);
+  }
+
+  DebtorEntity? _findBestDebtorMatch(
+    String aiCustomerName,
+    List<DebtorEntity> debtors,
+  ) {
+    final normalizedInput = _normalizePersonName(aiCustomerName);
+    if (normalizedInput.length < 3) return null;
+
+    DebtorEntity? bestDebtor;
+    var bestScore = 0.0;
+
+    for (final debtor in debtors) {
+      final score = _nameSimilarityScore(aiCustomerName, debtor.name);
+      if (score > bestScore) {
+        bestScore = score;
+        bestDebtor = debtor;
+      }
+    }
+
+    // Only auto-select when similarity is strong enough.
+    if (bestScore >= 0.82) {
+      return bestDebtor;
+    }
+    return null;
   }
 
   @override
@@ -232,6 +397,86 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  // AI Transcript Section (only for voice/audio input)
+                  if (_aiRawTranscript != null &&
+                      _aiRawTranscript!.isNotEmpty) ...[  
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.purple.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.mic,
+                                size: 14,
+                                color: Colors.purple[700],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                l10n.translate(
+                                  'order_create.voice_text_title',
+                                ),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.purple[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.subtitles_outlined,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: SelectableText(
+                                  _aiRawTranscript!,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (_aiConfidence != null && _aiConfidence!.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _confidenceBackgroundColor(_aiConfidence),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '${l10n.translate('accounting.ai_confidence')}: ${_confidenceLabel(l10n, _aiConfidence)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _confidenceTextColor(_aiConfidence),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
                   // Customer Info Section
                   Card(
                     elevation: 0,
@@ -307,6 +552,29 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                               builder: (context, debtState) {
                                 final debtors =
                                     debtState.activeDebtorsByLocation;
+
+                                // Auto-select debtor only when name matching confidence is high.
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (!mounted || _hasAttemptedDebtorAutoMatch) {
+                                    return;
+                                  }
+                                  if (_selectedDebtor != null || debtors.isEmpty) {
+                                    return;
+                                  }
+
+                                  final aiName = _customerNameController.text.trim();
+                                  if (aiName.isEmpty) return;
+
+                                  _hasAttemptedDebtorAutoMatch = true;
+                                  final matchedDebtor = _findBestDebtorMatch(aiName, debtors);
+                                  if (matchedDebtor == null) return;
+
+                                  setState(() {
+                                    _selectedDebtor = matchedDebtor;
+                                    _customerPhoneController.text = matchedDebtor.phone;
+                                  });
+                                });
+
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -654,9 +922,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                             items: List.from(_items),
                             locationId: locationId,
                             locationName: BusinessContext().currentBusinessName,
-                            pendingOrderId:
-                                widget.pendingOrderId ??
-                                widget.initialOrder?.id,
+                            pendingOrderId: widget.pendingOrderId,
                             initialDebtorId: _customerType == 'debtor'
                                 ? _selectedDebtor?.debtorId
                                 : null,

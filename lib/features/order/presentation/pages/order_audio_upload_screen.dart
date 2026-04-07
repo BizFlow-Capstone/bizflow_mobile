@@ -1,8 +1,17 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
-import 'package:file_picker/file_picker.dart';
+import '../../domain/entities/order_entity.dart';
+import '../../domain/entities/order_item_entity.dart';
+import '../bloc/order_bloc.dart';
 import 'order_form_screen.dart';
 
 class OrderAudioUploadScreen extends StatefulWidget {
@@ -18,32 +27,158 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
 
   Future<void> _pickAudioFile() async {
     if (_isProcessing) return;
+
     setState(() => _isProcessing = true);
+
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.audio,
-      );
+      final result = await FilePicker.platform.pickFiles(type: FileType.audio);
+      if (result == null || result.files.isEmpty || !mounted) return;
 
-      if (result != null) {
-        setState(() {
-          _selectedFileName = result.files.single.name;
-        });
-        // Simulate processing
-        await Future.delayed(const Duration(seconds: 1));
-        if (!mounted) return;
+      final selected = result.files.single;
+      final selectedPath = selected.path;
 
-        Navigator.pushReplacement(
+      setState(() {
+        _selectedFileName = selected.name;
+      });
+
+      if (selectedPath == null || selectedPath.trim().isEmpty) {
+        AppSnackBar.show(
           context,
-          MaterialPageRoute(
-            builder: (_) => const OrderFormScreen(inputType: 'audio'),
-          ),
+          message: AppLocalizations.of(
+            context,
+          ).translate('common.error_occurred'),
+          type: AppSnackBarType.error,
         );
+        return;
       }
+
+      await _parseAndNavigate(audioFile: File(selectedPath));
     } finally {
       if (mounted) {
         setState(() => _isProcessing = false);
       }
     }
+  }
+
+  Future<void> _parseAndNavigate({required File audioFile}) async {
+    final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
+    if (locationId == null || locationId <= 0) {
+      AppSnackBar.show(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).translate('common.error_occurred'),
+        type: AppSnackBarType.error,
+      );
+      return;
+    }
+
+    try {
+      final result = await context
+          .read<OrderBloc>()
+          .repository
+          .parseDraftOrderFromAudio(
+            locationId: locationId,
+            audioFile: audioFile,
+          );
+
+      if (!mounted) return;
+
+      final transcript = result.rawTranscript.trim();
+      final matchedItems = result.items
+          .where(
+            (item) =>
+                item.matched &&
+                ((item.productName?.trim().isNotEmpty ?? false) ||
+                    (item.saleItemId ?? 0) > 0 ||
+                    (item.productId?.trim().isNotEmpty ?? false)),
+          )
+          .toList();
+      final hasDebt = result.items.any((item) => item.matched && item.isDebt);
+
+      final initialOrder = _buildDraftOrder(
+        locationId: locationId,
+        rawTranscript: transcript,
+        customerName: result.items
+            .where((item) => item.matched && (item.customerName?.trim().isNotEmpty ?? false))
+            .map((item) => item.customerName!.trim())
+            .firstWhere((name) => name.isNotEmpty, orElse: () => ''),
+        items: matchedItems
+            .map((item) {
+              final quantity = item.quantity <= 0 ? 1 : item.quantity;
+              final calculatedPrice =
+                  item.unitPrice ??
+                  ((item.lineTotal ?? 0) > 0
+                      ? (item.lineTotal! / quantity)
+                      : 0);
+              return OrderItemEntity(
+                productId: item.productId ?? '',
+                saleItemId: item.saleItemId,
+                unitName: item.unit,
+                productName: item.productName ?? '',
+                price: calculatedPrice,
+                quantity: quantity,
+                discount: 0,
+              );
+            })
+            .toList(),
+        totalAmount: result.totalAmount,
+        hasDebt: hasDebt,
+        aiConfidence: result.confidence,
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OrderFormScreen(inputType: 'audio', initialOrder: initialOrder),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppSnackBar.show(
+        context,
+        message: AppLocalizations.of(
+          context,
+        ).translate('common.error_occurred'),
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
+  OrderEntity _buildDraftOrder({
+    required int locationId,
+    required String rawTranscript,
+    required String customerName,
+    required List<OrderItemEntity> items,
+    double? totalAmount,
+    bool hasDebt = false,
+    String? aiConfidence,
+  }) {
+    final now = DateTime.now();
+    final subtotal = items.fold<double>(
+      0,
+      (sum, item) => sum + (item.price * item.quantity),
+    );
+    final resolvedTotal = (totalAmount ?? subtotal).clamp(0, double.infinity);
+
+    return OrderEntity(
+      id: 'ai_draft_${now.millisecondsSinceEpoch}',
+      locationId: locationId.toString(),
+      locationName: BusinessContext().currentBusinessName ?? '',
+      status: 'draft',
+      items: items,
+      subtotal: subtotal,
+      discountAmount: 0,
+      taxAmount: 0,
+      totalAmount: resolvedTotal.toDouble(),
+      debtAmount: hasDebt ? 1.0 : 0, // Mark as debt if any item is debt
+      customerName: customerName.trim().isEmpty ? null : customerName.trim(),
+      note: rawTranscript.isEmpty ? null : rawTranscript,
+      aiConfidence: aiConfidence,
+      createdAt: now,
+      updatedAt: now,
+    );
   }
 
   @override

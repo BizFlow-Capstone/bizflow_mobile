@@ -1,11 +1,14 @@
+import 'dart:io';
+
 import '../../../../core/database/app_database.dart';
 import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/cache/local_api_cache_store.dart';
 import '../domain/entities/order_entity.dart';
 import '../domain/entities/order_item_entity.dart';
 import 'datasources/order_local_datasource.dart';
-import 'order_api_service.dart';
+import 'models/ai_draft_order_dto.dart';
 import 'models/order_dto.dart';
+import 'order_api_service.dart';
 
 /// Real Order Repository - Connects to OrderApiService & implements SWR
 class OrderRepository {
@@ -67,6 +70,16 @@ class OrderRepository {
       cancelReason: dto.cancelReason,
       invoiceNumber: dto.invoiceNumber,
       invoicedAt: dto.invoicedAt,
+    );
+  }
+
+  Future<AiDraftOrderResultDto> parseDraftOrderFromAudio({
+    required int locationId,
+    required File audioFile,
+  }) async {
+    return _apiService.parseDraftOrderFromAudio(
+      locationId: locationId,
+      audioFile: audioFile,
     );
   }
 
@@ -236,6 +249,7 @@ class OrderRepository {
   /// Clear all cache keys related to orders
   Future<void> clearCache() async {
     await _cache.removeByPrefix('orders_');
+    await _cache.removeByPrefix('home_dashboard_summary_');
     await _localApiCache.removeByGroup('orders');
   }
 }

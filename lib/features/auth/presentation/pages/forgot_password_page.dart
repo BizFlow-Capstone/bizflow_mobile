@@ -26,6 +26,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     6,
     (_) => TextEditingController(),
   );
+  final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
 
@@ -37,6 +38,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     _emailController.dispose();
     for (final c in _otpControllers) {
       c.dispose();
+    }
+    for (final node in _otpFocusNodes) {
+      node.dispose();
     }
     _passwordController.dispose();
     _confirmController.dispose();
@@ -65,7 +69,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             context,
             l10n.translate('auth.reset_password_success'),
           );
-          AppRouter.navigateAndClearStack(AppRoutes.login);
+          if (!mounted) return;
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            AppRoutes.login,
+            (route) => false,
+          );
         } else if (state is ForgotPasswordFailure) {
           AppSnackBar.error(context, state.message);
         }
@@ -143,29 +151,61 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(6, (index) {
-                        return SizedBox(
-                          width: 44,
-                          child: TextField(
-                            controller: _otpControllers[index],
-                            maxLength: 1,
-                            textAlign: TextAlign.center,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              ...?AppInputFormatters.withSqlInjectionGuard(
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        const gap = 8.0;
+                        final rawWidth = (constraints.maxWidth - (5 * gap)) / 6;
+                        final boxWidth = rawWidth.clamp(44.0, 56.0);
+
+                        return Row(
+                          children: List.generate(6, (index) {
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                right: index == 5 ? 0 : gap,
                               ),
-                            ],
-                            decoration: const InputDecoration(counterText: ''),
-                          ),
+                              child: SizedBox(
+                                width: boxWidth,
+                                height: 76,
+                                child: TextField(
+                                  controller: _otpControllers[index],
+                                  focusNode: _otpFocusNodes[index],
+                                  maxLength: 1,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  textAlignVertical: TextAlignVertical.center,
+                                  textDirection: TextDirection.ltr,
+                                  style: AppTextStyles.titleLarge.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.0,
+                                  ),
+                                  inputFormatters: [
+                                    ...?AppInputFormatters.withSqlInjectionGuard(
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
+                                    ),
+                                  ],
+                                  decoration: const InputDecoration(
+                                    counterText: '',
+                                    isCollapsed: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onChanged: (value) {
+                                    if (value.isNotEmpty && index < 5) {
+                                      _otpFocusNodes[index + 1].requestFocus();
+                                    } else if (value.isEmpty && index > 0) {
+                                      _otpFocusNodes[index - 1].requestFocus();
+                                    }
+                                  },
+                                ),
+                              ),
+                            );
+                          }),
                         );
-                      }),
+                      },
                     ),
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.xl),
                     _buildActionButton(
                       context,
                       l10n.translate('auth.verify_button'),
@@ -184,6 +224,25 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           ),
                         );
                       },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Center(
+                      child: TextButton(
+                        onPressed: () {
+                          context.read<AuthBloc>().add(
+                            ForgotPasswordSendOtpRequested(
+                              email: _emailController.text.trim(),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          l10n.translate('auth.resend_otp'),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                   if (_step == 3) ...[

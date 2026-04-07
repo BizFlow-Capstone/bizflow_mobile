@@ -198,7 +198,11 @@ class _OrderCompletionConfirmationScreenState
                 width: double.infinity,
                 child: TextButton(
                   onPressed: () {
-                    Navigator.popUntil(context, ModalRoute.withName('/home'));
+                    Navigator.pushNamedAndRemoveUntil(
+                      context,
+                      '/home',
+                      (route) => false,
+                    );
                   },
                   child: Text(l10n.translate('order_payment.view_order_list')),
                 ),

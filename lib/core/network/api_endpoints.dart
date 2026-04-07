@@ -195,6 +195,7 @@ class ApiEndpoints {
   // AI (via Backend API)
   static const String aiDraftRevenue = '/api/my-business/ai/draft-revenue';
   static const String aiDraftCost = '/api/my-business/ai/draft-cost';
+  static const String aiDraftOrder = '/api/my-business/ai/draft-order';
 
   // GL Entries
   static const String glEntries = '/api/my-business/accounting/gl-entries';

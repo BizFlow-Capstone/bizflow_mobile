@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_error_message_parser.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import 'models/ai_draft_order_dto.dart';
 import 'models/order_dto.dart';
 
 class OrderConfirmationRequiredException implements Exception {
@@ -66,9 +69,12 @@ class OrderApiService {
     }
 
     final joinedWarnings = warnings.join(' ').toUpperCase();
-    final requiresLowStock = joinedWarnings.contains('LOW_STOCK_CONFIRM_REQUIRED');
-    final requiresCreditLimit =
-        joinedWarnings.contains('DEBTOR_CREDIT_LIMIT_EXCEEDED_CONFIRM_REQUIRED');
+    final requiresLowStock = joinedWarnings.contains(
+      'LOW_STOCK_CONFIRM_REQUIRED',
+    );
+    final requiresCreditLimit = joinedWarnings.contains(
+      'DEBTOR_CREDIT_LIMIT_EXCEEDED_CONFIRM_REQUIRED',
+    );
 
     throw OrderConfirmationRequiredException(
       warnings: warnings,
@@ -129,8 +135,6 @@ class OrderApiService {
     }
   }
 
-
-
   /// Get single order by ID
   ///
   /// API: GET /api/order/{id}
@@ -153,6 +157,82 @@ class OrderApiService {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.getOrder error: $e');
+      throw Exception(ApiErrorMessageParser.parse(e));
+    }
+  }
+
+  /// Sanitize filename to ASCII-safe for multipart form-data
+  /// 
+  /// Removes Vietnamese diacritics and non-ASCII characters that can cause
+  /// Content-Disposition header encoding issues.
+  String _sanitizeFilename(String filename) {
+    // Map of Vietnamese characters to ASCII equivalents
+    const mapping = {
+      'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+      'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+      'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+      'đ': 'd',
+      'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+      'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+      'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+      'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+      'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+      'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+      'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+      'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+      'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    };
+
+    var result = '';
+    for (final char in filename.split('')) {
+      result += mapping[char] ?? char;
+    }
+    // Keep only alphanumeric, dash, underscore, dot
+    return result.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  }
+
+  /// Parse AI draft order from audio file
+  ///
+  /// API: POST /api/my-business/ai/draft-order
+  /// Returns: AiDraftOrderResultDto
+  Future<AiDraftOrderResultDto> parseDraftOrderFromAudio({
+    required int locationId,
+    required File audioFile,
+  }) async {
+    try {
+      // Sanitize filename to avoid Content-Disposition encoding issues with Vietnamese chars
+      final originalFilename = audioFile.path.split(Platform.pathSeparator).last;
+      final sanitized = _sanitizeFilename(originalFilename);
+      
+      // Create a temporary copy with safe filename in system temp dir
+      final tempDir = Directory.systemTemp;
+      final safeTempFile = File('${tempDir.path}/$sanitized');
+      await audioFile.copy(safeTempFile.path);
+
+      try {
+        final response = await _apiClient.postMultipart<Map<String, dynamic>>(
+          ApiEndpoints.aiDraftOrder,
+          fields: {'locationId': locationId.toString()},
+          files: {'audio': safeTempFile},
+        );
+
+        if (!response.isSuccess || response.data == null) {
+          throw Exception(response.message ?? 'Failed to parse draft order');
+        }
+
+        return AiDraftOrderResultDto.fromJson(response.data!);
+      } finally {
+        // Clean up temp file
+        try {
+          if (safeTempFile.existsSync()) {
+            safeTempFile.deleteSync();
+          }
+        } catch (_) {}
+      }
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      debugPrint('OrderApiService.parseDraftOrderFromAudio error: $e');
       throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
@@ -238,7 +318,10 @@ class OrderApiService {
   ///
   /// API: POST /api/my-business/accounting/orders/{id}/complete
   /// Returns: OrderDto
-  Future<OrderDto> completeOrder(String orderId, {bool confirmLowStock = false}) async {
+  Future<OrderDto> completeOrder(
+    String orderId, {
+    bool confirmLowStock = false,
+  }) async {
     try {
       final response = await _apiClient.post(
         ApiEndpoints.completeOrder(orderId),
@@ -270,7 +353,10 @@ class OrderApiService {
   ///
   /// API: POST /api/order/{id}/cancel
   /// Returns: bool (success/failure)
-  Future<bool> cancelOrder(String orderId, {required String cancelReason}) async {
+  Future<bool> cancelOrder(
+    String orderId, {
+    required String cancelReason,
+  }) async {
     try {
       final normalizedReason = cancelReason.trim();
       if (normalizedReason.isEmpty) {

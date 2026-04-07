@@ -409,9 +409,10 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: TextButton(
-                      onPressed: () => Navigator.popUntil(
+                      onPressed: () => Navigator.pushNamedAndRemoveUntil(
                         context,
-                        ModalRoute.withName('/home'),
+                        '/home',
+                        (route) => false,
                       ),
                       child: Text(l10n.translate('order_payment.back_to_list')),
                     ),

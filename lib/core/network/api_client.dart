@@ -778,13 +778,8 @@ class ApiClient {
             .transform(utf8.decoder)
             .join();
 
-        // Parse redirect response
-        dynamic jsonRedirectResponse;
-        try {
-          jsonRedirectResponse = json.decode(redirectBody);
-        } catch (_) {
-          jsonRedirectResponse = redirectBody;
-        }
+        // Parse redirect response (supports concatenated JSON payloads)
+        final jsonRedirectResponse = _decodeResponseBody(redirectBody);
 
         // Apply response interceptors to redirect response
         for (final interceptor in responseInterceptors) {
@@ -822,13 +817,8 @@ class ApiClient {
         }
       }
 
-      // Parse response
-      dynamic jsonResponse;
-      try {
-        jsonResponse = json.decode(responseBody);
-      } catch (_) {
-        jsonResponse = responseBody;
-      }
+      // Parse response (supports concatenated JSON payloads)
+      final jsonResponse = _decodeResponseBody(responseBody);
 
       // Apply response interceptors
       for (final interceptor in responseInterceptors) {
@@ -898,6 +888,13 @@ class ApiClient {
   }
 
   String _getErrorMessage(int statusCode, dynamic body) {
+    if (body is String) {
+      final decoded = _decodeResponseBody(body);
+      if (decoded is Map && decoded.containsKey('message')) {
+        return decoded['message'].toString();
+      }
+    }
+
     if (body is Map && body.containsKey('message')) {
       return body['message'].toString();
     }
@@ -921,5 +918,65 @@ class ApiClient {
   /// Close client
   void close() {
     _client.close();
+  }
+
+  dynamic _decodeResponseBody(String responseBody) {
+    try {
+      return json.decode(responseBody);
+    } catch (_) {
+      final firstJson = _extractFirstJsonObject(responseBody);
+      if (firstJson != null) {
+        try {
+          return json.decode(firstJson);
+        } catch (_) {
+          // Keep raw response fallback below
+        }
+      }
+      return responseBody;
+    }
+  }
+
+  String? _extractFirstJsonObject(String input) {
+    final start = input.indexOf('{');
+    if (start < 0) return null;
+
+    var depth = 0;
+    var inString = false;
+    var isEscaped = false;
+
+    for (var i = start; i < input.length; i++) {
+      final char = input[i];
+
+      if (inString) {
+        if (isEscaped) {
+          isEscaped = false;
+          continue;
+        }
+        if (char == '\\') {
+          isEscaped = true;
+          continue;
+        }
+        if (char == '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (char == '"') {
+        inString = true;
+        continue;
+      }
+
+      if (char == '{') {
+        depth++;
+      } else if (char == '}') {
+        depth--;
+        if (depth == 0) {
+          return input.substring(start, i + 1);
+        }
+      }
+    }
+
+    return null;
   }
 }
