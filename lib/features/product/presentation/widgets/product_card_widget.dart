@@ -23,6 +23,8 @@ class ProductCardWidget extends StatelessWidget {
   final VoidCallback? onQuickAdjustStock;
   final bool canManageActions;
   final ActionGuard _deleteGuard = ActionGuard();
+  final ActionGuard _detailGuard = ActionGuard();
+  final ActionGuard _editGuard = ActionGuard();
 
   ProductCardWidget({
     super.key,
@@ -224,22 +226,24 @@ class ProductCardWidget extends StatelessWidget {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final result = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProductDetailPage(
-                            product: product,
-                            locationId: locationId,
-                          ),
-                        ),
-                      );
-                      if (result == true && context.mounted) {
-                        context.read<ProductBloc>().add(
-                          LoadProductsByLocationRequested(
-                            locationId: locationId,
+                      await _detailGuard.run(() async {
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProductDetailPage(
+                              product: product,
+                              locationId: locationId,
+                            ),
                           ),
                         );
-                      }
+                        if (result == true && context.mounted) {
+                          context.read<ProductBloc>().add(
+                            LoadProductsByLocationRequested(
+                              locationId: locationId,
+                            ),
+                          );
+                        }
+                      });
                     },
                     icon: const Icon(Icons.info_outline, size: 18),
                     label: Text(l10n.translate('product.detail_title')),
@@ -255,34 +259,36 @@ class ProductCardWidget extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
-                            final result = await Navigator.push<bool>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => EditProductPage(
-                                  productId: product.id,
-                                  locationId: locationId,
-                                  productName: product.name,
-                                  barcode: product.barcode,
-                                  category: product.category,
-                                  costPrice: product.costPrice,
-                                  salePrice: product.salePrice,
-                                  quantity: product.quantity,
-                                  unit: product.unit,
-                                  description: product.description,
-                                  isActive: product.isActive,
-                                  businessTypeId: product.businessTypeId,
-                                  manufacturer: product.manufacturer,
-                                  imageUrl: product.imageUrl,
-                                ),
-                              ),
-                            );
-                            if (result == true && context.mounted) {
-                              context.read<ProductBloc>().add(
-                                LoadProductsByLocationRequested(
-                                  locationId: locationId,
+                            await _editGuard.run(() async {
+                              final result = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditProductPage(
+                                    productId: product.id,
+                                    locationId: locationId,
+                                    productName: product.name,
+                                    barcode: product.barcode,
+                                    category: product.category,
+                                    costPrice: product.costPrice,
+                                    salePrice: product.salePrice,
+                                    quantity: product.quantity,
+                                    unit: product.unit,
+                                    description: product.description,
+                                    isActive: product.isActive,
+                                    businessTypeId: product.businessTypeId,
+                                    manufacturer: product.manufacturer,
+                                    imageUrl: product.imageUrl,
+                                  ),
                                 ),
                               );
-                            }
+                              if (result == true && context.mounted) {
+                                context.read<ProductBloc>().add(
+                                  LoadProductsByLocationRequested(
+                                    locationId: locationId,
+                                  ),
+                                );
+                              }
+                            });
                           },
                           icon: const Icon(Icons.edit, size: 18),
                           label: Text(

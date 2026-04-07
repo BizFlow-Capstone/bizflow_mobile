@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_error_message_parser.dart';
+import 'models/ai_draft_cost_dto.dart';
 import 'models/cost_dto.dart';
 
 class CostApiService {
@@ -110,5 +111,22 @@ class CostApiService {
       ApiEndpoints.deleteManualCost(costId.toString()),
     );
     return response.statusCode == 200;
+  }
+
+  Future<AiDraftCostResultDto> parseDraftCostFromAudio({
+    required int locationId,
+    required File audioFile,
+  }) async {
+    final response = await _apiClient.postMultipart<Map<String, dynamic>>(
+      ApiEndpoints.aiDraftCost,
+      fields: {'locationId': locationId.toString()},
+      files: {'audio': audioFile},
+    );
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.message ?? ApiErrorMessageParser.genericMessage);
+    }
+
+    return AiDraftCostResultDto.fromJson(response.data!);
   }
 }

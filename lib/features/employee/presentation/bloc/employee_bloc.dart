@@ -269,7 +269,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
           .where((e) => e.status == EmployeeStatus.pending)
           .toList(); // Pending
     } else if (safeTabIndex == 3) {
-      filtered = employees.where((e) => !e.isActive).toList(); // History
+      filtered = employees.where(_isHistoryEmployee).toList(); // History
     }
 
     final keyword = searchKeyword.trim().toLowerCase();
@@ -303,7 +303,7 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
     final pendingCount = employees
         .where((e) => e.status == EmployeeStatus.pending)
         .length;
-    final historyCount = employees.where((e) => !e.isActive).length;
+    final historyCount = employees.where(_isHistoryEmployee).length;
     final totalCount = employees.length;
 
     return EmployeeLoaded(
@@ -316,6 +316,17 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       currentTab: safeTabIndex,
       searchKeyword: searchKeyword,
     );
+  }
+
+  bool _isHistoryEmployee(EmployeeEntity employee) {
+    if (!employee.isActive) return true;
+    if (employee.status == EmployeeStatus.inactive ||
+        employee.status == EmployeeStatus.rejected) {
+      return true;
+    }
+
+    final employmentStatus = employee.employmentStatus.trim().toLowerCase();
+    return employmentStatus == 'inactive' || employmentStatus == 'rejected';
   }
 
   Future<List<EmployeeEntity>> _getCachedEmployeesLocal(String businessId) {

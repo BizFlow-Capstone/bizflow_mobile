@@ -33,7 +33,8 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
   ) async {
     emit(state.copyWith(status: ImportHistoryStatus.loading));
 
-    final effectiveLocationId = state.businessLocationId ?? _currentBusinessLocationId;
+    final effectiveLocationId =
+        state.businessLocationId ?? _currentBusinessLocationId;
 
     try {
       final response = await _repository.getImports(
@@ -74,7 +75,8 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
     LoadMoreImportHistory event,
     Emitter<ImportHistoryState> emit,
   ) async {
-    if (state.hasReachedMax || state.status == ImportHistoryStatus.loadingMore) {
+    if (state.hasReachedMax ||
+        state.status == ImportHistoryStatus.loadingMore) {
       return;
     }
 
@@ -84,7 +86,8 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
       final response = await _repository.getImports(
         status: state.statusFilter,
         importType: state.typeFilter,
-        businessLocationId: state.businessLocationId ?? _currentBusinessLocationId,
+        businessLocationId:
+            state.businessLocationId ?? _currentBusinessLocationId,
         fromDate: state.fromDate,
         toDate: state.toDate,
         pageNumber: nextPage,
@@ -108,7 +111,7 @@ class ImportHistoryBloc extends Bloc<ImportHistoryEvent, ImportHistoryState> {
       emit(
         state.copyWith(
           status: ImportHistoryStatus.failure,
-          errorMessage: e.toString(),
+          errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
     }

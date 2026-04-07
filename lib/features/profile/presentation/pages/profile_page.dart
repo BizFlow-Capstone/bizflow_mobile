@@ -240,7 +240,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             onPressed: () {
                               setState(() {
                                 _isEditingProfile = false;
-                                _fullNameController.text = profile.fullName ?? '';
+                                _fullNameController.text =
+                                    profile.fullName ?? '';
                                 _taxCodeController.text = profile.taxCode ?? '';
                               });
                             },
@@ -342,8 +343,31 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _pickAndUploadAvatar(BuildContext context) async {
     final picker = ImagePicker();
+    final l10n = AppLocalizations.of(context);
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: Text(l10n.translate('common.source_camera')),
+              onTap: () => Navigator.of(sheetCtx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(l10n.translate('common.source_gallery')),
+              onTap: () => Navigator.of(sheetCtx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
     final selected = await picker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 85,
       maxWidth: 1600,
     );
@@ -488,7 +512,9 @@ class _ProfilePageState extends State<ProfilePage> {
                               return l10n.translate('auth.password_required');
                             }
                             if (trimmed.length < 8) {
-                              return l10n.translate('auth.password_min_length_8');
+                              return l10n.translate(
+                                'auth.password_min_length_8',
+                              );
                             }
                             return null;
                           },
@@ -811,10 +837,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     final phone = phoneController.text.trim();
                     final password = passwordController.text.trim();
                     if (phone.isEmpty) {
-                        AppSnackBar.warning(
-                          context,
-                          l10n.translate('common.required_field'),
-                        );
+                      AppSnackBar.warning(
+                        context,
+                        l10n.translate('common.required_field'),
+                      );
                       return;
                     }
 

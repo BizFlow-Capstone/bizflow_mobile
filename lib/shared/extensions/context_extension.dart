@@ -76,7 +76,7 @@ extension ContextExtension on BuildContext {
 
   void showSnackBar(SnackBar snackBar) {
     ScaffoldMessenger.of(this).hideCurrentSnackBar();
-    ScaffoldMessenger.of(this).showSnackBar(snackBar);
+    ScaffoldMessenger.of(this)..removeCurrentSnackBar()..showSnackBar(snackBar);
   }
 
   void hideSnackBar() {

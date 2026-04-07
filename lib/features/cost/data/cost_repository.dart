@@ -3,6 +3,7 @@ import '../../../shared/cache/cache_manager.dart';
 import '../../../shared/cache/local_api_cache_store.dart';
 import '../domain/entities/cost_entity.dart';
 import 'cost_api_service.dart';
+import 'models/ai_draft_cost_dto.dart';
 import 'models/cost_dto.dart';
 
 class CostRepository {
@@ -74,7 +75,12 @@ class CostRepository {
             },
           ),
       onData: (dataMap, isFromCache) {
-        _localApiCache.setMap(key, dataMap, groupKey: 'costs', cacheType: 'list');
+        _localApiCache.setMap(
+          key,
+          dataMap,
+          groupKey: 'costs',
+          cacheType: 'list',
+        );
         final items = (dataMap['items'] as List<dynamic>? ?? [])
             .map((e) => CostDto.fromJson(e as Map<String, dynamic>))
             .map(_mapToEntity)
@@ -118,5 +124,15 @@ class CostRepository {
       await clearCache();
     }
     return result;
+  }
+
+  Future<AiDraftCostResultDto> parseDraftCostFromAudio({
+    required int locationId,
+    required File audioFile,
+  }) {
+    return _apiService.parseDraftCostFromAudio(
+      locationId: locationId,
+      audioFile: audioFile,
+    );
   }
 }

@@ -46,6 +46,7 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
   late Future<BookSectionsResponse?> _sectionsFuture;
   late Future<List<Map<String, dynamic>>> _rowsFuture;
   bool _isShowingLoadErrorDialog = false;
+  bool _isExporting = false;
 
   @override
   void initState() {
@@ -106,6 +107,7 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -136,14 +138,10 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: AppColors.error,
-                    size: 36,
-                  ),
+                  Icon(Icons.error_outline, color: AppColors.error, size: 36),
                   SizedBox(height: AppSpacing.sm),
                   Text(
-                    'Không thể tải dữ liệu sổ kế toán',
+                    l10n.translate('accounting.book_load_failed'),
                     style: AppTextStyles.bodyMedium.copyWith(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w600,
@@ -156,7 +154,7 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
                       _sectionsFuture = _loadSections();
                       _rowsFuture = _loadAllRows();
                     }),
-                    child: const Text('Retry'),
+                    child: Text(l10n.translate('common.retry')),
                   ),
                 ],
               ),
@@ -352,18 +350,34 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
           Expanded(
             child: OutlinedButton.icon(
               icon: const Icon(Icons.download_outlined),
-              label: const Text('Tải xuống'),
-              onPressed: () =>
-                  _handleExport(context, sectionsData, shareAfterExport: false),
+              label: Text(
+                AppLocalizations.of(
+                  context,
+                ).translate('accounting.book_download'),
+              ),
+              onPressed: _isExporting
+                  ? null
+                  : () => _handleExport(
+                      context,
+                      sectionsData,
+                      shareAfterExport: false,
+                    ),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: ElevatedButton.icon(
               icon: const Icon(Icons.share_outlined),
-              label: const Text('Chia sẻ'),
-              onPressed: () =>
-                  _handleExport(context, sectionsData, shareAfterExport: true),
+              label: Text(
+                AppLocalizations.of(context).translate('accounting.book_share'),
+              ),
+              onPressed: _isExporting
+                  ? null
+                  : () => _handleExport(
+                      context,
+                      sectionsData,
+                      shareAfterExport: true,
+                    ),
             ),
           ),
         ],
@@ -377,18 +391,26 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
     required bool shareAfterExport,
   }) async {
     if (!context.mounted) return;
+    if (_isExporting) return;
+    setState(() => _isExporting = true);
+    final l10n = AppLocalizations.of(context);
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.reportExport,
     );
-    if (!allowed || !context.mounted) return;
+    if (!allowed || !context.mounted) {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+      return;
+    }
 
     AppSnackBar.info(
       context,
       shareAfterExport
-          ? 'Đang chuẩn bị file Excel để chia sẻ...'
-          : 'Đang tạo file Excel để tải xuống...',
+          ? l10n.translate('accounting.book_preparing_share')
+          : l10n.translate('accounting.book_preparing_download'),
     );
 
     try {
@@ -401,22 +423,25 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
         headerInfo: headerInfo,
       );
       if (files.isEmpty) {
-        throw Exception('Không thể tạo file Excel');
+        throw Exception(l10n.translate('accounting.book_create_excel_failed'));
       }
 
       if (!context.mounted) return;
       if (shareAfterExport) {
         await ExcelExportService.shareExportedFiles(files);
         if (!context.mounted) return;
-        AppSnackBar.success(context, 'Đã sẵn sàng chia sẻ file Excel');
+        AppSnackBar.success(
+          context,
+          l10n.translate('accounting.book_share_ready'),
+        );
       } else {
         await ExcelExportService.saveExportedFilesToDownloads(files);
         if (!context.mounted) return;
         AppSnackBar.success(
           context,
           Platform.isAndroid
-              ? 'Đã lưu file Excel vào Downloads'
-              : 'Đã lưu file Excel thành công',
+              ? l10n.translate('accounting.book_saved_downloads')
+              : l10n.translate('accounting.book_saved_success'),
         );
       }
     } catch (e, st) {
@@ -424,6 +449,10 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
       print('AccountingBookDetailPage._handleExport error: $e\n$st');
       if (!context.mounted) return;
       AppSnackBar.error(context, ApiErrorMessageParser.parse(e));
+    } finally {
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
     }
   }
 

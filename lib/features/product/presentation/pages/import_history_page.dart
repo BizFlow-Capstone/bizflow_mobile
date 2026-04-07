@@ -29,7 +29,12 @@ class ImportHistoryPage extends StatelessWidget {
     final locationState = context.read<LocationBloc>().state;
     if (locationState is LocationsLoaded &&
         locationState.locations.isNotEmpty) {
-      locationId = int.tryParse(locationState.locations.first.id);
+      final activeLocations = locationState.locations
+          .where((location) => location.isActive)
+          .toList();
+      if (activeLocations.isNotEmpty) {
+        locationId = int.tryParse(activeLocations.first.id);
+      }
     }
 
     final importRepo = context.read<ImportRepository>();
@@ -123,7 +128,8 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
               AppSnackBar.show(
                 context,
                 message:
-                    state.errorMessage ?? l10n.translate('common.error_occurred'),
+                    state.errorMessage ??
+                    l10n.translate('common.error_occurred'),
                 type: AppSnackBarType.error,
               );
             }
@@ -217,7 +223,12 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
             final locState = context.read<LocationBloc>().state;
             String currentLocId = '0';
             if (locState is LocationsLoaded && locState.locations.isNotEmpty) {
-              currentLocId = locState.locations.first.id;
+              final activeLocations = locState.locations
+                  .where((location) => location.isActive)
+                  .toList();
+              if (activeLocations.isNotEmpty) {
+                currentLocId = activeLocations.first.id;
+              }
             }
             Navigator.push(
               context,
@@ -299,13 +310,18 @@ class _ImportHistoryCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    item.importCode,
-                    style: AppTextStyles.titleMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      item.importCode,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.titleMedium.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
+                  SizedBox(width: AppSpacing.sm),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,

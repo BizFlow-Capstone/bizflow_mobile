@@ -79,7 +79,7 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
             setState(() {
               _isSubmitting = false;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
               SnackBar(
                 content: const Text('Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)'),
                 backgroundColor: AppColors.success,
@@ -92,7 +92,7 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
             setState(() {
               _isSubmitting = false;
             });
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: AppColors.error,
@@ -281,7 +281,7 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
     final locationIdText = widget.locationId?.trim();
     final businessLocationId = int.tryParse(locationIdText ?? '');
     if (businessLocationId == null || businessLocationId <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
         SnackBar(content: Text(l10n.translate('debt.location_required'))),
       );
       return;
@@ -289,7 +289,7 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
 
     final pendingOrderId = widget.pendingOrderId.trim();
     if (pendingOrderId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
         SnackBar(content: Text(l10n.translate('order.pending_required'))),
       );
       return;

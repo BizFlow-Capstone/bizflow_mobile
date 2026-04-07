@@ -14,6 +14,8 @@ class SubscriptionRepository {
   _usageTrackingSubscription;
   String? _activeUsageTrackingDocId;
   Map<String, int> _latestUsageByFeatureCode = const {};
+  // Preserve last valid snapshot when network error occurs
+  Map<String, int> _lastValidUsageSnapshot = const {};
 
   SubscriptionRepository(this._apiService) : _cache = CacheManager();
 
@@ -149,8 +151,19 @@ class SubscriptionRepository {
         .doc(docId)
         .snapshots()
         .listen((snapshot) {
-          _latestUsageByFeatureCode = _extractUsageMap(snapshot.data());
-        }, onError: (_) {});
+          final extracted = _extractUsageMap(snapshot.data());
+          _latestUsageByFeatureCode = extracted;
+          // Always preserve as last valid snapshot (even if empty doc)
+          if (extracted.isNotEmpty) {
+            _lastValidUsageSnapshot = extracted;
+          }
+        }, onError: (error) {
+          //FIX: On network error, keep using last valid snapshot
+          // Don't reset to empty - this prevents UI from showing wrong state
+          if (_lastValidUsageSnapshot.isNotEmpty) {
+            _latestUsageByFeatureCode = _lastValidUsageSnapshot;
+          }
+        });
   }
 
   int? _readUsedCountFromRealtimeCache(String featureCode) {

@@ -133,7 +133,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
             children: [
               TextButton.icon(
                 icon: const Icon(Icons.filter_list, color: AppColors.primary),
-                label: Text('Lọc dữ liệu'), // Fallback text
+                label: Text(context.tr('accounting.gl_filter_data')),
                 onPressed: _showFiltersBottomSheet,
               ),
             ],
@@ -308,13 +308,18 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    entry.documentNumber,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  Expanded(
+                    child: Text(
+                      entry.documentNumber,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
                     formatter.format(entry.amount),
                     style: TextStyle(
@@ -384,7 +389,10 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'Channel: ${entry.moneyChannel}',
+                            context.tr(
+                              'accounting.gl_detail_channel_chip',
+                              params: {'channel': entry.moneyChannel ?? '-'},
+                            ),
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.success,
@@ -463,7 +471,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('GL-${entry.entryId}'),
+        title: Text(
+          context.tr(
+            'accounting.gl_detail_title',
+            params: {'id': entry.entryId.toString()},
+          ),
+        ),
         content: SizedBox(
           width: 420,
           child: SingleChildScrollView(
@@ -471,32 +484,76 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Chứng từ: ${entry.documentNumber}'),
-                const SizedBox(height: 6),
-                Text('Ngày chứng từ: ${entry.documentDate ?? '-'}'),
-                const SizedBox(height: 6),
-                Text('Ngày: ${entry.date}'),
-                const SizedBox(height: 6),
-                Text('Nội dung: ${entry.note}'),
-                const SizedBox(height: 6),
-                Text('Loại giao dịch: ${entry.transactionType}'),
-                const SizedBox(height: 6),
-                Text('Kênh tiền: ${entry.moneyChannel ?? '-'}'),
-                const SizedBox(height: 6),
                 Text(
-                  'Reference: ${entry.referenceType.isNotEmpty ? entry.referenceType : '-'} ${entry.referenceId ?? ''}',
+                  context.tr(
+                    'accounting.gl_detail_document',
+                    params: {'value': entry.documentNumber},
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Entity: ${entry.entityType ?? '-'} ${entry.entityId ?? ''}',
+                  context.tr(
+                    'accounting.gl_detail_document_date',
+                    params: {'value': entry.documentDate ?? '-'},
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.tr(
+                    'accounting.gl_detail_date',
+                    params: {'value': entry.date},
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.tr(
+                    'accounting.gl_detail_note',
+                    params: {'value': entry.note},
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.tr(
+                    'accounting.gl_detail_transaction_type',
+                    params: {'value': entry.transactionType},
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.tr(
+                    'accounting.gl_detail_money_channel',
+                    params: {'value': entry.moneyChannel ?? '-'},
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.tr(
+                    'accounting.gl_detail_reference',
+                    params: {
+                      'type': entry.referenceType.isNotEmpty
+                          ? entry.referenceType
+                          : '-',
+                      'id': (entry.referenceId ?? '').toString(),
+                    },
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.tr(
+                    'accounting.gl_detail_entity',
+                    params: {
+                      'type': entry.entityType ?? '-',
+                      'id': (entry.entityId ?? '').toString(),
+                    },
+                  ),
                 ),
                 if ((entry.entityType ?? '').toLowerCase() == 'order' &&
                     (entry.entityId ?? 0) > 0) ...[
                   const SizedBox(height: 12),
                   const Divider(),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Order detail',
+                  Text(
+                    context.tr('accounting.linked_order_detail'),
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
@@ -512,18 +569,38 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
 
                       final order = snapshot.data;
                       if (order == null) {
-                        return const Text('Không tải được chi tiết đơn hàng');
+                        return Text(
+                          context.tr('accounting.order_detail_unavailable'),
+                        );
                       }
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Order ID: ${order.id}'),
-                          const SizedBox(height: 4),
-                          Text('Trạng thái: ${order.status}'),
+                          Text(
+                            context.tr(
+                              'accounting.gl_detail_order_id',
+                              params: {'value': order.id.toString()},
+                            ),
+                          ),
                           const SizedBox(height: 4),
                           Text(
-                            'Tổng tiền: ${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(order.totalAmount)}',
+                            context.tr(
+                              'accounting.gl_detail_order_status',
+                              params: {'value': order.status},
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            context.tr(
+                              'accounting.gl_detail_order_total',
+                              params: {
+                                'value': NumberFormat.currency(
+                                  locale: 'vi',
+                                  symbol: 'đ',
+                                ).format(order.totalAmount),
+                              },
+                            ),
                           ),
                           const SizedBox(height: 8),
                           ...order.items.map(

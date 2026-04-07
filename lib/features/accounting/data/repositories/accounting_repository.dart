@@ -12,17 +12,25 @@ class AccountingRepository {
   AccountingRepository({
     required AccountingApiService apiService,
     LocalApiCacheStore? localApiCacheStore,
-  })  : _apiService = apiService,
-        _localApiCache = localApiCacheStore ?? LocalApiCacheStore();
+  }) : _apiService = apiService,
+       _localApiCache = localApiCacheStore ?? LocalApiCacheStore();
 
   String _periodsKey(String locationId) => 'periods_$locationId';
   String _periodDetailKey(String locationId, String periodId) =>
       'period_detail_${locationId}_$periodId';
-    String _booksKey(String locationId, String? periodId) =>
+  String _booksKey(String locationId, String? periodId) =>
       'books_${locationId}_${periodId ?? 'all'}';
+  String _bookRowsKey(
+    String locationId,
+    String bookId,
+    String? cursor,
+    int batchSize,
+  ) => 'book_rows_${locationId}_${bookId}_${cursor ?? 'first'}_$batchSize';
+  String _bookSectionsKey(String locationId, String bookId) =>
+      'book_sections_${locationId}_$bookId';
 
-    static const String _periodsSyncResourceKey = 'accounting_periods_list';
-    static const String _booksSyncResourceKey = 'accounting_books_list';
+  static const String _periodsSyncResourceKey = 'accounting_periods_list';
+  static const String _booksSyncResourceKey = 'accounting_books_list';
 
   // ──────────────────────────────────────────────────────
   // SWR: List Periods
@@ -33,7 +41,7 @@ class AccountingRepository {
   Future<void> fetchPeriodsSWR({
     required String locationId,
     required void Function(List<AccountingPeriod> periods, bool fromCache)
-        onData,
+    onData,
     void Function(dynamic error)? onError,
   }) async {
     var hasLocalData = false;
@@ -85,10 +93,8 @@ class AccountingRepository {
       'periodType': periodType,
       'year': year,
       if (quarter != null) 'quarter': quarter,
-      if (openingCashBalance != null)
-        'openingCashBalance': openingCashBalance,
-      if (openingBankBalance != null)
-        'openingBankBalance': openingBankBalance,
+      if (openingCashBalance != null) 'openingCashBalance': openingCashBalance,
+      if (openingBankBalance != null) 'openingBankBalance': openingBankBalance,
       'useSuggestedOpeningBalances': useSuggestedOpeningBalances,
     };
 
@@ -112,10 +118,8 @@ class AccountingRepository {
     final body = <String, dynamic>{
       'startDate': startDate,
       'endDate': endDate,
-      if (openingCashBalance != null)
-        'openingCashBalance': openingCashBalance,
-      if (openingBankBalance != null)
-        'openingBankBalance': openingBankBalance,
+      if (openingCashBalance != null) 'openingCashBalance': openingCashBalance,
+      if (openingBankBalance != null) 'openingBankBalance': openingBankBalance,
       'useSuggestedOpeningBalances': useSuggestedOpeningBalances,
     };
 
@@ -369,12 +373,28 @@ class AccountingRepository {
     String? cursor,
     int batchSize = 200,
   }) async {
-    return _apiService.getBookRows(
-      locationId,
-      bookId,
-      cursor: cursor,
-      batchSize: batchSize,
-    );
+    final key = _bookRowsKey(locationId, bookId, cursor, batchSize);
+    try {
+      final rows = await _apiService.getBookRows(
+        locationId,
+        bookId,
+        cursor: cursor,
+        batchSize: batchSize,
+      );
+      await _localApiCache.setMap(
+        key,
+        _bookRowsResponseToJson(rows),
+        groupKey: 'accounting_book_rows',
+        cacheType: 'list',
+      );
+      return rows;
+    } catch (e) {
+      final localCached = await _localApiCache.getMap(key);
+      if (localCached != null) {
+        return BookRowsResponse.fromJson(localCached);
+      }
+      rethrow;
+    }
   }
 
   // ──────────────────────────────────────────────────────
@@ -385,7 +405,23 @@ class AccountingRepository {
     required String locationId,
     required String bookId,
   }) async {
-    return _apiService.getBookSections(locationId, bookId);
+    final key = _bookSectionsKey(locationId, bookId);
+    try {
+      final sections = await _apiService.getBookSections(locationId, bookId);
+      await _localApiCache.setMap(
+        key,
+        _bookSectionsResponseToJson(sections),
+        groupKey: 'accounting_book_sections',
+        cacheType: 'detail',
+      );
+      return sections;
+    } catch (e) {
+      final localCached = await _localApiCache.getMap(key);
+      if (localCached != null) {
+        return BookSectionsResponse.fromJson(localCached);
+      }
+      rethrow;
+    }
   }
 
   // ──────────────────────────────────────────────────────
@@ -397,8 +433,78 @@ class AccountingRepository {
       await _localApiCache.removeByKey(_periodsKey(locationId));
       await _localApiCache.removeByGroup('accounting_periods');
       await _localApiCache.removeByGroup('accounting_books');
+      await _localApiCache.removeByGroup('accounting_book_rows');
+      await _localApiCache.removeByGroup('accounting_book_sections');
     } catch (e) {
       debugPrint('AccountingRepository._invalidateCache error: $e');
     }
+  }
+
+  Map<String, dynamic> _bookRowsResponseToJson(BookRowsResponse value) {
+    return {
+      'rows': value.rows,
+      'hasMore': value.hasMore,
+      'nextCursor': value.nextCursor,
+      'loadedCount': value.loadedCount,
+      'totalEstimated': value.totalEstimated,
+    };
+  }
+
+  Map<String, dynamic> _bookSectionsResponseToJson(BookSectionsResponse value) {
+    return {
+      'bookId': value.bookId,
+      'templateCode': value.templateCode,
+      'templateName': value.templateName,
+      'lastCalculatedAt': value.lastCalculatedAt.toIso8601String(),
+      'columns': value.columns
+          .map(
+            (column) => {
+              'fieldCode': column.fieldCode,
+              'label': column.label,
+              'fieldType': column.fieldType,
+              'exportColumn': column.exportColumn,
+            },
+          )
+          .toList(),
+      'sections': value.sections
+          .map(
+            (section) => {
+              'sectionType': section.sectionType,
+              'businessTypeId': section.businessTypeId,
+              'businessTypeName': section.businessTypeName,
+              'groupIndex': section.groupIndex,
+              'rows': section.rows
+                  .map(
+                    (row) => {
+                      'lineType': row.lineType,
+                      'values': row.values,
+                      'dataFilter': {
+                        'businessTypeId': row.businessTypeId,
+                        'section': row.section,
+                      },
+                      'taxMetadata': {
+                        'taxType': row.taxType,
+                        'rate': row.taxRate,
+                      },
+                    },
+                  )
+                  .toList(),
+            },
+          )
+          .toList(),
+      'footerRows': value.footerRows
+          .map(
+            (row) => {
+              'lineType': row.lineType,
+              'values': row.values,
+              'dataFilter': {
+                'businessTypeId': row.businessTypeId,
+                'section': row.section,
+              },
+              'taxMetadata': {'taxType': row.taxType, 'rate': row.taxRate},
+            },
+          )
+          .toList(),
+    };
   }
 }

@@ -122,7 +122,7 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
                 );
                 Navigator.pop(context);
               } else if (state is EmployeeFailure) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
                   SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
                 );
               }

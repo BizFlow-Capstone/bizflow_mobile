@@ -208,6 +208,12 @@ class _LoginPageContent extends StatelessWidget {
             if (!context.mounted) return;
             PostAuthNavigation.route(context);
           });
+        } else if (state is GoogleLoginPhoneLinkRequired) {
+          FocusScope.of(context).unfocus();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            AppRouter.navigateAndClearStack(AppRoutes.googlePhoneLink);
+          });
         } else if (state is GoogleLoginSetPasswordRequired) {
           FocusScope.of(context).unfocus();
           WidgetsBinding.instance.addPostFrameCallback((_) {

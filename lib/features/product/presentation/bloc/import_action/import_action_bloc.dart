@@ -25,7 +25,12 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     CreateImportEvent event,
     Emitter<ImportActionState> emit,
   ) async {
-    emit(state.copyWith(status: ImportActionStatus.submitting));
+    emit(
+      state.copyWith(
+        status: ImportActionStatus.submitting,
+        actionType: ImportActionType.create,
+      ),
+    );
     try {
       final response = await _repository.createImport(event.request);
       final importData = ImportDetailModel.fromJson(response['data']);
@@ -33,6 +38,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
+          actionType: ImportActionType.create,
           importDetail: importData,
           successMessage: response['message'],
         ),
@@ -41,6 +47,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
+          actionType: ImportActionType.create,
           errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
@@ -51,7 +58,12 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     UpdateImportEvent event,
     Emitter<ImportActionState> emit,
   ) async {
-    emit(state.copyWith(status: ImportActionStatus.submitting));
+    emit(
+      state.copyWith(
+        status: ImportActionStatus.submitting,
+        actionType: ImportActionType.update,
+      ),
+    );
     try {
       final response = await _repository.updateImport(
         event.importId,
@@ -62,6 +74,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
+          actionType: ImportActionType.update,
           importDetail: importData,
           successMessage: response['message'],
         ),
@@ -70,6 +83,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
+          actionType: ImportActionType.update,
           errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
@@ -80,7 +94,12 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     ConfirmImportEvent event,
     Emitter<ImportActionState> emit,
   ) async {
-    emit(state.copyWith(status: ImportActionStatus.submitting));
+    emit(
+      state.copyWith(
+        status: ImportActionStatus.submitting,
+        actionType: ImportActionType.confirm,
+      ),
+    );
     try {
       final response = await _repository.confirmImport(
         event.importId,
@@ -90,6 +109,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
+          actionType: ImportActionType.confirm,
           importDetail: state.importDetail,
           successMessage: response['message'],
         ),
@@ -98,6 +118,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
+          actionType: ImportActionType.confirm,
           errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
@@ -108,13 +129,19 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     DeleteImportEvent event,
     Emitter<ImportActionState> emit,
   ) async {
-    emit(state.copyWith(status: ImportActionStatus.submitting));
+    emit(
+      state.copyWith(
+        status: ImportActionStatus.submitting,
+        actionType: ImportActionType.delete,
+      ),
+    );
     try {
       final response = await _repository.deleteImport(event.importId);
       await _invalidateImportHistoryCache();
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
+          actionType: ImportActionType.delete,
           successMessage: response['message'],
         ),
       );
@@ -122,6 +149,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
+          actionType: ImportActionType.delete,
           errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
@@ -132,13 +160,19 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     GetImportDetailEvent event,
     Emitter<ImportActionState> emit,
   ) async {
-    emit(state.copyWith(status: ImportActionStatus.loading));
+    emit(
+      state.copyWith(
+        status: ImportActionStatus.loading,
+        actionType: ImportActionType.loadDetail,
+      ),
+    );
     try {
       final response = await _repository.getImportDetail(event.importId);
       final importData = ImportDetailModel.fromJson(response);
       emit(
         state.copyWith(
           status: ImportActionStatus.loaded,
+          actionType: ImportActionType.loadDetail,
           importDetail: importData,
         ),
       );
@@ -146,6 +180,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
+          actionType: ImportActionType.loadDetail,
           errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );
@@ -156,13 +191,19 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
     GetImportTemplateEvent event,
     Emitter<ImportActionState> emit,
   ) async {
-    emit(state.copyWith(status: ImportActionStatus.loading));
+    emit(
+      state.copyWith(
+        status: ImportActionStatus.loading,
+        actionType: ImportActionType.loadTemplate,
+      ),
+    );
     try {
       final response = await _repository.getImportTemplate();
       final schemaJson = response['data']['schemaJson'] as String;
       emit(
         state.copyWith(
           status: ImportActionStatus.templateLoaded,
+          actionType: ImportActionType.loadTemplate,
           templateJson: schemaJson,
         ),
       );
@@ -170,6 +211,7 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
       emit(
         state.copyWith(
           status: ImportActionStatus.failure,
+          actionType: ImportActionType.loadTemplate,
           errorMessage: ApiErrorMessageParser.parse(e),
         ),
       );

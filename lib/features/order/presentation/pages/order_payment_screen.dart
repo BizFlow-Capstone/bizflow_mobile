@@ -236,6 +236,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
     bool confirmLowStock = false,
     bool confirmCreditLimit = false,
   }) async {
+    if (_isSubmitting) return;
     final l10n = AppLocalizations.of(context);
 
     if (_selectedMethods.isEmpty) {
@@ -439,7 +440,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           color: AppColors.black,
-          onPressed: () => Navigator.pop(context),
+          onPressed: _isSubmitting ? null : () => Navigator.pop(context),
         ),
         bottom: const AppSyncStatusText(),
       ),
@@ -588,7 +589,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         horizontal: AppSpacing.sm,
         vertical: AppSpacing.xs,
       ),
-      onSelected: (_) => _onMethodToggled(method),
+      onSelected: _isSubmitting ? null : (_) => _onMethodToggled(method),
     );
   }
 
@@ -706,6 +707,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
                 );
               }).toList(),
               onChanged: (value) {
+                if (_isSubmitting) return;
                 if (value != null) {
                   setState(() {
                     _selectedDebtor = debtors.firstWhere(
@@ -719,9 +721,11 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         ),
         const SizedBox(height: AppSpacing.sm),
         TextButton.icon(
-          onPressed: () {
-            // Future: Show create debtor sheet
-          },
+          onPressed: _isSubmitting
+              ? null
+              : () {
+                  // Future: Show create debtor sheet
+                },
           icon: const Icon(Icons.person_add),
           label: Text(l10n.translate('order_payment.select_debtor_list')),
         ),

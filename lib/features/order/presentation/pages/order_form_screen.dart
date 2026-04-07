@@ -55,6 +55,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       TextEditingController();
   DateTime? _documentDate;
   bool _isCreatingDebtorProfile = false;
+  bool _isSavingDraft = false;
+  bool _isProceedingPayment = false;
 
   static const int _phoneLength = 10;
   late final String _draftId;
@@ -158,12 +160,24 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
           foregroundColor: Colors.black,
           actions: [
             TextButton(
-              onPressed: () async {
-                await _saveLocalDraft(showFeedback: true);
-                if (mounted) {
-                  Navigator.popUntil(context, ModalRoute.withName('/home'));
-                }
-              },
+              onPressed: _isSavingDraft
+                  ? null
+                  : () async {
+                      setState(() => _isSavingDraft = true);
+                      try {
+                        await _saveLocalDraft(showFeedback: true);
+                        if (mounted) {
+                          Navigator.popUntil(
+                            context,
+                            ModalRoute.withName('/home'),
+                          );
+                        }
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isSavingDraft = false);
+                        }
+                      }
+                    },
               child: Text(
                 l10n.translate('order_create.save_draft'),
                 style: const TextStyle(color: Colors.black),
@@ -625,12 +639,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              onPressed: _items.isEmpty
+              onPressed: _items.isEmpty || _isProceedingPayment
                   ? null
-                  : () {
+                  : () async {
+                      if (_isProceedingPayment) return;
+                      setState(() => _isProceedingPayment = true);
                       final locationId = BusinessContext().currentBusinessId;
 
-                      Navigator.push(
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => OrderPaymentScreen(
@@ -660,6 +676,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                           ),
                         ),
                       );
+                      if (mounted) {
+                        setState(() => _isProceedingPayment = false);
+                      }
                     },
               child: Text(
                 l10n.translate('order_create.proceed_payment'),
@@ -1379,51 +1398,47 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                                 '${CurrencyFormatter.formatVND(unitPrice)}${selectedUnit.isNotEmpty ? ' / $selectedUnit' : ''}',
                               ),
                               const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      '${l10n.translate('order_create.sale_unit_label')}:',
-                                      style: const TextStyle(fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: DropdownButtonHideUnderline(
-                                      child: DropdownButton<String>(
-                                        isDense: true,
-                                        isExpanded: true,
-                                        value:
-                                            selectedSaleItem['key'] as String,
-                                        items: saleItems
-                                            .map(
-                                              (
-                                                saleItem,
-                                              ) => DropdownMenuItem<String>(
-                                                value:
-                                                    saleItem['key'] as String,
-                                                child: Text(
-                                                  '${_displayUnitName(saleItem['unit'] as String?)} x${saleItem['quantity']} (${CurrencyFormatter.formatVND((saleItem['price'] as num).toDouble())})',
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: saleItems.length <= 1
-                                            ? null
-                                            : (value) {
-                                                if (value == null) return;
-                                                _setSaleItemKey(
-                                                  productId,
-                                                  value,
-                                                );
-                                              },
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                '${l10n.translate('order_create.sale_unit_label')}:',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                              const SizedBox(height: 4),
+                              DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isDense: true,
+                                  isExpanded: true,
+                                  value: selectedSaleItem['key'] as String,
+                                  items: saleItems
+                                      .map(
+                                        (saleItem) => DropdownMenuItem<String>(
+                                          value: saleItem['key'] as String,
+                                          child: Text(
+                                            '${_displayUnitName(saleItem['unit'] as String?)} x${saleItem['quantity']} (${CurrencyFormatter.formatVND((saleItem['price'] as num).toDouble())})',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  selectedItemBuilder: (context) {
+                                    return saleItems.map((saleItem) {
+                                      return Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          '${_displayUnitName(saleItem['unit'] as String?)} x${saleItem['quantity']}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      );
+                                    }).toList();
+                                  },
+                                  onChanged: saleItems.length <= 1
+                                      ? null
+                                      : (value) {
+                                          if (value == null) return;
+                                          _setSaleItemKey(productId, value);
+                                        },
+                                ),
                               ),
                             ],
                           ),

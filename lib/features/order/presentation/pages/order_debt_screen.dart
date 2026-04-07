@@ -96,7 +96,7 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
           if (state is OrderCreated || state is OrderUpdated) {
             if (!mounted) return;
             setState(() => _isSubmitting = false);
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
               SnackBar(
                 content: const Text(
                   'Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)',
@@ -122,7 +122,7 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
           } else if (state is OrderError) {
             if (!mounted) return;
             setState(() => _isSubmitting = false);
-            ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: AppColors.error,

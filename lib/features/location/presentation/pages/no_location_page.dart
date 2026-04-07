@@ -18,7 +18,8 @@ class NoLocationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocListener<LocationBloc, LocationState>(
       listener: (context, state) {
-        if (state is LocationsLoaded && state.locations.isNotEmpty) {
+        if (state is LocationsLoaded &&
+            state.locations.any((location) => location.isActive)) {
           // If locations are found (e.g. from background refresh after invitation)
           // automatically navigate back to Home.
           AppRouter.navigateAndClearStack(AppRoutes.home);

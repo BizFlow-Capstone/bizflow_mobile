@@ -21,7 +21,7 @@ class NotificationContext extends ChangeNotifier {
     if (repository == null) return;
 
     try {
-      final unreadCount = await repository.getUnreadCount();
+      final unreadCount = await repository.getUnreadCountSWR();
       if (_unreadCount != unreadCount) {
         _unreadCount = unreadCount;
         notifyListeners();

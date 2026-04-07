@@ -10,11 +10,11 @@ import '../../../../core/services/notification_realtime_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../shared/context/notification_context.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/models/user_notification_dto.dart';
 import '../../data/notification_repository.dart';
-import '../../../../shared/cache/cache_manager.dart';
 
 class NotificationListPage extends StatefulWidget {
   const NotificationListPage({super.key});
@@ -65,12 +65,9 @@ class _NotificationListPageState extends State<NotificationListPage> {
       _currentPage = 1;
     });
 
-    await CacheManager().fetchWithSWR<PaginatedNotificationsDto>(
-      key: "notifications_page_${_currentPage}_size_$_pageSize",
-      fetcher: ({cancelToken}) => _repository.getMyNotifications(
-        pageNumber: _currentPage,
-        pageSize: _pageSize,
-      ),
+    await _repository.fetchNotificationsSWR(
+      pageNumber: _currentPage,
+      pageSize: _pageSize,
       onData: (page, isFromCache) {
         if (!mounted) return;
         setState(() {
@@ -98,13 +95,11 @@ class _NotificationListPageState extends State<NotificationListPage> {
         if (!mounted) return;
         if (_notifications.isEmpty) {
           setState(() {
-            _errorMessage = error.toString();
+            _errorMessage = ApiErrorMessageParser.parse(error);
             _isInitialLoading = false;
           });
         }
       },
-      fromJson: (json) => PaginatedNotificationsDto.fromJson(json),
-      toJson: (data) => data.toJson(),
     );
   }
 
@@ -117,28 +112,39 @@ class _NotificationListPageState extends State<NotificationListPage> {
       _isLoadingMore = true;
     });
 
-    try {
-      final nextPage = _currentPage + 1;
-      final page = await _repository.getMyNotifications(
-        pageNumber: nextPage,
-        pageSize: _pageSize,
-      );
-
-      if (!mounted) return;
-      setState(() {
-        _currentPage = nextPage;
-        _notifications.addAll(page.items);
-        _hasNextPage = page.hasNextPage;
-      });
-    } catch (_) {
-      // Keep current list on load-more failure.
-    } finally {
-      if (mounted) {
+    final nextPage = _currentPage + 1;
+    await _repository.fetchNotificationsSWR(
+      pageNumber: nextPage,
+      pageSize: _pageSize,
+      onData: (page, _) {
+        if (!mounted) return;
+        setState(() {
+          final ids = _notifications.map((e) => e.userNotificationId).toSet();
+          for (final item in page.items) {
+            if (!ids.contains(item.userNotificationId)) {
+              _notifications.add(item);
+              ids.add(item.userNotificationId);
+            } else {
+              final idx = _notifications.indexWhere(
+                (n) => n.userNotificationId == item.userNotificationId,
+              );
+              if (idx != -1) {
+                _notifications[idx] = item;
+              }
+            }
+          }
+          _currentPage = nextPage;
+          _hasNextPage = page.hasNextPage;
+          _isLoadingMore = false;
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
         setState(() {
           _isLoadingMore = false;
         });
-      }
-    }
+      },
+    );
   }
 
   Future<void> _markAllAsRead() async {

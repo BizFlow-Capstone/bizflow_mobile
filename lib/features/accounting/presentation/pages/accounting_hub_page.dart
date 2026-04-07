@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +12,7 @@ import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_bloc.d
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_event.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_state.dart';
 import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
+import 'package:bizflow_mobile/features/order/presentation/pages/order_detail_screen.dart';
 import 'package:bizflow_mobile/features/revenue/presentation/bloc/revenue_bloc.dart';
 import 'package:bizflow_mobile/features/cost/presentation/bloc/cost_bloc.dart';
 import 'package:bizflow_mobile/features/product/data/models/business_type_model.dart';
@@ -23,14 +25,18 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/dialogs/app_bottom_sheet.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/cache/sync_status_controller.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../bloc/accounting_period_bloc.dart';
+import '../dialogs/ai_draft_cost_dialog.dart';
+import '../dialogs/ai_draft_revenue_dialog.dart';
 import '../widgets/accounting_cost_revenue_tab.dart';
 import '../widgets/accounting_gl_tab.dart';
 import '../widgets/accounting_period_tab.dart';
@@ -198,6 +204,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       );
       return;
     }
+
+    if (_voicePlayer.state == PlayerState.playing) {
+      await _voicePlayer.stop();
+      return;
+    }
+
     await _voicePlayer.stop();
     await _voicePlayer.play(DeviceFileSource(path));
   }
@@ -245,6 +257,82 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     if (descriptionController.text.trim().isEmpty) {
       descriptionController.text = transcript;
     }
+  }
+
+  String _formatIsoDate(DateTime? date, {String fallback = '-'}) {
+    final formatted = DateFormatter.formatIso(date);
+    return formatted.isEmpty ? fallback : formatted;
+  }
+
+  Future<DateTime?> _pickDate({
+    required BuildContext context,
+    required DateTime initialDate,
+  }) {
+    return showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+  }
+
+  Widget _buildStringDropdownField({
+    required String label,
+    required String? value,
+    required List<String> options,
+    required ValueChanged<String?> onChanged,
+    bool isExpanded = false,
+  }) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: isExpanded,
+      decoration: InputDecoration(labelText: label),
+      items: options
+          .map(
+            (option) => DropdownMenuItem<String>(
+              value: option,
+              child: Text(option, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildDateSelectorTile({
+    required String title,
+    required BuildContext dialogCtx,
+    required DateTime? value,
+    required DateTime initialDate,
+    required ValueChanged<DateTime?> onChanged,
+    String emptyText = '-',
+    bool allowClear = false,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(title),
+      subtitle: Text(value == null ? emptyText : _formatIsoDate(value)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (allowClear && value != null)
+            IconButton(
+              onPressed: () => onChanged(null),
+              icon: const Icon(Icons.close),
+            ),
+          const Icon(Icons.calendar_today),
+        ],
+      ),
+      onTap: () async {
+        final picked = await _pickDate(
+          context: dialogCtx,
+          initialDate: value ?? initialDate,
+        );
+        if (picked != null) {
+          onChanged(picked);
+        }
+      },
+    );
   }
 
   Widget _buildVoiceAssistControls({
@@ -298,10 +386,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              OutlinedButton.icon(
-                onPressed: _lastVoicePath == null ? null : _playLastVoiceRecord,
-                icon: const Icon(Icons.play_arrow),
-                label: Text(l10n.translate('accounting.voice_play_back')),
+              _VoicePlayBtn(
+                player: _voicePlayer,
+                isDisabled: _lastVoicePath == null,
+                onTap: _playLastVoiceRecord,
+                label: l10n.translate('accounting.voice_play_back'),
               ),
             ],
           ),
@@ -530,12 +619,13 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           mode: AccountingCostRevenueMode.revenue,
                           revenues: revenueEntities,
                           costs: const <CostEntity>[],
-                          onAddRevenue: _showAddRevenueDialog,
-                          onAddCost: _showAddCostDialog,
+                          onAddRevenue: _showCreateRevenueModeDialog,
+                          onAddCost: _showCreateCostModeDialog,
                           onEditRevenue: _showEditRevenueDialog,
                           onTapRevenue: _showRevenueDetailDialog,
                           onDeleteRevenue: _onDeleteRevenue,
                           onEditCost: _showEditCostDialog,
+                          onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
                         );
                       },
@@ -551,12 +641,13 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           mode: AccountingCostRevenueMode.cost,
                           revenues: const <RevenueEntity>[],
                           costs: costEntities,
-                          onAddRevenue: _showAddRevenueDialog,
-                          onAddCost: _showAddCostDialog,
+                          onAddRevenue: _showCreateRevenueModeDialog,
+                          onAddCost: _showCreateCostModeDialog,
                           onEditRevenue: _showEditRevenueDialog,
                           onTapRevenue: _showRevenueDetailDialog,
                           onDeleteRevenue: _onDeleteRevenue,
                           onEditCost: _showEditCostDialog,
+                          onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
                         );
                       },
@@ -566,6 +657,100 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  List<String> _getMoneyChannelsForDialog() {
+    final state = context.read<ReferenceBloc>().state;
+    if (state is ReferenceLoaded) {
+      return state.references['moneyChannelTypes'] ?? const <String>[];
+    }
+    return const <String>[];
+  }
+
+  List<String> _getCostTypesForDialog() {
+    final state = context.read<ReferenceBloc>().state;
+    if (state is ReferenceLoaded) {
+      return (state.references['costTypes'] ?? const <String>[])
+          .where((c) => c.toLowerCase() != 'import')
+          .toSet()
+          .toList();
+    }
+    return const <String>[];
+  }
+
+  Future<void> _showCreateRevenueModeDialog() async {
+    final selected = await AppBottomSheet.showList<_EntryCreateMode>(
+      context,
+      items: [
+        AppBottomSheetItem<_EntryCreateMode>(
+          icon: Icons.edit_note_outlined,
+          title: l10n.translate('accounting.create_mode_manual'),
+          subtitle: l10n.translate('accounting.create_mode_manual_subtitle'),
+          value: _EntryCreateMode.manual,
+        ),
+        AppBottomSheetItem<_EntryCreateMode>(
+          icon: Icons.auto_awesome_outlined,
+          title: l10n.translate('accounting.create_mode_ai_draft'),
+          subtitle: l10n.translate('accounting.create_mode_ai_draft_subtitle'),
+          value: _EntryCreateMode.aiDraft,
+        ),
+      ],
+    );
+
+    if (!mounted || selected == null) return;
+    if (selected == _EntryCreateMode.manual) {
+      await _showAddRevenueDialog();
+      return;
+    }
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AIDraftRevenueDialog(
+          voiceItems: const [],
+          getMoneyChannels: _getMoneyChannelsForDialog,
+          parentContext: context,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showCreateCostModeDialog() async {
+    final selected = await AppBottomSheet.showList<_EntryCreateMode>(
+      context,
+      items: [
+        AppBottomSheetItem<_EntryCreateMode>(
+          icon: Icons.edit_note_outlined,
+          title: l10n.translate('accounting.create_mode_manual'),
+          subtitle: l10n.translate('accounting.create_mode_manual_subtitle'),
+          value: _EntryCreateMode.manual,
+        ),
+        AppBottomSheetItem<_EntryCreateMode>(
+          icon: Icons.auto_awesome_outlined,
+          title: l10n.translate('accounting.create_mode_ai_draft'),
+          subtitle: l10n.translate('accounting.create_mode_ai_draft_subtitle'),
+          value: _EntryCreateMode.aiDraft,
+        ),
+      ],
+    );
+
+    if (!mounted || selected == null) return;
+    if (selected == _EntryCreateMode.manual) {
+      await _showAddCostDialog();
+      return;
+    }
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AIDraftCostDialog(
+          voiceItems: const [],
+          getMoneyChannels: _getMoneyChannelsForDialog,
+          getCostTypes: _getCostTypesForDialog,
+          parentContext: context,
         ),
       ),
     );
@@ -616,51 +801,23 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildVoiceAssistControls(
-                  l10n: l10n,
-                  dialogCtx: dialogCtx,
-                  setDialogState: setDialogState,
-                  onTranscriptReady: (transcript) {
-                    _applyRevenueTranscript(
-                      transcript: transcript,
-                      amountController: amountController,
-                      descriptionController: descriptionController,
-                    );
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.revenue_amount'),
-                  ),
+                  label: l10n.translate('accounting.revenue_amount'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: descriptionController,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.revenue_description'),
-                  ),
+                  label: l10n.translate('accounting.revenue_description'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedMoneyChannel,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.channel'),
-                  ),
-                  items: getMoneyChannels()
-                      .map(
-                        (channel) => DropdownMenuItem<String>(
-                          value: channel,
-                          child: Text(channel),
-                        ),
-                      )
-                      .toList(),
+                _buildStringDropdownField(
+                  label: l10n.translate('accounting.channel'),
+                  value: selectedMoneyChannel,
+                  options: getMoneyChannels(),
                   onChanged: (value) {
-                    setDialogState(() {
-                      selectedMoneyChannel = value;
-                    });
+                    setDialogState(() => selectedMoneyChannel = value);
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -690,67 +847,34 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: referenceOrderIdController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Order ID (optional)',
-                    hintText: 'Ví dụ: 123',
-                  ),
+                  label: 'Order ID (optional)',
+                  hintText: 'Vi du: 123',
                 ),
                 const SizedBox(height: AppSpacing.md),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.translate('accounting.revenue_date')),
-                  subtitle: Text(
-                    '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
+                _buildDateSelectorTile(
+                  title: l10n.translate('accounting.revenue_date'),
+                  dialogCtx: dialogCtx,
+                  value: selectedDate,
+                  initialDate: selectedDate,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedDate = value);
                     }
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ngày chứng từ'),
-                  subtitle: Text(
-                    selectedDocumentDate == null
-                        ? l10n.translate('common.no_data')
-                        : DateFormat(
-                            'yyyy-MM-dd',
-                          ).format(selectedDocumentDate!),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (selectedDocumentDate != null)
-                        IconButton(
-                          onPressed: () =>
-                              setDialogState(() => selectedDocumentDate = null),
-                          icon: const Icon(Icons.close),
-                        ),
-                      const Icon(Icons.calendar_today),
-                    ],
-                  ),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDocumentDate ?? selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDocumentDate = picked);
-                    }
+                _buildDateSelectorTile(
+                  title: 'Ngay chung tu',
+                  dialogCtx: dialogCtx,
+                  value: selectedDocumentDate,
+                  initialDate: selectedDate,
+                  emptyText: l10n.translate('common.no_data'),
+                  allowClear: true,
+                  onChanged: (value) {
+                    setDialogState(() => selectedDocumentDate = value);
                   },
                 ),
               ],
@@ -768,12 +892,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 if (amount <= 0) return;
 
                 if ((selectedMoneyChannel ?? '').trim().isEmpty) {
-                  ScaffoldMessenger.of(dialogCtx).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        l10n.translate('accounting.money_channel_required'),
-                      ),
-                    ),
+                  AppSnackBar.warning(
+                    dialogCtx,
+                    l10n.translate('accounting.money_channel_required'),
                   );
                   return;
                 }
@@ -889,122 +1010,57 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildVoiceAssistControls(
-                  l10n: l10n,
-                  dialogCtx: dialogCtx,
-                  setDialogState: setDialogState,
-                  onTranscriptReady: (transcript) {
-                    _applyCostTranscript(
-                      transcript: transcript,
-                      amountController: amountController,
-                      descriptionController: descriptionController,
-                    );
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: descriptionController,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.description'),
-                  ),
+                  label: l10n.translate('accounting.description'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                    inputFormatters: [CurrencyInputFormatter()],
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.amount'),
-                  ),
+                  inputFormatters: [CurrencyInputFormatter()],
+                  label: l10n.translate('accounting.amount'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedCostType,
-                  decoration: const InputDecoration(labelText: 'Loại chi phí'),
-                  items: getCostTypes()
-                      .where(
-                        (c) => c.toLowerCase() != 'import',
-                      ) // Backend excludes 'import'
-                      .map(
-                        (val) => DropdownMenuItem<String>(
-                          value: val,
-                          child: Text(val),
-                        ),
-                      )
+                _buildStringDropdownField(
+                  label: 'Loai chi phi',
+                  value: selectedCostType,
+                  options: getCostTypes()
+                      .where((c) => c.toLowerCase() != 'import')
                       .toList(),
                   onChanged: (value) =>
                       setDialogState(() => selectedCostType = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedPaymentMethod,
-                  decoration: const InputDecoration(
-                    labelText: 'Phương thức thanh toán',
-                  ),
-                  items: getPaymentMethods()
-                      .map(
-                        (val) => DropdownMenuItem<String>(
-                          value: val,
-                          child: Text(val),
-                        ),
-                      )
-                      .toList(),
+                _buildStringDropdownField(
+                  label: 'Phuong thuc thanh toan',
+                  value: selectedPaymentMethod,
+                  options: getPaymentMethods(),
                   onChanged: (value) =>
                       setDialogState(() => selectedPaymentMethod = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ngày chi'),
-                  subtitle: Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
+                _buildDateSelectorTile(
+                  title: 'Ngay chi',
+                  dialogCtx: dialogCtx,
+                  value: selectedDate,
+                  initialDate: selectedDate,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedDate = value);
                     }
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ngày chứng từ'),
-                  subtitle: Text(
-                    selectedDocumentDate == null
-                        ? l10n.translate('common.no_data')
-                        : DateFormat(
-                            'yyyy-MM-dd',
-                          ).format(selectedDocumentDate!),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (selectedDocumentDate != null)
-                        IconButton(
-                          onPressed: () =>
-                              setDialogState(() => selectedDocumentDate = null),
-                          icon: const Icon(Icons.close),
-                        ),
-                      const Icon(Icons.calendar_today),
-                    ],
-                  ),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDocumentDate ?? selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDocumentDate = picked);
-                    }
+                _buildDateSelectorTile(
+                  title: 'Ngay chung tu',
+                  dialogCtx: dialogCtx,
+                  value: selectedDocumentDate,
+                  initialDate: selectedDate,
+                  emptyText: l10n.translate('common.no_data'),
+                  allowClear: true,
+                  onChanged: (value) {
+                    setDialogState(() => selectedDocumentDate = value);
                   },
                 ),
               ],
@@ -1101,107 +1157,57 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                AppTextField(
                   controller: descriptionController,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.description'),
-                  ),
+                  label: l10n.translate('accounting.description'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                    inputFormatters: [CurrencyInputFormatter()],
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.amount'),
-                  ),
+                  inputFormatters: [CurrencyInputFormatter()],
+                  label: l10n.translate('accounting.amount'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedCostType,
-                  decoration: const InputDecoration(labelText: 'Loại chi phí'),
-                  items: getCostTypes()
+                _buildStringDropdownField(
+                  label: 'Loai chi phi',
+                  value: selectedCostType,
+                  options: getCostTypes()
                       .where((c) => c.toLowerCase() != 'import')
-                      .map(
-                        (val) => DropdownMenuItem<String>(
-                          value: val,
-                          child: Text(val),
-                        ),
-                      )
                       .toList(),
                   onChanged: (value) =>
                       setDialogState(() => selectedCostType = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedPaymentMethod,
-                  decoration: const InputDecoration(
-                    labelText: 'Phương thức thanh toán',
-                  ),
-                  items: getPaymentMethods()
-                      .map(
-                        (val) => DropdownMenuItem<String>(
-                          value: val,
-                          child: Text(val),
-                        ),
-                      )
-                      .toList(),
+                _buildStringDropdownField(
+                  label: 'Phuong thuc thanh toan',
+                  value: selectedPaymentMethod,
+                  options: getPaymentMethods(),
                   onChanged: (value) =>
                       setDialogState(() => selectedPaymentMethod = value),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ngày chi'),
-                  subtitle: Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
+                _buildDateSelectorTile(
+                  title: 'Ngay chi',
+                  dialogCtx: dialogCtx,
+                  value: selectedDate,
+                  initialDate: selectedDate,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedDate = value);
                     }
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ngày chứng từ'),
-                  subtitle: Text(
-                    selectedDocumentDate == null
-                        ? l10n.translate('common.no_data')
-                        : DateFormat(
-                            'yyyy-MM-dd',
-                          ).format(selectedDocumentDate!),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (selectedDocumentDate != null)
-                        IconButton(
-                          onPressed: () =>
-                              setDialogState(() => selectedDocumentDate = null),
-                          icon: const Icon(Icons.close),
-                        ),
-                      const Icon(Icons.calendar_today),
-                    ],
-                  ),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDocumentDate ?? selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDocumentDate = picked);
-                    }
+                _buildDateSelectorTile(
+                  title: 'Ngay chung tu',
+                  dialogCtx: dialogCtx,
+                  value: selectedDocumentDate,
+                  initialDate: selectedDate,
+                  emptyText: l10n.translate('common.no_data'),
+                  allowClear: true,
+                  onChanged: (value) {
+                    setDialogState(() => selectedDocumentDate = value);
                   },
                 ),
               ],
@@ -1264,95 +1270,188 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   }
 
   void _showRevenueDetailDialog(RevenueEntity revenue) {
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: Text('REV-${revenue.id}'),
-        content: SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Số tiền: ${CurrencyFormatter.formatVND(revenue.amount)}'),
-                const SizedBox(height: 6),
-                Text('Mô tả: ${revenue.description}'),
-                const SizedBox(height: 6),
-                Text('Kênh tiền: ${revenue.moneyChannel ?? '-'}'),
-                const SizedBox(height: 6),
-                Text(
-                  'Ngày chứng từ: ${revenue.documentDate == null ? '-' : DateFormat('yyyy-MM-dd').format(revenue.documentDate!)}',
-                ),
-                const SizedBox(height: 6),
-                Text('Loại hình KD: ${revenue.businessTypeName ?? '-'}'),
-                const SizedBox(height: 6),
-                Text('Loại tham chiếu: ${revenue.referenceType ?? '-'}'),
-                const SizedBox(height: 6),
-                Text(
-                  'Mã tham chiếu: ${revenue.referenceCode ?? revenue.referenceId?.toString() ?? '-'}',
-                ),
-                const SizedBox(height: 12),
-                if ((revenue.referenceType ?? '').toLowerCase() == 'order' &&
-                    (revenue.referenceId ?? 0) > 0) ...[
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Order detail',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  FutureBuilder<OrderEntity?>(
-                    future: _loadLinkedOrder(revenue),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
+    final refId = revenue.referenceId ?? 0;
+    final refType = revenue.referenceType;
+    final refCode = revenue.referenceCode;
+    if (refId > 0) {
+      if (_isImportReference(refType, refCode)) {
+        final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
+        AppRouter.navigateTo(
+          AppRoutes.stockImport,
+          arguments: {'locationId': locationId, 'importId': refId},
+        );
+        return;
+      }
+      if (_isOrderReference(refType, refCode)) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderDetailScreen(orderId: refId.toString()),
+          ),
+        );
+        return;
+      }
+    }
 
-                      final order = snapshot.data;
-                      if (order == null) {
-                        return const Text('Không tải được chi tiết đơn hàng');
-                      }
+    AppDialog.show(
+      context,
+      title: 'REV-${revenue.id}',
+      confirmText: l10n.translate('common.close'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Số tiền: ${CurrencyFormatter.formatVND(revenue.amount)}'),
+              const SizedBox(height: 6),
+              Text('Mô tả: ${revenue.description}'),
+              const SizedBox(height: 6),
+              Text('Kênh tiền: ${revenue.moneyChannel ?? '-'}'),
+              const SizedBox(height: 6),
+                Text('Ngay chung tu: ${_formatIsoDate(revenue.documentDate)}'),
+              const SizedBox(height: 6),
+              Text('Loại hình KD: ${revenue.businessTypeName ?? '-'}'),
+              const SizedBox(height: 6),
+              Text('Loại tham chiếu: ${revenue.referenceType ?? '-'}'),
+              const SizedBox(height: 6),
+              Text(
+                'Mã tham chiếu: ${revenue.referenceCode ?? revenue.referenceId?.toString() ?? '-'}',
+              ),
+              const SizedBox(height: 12),
+              if ((revenue.referenceType ?? '').toLowerCase() == 'order' &&
+                  (revenue.referenceId ?? 0) > 0) ...[
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Order detail',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                FutureBuilder<OrderEntity?>(
+                  future: _loadLinkedOrder(revenue),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Order ID: ${order.id}'),
-                          const SizedBox(height: 4),
-                          Text('Trạng thái: ${order.status}'),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Tổng: ${CurrencyFormatter.formatVND(order.totalAmount)}',
-                          ),
-                          const SizedBox(height: 8),
-                          ...order.items.map(
-                            (item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Text(
-                                '• ${item.productName} x${item.quantity} - ${CurrencyFormatter.formatVND(item.price)}',
-                              ),
+                    final order = snapshot.data;
+                    if (order == null) {
+                      return const Text('Không tải được chi tiết đơn hàng');
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Order ID: ${order.id}'),
+                        const SizedBox(height: 4),
+                        Text('Trạng thái: ${order.status}'),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tổng: ${CurrencyFormatter.formatVND(order.totalAmount)}',
+                        ),
+                        const SizedBox(height: 8),
+                        ...order.items.map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(
+                              '• ${item.productName} x${item.quantity} - ${CurrencyFormatter.formatVND(item.price)}',
                             ),
                           ),
-                        ],
-                      );
-                    },
-                  ),
-                ],
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
-            ),
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: Text(l10n.translate('common.close')),
-          ),
-        ],
       ),
     );
+  }
+
+  void _showCostDetailDialog(CostEntity cost) {
+    final refId = cost.referenceId ?? 0;
+    final refType = cost.referenceType;
+    final refCode = cost.referenceCode;
+    if (refId > 0) {
+      if (_isImportReference(refType, refCode)) {
+        final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
+        AppRouter.navigateTo(
+          AppRoutes.stockImport,
+          arguments: {'locationId': locationId, 'importId': refId},
+        );
+        return;
+      }
+      if (_isOrderReference(refType, refCode)) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OrderDetailScreen(orderId: refId.toString()),
+          ),
+        );
+        return;
+      }
+    }
+
+    AppDialog.show(
+      context,
+      title: 'COST-${cost.id}',
+      confirmText: l10n.translate('common.close'),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Số tiền: ${CurrencyFormatter.formatVND(cost.amount)}'),
+              const SizedBox(height: 6),
+              Text('Mô tả: ${cost.description}'),
+              const SizedBox(height: 6),
+              Text('Kênh tiền: ${cost.paymentMethod ?? '-'}'),
+              const SizedBox(height: 6),
+              Text('Ngay chi: ${_formatIsoDate(cost.date)}'),
+              const SizedBox(height: 6),
+              Text('Loại chi phí: ${cost.type}'),
+              const SizedBox(height: 6),
+              Text('Loại tham chiếu: ${cost.referenceType ?? '-'}'),
+              const SizedBox(height: 6),
+              Text(
+                'Mã tham chiếu: ${cost.referenceCode ?? cost.referenceId?.toString() ?? '-'}',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _normalizeReferenceType(String? value) {
+    final raw = (value ?? '').trim().toLowerCase();
+    return raw.replaceAll(RegExp(r'[^a-z0-9]'), '');
+  }
+
+  bool _isOrderReference(String? referenceType, String? referenceCode) {
+    final normalizedType = _normalizeReferenceType(referenceType);
+    final normalizedCode = (referenceCode ?? '').trim().toLowerCase();
+    return normalizedType.contains('order') ||
+        normalizedCode.startsWith('ord') ||
+        normalizedCode.startsWith('order');
+  }
+
+  bool _isImportReference(String? referenceType, String? referenceCode) {
+    final normalizedType = _normalizeReferenceType(referenceType);
+    final normalizedCode = (referenceCode ?? '').trim().toLowerCase();
+    return normalizedType.contains('import') ||
+        normalizedType.contains('inventory') ||
+        normalizedCode.startsWith('imp') ||
+        normalizedCode.startsWith('import');
   }
 
   Future<void> _showEditRevenueDialog(RevenueEntity item) async {
@@ -1413,22 +1512,16 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                AppTextField(
                   controller: amountController,
                   keyboardType: TextInputType.number,
-                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                    inputFormatters: [CurrencyInputFormatter()],
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.revenue_amount'),
-                  ),
+                  inputFormatters: [CurrencyInputFormatter()],
+                  label: l10n.translate('accounting.revenue_amount'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                TextField(
+                AppTextField(
                   controller: descriptionController,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.revenue_description'),
-                  ),
+                  label: l10n.translate('accounting.revenue_description'),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 DropdownButtonFormField<String>(
@@ -1477,56 +1570,27 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l10n.translate('accounting.revenue_date')),
-                  subtitle: Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
+                _buildDateSelectorTile(
+                  title: l10n.translate('accounting.revenue_date'),
+                  dialogCtx: dialogCtx,
+                  value: selectedDate,
+                  initialDate: selectedDate,
+                  onChanged: (value) {
+                    if (value != null) {
+                      setDialogState(() => selectedDate = value);
                     }
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ngày chứng từ'),
-                  subtitle: Text(
-                    selectedDocumentDate == null
-                        ? l10n.translate('common.no_data')
-                        : DateFormat(
-                            'yyyy-MM-dd',
-                          ).format(selectedDocumentDate!),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (selectedDocumentDate != null)
-                        IconButton(
-                          onPressed: () =>
-                              setDialogState(() => selectedDocumentDate = null),
-                          icon: const Icon(Icons.close),
-                        ),
-                      const Icon(Icons.calendar_today),
-                    ],
-                  ),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: dialogCtx,
-                      initialDate: selectedDocumentDate ?? selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDocumentDate = picked);
-                    }
+                _buildDateSelectorTile(
+                  title: 'Ngay chung tu',
+                  dialogCtx: dialogCtx,
+                  value: selectedDocumentDate,
+                  initialDate: selectedDate,
+                  emptyText: l10n.translate('common.no_data'),
+                  allowClear: true,
+                  onChanged: (value) {
+                    setDialogState(() => selectedDocumentDate = value);
                   },
                 ),
               ],
@@ -1590,6 +1654,54 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ],
         ),
       ),
+    );
+  }
+}
+
+enum _EntryCreateMode { manual, aiDraft }
+
+class _VoicePlayBtn extends StatefulWidget {
+  final AudioPlayer player;
+  final bool isDisabled;
+  final VoidCallback onTap;
+  final String label;
+
+  const _VoicePlayBtn({
+    required this.player,
+    required this.isDisabled,
+    required this.onTap,
+    required this.label,
+  });
+
+  @override
+  State<_VoicePlayBtn> createState() => _VoicePlayBtnState();
+}
+
+class _VoicePlayBtnState extends State<_VoicePlayBtn> {
+  bool _isPlaying = false;
+  late final StreamSubscription<PlayerState> _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = widget.player.onPlayerStateChanged.listen((state) {
+      if (!mounted) return;
+      setState(() => _isPlaying = state == PlayerState.playing);
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: widget.isDisabled ? null : widget.onTap,
+      icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow),
+      label: Text(widget.label),
     );
   }
 }

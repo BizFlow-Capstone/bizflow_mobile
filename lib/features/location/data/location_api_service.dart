@@ -370,6 +370,15 @@ class LocationApiService {
         throw Exception('Permission denied: You are not the owner');
       } else if (e.statusCode == 404) {
         throw Exception('Location not found');
+      } else if (e.statusCode == 400) {
+        final raw = (e.message ?? '').toLowerCase();
+        if (raw.contains('fk_book_location') ||
+            raw.contains('accountingbooks') ||
+            raw.contains('foreign key constraint fails')) {
+          throw Exception(
+            'Không thể xóa địa điểm vì đang có dữ liệu sổ kế toán liên quan. Vui lòng xử lý hoặc xóa dữ liệu kế toán trước.',
+          );
+        }
       }
       throw Exception('Error deleting location: ${e.message}');
     } catch (e) {

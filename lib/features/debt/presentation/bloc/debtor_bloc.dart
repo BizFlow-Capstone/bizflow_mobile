@@ -358,37 +358,48 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
     LoadDebtorDetailRequested event,
     Emitter<DebtorState> emit,
   ) async {
-    try {
-      final detail = await repository.getDebtorDetail(event.debtorId);
-      if (detail != null) {
-        _debtors = _debtors
-            .map(
-              (debtor) => debtor.debtorId == detail.debtorId ? detail : debtor,
-            )
-            .toList();
-      }
-      emit(
-        state.copyWith(
-          debtors: _debtors,
-          debtorDetail: detail,
-          errorMessage: null,
-        ),
-      );
-    } catch (e) {
-      emit(state.copyWith(errorMessage: _parseErrorMessage(e)));
-    }
+    await repository.getDebtorDetailSWR(
+      debtorId: event.debtorId,
+      onData: (detail, _) {
+        if (emit.isDone) return;
+        if (detail != null) {
+          _debtors = _debtors
+              .map(
+                (debtor) =>
+                    debtor.debtorId == detail.debtorId ? detail : debtor,
+              )
+              .toList();
+        }
+        emit(
+          state.copyWith(
+            debtors: _debtors,
+            debtorDetail: detail,
+            errorMessage: null,
+          ),
+        );
+      },
+      onError: (error) {
+        if (emit.isDone) return;
+        emit(state.copyWith(errorMessage: _parseErrorMessage(error)));
+      },
+    );
   }
 
   Future<void> _onLoadDebtPaymentHistoryRequested(
     LoadDebtPaymentHistoryRequested event,
     Emitter<DebtorState> emit,
   ) async {
-    try {
-      final history = await repository.getDebtPaymentHistory(event.debtorId);
-      emit(state.copyWith(paymentHistory: history, errorMessage: null));
-    } catch (e) {
-      emit(state.copyWith(errorMessage: _parseErrorMessage(e)));
-    }
+    await repository.getDebtPaymentHistorySWR(
+      debtorId: event.debtorId,
+      onData: (history, _) {
+        if (emit.isDone) return;
+        emit(state.copyWith(paymentHistory: history, errorMessage: null));
+      },
+      onError: (error) {
+        if (emit.isDone) return;
+        emit(state.copyWith(errorMessage: _parseErrorMessage(error)));
+      },
+    );
   }
 
   Future<void> _onLoadActiveDebtorsByLocation(
@@ -472,7 +483,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
   }
 
   String _parseErrorMessage(dynamic error) {
-    return ApiErrorMessageParser.parse(error, fallback: 'Unknown error');
+    return ApiErrorMessageParser.parse(error);
   }
 
   void _onResetDebtors(ResetDebtors event, Emitter<DebtorState> emit) {

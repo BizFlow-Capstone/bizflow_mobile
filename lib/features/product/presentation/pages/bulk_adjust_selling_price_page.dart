@@ -195,7 +195,7 @@ class _BulkAdjustSellingPricePageState
     final deltaAmount = increase - decrease;
 
     if (_selectedSaleItemIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
         SnackBar(
           content: Text(
             l10n.translate('product.bulk_adjust.select_sale_items_required'),
@@ -206,7 +206,7 @@ class _BulkAdjustSellingPricePageState
     }
 
     if (deltaAmount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
         SnackBar(
           content: Text(l10n.translate('product.bulk_adjust.delta_required')),
         ),
@@ -250,7 +250,7 @@ class _BulkAdjustSellingPricePageState
         RefreshProductsRequested(locationId: widget.locationId),
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
         SnackBar(
           content: Text(l10n.translate('product.bulk_adjust.success')),
           backgroundColor: AppColors.success,
@@ -260,7 +260,7 @@ class _BulkAdjustSellingPricePageState
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceFirst('Exception: ', '')),
           backgroundColor: AppColors.error,

@@ -65,7 +65,7 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
             const SnackBar(content: Text('Microphone permission denied')),
           );
         }

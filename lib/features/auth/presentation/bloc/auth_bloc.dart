@@ -117,6 +117,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           emit(const NeedsSetPasswordOnResume());
           return;
         }
+
+        final cachedCredentialTypes = await secureStorage.getCredentialTypes();
+        if (_isGooglePhoneLinkRequired(cachedCredentialTypes)) {
+          emit(const NeedsGooglePhoneLinkOnResume());
+          return;
+        }
+
+        if (cachedCredentialTypes.isEmpty) {
+          final credentialResult = await authRepository.getCredentials();
+          if (credentialResult.success) {
+            final normalized = credentialResult.credentialTypes
+                .map((e) => e.trim().toLowerCase())
+                .where((e) => e.isNotEmpty)
+                .toSet()
+                .toList();
+            if (normalized.isNotEmpty) {
+              await secureStorage.setCredentialTypes(normalized);
+            }
+            if (_isGooglePhoneLinkRequired(normalized)) {
+              emit(const NeedsGooglePhoneLinkOnResume());
+              return;
+            }
+          }
+        }
+
         final needsSetPassword = await secureStorage.getNeedsSetPassword();
         if (needsSetPassword) {
           emit(const NeedsSetPasswordOnResume());
@@ -262,17 +287,39 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         avatarUrl: result.avatarUrl,
       );
 
-      if (result.isNewAccount == true) {
-        await secureStorage.setNeedsSetPassword(false);
+      final credentialTypes = await _resolveCredentialTypes(result);
+      if (credentialTypes.isNotEmpty) {
+        await secureStorage.setCredentialTypes(credentialTypes);
+      }
+
+      final requiresPhoneLink = !credentialTypes.contains('phone');
+      final requiresSetPassword =
+          (result.hasPassword == false) || (result.isNewAccount == true);
+
+      if (requiresPhoneLink) {
+        await secureStorage.setNeedsSetPassword(requiresSetPassword);
         await secureStorage.setGoogleOnboardingStep(
           _googleOnboardingStepLinkPhone,
         );
         emit(const GoogleLoginPhoneLinkRequired());
       } else {
-        await secureStorage.setNeedsSetPassword(false);
-        await secureStorage.clearGoogleOnboardingStep();
-        await firebaseMessagingService.registerCurrentToken();
-        emit(LoginSuccess(accessToken: result.accessToken!, user: const {}));
+        if (requiresSetPassword) {
+          await secureStorage.setNeedsSetPassword(true);
+          await secureStorage.setGoogleOnboardingStep(
+            _googleOnboardingStepSetPassword,
+          );
+          emit(
+            GoogleLoginSetPasswordRequired(
+              accessToken: result.accessToken!,
+              refreshToken: result.refreshToken ?? '',
+            ),
+          );
+        } else {
+          await secureStorage.setNeedsSetPassword(false);
+          await secureStorage.clearGoogleOnboardingStep();
+          await firebaseMessagingService.registerCurrentToken();
+          emit(LoginSuccess(accessToken: result.accessToken!, user: const {}));
+        }
       }
     } catch (e) {
       emit(
@@ -404,11 +451,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       _pendingVerificationId = verificationId;
       emit(PhoneOtpCodeSent(phone: event.phone));
     } catch (e) {
-      emit(
-        PhoneRegisterFailure(
-          message: _mapPhoneAuthError(e),
-        ),
-      );
+      emit(PhoneRegisterFailure(message: _mapPhoneAuthError(e)));
     }
   }
 
@@ -435,11 +478,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit: emit,
       );
     } catch (e) {
-      emit(
-        PhoneRegisterFailure(
-          message: _mapPhoneAuthError(e),
-        ),
-      );
+      emit(PhoneRegisterFailure(message: _mapPhoneAuthError(e)));
     }
   }
 
@@ -473,23 +512,43 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(CredentialsLoaded(credentialTypes: cachedCredentialTypes));
     }
 
-    final CredentialsResponse result = await authRepository.getCredentials();
-    if (!result.success) {
-      if (cachedCredentialTypes.isNotEmpty) {
-        return;
-      }
-      emit(CredentialsFailure(message: result.message));
-      return;
-    }
-
-    final normalizedCredentialTypes = result.credentialTypes
-        .map((e) => e.trim().toLowerCase())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList();
-
-    await secureStorage.setCredentialTypes(normalizedCredentialTypes);
-    emit(CredentialsLoaded(credentialTypes: normalizedCredentialTypes));
+    await CacheManager().fetchWithSWR<List<String>>(
+      key: 'auth_credentials_methods',
+      fetcher: ({cancelToken}) async {
+        final CredentialsResponse result = await authRepository
+            .getCredentials();
+        if (!result.success) {
+          throw Exception(result.message);
+        }
+        return result.credentialTypes
+            .map((e) => e.trim().toLowerCase())
+            .where((e) => e.isNotEmpty)
+            .toSet()
+            .toList();
+      },
+      fromJson: (json) {
+        final raw = json['types'];
+        if (raw is! List) {
+          return <String>[];
+        }
+        return raw.map((e) => e.toString()).toList();
+      },
+      toJson: (types) => {'types': types},
+      onData: (types, _) {
+        if (types.isNotEmpty) {
+          secureStorage.setCredentialTypes(types);
+        }
+        if (!emit.isDone) {
+          emit(CredentialsLoaded(credentialTypes: types));
+        }
+      },
+      onError: (error) {
+        if (cachedCredentialTypes.isNotEmpty || emit.isDone) {
+          return;
+        }
+        emit(CredentialsFailure(message: ApiErrorMessageParser.parse(error)));
+      },
+    );
   }
 
   Future<void> _onLinkEmailRequested(
@@ -610,11 +669,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       _pendingLinkPhoneVerificationId = verificationId;
       emit(LinkPhoneOtpCodeSent(phone: event.phone));
     } catch (e) {
-      emit(
-        LinkCredentialFailure(
-          message: _mapPhoneAuthError(e),
-        ),
-      );
+      emit(LinkCredentialFailure(message: _mapPhoneAuthError(e)));
     }
   }
 
@@ -642,11 +697,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit: emit,
       );
     } catch (e) {
-      emit(
-        LinkCredentialFailure(
-          message: _mapPhoneAuthError(e),
-        ),
-      );
+      emit(LinkCredentialFailure(message: _mapPhoneAuthError(e)));
     }
   }
 
@@ -791,7 +842,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(const ProfileLoading());
-    final result = await authRepository.updateAvatar(avatarPath: event.avatarPath);
+    final result = await authRepository.updateAvatar(
+      avatarPath: event.avatarPath,
+    );
     if (!result.success) {
       emit(ProfileUpdateFailure(message: result.message));
       return;
@@ -1108,7 +1161,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       if (code == 'invalid-phone-number') {
         return isVietnamese
             ? vi('Số điện thoại không đúng định dạng E.164. Vui lòng nhập lại.')
-            : en('Invalid phone number format. Please enter a valid E.164 phone number.');
+            : en(
+                'Invalid phone number format. Please enter a valid E.164 phone number.',
+              );
       }
       if (code == 'too-many-requests' || code == 'quota-exceeded') {
         return isVietnamese
@@ -1117,7 +1172,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
       if (code == 'network-request-failed') {
         return isVietnamese
-            ? vi('Kết nối mạng không ổn định. Vui lòng kiểm tra mạng và thử lại.')
+            ? vi(
+                'Kết nối mạng không ổn định. Vui lòng kiểm tra mạng và thử lại.',
+              )
             : en('Network error. Please check your connection and try again.');
       }
       if (code == 'session-expired' || code == 'invalid-verification-code') {
@@ -1207,5 +1264,44 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     return null;
+  }
+
+  bool _isGooglePhoneLinkRequired(List<String> credentialTypes) {
+    final normalized = credentialTypes
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    return normalized.contains('google') && !normalized.contains('phone');
+  }
+
+  Future<List<String>> _resolveCredentialTypes(AuthResponse result) async {
+    final fromLogin = result.credentialTypes
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    if (fromLogin.isNotEmpty) {
+      return fromLogin;
+    }
+
+    final fromCache = await secureStorage.getCredentialTypes();
+    if (fromCache.isNotEmpty) {
+      return fromCache
+          .map((e) => e.trim().toLowerCase())
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+
+    final fetched = await authRepository.getCredentials();
+    if (!fetched.success) {
+      return const <String>[];
+    }
+
+    return fetched.credentialTypes
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
   }
 }

@@ -292,6 +292,9 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       emit(LocationDeleteSuccess(locationId: event.locationId));
     } catch (e) {
       emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
+      if (_locations.isNotEmpty) {
+        emit(LocationsLoaded(locations: List.from(_locations)));
+      }
     }
   }
 

@@ -52,8 +52,10 @@ class OrderCard extends StatelessWidget {
                               'number': order.isDraft
                                   ? order.id
                                   : (order.id.length > 8
-                                      ? order.id.substring(order.id.length - 8)
-                                      : order.id),
+                                        ? order.id.substring(
+                                            order.id.length - 8,
+                                          )
+                                        : order.id),
                             },
                           ),
                           style: const TextStyle(
@@ -118,34 +120,32 @@ class OrderCard extends StatelessWidget {
               // Action buttons
               if (order.isDraft || order.isPending) ...[
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     if (onEdit != null)
                       TextButton(
-                        onPressed: onEdit,
+                        onPressed: isPublishing ? null : onEdit,
                         child: Text(l10n.translate('order.action_edit')),
                       ),
-                    const SizedBox(width: 8),
                     if (order.isDraft && onDeleteDraft != null)
                       TextButton(
-                        onPressed: onDeleteDraft,
+                        onPressed: isPublishing ? null : onDeleteDraft,
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.red,
                         ),
                         child: Text(l10n.translate('common.delete')),
                       ),
-                    if (order.isDraft && onDeleteDraft != null)
-                      const SizedBox(width: 8),
                     if (order.isPending && onCancel != null)
                       TextButton(
-                        onPressed: onCancel,
+                        onPressed: isPublishing ? null : onCancel,
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.red,
                         ),
                         child: Text(l10n.translate('order.action_cancel')),
                       ),
-                    const SizedBox(width: 8),
                     if (!order.isDraft && onPublish != null)
                       TextButton(
                         onPressed: isPublishing ? null : onPublish,
@@ -181,7 +181,7 @@ class OrderCard extends StatelessWidget {
 
     if (order.isDraft) {
       bgColor = Colors.orange;
-      label = 'Nháp';
+      label = l10n.translate('order.status_draft');
     } else if (order.isPending) {
       bgColor = Colors.blue;
       label = l10n.translate('order.status_pending');

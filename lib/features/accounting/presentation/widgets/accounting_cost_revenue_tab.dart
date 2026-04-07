@@ -20,6 +20,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
   final ValueChanged<RevenueEntity> onTapRevenue;
   final ValueChanged<RevenueEntity> onDeleteRevenue;
   final ValueChanged<CostEntity> onEditCost;
+  final ValueChanged<CostEntity> onTapCost;
   final ValueChanged<CostEntity> onDeleteCost;
 
   const AccountingCostRevenueTab({
@@ -33,6 +34,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     required this.onTapRevenue,
     required this.onDeleteRevenue,
     required this.onEditCost,
+    required this.onTapCost,
     required this.onDeleteCost,
   });
 
@@ -90,7 +92,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
                             context,
                             item: item,
                             isRevenue: false,
-                            onTap: null,
+                            onTap: () => onTapCost(item),
                             onEdit: () => onEditCost(item),
                             onDelete: () => onDeleteCost(item),
                           ),
@@ -138,7 +140,12 @@ class AccountingCostRevenueTab extends StatelessWidget {
       onTap: onTap,
       contentPadding: EdgeInsets.zero,
       title: Text(title, style: AppTextStyles.bodyMedium),
-      subtitle: Text(subtitle, style: AppTextStyles.bodySmall),
+      subtitle: Text(
+        subtitle,
+        style: AppTextStyles.bodySmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

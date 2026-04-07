@@ -40,6 +40,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late Future<OrderEntity?> _detailFuture;
   bool _isCancelling = false;
   bool _isPublishing = false;
+  bool _isInvoiceActionInProgress = false;
 
   String _formatDateTime(DateTime value) {
     return DateFormat('dd/MM/yyyy HH:mm').format(value.toLocal());
@@ -100,13 +101,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           TextButton(
             onPressed: () {
               if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      l10n.translate('order.cancel_reason_required'),
+                ScaffoldMessenger.of(context)
+                  ..removeCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        l10n.translate('order.cancel_reason_required'),
+                      ),
                     ),
-                  ),
-                );
+                  );
                 return;
               }
               Navigator.pop(context, true);
@@ -126,15 +129,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         cancelReason: reasonController.text.trim(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('order.cancel_success'))),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(l10n.translate('order.cancel_success'))),
+        );
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.toString())));
     } finally {
       if (mounted) {
         setState(() => _isCancelling = false);
@@ -286,7 +291,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         case 'qty':
           return item.quantity.toString();
         case 'unit':
-          return _pdfFormat(item.unitName?.trim().isNotEmpty == true ? item.unitName! : '-');
+          return _pdfFormat(
+            item.unitName?.trim().isNotEmpty == true ? item.unitName! : '-',
+          );
         case 'unitPrice':
           return _pdfCurrency(item.price);
         case 'discount':
@@ -301,7 +308,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }).toList();
   }
 
-  Future<File> _buildPdfFile(OrderEntity detail, InvoiceTemplateEntity template) async {
+  Future<File> _buildPdfFile(
+    OrderEntity detail,
+    InvoiceTemplateEntity template,
+  ) async {
     final pdf = pw.Document();
     final columns = _buildColumns(template);
     final itemRows = <List<String>>[];
@@ -318,17 +328,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               pw.Text(
-                _pdfFormat(template.businessName.isNotEmpty
-                    ? template.businessName
-                    : ''),
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                _pdfFormat(
+                  template.businessName.isNotEmpty ? template.businessName : '',
+                ),
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               if (template.businessAddress.isNotEmpty)
-                pw.Text(_pdfFormat(template.businessAddress),
-                    style: const pw.TextStyle(fontSize: 10)),
+                pw.Text(
+                  _pdfFormat(template.businessAddress),
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
               if (template.businessPhone.isNotEmpty)
-                pw.Text('SDT: ${template.businessPhone}',
-                    style: const pw.TextStyle(fontSize: 10)),
+                pw.Text(
+                  'SDT: ${template.businessPhone}',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
             ],
           ),
           pw.SizedBox(height: 16),
@@ -355,7 +372,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       'Ma don: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
                     ),
                   ),
-                  pw.Text(_pdfFormat('Ngay: ${CurrencyFormatter.formatDate(detail.createdAt)}')),
+                  pw.Text(
+                    _pdfFormat(
+                      'Ngay: ${CurrencyFormatter.formatDate(detail.createdAt)}',
+                    ),
+                  ),
                   pw.Text(_pdfFormat('Dia diem: ${detail.locationName}')),
                 ],
               ),
@@ -395,20 +416,26 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   ),
                 if (template.showTotalDiscount)
                   pw.Text(
-                    _pdfFormat('Giam gia: ${_pdfCurrency(detail.discountAmount)}'),
+                    _pdfFormat(
+                      'Giam gia: ${_pdfCurrency(detail.discountAmount)}',
+                    ),
                   ),
                 if (template.showTotalVat)
-                  pw.Text(
-                    _pdfFormat('VAT: ${_pdfCurrency(detail.taxAmount)}'),
-                  ),
+                  pw.Text(_pdfFormat('VAT: ${_pdfCurrency(detail.taxAmount)}')),
                 pw.Text(
-                  _pdfFormat('Tong thanh toan: ${_pdfCurrency(detail.totalAmount)}'),
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  _pdfFormat(
+                    'Tong thanh toan: ${_pdfCurrency(detail.totalAmount)}',
+                  ),
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
               ],
             ),
           ),
-          if (template.showFooterNote && template.footerNoteText.trim().isNotEmpty) ...[
+          if (template.showFooterNote &&
+              template.footerNoteText.trim().isNotEmpty) ...[
             pw.SizedBox(height: 10),
             pw.Text(
               _pdfFormat(template.footerNoteText.trim()),
@@ -437,17 +464,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Future<void> _shareInvoice(OrderEntity detail) async {
+    if (_isInvoiceActionInProgress) return;
+    setState(() => _isInvoiceActionInProgress = true);
     final template = _getTemplate();
-    final file = await _buildPdfFile(detail, template);
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: _pdfFormat(
-        'Hoa don ban hang #${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
-      ),
-    );
+    try {
+      final file = await _buildPdfFile(detail, template);
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: _pdfFormat(
+          'Hoa don ban hang #${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isInvoiceActionInProgress = false);
+      }
+    }
   }
 
   Future<void> _downloadInvoice(OrderEntity detail) async {
+    if (_isInvoiceActionInProgress) return;
+    setState(() => _isInvoiceActionInProgress = true);
     final l10n = AppLocalizations.of(context);
     try {
       final template = _getTemplate();
@@ -478,6 +515,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         message: e.toString(),
         type: AppSnackBarType.error,
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isInvoiceActionInProgress = false);
+      }
     }
   }
 
@@ -515,12 +556,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               });
             }
           } else if (state is OrderError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.error,
+                ),
+              );
           }
         },
         child: FutureBuilder<OrderEntity?>(
@@ -546,17 +589,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => OrderFormScreen(
-                                inputType: 'manual',
-                                initialOrder: detail,
-                              ),
-                            ),
-                          );
-                        },
+                        onPressed:
+                            (_isCancelling ||
+                                _isPublishing ||
+                                _isInvoiceActionInProgress)
+                            ? null
+                            : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => OrderFormScreen(
+                                      inputType: 'manual',
+                                      initialOrder: detail,
+                                    ),
+                                  ),
+                                );
+                              },
                         icon: const Icon(Icons.edit),
                         label: const Text('Sửa đơn hàng'),
                       ),
@@ -572,7 +620,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => _shareInvoice(detail),
+                            onPressed: _isInvoiceActionInProgress
+                                ? null
+                                : () => _shareInvoice(detail),
                             icon: const Icon(Icons.share_outlined),
                             label: Text(
                               l10n.translate('order_payment.share_invoice'),
@@ -582,7 +632,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () => _downloadInvoice(detail),
+                            onPressed: _isInvoiceActionInProgress
+                                ? null
+                                : () => _downloadInvoice(detail),
                             icon: const Icon(Icons.download_outlined),
                             label: Text(
                               l10n.translate('order_payment.download_invoice'),
@@ -602,7 +654,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: _isCancelling
+                            onPressed: (_isCancelling || _isPublishing)
                                 ? null
                                 : () => _cancelOrder(detail),
                             style: OutlinedButton.styleFrom(
@@ -624,18 +676,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => OrderFormScreen(
-                                    inputType: 'manual',
-                                    initialOrder: detail,
-                                    pendingOrderId: detail.id,
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: (_isCancelling || _isPublishing)
+                                ? null
+                                : () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => OrderFormScreen(
+                                          inputType: 'manual',
+                                          initialOrder: detail,
+                                          pendingOrderId: detail.id,
+                                        ),
+                                      ),
+                                    );
+                                  },
                             icon: const Icon(Icons.edit),
                             label: const Text('Sửa đơn'),
                           ),
@@ -651,7 +705,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: _isPublishing
+                        onPressed: (_isPublishing || _isCancelling)
                             ? null
                             : () => _completeOrder(detail),
                         style: ElevatedButton.styleFrom(

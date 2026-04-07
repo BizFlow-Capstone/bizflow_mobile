@@ -33,6 +33,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   String? _currentLocationFilter;
   final Set<String> _publishingOrderIds = {};
   final ActionGuard _cancelOrderGuard = ActionGuard();
+  final ActionGuard _openOrderCreationGuard = ActionGuard();
 
   String? _resolveLocationId({String? preferred}) {
     final raw = (preferred ?? context.read<BusinessContext>().currentBusinessId)
@@ -508,13 +509,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const OrderCreationSelectionScreen(),
-            ),
-          );
+        onPressed: () async {
+          await _openOrderCreationGuard.run(() async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const OrderCreationSelectionScreen(),
+              ),
+            );
+          });
         },
         child: const Icon(Icons.add),
       ),

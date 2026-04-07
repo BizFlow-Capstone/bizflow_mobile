@@ -48,12 +48,14 @@ class PlanFeatureDto {
   final int featureId;
   final String featureCode;
   final String featureName;
+  final String featureDescription;
   final int usageLimit; // The maximum limit defined by the plan
 
   PlanFeatureDto({
     required this.featureId,
     required this.featureCode,
     required this.featureName,
+    required this.featureDescription,
     required this.usageLimit,
   });
 
@@ -62,6 +64,7 @@ class PlanFeatureDto {
       featureId: json['featureId'] as int? ?? 0,
       featureCode: json['featureCode'] as String? ?? '',
       featureName: json['featureName'] as String? ?? '',
+      featureDescription: json['featureDescription'] as String? ?? '',
       usageLimit: json['usageLimit'] as int? ?? 0,
     );
   }
@@ -70,6 +73,7 @@ class PlanFeatureDto {
         'featureId': featureId,
         'featureCode': featureCode,
         'featureName': featureName,
+        'featureDescription': featureDescription,
         'usageLimit': usageLimit,
       };
 }

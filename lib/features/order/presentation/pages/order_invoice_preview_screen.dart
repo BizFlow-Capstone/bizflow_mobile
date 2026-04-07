@@ -14,6 +14,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
@@ -26,10 +27,11 @@ import '../../../../shared/utils/string_utils.dart';
 class OrderInvoicePreviewScreen extends StatelessWidget {
   static const String _featureReportExport =
       SubscriptionFeatureCodes.reportExport;
+  final ActionGuard _exportGuard = ActionGuard();
 
   final OrderEntity order;
 
-  const OrderInvoicePreviewScreen({super.key, required this.order});
+  OrderInvoicePreviewScreen({super.key, required this.order});
 
   String _pdfFormat(String text) => StringUtils.removeDiacritics(text);
   String _pdfCurrency(num? amount) =>
@@ -86,7 +88,9 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
         case 'qty':
           return item.quantity.toString();
         case 'unit':
-          return _pdfFormat(item.unitName?.trim().isNotEmpty == true ? item.unitName! : '-');
+          return _pdfFormat(
+            item.unitName?.trim().isNotEmpty == true ? item.unitName! : '-',
+          );
         case 'unitPrice':
           return _pdfCurrency(item.price);
         case 'discount':
@@ -118,17 +122,24 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               pw.Text(
-                _pdfFormat(template.businessName.isNotEmpty
-                    ? template.businessName
-                    : ''),
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                _pdfFormat(
+                  template.businessName.isNotEmpty ? template.businessName : '',
+                ),
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               if (template.businessAddress.isNotEmpty)
-                pw.Text(_pdfFormat(template.businessAddress),
-                    style: const pw.TextStyle(fontSize: 10)),
+                pw.Text(
+                  _pdfFormat(template.businessAddress),
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
               if (template.businessPhone.isNotEmpty)
-                pw.Text('SDT: ${template.businessPhone}',
-                    style: const pw.TextStyle(fontSize: 10)),
+                pw.Text(
+                  'SDT: ${template.businessPhone}',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
             ],
           ),
           pw.SizedBox(height: 16),
@@ -155,7 +166,11 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                       'Ma don: ${order.orderCode.isNotEmpty ? order.orderCode : order.id}',
                     ),
                   ),
-                  pw.Text(_pdfFormat('Ngay: ${CurrencyFormatter.formatDate(order.createdAt)}')),
+                  pw.Text(
+                    _pdfFormat(
+                      'Ngay: ${CurrencyFormatter.formatDate(order.createdAt)}',
+                    ),
+                  ),
                   pw.Text(_pdfFormat('Dia diem: ${order.locationName}')),
                 ],
               ),
@@ -195,20 +210,26 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                   ),
                 if (template.showTotalDiscount)
                   pw.Text(
-                    _pdfFormat('Giam gia: ${_pdfCurrency(order.discountAmount)}'),
+                    _pdfFormat(
+                      'Giam gia: ${_pdfCurrency(order.discountAmount)}',
+                    ),
                   ),
                 if (template.showTotalVat)
-                  pw.Text(
-                    _pdfFormat('VAT: ${_pdfCurrency(order.taxAmount)}'),
-                  ),
+                  pw.Text(_pdfFormat('VAT: ${_pdfCurrency(order.taxAmount)}')),
                 pw.Text(
-                  _pdfFormat('Tong thanh toan: ${_pdfCurrency(order.totalAmount)}'),
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  _pdfFormat(
+                    'Tong thanh toan: ${_pdfCurrency(order.totalAmount)}',
+                  ),
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
               ],
             ),
           ),
-          if (template.showFooterNote && template.footerNoteText.trim().isNotEmpty) ...[
+          if (template.showFooterNote &&
+              template.footerNoteText.trim().isNotEmpty) ...[
             pw.SizedBox(height: 10),
             pw.Text(
               _pdfFormat(template.footerNoteText.trim()),
@@ -236,7 +257,10 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
     return file;
   }
 
-  Future<void> _sharePdf(BuildContext context, InvoiceTemplateEntity template) async {
+  Future<void> _sharePdf(
+    BuildContext context,
+    InvoiceTemplateEntity template,
+  ) async {
     final file = await _buildPdfFile(template);
     await Share.shareXFiles(
       [XFile(file.path)],
@@ -246,7 +270,10 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _downloadInvoice(BuildContext context, InvoiceTemplateEntity template) async {
+  Future<void> _downloadInvoice(
+    BuildContext context,
+    InvoiceTemplateEntity template,
+  ) async {
     final l10n = AppLocalizations.of(context);
     try {
       final file = await _buildPdfFile(template);
@@ -344,9 +371,13 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
-                            final allowed = await _checkExportFeature(context);
-                            if (!allowed) return;
-                            await _sharePdf(context, template);
+                            await _exportGuard.run(() async {
+                              final allowed = await _checkExportFeature(
+                                context,
+                              );
+                              if (!allowed) return;
+                              await _sharePdf(context, template);
+                            });
                           },
                           icon: const Icon(Icons.share_outlined),
                           label: Text(
@@ -358,9 +389,13 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () async {
-                            final allowed = await _checkExportFeature(context);
-                            if (!allowed) return;
-                            await _downloadInvoice(context, template);
+                            await _exportGuard.run(() async {
+                              final allowed = await _checkExportFeature(
+                                context,
+                              );
+                              if (!allowed) return;
+                              await _downloadInvoice(context, template);
+                            });
                           },
                           icon: const Icon(Icons.download_outlined),
                           label: Text(

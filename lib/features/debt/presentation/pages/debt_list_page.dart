@@ -278,7 +278,7 @@ class _DebtListPageState extends State<DebtListPage> {
     return FutureBuilder<bool>(
       future: _canManageDebtFuture,
       builder: (context, featureSnapshot) {
-        final canManageDebt = featureSnapshot.data ?? true;
+        final canManageDebt = featureSnapshot.data ?? false;
         final limitWarning = l10n.translate('subscription.limit_warning');
 
         return Scaffold(

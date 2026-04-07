@@ -392,7 +392,7 @@ class AuthApiService {
 
     final response = await _apiClient.putMultipart<Map<String, dynamic>>(
       ApiEndpoints.authProfileAvatar,
-      fields: const {'removeAvatar': 'false'},
+      fields: const {'RemoveAvatar': 'false'},
       files: {'avatar': avatarFile},
       parser: (data) {
         if (data is Map<String, dynamic>) {

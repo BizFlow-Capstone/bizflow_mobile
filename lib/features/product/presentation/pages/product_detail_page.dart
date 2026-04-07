@@ -438,7 +438,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
                           if (stock == null || stock < 0) {
                             if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
                               SnackBar(
                                 content: Text(
                                   l10n?.translate(
@@ -465,7 +465,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             Navigator.pop(dialogContext);
 
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                              ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
                                 SnackBar(
                                   content: Text(
                                     l10n?.translate(
@@ -493,7 +493,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                             }
                           } catch (e) {
                             if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
                               SnackBar(
                                 content: Text(ApiErrorMessageParser.parse(e)),
                                 backgroundColor: AppColors.error,

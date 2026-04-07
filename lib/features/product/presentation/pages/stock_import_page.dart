@@ -106,10 +106,36 @@ class _StockImportViewState extends State<_StockImportView> {
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
+  Future<ImageSource?> _selectImageSource() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: Text(l10n.translate('common.source_camera')),
+              onTap: () => Navigator.of(sheetCtx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(l10n.translate('common.source_gallery')),
+              onTap: () => Navigator.of(sheetCtx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage({ImageSource? source}) async {
     try {
+      final selectedSource = source ?? await _selectImageSource();
+      if (selectedSource == null) return;
+
       final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: selectedSource,
         imageQuality: 80,
       );
 
@@ -119,20 +145,70 @@ class _StockImportViewState extends State<_StockImportView> {
           _selectedImagePath = pickedFile.path;
           _removeImage = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${l10n.translate('common.image_selected')}: ${pickedFile.name}',
+        ScaffoldMessenger.of(context)
+          ..removeCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                '${l10n.translate('common.image_selected')}: ${pickedFile.name}',
+              ),
             ),
-          ),
-        );
+          );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.translate('common.error')}: $e')),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('${l10n.translate('common.error')}: $e')),
+        );
     }
+  }
+
+  void _showImagePreview({String? imagePath, String? imageUrl}) {
+    if ((imagePath == null || imagePath.isEmpty) &&
+        (imageUrl == null || imageUrl.isEmpty)) {
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black,
+      builder: (dialogCtx) => SafeArea(
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.7,
+                maxScale: 4,
+                child: imagePath != null && imagePath.isNotEmpty
+                    ? Image.file(File(imagePath), fit: BoxFit.contain)
+                    : Image.network(
+                        imageUrl!,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => Center(
+                          child: Text(
+                            l10n.translate('common.error_occurred'),
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            Positioned(
+              right: 12,
+              top: 12,
+              child: IconButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   AppLocalizations get l10n => AppLocalizations.of(context);
@@ -140,6 +216,14 @@ class _StockImportViewState extends State<_StockImportView> {
   Future<void> _onSaveDraft() async {
     if (_selectedItems.isEmpty) {
       _showErrorSnackBar(l10n.translate('stock_import.add_product_required'));
+      return;
+    }
+
+    final hasInvoiceImage =
+        _selectedImagePath != null ||
+        ((_existingImageUrl?.isNotEmpty == true) && !_removeImage);
+    if (_hasInvoice && !hasInvoiceImage) {
+      _showErrorSnackBar(l10n.translate('stock_import.upload_invoice'));
       return;
     }
 
@@ -193,6 +277,14 @@ class _StockImportViewState extends State<_StockImportView> {
       return;
     }
 
+    final hasInvoiceImage =
+        _selectedImagePath != null ||
+        ((_existingImageUrl?.isNotEmpty == true) && !_removeImage);
+    if (_hasInvoice && !hasInvoiceImage) {
+      _showErrorSnackBar(l10n.translate('stock_import.upload_invoice'));
+      return;
+    }
+
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.inventoryImport,
@@ -201,68 +293,91 @@ class _StockImportViewState extends State<_StockImportView> {
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.translate('stock_import.confirm_title')),
-        content: Text(
-          l10n.translate(
-            'stock_import.confirm_message',
-            params: {'count': _selectedItems.length.toString()},
+      builder: (dialogContext) {
+        var isSubmitting = false;
+        return StatefulBuilder(
+          builder: (innerContext, setDialogState) => AlertDialog(
+            title: Text(l10n.translate('stock_import.confirm_title')),
+            content: Text(
+              l10n.translate(
+                'stock_import.confirm_message',
+                params: {'count': _selectedItems.length.toString()},
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: Text(l10n.translate('common.cancel')),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        setDialogState(() => isSubmitting = true);
+                        await _confirmGuard.run(() async {
+                          Navigator.pop(dialogContext);
+                          if (widget.importId == null) {
+                            final req = CreateImportRequest(
+                              importType: _hasInvoice
+                                  ? 'INVOICE'
+                                  : 'INVENTORY_ADJUSTMENT',
+                              businessLocationId: int.parse(widget.locationId),
+                              supplier: _supplierController.text,
+                              note: _noteController.text,
+                              receivedAt: DateTime.now(),
+                              documentDate: _documentDate,
+                              documentNumber:
+                                  _documentNumberController.text.isNotEmpty
+                                  ? _documentNumberController.text
+                                  : null,
+                              saveAsDraft: false,
+                              imagePath: _selectedImagePath,
+                              items: _selectedItems,
+                            );
+                            this.context.read<ImportActionBloc>().add(
+                              CreateImportEvent(req),
+                            );
+                          } else {
+                            _confirmAfterUpdate = true;
+                            final req = UpdateImportRequest(
+                              importType: _hasInvoice
+                                  ? 'INVOICE'
+                                  : 'INVENTORY_ADJUSTMENT',
+                              supplier: _supplierController.text,
+                              note: _noteController.text,
+                              receivedAt: null,
+                              documentDate: _documentDate,
+                              documentNumber:
+                                  _documentNumberController.text.isNotEmpty
+                                  ? _documentNumberController.text
+                                  : null,
+                              imagePath: _selectedImagePath,
+                              removeImage: _removeImage,
+                              items: _selectedItems,
+                            );
+                            this.context.read<ImportActionBloc>().add(
+                              UpdateImportEvent(widget.importId!, req),
+                            );
+                          }
+                        });
+                        if (mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.translate('common.confirm')),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(l10n.translate('common.cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await _confirmGuard.run(() async {
-                Navigator.pop(dialogContext);
-                if (widget.importId == null) {
-                  final req = CreateImportRequest(
-                    importType: _hasInvoice
-                        ? 'INVOICE'
-                        : 'INVENTORY_ADJUSTMENT',
-                    businessLocationId: int.parse(widget.locationId),
-                    supplier: _supplierController.text,
-                    note: _noteController.text,
-                    receivedAt: DateTime.now(),
-                    documentDate: _documentDate,
-                    documentNumber: _documentNumberController.text.isNotEmpty
-                        ? _documentNumberController.text
-                        : null,
-                    saveAsDraft: false,
-                    imagePath: _selectedImagePath,
-                    items: _selectedItems,
-                  );
-                  context.read<ImportActionBloc>().add(CreateImportEvent(req));
-                } else {
-                  _confirmAfterUpdate = true;
-                  final req = UpdateImportRequest(
-                    importType: _hasInvoice
-                        ? 'INVOICE'
-                        : 'INVENTORY_ADJUSTMENT',
-                    supplier: _supplierController.text,
-                    note: _noteController.text,
-                    receivedAt: null,
-                    documentDate: _documentDate,
-                    documentNumber: _documentNumberController.text.isNotEmpty
-                        ? _documentNumberController.text
-                        : null,
-                    imagePath: _selectedImagePath,
-                    removeImage: _removeImage,
-                    items: _selectedItems,
-                  );
-                  context.read<ImportActionBloc>().add(
-                    UpdateImportEvent(widget.importId!, req),
-                  );
-                }
-              });
-            },
-            child: Text(l10n.translate('common.confirm')),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -275,34 +390,57 @@ class _StockImportViewState extends State<_StockImportView> {
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-          _status == 'DRAFT'
-              ? l10n.translate('stock_import.delete_draft_title')
-              : l10n.translate('stock_import.cancel_import_title'),
-        ),
-        content: Text(l10n.translate('stock_import.confirm_action_message')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(l10n.translate('common.cancel')),
+      builder: (dialogContext) {
+        var isSubmitting = false;
+        return StatefulBuilder(
+          builder: (innerContext, setDialogState) => AlertDialog(
+            title: Text(
+              _status == 'DRAFT'
+                  ? l10n.translate('stock_import.delete_draft_title')
+                  : l10n.translate('stock_import.cancel_import_title'),
+            ),
+            content: Text(
+              l10n.translate('stock_import.confirm_action_message'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: Text(l10n.translate('common.cancel')),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                ),
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        setDialogState(() => isSubmitting = true);
+                        await _deleteGuard.run(() async {
+                          Navigator.pop(dialogContext);
+                          if (widget.importId != null) {
+                            this.context.read<ImportActionBloc>().add(
+                              DeleteImportEvent(widget.importId!),
+                            );
+                          }
+                        });
+                        if (mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                      },
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.translate('common.confirm')),
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () async {
-              await _deleteGuard.run(() async {
-                Navigator.pop(dialogContext);
-                if (widget.importId != null) {
-                  context.read<ImportActionBloc>().add(
-                    DeleteImportEvent(widget.importId!),
-                  );
-                }
-              });
-            },
-            child: Text(l10n.translate('common.confirm')),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -522,6 +660,8 @@ class _StockImportViewState extends State<_StockImportView> {
     return BlocConsumer<ImportActionBloc, ImportActionState>(
       listener: (context, state) {
         if (state.status == ImportActionStatus.success) {
+          final isDeleteSuccess = state.actionType == ImportActionType.delete;
+
           if (_confirmAfterUpdate && widget.importId != null) {
             _confirmAfterUpdate = false;
             _confirmGuard.run(() async {
@@ -541,8 +681,15 @@ class _StockImportViewState extends State<_StockImportView> {
           if (state.successMessage != null) {
             _showSuccessSnackBar(state.successMessage!);
           }
+          if (isDeleteSuccess) {
+            Navigator.pop(context, true);
+            return;
+          }
+
           // MANUAL type: show receipt template before popping
-          if (!_hasInvoice && state.importDetail != null) {
+          if (!_hasInvoice &&
+              state.importDetail != null &&
+              state.actionType == ImportActionType.confirm) {
             _showReceiptDialog(state.importDetail!);
           } else {
             Navigator.pop(context, true);
@@ -566,6 +713,35 @@ class _StockImportViewState extends State<_StockImportView> {
         }
       },
       builder: (context, state) {
+        final isSubmitting = state.status == ImportActionStatus.submitting;
+
+        if (widget.importId != null &&
+            state.importDetail == null &&
+            state.status != ImportActionStatus.failure) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              elevation: 0,
+              backgroundColor: AppColors.white,
+              foregroundColor: AppColors.textPrimary,
+              systemOverlayStyle: SystemUiOverlayStyle.dark,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+                color: Colors.black,
+              ),
+              title: Text(
+                l10n.translate('common.detail'),
+                style: AppTextStyles.titleLarge.copyWith(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              bottom: const AppSyncStatusText(),
+            ),
+            body: const Center(child: AppLoadingIndicator()),
+          );
+        }
+
         final isDetailLoadFailed =
             widget.importId != null &&
             state.status == ImportActionStatus.failure &&
@@ -649,18 +825,21 @@ class _StockImportViewState extends State<_StockImportView> {
                     Icons.delete_outline,
                     color: AppColors.error,
                   ),
-                  onPressed: _onCancelDelete,
+                  onPressed: isSubmitting ? null : _onCancelDelete,
                 ),
             ],
             bottom: const AppSyncStatusText(),
           ),
-          body:
-              (state.status == ImportActionStatus.loading ||
-                  state.status == ImportActionStatus.submitting)
-              ? const Center(child: AppLoadingIndicator())
-              : _buildBody(formatCurrency),
+          body: AppLoadingOverlay(
+            isLoading: isSubmitting,
+            child: SafeArea(
+              top: true,
+              bottom: false,
+              child: _buildBody(formatCurrency),
+            ),
+          ),
           bottomNavigationBar: _status == 'DRAFT' || widget.importId == null
-              ? _buildBottomActions()
+              ? _buildBottomActions(isSubmitting: isSubmitting)
               : null,
         );
       },
@@ -718,7 +897,20 @@ class _StockImportViewState extends State<_StockImportView> {
                     ),
                     SizedBox(height: AppSpacing.sm),
                     GestureDetector(
-                      onTap: _pickImage,
+                      onTap: () {
+                        final hasImage =
+                            _selectedImagePath != null ||
+                            (_existingImageUrl?.isNotEmpty == true &&
+                                !_removeImage);
+                        if (hasImage) {
+                          _showImagePreview(
+                            imagePath: _selectedImagePath,
+                            imageUrl: _existingImageUrl,
+                          );
+                          return;
+                        }
+                        _pickImage();
+                      },
                       child: Container(
                         width: double.infinity,
                         height: 160,
@@ -807,6 +999,53 @@ class _StockImportViewState extends State<_StockImportView> {
                     ),
                     SizedBox(height: AppSpacing.md),
                   ],
+                ] else if (_hasInvoice) ...[
+                  Text(
+                    l10n.translate('stock_import.invoice_image'),
+                    style: AppTextStyles.titleSmall.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: AppSpacing.sm),
+                  GestureDetector(
+                    onTap: () => _showImagePreview(imageUrl: _existingImageUrl),
+                    child: Container(
+                      width: double.infinity,
+                      height: 160,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.divider),
+                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.background,
+                      ),
+                      child: (_existingImageUrl?.isNotEmpty == true)
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                _existingImageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Text(
+                                    l10n.translate(
+                                      'stock_import.upload_invoice',
+                                    ),
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Center(
+                              child: Text(
+                                l10n.translate('stock_import.upload_invoice'),
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                  SizedBox(height: AppSpacing.md),
                 ],
                 TextField(
                   controller: _supplierController,
@@ -836,8 +1075,10 @@ class _StockImportViewState extends State<_StockImportView> {
                   controller: _documentNumberController,
                   enabled: isEditable,
                   decoration: InputDecoration(
-                    labelText: 'Số chứng từ',
-                    hintText: 'Nhập số chứng từ (nếu có)',
+                    labelText: l10n.translate('stock_import.document_number'),
+                    hintText: l10n.translate(
+                      'stock_import.document_number_hint',
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -861,7 +1102,7 @@ class _StockImportViewState extends State<_StockImportView> {
                       : null,
                   child: InputDecorator(
                     decoration: InputDecoration(
-                      labelText: 'Ngày chứng từ',
+                      labelText: l10n.translate('stock_import.document_date'),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -870,7 +1111,7 @@ class _StockImportViewState extends State<_StockImportView> {
                     child: Text(
                       _documentDate != null
                           ? DateFormatter.formatDate(_documentDate)
-                          : 'Chọn ngày chứng từ (nếu có)',
+                          : l10n.translate('stock_import.document_date_hint'),
                       style: _documentDate != null
                           ? null
                           : TextStyle(color: AppColors.textSecondary),
@@ -945,14 +1186,17 @@ class _StockImportViewState extends State<_StockImportView> {
                                 children: [
                                   Text(
                                     item.productName ?? 'SP #${item.productId}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                     style: AppTextStyles.bodyMedium.copyWith(
                                       fontWeight: FontWeight.w600,
                                       color: AppColors.textPrimary,
                                     ),
                                   ),
+                                  const SizedBox(height: 10),
                                   if (isEditable)
                                     SizedBox(
-                                      width: 150,
+                                      width: 190,
                                       child: TextFormField(
                                         key: ValueKey(
                                           'cost_${item.productId}_${item.quantity}',
@@ -1036,9 +1280,7 @@ class _StockImportViewState extends State<_StockImportView> {
                                   SizedBox(
                                     width: 56,
                                     child: TextFormField(
-                                      key: ValueKey(
-                                        'qty_${item.productId}_${item.quantity}',
-                                      ),
+                                      key: ValueKey('qty_${item.productId}'),
                                       initialValue: item.quantity.toString(),
                                       textAlign: TextAlign.center,
                                       keyboardType: TextInputType.number,
@@ -1183,7 +1425,7 @@ class _StockImportViewState extends State<_StockImportView> {
     );
   }
 
-  Widget _buildBottomActions() {
+  Widget _buildBottomActions({required bool isSubmitting}) {
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -1201,7 +1443,9 @@ class _StockImportViewState extends State<_StockImportView> {
           children: [
             Expanded(
               child: OutlinedButton(
-                onPressed: _onSaveDraft,
+                onPressed: (isSubmitting || _saveDraftGuard.isRunning)
+                    ? null
+                    : _onSaveDraft,
                 style: OutlinedButton.styleFrom(
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
                   side: BorderSide(color: AppColors.secondary),
@@ -1209,18 +1453,26 @@ class _StockImportViewState extends State<_StockImportView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: Text(
-                  l10n.translate('stock_import.save_draft'),
-                  style: AppTextStyles.labelLarge.copyWith(
-                    color: AppColors.secondary,
-                  ),
-                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        l10n.translate('stock_import.save_draft'),
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: AppColors.secondary,
+                        ),
+                      ),
               ),
             ),
             SizedBox(width: AppSpacing.md),
             Expanded(
               child: ElevatedButton(
-                onPressed: _onConfirm,
+                onPressed: (isSubmitting || _confirmGuard.isRunning)
+                    ? null
+                    : _onConfirm,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
                   padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
@@ -1228,10 +1480,21 @@ class _StockImportViewState extends State<_StockImportView> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: Text(
-                  l10n.translate('common.confirm'),
-                  style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
-                ),
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(
+                        l10n.translate('common.confirm'),
+                        style: AppTextStyles.labelLarge.copyWith(
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -1604,7 +1867,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                                         ),
                                         child: TextFormField(
                                           key: ValueKey(
-                                            'selector_qty_${product.id}_$qty',
+                                            'selector_qty_${product.id}',
                                           ),
                                           initialValue: qty.toString(),
                                           textAlign: TextAlign.center,

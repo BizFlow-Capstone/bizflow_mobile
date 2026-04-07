@@ -49,8 +49,17 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   late TextEditingController _taxCodeController;
   String? _selectedManagerId;
   final ActionGuard _submitGuard = ActionGuard();
+  final ActionGuard _employeeMutationGuard = ActionGuard();
   Completer<void>? _submitCompleter;
   Future<bool>? _canCreateLocationFuture;
+  final ScrollController _formScrollController = ScrollController();
+  final GlobalKey _nameFieldKey = GlobalKey();
+  final GlobalKey _addressFieldKey = GlobalKey();
+  final FocusNode _nameFocusNode = FocusNode();
+  final FocusNode _addressFocusNode = FocusNode();
+  String? _nameError;
+  String? _addressError;
+  bool _showRequiredValidation = false;
 
   @override
   void initState() {
@@ -118,20 +127,6 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     });
   }
 
-  @override
-  void dispose() {
-    _completeSubmitGuard();
-    _tabController.dispose();
-    _nameController.dispose();
-    _addressController.dispose();
-    _managerNameController.dispose();
-    _districtController.dispose();
-    _cityController.dispose();
-    _phoneController.dispose();
-    _taxCodeController.dispose();
-    super.dispose();
-  }
-
   void _completeSubmitGuard() {
     final completer = _submitCompleter;
     if (completer != null && !completer.isCompleted) {
@@ -140,14 +135,90 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     _submitCompleter = null;
   }
 
-  Future<void> _handleSubmit() async {
-    if (_nameController.text.isEmpty || _addressController.text.isEmpty) {
-      final l10n = AppLocalizations.of(context);
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('location.validation_error'),
-        type: AppSnackBarType.warning,
+  Future<void> _runEmployeeMutation(Future<void> Function() action) async {
+    if (_employeeMutationGuard.isRunning) return;
+    if (mounted) setState(() {});
+    await _employeeMutationGuard.run(action);
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _completeSubmitGuard();
+    _tabController.dispose();
+    _formScrollController.dispose();
+    _nameController.dispose();
+    _addressController.dispose();
+    _managerNameController.dispose();
+    _districtController.dispose();
+    _cityController.dispose();
+    _phoneController.dispose();
+    _nameFocusNode.dispose();
+    _addressFocusNode.dispose();
+    _taxCodeController.dispose();
+    super.dispose();
+  }
+
+  String _requiredLabel(String label) => '$label *';
+
+  String? _requiredFieldError(String value) {
+    if (value.trim().isEmpty) {
+      return AppLocalizations.of(context).translate('common.required_field');
+    }
+    return null;
+  }
+
+  bool _validateRequiredFields({required bool shouldFocus}) {
+    final nameError = _requiredFieldError(_nameController.text);
+    final addressError = _requiredFieldError(_addressController.text);
+
+    setState(() {
+      _showRequiredValidation = true;
+      _nameError = nameError;
+      _addressError = addressError;
+    });
+
+    if (nameError == null && addressError == null) {
+      return true;
+    }
+
+    if (shouldFocus) {
+      _scrollToFirstInvalidField(
+        nameError: nameError,
+        addressError: addressError,
       );
+    }
+    return false;
+  }
+
+  void _scrollToField(GlobalKey key) {
+    final contextForKey = key.currentContext;
+    if (contextForKey == null) return;
+    Scrollable.ensureVisible(
+      contextForKey,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      alignment: 0.1,
+    );
+  }
+
+  void _scrollToFirstInvalidField({
+    required String? nameError,
+    required String? addressError,
+  }) {
+    if (nameError != null) {
+      _scrollToField(_nameFieldKey);
+      _nameFocusNode.requestFocus();
+      return;
+    }
+    if (addressError != null) {
+      _scrollToField(_addressFieldKey);
+      _addressFocusNode.requestFocus();
+    }
+  }
+
+  Future<void> _handleSubmit() async {
+    if (!_validateRequiredFields(shouldFocus: true)) {
       return;
     }
 
@@ -297,24 +368,37 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   Widget _buildLocationForm(AppLocalizations l10n, bool isEditMode) {
     return SafeArea(
       child: SingleChildScrollView(
+        controller: _formScrollController,
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Location Name
             Text(
-              l10n.translate('location.location_name'),
+              _requiredLabel(l10n.translate('location.location_name')),
               style: AppTextStyles.labelLarge.copyWith(
                 color: AppColors.textPrimary,
               ),
             ),
             SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                hintText: l10n.translate('location.location_name_hint'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            Container(
+              key: _nameFieldKey,
+              child: TextField(
+                controller: _nameController,
+                focusNode: _nameFocusNode,
+                onChanged: (_) {
+                  if (_showRequiredValidation) {
+                    setState(() {
+                      _nameError = _requiredFieldError(_nameController.text);
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: l10n.translate('location.location_name_hint'),
+                  errorText: _showRequiredValidation ? _nameError : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
                 ),
               ),
             ),
@@ -322,21 +406,35 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
 
             // Address
             Text(
-              l10n.translate('location.location_address'),
+              _requiredLabel(l10n.translate('location.location_address')),
               style: AppTextStyles.labelLarge.copyWith(
                 color: AppColors.textPrimary,
               ),
             ),
             SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _addressController,
-              decoration: InputDecoration(
-                hintText: l10n.translate('location.location_address_hint'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            Container(
+              key: _addressFieldKey,
+              child: TextField(
+                controller: _addressController,
+                focusNode: _addressFocusNode,
+                onChanged: (_) {
+                  if (_showRequiredValidation) {
+                    setState(() {
+                      _addressError = _requiredFieldError(
+                        _addressController.text,
+                      );
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: l10n.translate('location.location_address_hint'),
+                  errorText: _showRequiredValidation ? _addressError : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
                 ),
+                maxLines: 3,
               ),
-              maxLines: 3,
             ),
             SizedBox(height: AppSpacing.lg),
 
@@ -464,7 +562,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                 return FutureBuilder<bool>(
                   future: _canCreateLocationFuture,
                   builder: (context, snapshot) {
-                    final canCreateLocation = snapshot.data ?? true;
+                    final canCreateLocation = snapshot.data ?? false;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -648,27 +746,33 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline),
                       color: Colors.red,
-                      onPressed: () async {
-                        final confirmed = await AppDialog.delete(
-                          context,
-                          title: l10n.translate('product.confirm_delete_title'),
-                          message: l10n.translate(
-                            'product.confirm_delete_message',
-                          ),
-                          confirmText: l10n.translate('common.delete'),
-                        );
+                      onPressed: _employeeMutationGuard.isRunning
+                          ? null
+                          : () async {
+                              await _runEmployeeMutation(() async {
+                                final confirmed = await AppDialog.delete(
+                                  context,
+                                  title: l10n.translate(
+                                    'product.confirm_delete_title',
+                                  ),
+                                  message: l10n.translate(
+                                    'product.confirm_delete_message',
+                                  ),
+                                  confirmText: l10n.translate('common.delete'),
+                                );
 
-                        if (!context.mounted || confirmed != true) {
-                          return;
-                        }
+                                if (!context.mounted || confirmed != true) {
+                                  return;
+                                }
 
-                        context.read<LocationBloc>().add(
-                          RemoveEmployeeFromLocationRequested(
-                            locationId: widget.location!.id,
-                            employeeId: employee.id,
-                          ),
-                        );
-                      },
+                                context.read<LocationBloc>().add(
+                                  RemoveEmployeeFromLocationRequested(
+                                    locationId: widget.location!.id,
+                                    employeeId: employee.id,
+                                  ),
+                                );
+                              });
+                            },
                     ),
                   );
                 },
@@ -734,14 +838,18 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                     trailing: IconButton(
                       icon: const Icon(Icons.add_circle_outline),
                       color: AppColors.primary,
-                      onPressed: () {
-                        context.read<LocationBloc>().add(
-                          AddEmployeeToLocationFromTabRequested(
-                            locationId: widget.location!.id,
-                            employeeId: employee.id,
-                          ),
-                        );
-                      },
+                      onPressed: _employeeMutationGuard.isRunning
+                          ? null
+                          : () async {
+                              await _runEmployeeMutation(() async {
+                                context.read<LocationBloc>().add(
+                                  AddEmployeeToLocationFromTabRequested(
+                                    locationId: widget.location!.id,
+                                    employeeId: employee.id,
+                                  ),
+                                );
+                              });
+                            },
                     ),
                   );
                 },

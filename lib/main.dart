@@ -40,6 +40,7 @@ import 'features/invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import 'features/invoice_template/presentation/bloc/invoice_template_event.dart';
 import 'features/location/data/location_repository.dart';
 import 'features/location/presentation/bloc/location_bloc.dart';
+import 'features/location/domain/entities/location_entity.dart';
 import 'features/subscription/data/subscription_api_service.dart';
 import 'features/subscription/data/subscription_repository.dart';
 import 'features/order/data/order_api_service.dart';
@@ -69,6 +70,7 @@ import 'features/revenue/presentation/bloc/revenue_bloc.dart';
 import 'features/cost/data/cost_api_service.dart';
 import 'features/cost/data/cost_repository.dart';
 import 'features/cost/presentation/bloc/cost_bloc.dart';
+import 'features/home/data/home_dashboard_api_service.dart';
 
 import 'shared/context/business_context.dart';
 import 'shared/context/notification_context.dart';
@@ -134,6 +136,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late RevenueRepository _revenueRepository;
   late CostApiService _costApiService;
   late CostRepository _costRepository;
+  late HomeDashboardApiService _homeDashboardApiService;
   late NotificationApiService _notificationApiService;
   late NotificationRepository _notificationRepository;
   late RemoteConfigService _remoteConfigService;
@@ -222,6 +225,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _referenceApiService = ReferenceApiService(apiClient: _apiClient);
     _revenueApiService = RevenueApiService(apiClient: _apiClient);
     _costApiService = CostApiService(apiClient: _apiClient);
+    _homeDashboardApiService = HomeDashboardApiService(apiClient: _apiClient);
 
     // Initialize Repositories (calls Services)
     _locationRepository = LocationRepository(service: _locationApiService);
@@ -271,7 +275,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 'Main: Auto-refreshed and cached ${locations.length} locations after network recovery.',
               );
             })
-            .catchError((_) {});
+            .catchError((Object _) => <LocationEntity>[]);
       }
     });
 
@@ -341,13 +345,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         ChangeNotifierProvider.value(value: BusinessContext()),
         ChangeNotifierProvider.value(value: NotificationContext()),
         BlocProvider(
-          create: (context) =>
-              AuthBloc(
-                locationRepository: _locationRepository,
-                authRepository: _authRepository,
-                secureStorage: _secureStorage,
-                firebaseMessagingService: _firebaseMessagingService,
-              )..add(const AppStarted()),
+          create: (context) => AuthBloc(
+            locationRepository: _locationRepository,
+            authRepository: _authRepository,
+            secureStorage: _secureStorage,
+            firebaseMessagingService: _firebaseMessagingService,
+          )..add(const AppStarted()),
         ),
         BlocProvider(
           create: (context) => LocationBloc(
@@ -393,6 +396,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         Provider<ImportRepository>.value(value: _importRepository),
         Provider<AccountingRepository>.value(value: _accountingRepository),
         Provider<NotificationRepository>.value(value: _notificationRepository),
+        Provider<HomeDashboardApiService>.value(
+          value: _homeDashboardApiService,
+        ),
       ],
       child: Consumer<LocalizationProvider>(
         builder: (context, localizationProvider, _) {

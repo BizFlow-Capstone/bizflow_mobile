@@ -645,7 +645,11 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                   LocationItem? selectedLocation;
 
                   if (state is LocationsLoaded) {
-                    locations = state.locations
+                    final activeLocations = state.locations
+                        .where((loc) => loc.isActive)
+                        .toList();
+
+                    locations = activeLocations
                         .map(
                           (loc) => LocationItem(
                             id: loc.id,
@@ -688,6 +692,14 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                           isOwner: fallbackLocation.isOwner,
                           ownerProfileId: fallbackLocation.ownerProfileId,
                         );
+                      });
+                    } else if (locations.isEmpty && selectedBusinessId != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) async {
+                        if (!context.mounted) return;
+                        if (businessContext.currentBusinessId == null) {
+                          return;
+                        }
+                        await businessContext.clear();
                       });
                     }
                   }
@@ -745,7 +757,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                     ownerProfileId: context.read<BusinessContext>().currentOwnerProfileId,
                   ),
                   builder: (context, snapshot) {
-                    final canCreateLocation = snapshot.data ?? true;
+                    final canCreateLocation = snapshot.data ?? false;
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.end,

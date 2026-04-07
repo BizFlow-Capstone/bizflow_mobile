@@ -89,8 +89,34 @@ class _AddProductPageState extends State<AddProductPage> {
   /// Pick image from gallery or camera
   Future<void> _pickImage() async {
     try {
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (sheetCtx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: Text(
+                  l10n?.translate('common.source_camera') ?? 'Camera',
+                ),
+                onTap: () => Navigator.of(sheetCtx).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text(
+                  l10n?.translate('common.source_gallery') ?? 'Gallery',
+                ),
+                onTap: () => Navigator.of(sheetCtx).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (source == null) return;
+
       final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 80,
       );
 
@@ -190,7 +216,7 @@ class _AddProductPageState extends State<AddProductPage> {
                   context,
                   message:
                       l10n?.translate('common.required_field') ??
-                      'Vui lòng nhập đủ thông tin',
+                      'Trường này là bắt buộc',
                   type: AppSnackBarType.warning,
                 );
                 return;

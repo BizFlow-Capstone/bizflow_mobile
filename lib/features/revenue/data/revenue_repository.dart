@@ -2,7 +2,9 @@ import '../../../../shared/cache/cache_manager.dart';
 import '../../../../shared/cache/local_api_cache_store.dart';
 import '../domain/entities/revenue_entity.dart';
 import 'revenue_api_service.dart';
+import 'models/ai_draft_revenue_dto.dart';
 import 'models/revenue_dto.dart';
+import 'dart:io';
 
 class RevenueRepository {
   final RevenueApiService _apiService;
@@ -78,7 +80,12 @@ class RevenueRepository {
             },
           ),
       onData: (dataMap, isFromCache) {
-        _localApiCache.setMap(key, dataMap, groupKey: 'revenues', cacheType: 'list');
+        _localApiCache.setMap(
+          key,
+          dataMap,
+          groupKey: 'revenues',
+          cacheType: 'list',
+        );
         final items = (dataMap['items'] as List<dynamic>? ?? [])
             .map((e) => RevenueDto.fromJson(e as Map<String, dynamic>))
             .map(_mapToEntity)
@@ -118,5 +125,15 @@ class RevenueRepository {
       await clearCache();
     }
     return result;
+  }
+
+  Future<AiDraftRevenueResultDto> parseDraftRevenueFromAudio({
+    required int locationId,
+    required File audioFile,
+  }) {
+    return _apiService.parseDraftRevenueFromAudio(
+      locationId: locationId,
+      audioFile: audioFile,
+    );
   }
 }

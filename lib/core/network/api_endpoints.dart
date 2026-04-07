@@ -14,16 +14,16 @@ class ApiEndpoints {
   static const String linkPhone = '/api/auth/link/phone';
   static const String linkEmail = '/api/auth/link/email';
   static const String linkGoogle = '/api/auth/link/google';
-    static const String firebaseCustomToken = '/api/auth/firebase/custom-token';
-    static const String forgotPasswordSendOtp =
-            '/api/auth/forgot-password/send-otp';
-    static const String forgotPasswordVerifyOtp =
-            '/api/auth/forgot-password/verify-otp';
-    static const String forgotPasswordReset = '/api/auth/forgot-password/reset';
-    static const String authProfile = '/api/auth/profile';
-    static const String authProfileAvatar = '/api/auth/profile/avatar';
-    static const String authChangePassword = '/api/auth/change-password';
-    static const String authDeleteAccount = '/api/auth/delete-account';
+  static const String firebaseCustomToken = '/api/auth/firebase/custom-token';
+  static const String forgotPasswordSendOtp =
+      '/api/auth/forgot-password/send-otp';
+  static const String forgotPasswordVerifyOtp =
+      '/api/auth/forgot-password/verify-otp';
+  static const String forgotPasswordReset = '/api/auth/forgot-password/reset';
+  static const String authProfile = '/api/auth/profile';
+  static const String authProfileAvatar = '/api/auth/profile/avatar';
+  static const String authChangePassword = '/api/auth/change-password';
+  static const String authDeleteAccount = '/api/auth/delete-account';
 
   // Legacy aliases (kept for compatibility if any file references them)
   static const String login = '/api/auth/login/email';
@@ -41,6 +41,7 @@ class ApiEndpoints {
 
   // Home
   static const String dashboard = '/dashboard';
+  static const String dashboardSummary = '/api/my-business/dashboard/summary';
   static const String notifications = '/notifications';
 
   // Location
@@ -48,18 +49,22 @@ class ApiEndpoints {
   static const String workAtLocations = '/api/location/work-at-locations';
   static const String createLocation = '/api/location/create';
   static const String myEmployees = '/api/my-employee/employees';
-        static const String myEmployeesDetails = '/api/my-employee/employees/details';
-    static const String searchEmployees = '/api/my-employee/search';
-    static const String inviteEmployee = '/api/my-employee/invite';
-    static const String employeeInvitations = '/api/my-employee/invitations';
-    static String acceptEmployeeInvitation(int hireId) =>
-            '/api/my-employee/invitations/$hireId/accept';
-    static String rejectEmployeeInvitation(int hireId) =>
-            '/api/my-employee/invitations/$hireId/reject';
-    static String deleteEmployee(String employeeId) => '/api/my-employee/$employeeId';
-    static const String registerDeviceToken = '/api/notifications/register-device-token';
-    static const String unregisterDeviceToken = '/api/notifications/unregister-device-token';
-    static const String invitationReplyNotification = '/api/my-employee/invitations/reply-notification';
+  static const String myEmployeesDetails = '/api/my-employee/employees/details';
+  static const String searchEmployees = '/api/my-employee/search';
+  static const String inviteEmployee = '/api/my-employee/invite';
+  static const String employeeInvitations = '/api/my-employee/invitations';
+  static String acceptEmployeeInvitation(int hireId) =>
+      '/api/my-employee/invitations/$hireId/accept';
+  static String rejectEmployeeInvitation(int hireId) =>
+      '/api/my-employee/invitations/$hireId/reject';
+  static String deleteEmployee(String employeeId) =>
+      '/api/my-employee/$employeeId';
+  static const String registerDeviceToken =
+      '/api/notifications/register-device-token';
+  static const String unregisterDeviceToken =
+      '/api/notifications/unregister-device-token';
+  static const String invitationReplyNotification =
+      '/api/my-employee/invitations/reply-notification';
 
   // Location with ID - use with String interpolation
   static String updateLocationStatus(String id) =>
@@ -81,21 +86,30 @@ class ApiEndpoints {
 
   // Order with ID - use with String interpolation
   static String getOrder(String id) => '/api/my-business/accounting/orders/$id';
-  static String updateOrder(String id) => '/api/my-business/accounting/orders/$id';
-  static String completeOrder(String id) => '/api/my-business/accounting/orders/$id/complete';
-  static String cancelOrder(String id) => '/api/my-business/accounting/orders/$id/cancel';
+  static String updateOrder(String id) =>
+      '/api/my-business/accounting/orders/$id';
+  static String completeOrder(String id) =>
+      '/api/my-business/accounting/orders/$id/complete';
+  static String cancelOrder(String id) =>
+      '/api/my-business/accounting/orders/$id/cancel';
 
   // Revenue
   static const String revenues = '/api/my-business/accounting/revenues';
-  static const String createManualRevenue = '/api/my-business/accounting/revenues/manual';
-    static String updateManualRevenue(String id) => '/api/my-business/accounting/revenues/$id';
-  static String deleteManualRevenue(String id) => '/api/my-business/accounting/revenues/$id';
+  static const String createManualRevenue =
+      '/api/my-business/accounting/revenues/manual';
+  static String updateManualRevenue(String id) =>
+      '/api/my-business/accounting/revenues/$id';
+  static String deleteManualRevenue(String id) =>
+      '/api/my-business/accounting/revenues/$id';
 
   // Cost
   static const String costs = '/api/my-business/accounting/costs';
-  static const String createManualCost = '/api/my-business/accounting/costs/manual';
-  static String updateManualCost(String id) => '/api/my-business/accounting/costs/$id';
-  static String deleteManualCost(String id) => '/api/my-business/accounting/costs/$id';
+  static const String createManualCost =
+      '/api/my-business/accounting/costs/manual';
+  static String updateManualCost(String id) =>
+      '/api/my-business/accounting/costs/$id';
+  static String deleteManualCost(String id) =>
+      '/api/my-business/accounting/costs/$id';
 
   // Product
   static const String products = '/api/my-business/products';
@@ -178,6 +192,10 @@ class ApiEndpoints {
   static String accountingBookSections(String locationId, String bookId) =>
       '/api/locations/$locationId/accounting/books/$bookId/sections';
 
+  // AI (via Backend API)
+  static const String aiDraftRevenue = '/api/my-business/ai/draft-revenue';
+  static const String aiDraftCost = '/api/my-business/ai/draft-cost';
+
   // GL Entries
   static const String glEntries = '/api/my-business/accounting/gl-entries';
 
@@ -186,5 +204,6 @@ class ApiEndpoints {
   static const String subscriptionPlans = '/api/subscription-plans';
   static const String currentSubscription = '/api/subscriptions/current';
   static const String checkoutSubscription = '/api/subscriptions/checkout';
-  static const String subscriptionTransactions = '/api/subscriptions/transactions';
+  static const String subscriptionTransactions =
+      '/api/subscriptions/transactions';
 }

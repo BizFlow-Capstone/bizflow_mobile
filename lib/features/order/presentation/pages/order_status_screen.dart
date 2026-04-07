@@ -28,6 +28,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
   late TabController _tabController;
   final ActionGuard _publishOrderGuard = ActionGuard();
   final ActionGuard _cancelOrderGuard = ActionGuard();
+  final ActionGuard _openOrderFormGuard = ActionGuard();
 
   @override
   void initState() {
@@ -50,85 +51,91 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
 
   Future<void> _openDraftForEditing(OrderEntity order) async {
     if (!order.isDraft) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OrderFormScreen(inputType: 'manual', draftId: order.id),
-      ),
-    );
-    if (!mounted) return;
-    context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+    await _openOrderFormGuard.run(() async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OrderFormScreen(inputType: 'manual', draftId: order.id),
+        ),
+      );
+      if (!mounted) return;
+      context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+    });
   }
 
   Future<void> _openPendingForEditing(OrderEntity order) async {
     if (!order.isPending) return;
 
-    final storage = await LocalStorage.getInstance();
-    final raw = storage.getString(StorageKeys.orderLocalDrafts);
+    await _openOrderFormGuard.run(() async {
+      final storage = await LocalStorage.getInstance();
+      final raw = storage.getString(StorageKeys.orderLocalDrafts);
 
-    List<Map<String, dynamic>> drafts = [];
-    if (raw != null && raw.trim().isNotEmpty) {
-      final decoded = jsonDecode(raw);
-      if (decoded is List) {
-        drafts = decoded
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
+      List<Map<String, dynamic>> drafts = [];
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          drafts = decoded
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        }
       }
-    }
 
-    final draftId = 'edit_${order.id}';
-    final payload = {
-      'id': draftId,
-      'locationId': order.locationId,
-      'locationName': order.locationName,
-      'status': 'draft',
-      'customerType': 'walkin',
-      'customerName': order.customerName ?? '',
-      'customerPhone': order.customerPhone ?? '',
-      'subtotal': order.subtotal,
-      'discountAmount': order.discountAmount,
-      'taxAmount': order.taxAmount,
-      'totalAmount': order.totalAmount,
-      'items': order.items
-          .map(
-            (item) => {
-              'id': item.id,
-              'productId': item.productId,
-              'saleItemId': item.saleItemId ?? int.tryParse(item.productId),
-              'unitName': item.unitName,
-              'productName': item.productName,
-              'price': item.price,
-              'quantity': item.quantity,
-              'discount': item.discount,
-              'note': item.note,
-            },
-          )
-          .toList(),
-      'createdAt': order.createdAt.toUtc().toIso8601String(),
-      'updatedAt': DateTime.now().toUtc().toIso8601String(),
-    };
+      final draftId = 'edit_${order.id}';
+      final payload = {
+        'id': draftId,
+        'locationId': order.locationId,
+        'locationName': order.locationName,
+        'status': 'draft',
+        'customerType': 'walkin',
+        'customerName': order.customerName ?? '',
+        'customerPhone': order.customerPhone ?? '',
+        'subtotal': order.subtotal,
+        'discountAmount': order.discountAmount,
+        'taxAmount': order.taxAmount,
+        'totalAmount': order.totalAmount,
+        'items': order.items
+            .map(
+              (item) => {
+                'id': item.id,
+                'productId': item.productId,
+                'saleItemId': item.saleItemId ?? int.tryParse(item.productId),
+                'unitName': item.unitName,
+                'productName': item.productName,
+                'price': item.price,
+                'quantity': item.quantity,
+                'discount': item.discount,
+                'note': item.note,
+              },
+            )
+            .toList(),
+        'createdAt': order.createdAt.toUtc().toIso8601String(),
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      };
 
-    final index = drafts.indexWhere((item) => item['id'] == draftId);
-    if (index >= 0) {
-      drafts[index] = payload;
-    } else {
-      drafts.insert(0, payload);
-    }
+      final index = drafts.indexWhere((item) => item['id'] == draftId);
+      if (index >= 0) {
+        drafts[index] = payload;
+      } else {
+        drafts.insert(0, payload);
+      }
 
-    await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
+      await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
 
-    if (!mounted) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OrderFormScreen(inputType: 'manual', draftId: draftId),
-      ),
-    );
-    if (!mounted) return;
-    await _removeTempDraftById(draftId);
-    if (!mounted) return;
-    _refreshOrders();
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OrderFormScreen(inputType: 'manual', draftId: draftId),
+        ),
+      );
+      if (!mounted) return;
+      await _removeTempDraftById(draftId);
+      if (!mounted) return;
+      _refreshOrders();
+    });
   }
 
   Future<void> _removeTempDraftById(String draftId) async {
@@ -217,14 +224,16 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const OrderFormScreen(inputType: 'manual'),
-            ),
-          );
-          if (!mounted) return;
-          context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+          await _openOrderFormGuard.run(() async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const OrderFormScreen(inputType: 'manual'),
+              ),
+            );
+            if (!mounted) return;
+            context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+          });
         },
         child: const Icon(Icons.add),
       ),

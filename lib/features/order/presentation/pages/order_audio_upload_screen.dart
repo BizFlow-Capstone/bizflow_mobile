@@ -14,26 +14,35 @@ class OrderAudioUploadScreen extends StatefulWidget {
 
 class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
   String? _selectedFileName;
+  bool _isProcessing = false;
 
   Future<void> _pickAudioFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.audio,
-    );
-
-    if (result != null) {
-      setState(() {
-        _selectedFileName = result.files.single.name;
-      });
-      // Simulate processing
-      await Future.delayed(const Duration(seconds: 1));
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const OrderFormScreen(inputType: 'audio'),
-        ),
+    if (_isProcessing) return;
+    setState(() => _isProcessing = true);
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.audio,
       );
+
+      if (result != null) {
+        setState(() {
+          _selectedFileName = result.files.single.name;
+        });
+        // Simulate processing
+        await Future.delayed(const Duration(seconds: 1));
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const OrderFormScreen(inputType: 'audio'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
     }
   }
 
@@ -47,10 +56,10 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
         elevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context),
-            color: Colors.black,
-          ),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _isProcessing ? null : () => Navigator.pop(context),
+          color: Colors.black,
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         bottom: const AppSyncStatusText(),
@@ -87,11 +96,18 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _pickAudioFile,
+                    onPressed: _isProcessing ? null : _pickAudioFile,
                     icon: const Icon(Icons.audio_file),
-                    label: Text(
-                      l10n.translate('order_create.audio_upload_btn'),
-                    ),
+                    label: _isProcessing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(l10n.translate('order_create.audio_upload_btn')),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),

@@ -37,7 +37,9 @@ class PostAuthNavigation {
     }
 
     final loadedState = state as LocationsLoaded;
-    final locations = loadedState.locations;
+    final locations = loadedState.locations
+      .where((location) => location.isActive)
+      .toList();
     final businessContext = BusinessContext();
 
     if (locations.isEmpty) {

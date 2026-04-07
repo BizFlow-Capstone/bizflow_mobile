@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import 'models/ai_draft_revenue_dto.dart';
 import 'models/revenue_dto.dart';
 
 class RevenueApiService {
@@ -19,7 +21,8 @@ class RevenueApiService {
       final queryParams = {
         'pageNumber': pageNumber,
         'pageSize': pageSize,
-        if (businessLocationId != null) 'businessLocationId': businessLocationId,
+        if (businessLocationId != null)
+          'businessLocationId': businessLocationId,
         if (fromDate != null) 'fromDate': fromDate.toIso8601String(),
         if (toDate != null) 'toDate': toDate.toIso8601String(),
       };
@@ -30,7 +33,9 @@ class RevenueApiService {
       );
 
       if (response.isSuccess && response.data != null) {
-        return RevenueResponseDto.fromJson(response.data as Map<String, dynamic>);
+        return RevenueResponseDto.fromJson(
+          response.data as Map<String, dynamic>,
+        );
       } else {
         throw Exception(response.message ?? 'Failed to load revenues');
       }
@@ -55,6 +60,28 @@ class RevenueApiService {
       }
     } catch (e) {
       debugPrint('RevenueApiService.createManualRevenue error: $e');
+      rethrow;
+    }
+  }
+
+  Future<AiDraftRevenueResultDto> parseDraftRevenueFromAudio({
+    required int locationId,
+    required File audioFile,
+  }) async {
+    try {
+      final response = await _apiClient.postMultipart<Map<String, dynamic>>(
+        ApiEndpoints.aiDraftRevenue,
+        fields: {'locationId': locationId.toString()},
+        files: {'audio': audioFile},
+      );
+
+      if (!response.isSuccess || response.data == null) {
+        throw Exception(response.message ?? 'Failed to parse draft revenue');
+      }
+
+      return AiDraftRevenueResultDto.fromJson(response.data!);
+    } catch (e) {
+      debugPrint('RevenueApiService.parseDraftRevenueFromAudio error: $e');
       rethrow;
     }
   }

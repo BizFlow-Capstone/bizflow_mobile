@@ -106,10 +106,13 @@ class _AdvancedInvoiceTemplatePageState
         // Auto-fill from current location if template is empty/default
         final locationState = context.read<LocationBloc>().state;
         if (locationState is LocationsLoaded) {
+          final activeLocations = locationState.locations
+              .where((location) => location.isActive)
+              .toList();
           final currentId = BusinessContext().currentBusinessId;
-          final currentLocation = locationState.locations.cast<LocationEntity?>().firstWhere(
+          final currentLocation = activeLocations.cast<LocationEntity?>().firstWhere(
                 (l) => l?.id == currentId,
-                orElse: () => locationState.locations.isNotEmpty ? locationState.locations.first : null,
+                orElse: () => activeLocations.isNotEmpty ? activeLocations.first : null,
               );
 
           if (currentLocation != null) {

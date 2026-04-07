@@ -25,6 +25,12 @@ class AccountingPeriodTab extends StatefulWidget {
 
 class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
   List<AccountingPeriod> _cachedPeriods = const [];
+  bool _isCreatePeriodSheetOpen = false;
+
+  void _showSnackNow(ScaffoldMessengerState messenger, SnackBar snackBar) {
+    messenger.removeCurrentSnackBar();
+    messenger.showSnackBar(snackBar);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,13 +39,22 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
 
     return BlocConsumer<AccountingPeriodBloc, AccountingPeriodState>(
       listenWhen: (prev, curr) =>
-          curr.status == AccountingPeriodStatus.actionSuccess &&
-          prev.status != AccountingPeriodStatus.actionSuccess,
+          (curr.status == AccountingPeriodStatus.actionSuccess &&
+              prev.status != AccountingPeriodStatus.actionSuccess) ||
+          (curr.status == AccountingPeriodStatus.error &&
+              prev.status != AccountingPeriodStatus.error),
       listener: (context, state) {
         if (messenger == null) return;
+
+        if (_isCreatePeriodSheetOpen &&
+            state.status == AccountingPeriodStatus.error) {
+          return;
+        }
+
         if (state.status == AccountingPeriodStatus.actionSuccess &&
             state.actionSuccessKey != null) {
-          messenger.showSnackBar(
+          _showSnackNow(
+            messenger,
             SnackBar(
               content: Text(l10n.translate(state.actionSuccessKey!)),
               backgroundColor: AppColors.success,
@@ -138,7 +153,8 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
     } else {
       userMessage = rawMessage;
     }
-    messenger.showSnackBar(
+    _showSnackNow(
+      messenger,
       SnackBar(content: Text(userMessage), backgroundColor: AppColors.error),
     );
   }
@@ -152,6 +168,7 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
   }) async {
     if (!context.mounted) return;
     final bloc = context.read<AccountingPeriodBloc>();
+    setState(() => _isCreatePeriodSheetOpen = true);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -166,6 +183,8 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
         ),
       ),
     );
+    if (!mounted) return;
+    setState(() => _isCreatePeriodSheetOpen = false);
   }
 }
 
@@ -253,6 +272,9 @@ class _PeriodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+    final isActionLoading = context.select(
+      (AccountingPeriodBloc bloc) => bloc.state.isActionLoading,
+    );
 
     return Card(
       elevation: 2,
@@ -315,72 +337,83 @@ class _PeriodCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: AppSpacing.sm),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  // Audit log button
-                  TextButton.icon(
-                    onPressed: () => _showAuditLog(context),
-                    icon: const Icon(Icons.history, size: 16),
-                    label: Text(
-                      l10n.translate('accounting.action_view_audit'),
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                      ),
-                    ),
-                  ),
-                  // Create Books button (if period is open)
-                  if (period.isOpen)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    // Audit log button
                     TextButton.icon(
-                      onPressed: () => _showCreateBooksDialog(context),
-                      icon: const Icon(Icons.book_outlined, size: 16),
+                      onPressed: () => _showAuditLog(context),
+                      icon: const Icon(Icons.history, size: 16),
                       label: Text(
-                        l10n.translate('accounting.action_create_books'),
+                        l10n.translate('accounting.action_view_audit'),
                         style: const TextStyle(fontSize: 12),
                       ),
                       style: TextButton.styleFrom(
-                        foregroundColor: AppColors.secondary,
+                        foregroundColor: AppColors.textSecondary,
                         padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.sm,
                         ),
                       ),
                     ),
-                  // Finalize / Reopen button
-                  if (period.isOpen)
-                    TextButton.icon(
-                      onPressed: () => _confirmFinalize(context),
-                      icon: const Icon(Icons.lock_outline, size: 16),
-                      label: Text(
-                        l10n.translate('accounting.action_finalize'),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm,
+                    // Create Books button (if period is open)
+                    if (period.isOpen)
+                      TextButton.icon(
+                        onPressed: isActionLoading
+                            ? null
+                            : () => _showCreateBooksDialog(context),
+                        icon: const Icon(Icons.book_outlined, size: 16),
+                        label: Text(
+                          l10n.translate('accounting.action_create_books'),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.secondary,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                          ),
                         ),
                       ),
-                    )
-                  else if (period.isFinalized)
-                    TextButton.icon(
-                      onPressed: () => _confirmReopen(context),
-                      icon: const Icon(Icons.lock_open_outlined, size: 16),
-                      label: Text(
-                        l10n.translate('accounting.action_reopen'),
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.orange,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm,
+                    // Finalize / Reopen button
+                    if (period.isOpen)
+                      TextButton.icon(
+                        onPressed: isActionLoading
+                            ? null
+                            : () => _confirmFinalize(context),
+                        icon: const Icon(Icons.lock_outline, size: 16),
+                        label: Text(
+                          l10n.translate('accounting.action_finalize'),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                          ),
+                        ),
+                      )
+                    else if (period.isFinalized)
+                      TextButton.icon(
+                        onPressed: isActionLoading
+                            ? null
+                            : () => _confirmReopen(context),
+                        icon: const Icon(Icons.lock_open_outlined, size: 16),
+                        label: Text(
+                          l10n.translate('accounting.action_reopen'),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.orange,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -1103,6 +1136,9 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
 
   bool _useSuggestion = false;
   bool _loadingSuggestion = false;
+  bool _isSubmitting = false;
+  bool _isWaitingCreateResult = false;
+  String? _submitErrorMessage;
 
   AppLocalizations get l10n => widget.l10n;
 
@@ -1148,11 +1184,18 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
     }
   }
 
+  void _setSubmitError(String? message) {
+    if (!mounted) return;
+    setState(() {
+      _submitErrorMessage = message;
+    });
+  }
+
   void _submit() {
+    if (_isSubmitting) return;
+
     if (_periodType == 'quarter' && (_quarter < 1 || _quarter > 4)) {
-      widget.messenger?.showSnackBar(
-        SnackBar(content: Text(l10n.translate('common.required'))),
-      );
+      _setSubmitError(l10n.translate('common.required'));
       return;
     }
 
@@ -1160,27 +1203,24 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
     final bank = CurrencyFormatter.parse(_bankController.text)?.toDouble();
 
     if (widget.isFirstPeriod && (cash == null || bank == null)) {
-      widget.messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.translate('accounting.first_period_opening_balance_required'),
-          ),
-          backgroundColor: AppColors.error,
-        ),
+      _setSubmitError(
+        l10n.translate('accounting.first_period_opening_balance_required'),
       );
       return;
     }
 
     if (_periodType == 'custom' && _endDate.isBefore(_startDate)) {
-      widget.messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.translate('accounting.custom_end_date_must_be_after_start'),
-          ),
-        ),
+      _setSubmitError(
+        l10n.translate('accounting.custom_end_date_must_be_after_start'),
       );
       return;
     }
+
+    _setSubmitError(null);
+    setState(() {
+      _isSubmitting = true;
+      _isWaitingCreateResult = false;
+    });
 
     final bloc = context.read<AccountingPeriodBloc>();
 
@@ -1208,16 +1248,51 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
         ),
       );
     }
-
-    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<AccountingPeriodBloc, AccountingPeriodState>(
-      listenWhen: (prev, curr) => prev.suggestion != curr.suggestion,
+      listenWhen: (prev, curr) =>
+          prev.suggestion != curr.suggestion ||
+          prev.status != curr.status ||
+          prev.errorMessage != curr.errorMessage,
       listener: (context, state) {
         if (!mounted) return;
+
+        if (_isSubmitting && state.isActionLoading) {
+          if (!_isWaitingCreateResult) {
+            setState(() => _isWaitingCreateResult = true);
+          }
+          return;
+        }
+
+        if (state.status == AccountingPeriodStatus.actionSuccess) {
+          if (!_isSubmitting || !_isWaitingCreateResult) {
+            return;
+          }
+          setState(() {
+            _isSubmitting = false;
+            _isWaitingCreateResult = false;
+          });
+          Navigator.pop(context);
+          return;
+        }
+
+        if (state.status == AccountingPeriodStatus.error) {
+          if (!_isSubmitting || !_isWaitingCreateResult) {
+            return;
+          }
+          setState(() {
+            _isSubmitting = false;
+            _isWaitingCreateResult = false;
+          });
+          if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
+            _setSubmitError(state.errorMessage);
+          }
+          return;
+        }
+
         final suggestion = state.suggestion;
         if (suggestion != null) {
           setState(() {
@@ -1232,11 +1307,15 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
               _useSuggestion = true;
             } else {
               if (!mounted) return;
-              widget.messenger?.showSnackBar(
-                SnackBar(
-                  content: Text(l10n.translate('accounting.no_suggestion')),
-                ),
-              );
+              final messenger = widget.messenger;
+              if (messenger != null) {
+                messenger.removeCurrentSnackBar();
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(l10n.translate('accounting.no_suggestion')),
+                  ),
+                );
+              }
             }
           });
         }
@@ -1545,27 +1624,70 @@ class _CreatePeriodSheetState extends State<_CreatePeriodSheet> {
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        foregroundColor: AppColors.white,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.md,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusMd,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_submitErrorMessage != null) ...[
+                        Container(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          padding: const EdgeInsets.all(AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusSm,
+                            ),
+                            border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Text(
+                            _submitErrorMessage!,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
+                      ],
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _submit,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            foregroundColor: AppColors.white,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.md,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMd,
+                              ),
+                            ),
+                          ),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      AppColors.white,
+                                    ),
+                                  ),
+                                )
+                              : Text(
+                                  l10n.translate(
+                                    'accounting.create_period_title',
+                                  ),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                        ),
                       ),
-                      child: Text(
-                        l10n.translate('accounting.create_period_title'),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -1708,7 +1830,10 @@ class _ErrorView extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.md),
-          ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
+          ElevatedButton(
+            onPressed: onRetry,
+            child: Text(AppLocalizations.of(context).translate('common.retry')),
+          ),
         ],
       ),
     );

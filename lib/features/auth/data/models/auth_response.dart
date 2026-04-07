@@ -10,6 +10,8 @@ class AuthResponse {
   final bool? isNewAccount;
   final String? fullName;
   final String? avatarUrl;
+  final bool? hasPassword;
+  final List<String> credentialTypes;
 
   AuthResponse({
     required this.success,
@@ -21,6 +23,8 @@ class AuthResponse {
     this.isNewAccount,
     this.fullName,
     this.avatarUrl,
+    this.hasPassword,
+    this.credentialTypes = const <String>[],
   });
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) {
@@ -32,6 +36,49 @@ class AuthResponse {
     final account = rawAccount is Map<String, dynamic>
         ? rawAccount
         : (rawAccount is Map ? Map<String, dynamic>.from(rawAccount) : null);
+
+    final rawCredentials = account?['credentials'];
+    final credentials = rawCredentials is List
+        ? rawCredentials
+        : const <dynamic>[];
+
+    String? normalizeCredentialType(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString().trim().toLowerCase();
+      if (text.isEmpty) return null;
+      if (text.contains('phone')) return 'phone';
+      if (text.contains('email')) return 'email';
+      if (text.contains('google')) return 'google';
+      return null;
+    }
+
+    final normalizedCredentialTypes = credentials
+        .map((item) {
+          if (item is String) {
+            return normalizeCredentialType(item);
+          }
+          if (item is Map<String, dynamic>) {
+            return normalizeCredentialType(
+              item['type'] ??
+                  item['credentialType'] ??
+                  item['provider'] ??
+                  item['method'],
+            );
+          }
+          if (item is Map) {
+            return normalizeCredentialType(
+              item['type'] ??
+                  item['credentialType'] ??
+                  item['provider'] ??
+                  item['method'],
+            );
+          }
+          return null;
+        })
+        .whereType<String>()
+        .toSet()
+        .toList();
+
     return AuthResponse(
       success: json['success'] as bool? ?? false,
       message: json['message'] as String? ?? '',
@@ -43,8 +90,12 @@ class AuthResponse {
       isNewAccount: data['isNewAccount'] as bool?,
       fullName: account?['fullName'] as String?,
       avatarUrl: account?['avatarUrl'] as String?,
+      hasPassword: account?['hasPassword'] as bool?,
+      credentialTypes: normalizedCredentialTypes,
     );
   }
+
+  bool get hasPhoneCredential => credentialTypes.contains('phone');
 
   Map<String, dynamic> toJson() {
     return {
@@ -57,6 +108,8 @@ class AuthResponse {
       if (isNewAccount != null) 'isNewAccount': isNewAccount,
       if (fullName != null) 'fullName': fullName,
       if (avatarUrl != null) 'avatarUrl': avatarUrl,
+      if (hasPassword != null) 'hasPassword': hasPassword,
+      if (credentialTypes.isNotEmpty) 'credentialTypes': credentialTypes,
     };
   }
 }

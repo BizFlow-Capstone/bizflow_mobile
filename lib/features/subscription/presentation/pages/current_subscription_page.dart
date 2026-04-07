@@ -13,13 +13,21 @@ import '../../data/subscription_api_service.dart';
 
 import '../../../../shared/context/business_context.dart';
 
-class CurrentSubscriptionPage extends StatelessWidget {
+class CurrentSubscriptionPage extends StatefulWidget {
   final bool fromCheckoutResult;
 
   const CurrentSubscriptionPage({
     super.key,
     this.fromCheckoutResult = false,
   });
+
+  @override
+  State<CurrentSubscriptionPage> createState() => _CurrentSubscriptionPageState();
+}
+
+class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
+  // Cache last valid snapshot from Firestore stream
+  DocumentSnapshot<Map<String, dynamic>>? _lastValidSnapshot;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +47,7 @@ class CurrentSubscriptionPage extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            if (fromCheckoutResult) {
+            if (widget.fromCheckoutResult) {
               AppRouter.navigateAndClearStack(AppRoutes.home);
               return;
             }
@@ -220,7 +228,16 @@ class CurrentSubscriptionPage extends StatelessWidget {
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
       stream: stream,
       builder: (context, snapshot) {
+        // Cache last valid snapshot (only when data is valid and not error)
+        if (snapshot.hasData && snapshot.data?.data() != null && !snapshot.hasError) {
+          _lastValidSnapshot = snapshot.data;
+        }
+
         if (snapshot.hasError) {
+          // FIX: Show cached data instead of empty map when offline
+          final cachedData = _lastValidSnapshot?.data();
+          final featuresUsage = cachedData?['features'] as Map<String, dynamic>? ?? {};
+          
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -233,7 +250,7 @@ class CurrentSubscriptionPage extends StatelessWidget {
                   border: Border.all(color: Colors.amber.shade200),
                 ),
                 child: const Text(
-                  'Khong the doc thong tin su dung tu Firestore. Dang hien han muc theo goi hien tai.',
+                  'Không thể cập nhật thông tin sử dụng từ Firestore. Hiển thị dữ liệu được lưu gần đây.',
                   style: TextStyle(color: Colors.black87),
                 ),
               ),
@@ -242,18 +259,22 @@ class CurrentSubscriptionPage extends StatelessWidget {
                 context: context,
                 l10n: l10n,
                 planFeatures: planFeatures,
-                featuresUsage: const {},
+                featuresUsage: featuresUsage,
               ),
             ],
           );
         }
 
         if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          // While connecting, show last cached data if available
+          final cachedData = _lastValidSnapshot?.data();
+          final featuresUsage = cachedData?['features'] as Map<String, dynamic>? ?? {};
+          
           return _buildUsageSection(
             context: context,
             l10n: l10n,
             planFeatures: planFeatures,
-            featuresUsage: const {},
+            featuresUsage: featuresUsage,
           );
         }
 

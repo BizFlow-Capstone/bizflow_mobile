@@ -57,10 +57,10 @@ class SubscriptionPlansPage extends StatelessWidget {
       ),
       body: SwrBuilder<CurrentSubscriptionDto?>(
         cacheKey: 'current_subscription_for_plans',
-        fetcher: ({cancelToken}) => apiService.getCurrentSubscription(
-          cancelToken: cancelToken,
-        ),
-        fromJson: (json) => json.isEmpty ? null : CurrentSubscriptionDto.fromJson(json),
+        fetcher: ({cancelToken}) =>
+            apiService.getCurrentSubscription(cancelToken: cancelToken),
+        fromJson: (json) =>
+            json.isEmpty ? null : CurrentSubscriptionDto.fromJson(json),
         toJson: (data) => data?.toJson() ?? {},
         builder: (context, currentSub, _, __) {
           return SwrBuilder<List<SubscriptionPlanDto>>(
@@ -75,99 +75,113 @@ class SubscriptionPlansPage extends StatelessWidget {
             },
             toJson: (data) => {'list': data.map((e) => e.toJson()).toList()},
             builder: (context, plans, isLoading, error) {
-          if (isLoading && (plans == null || plans.isEmpty)) {
-            return const Center(child: CircularProgressIndicator());
-          }
+              if (isLoading && (plans == null || plans.isEmpty)) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-          if (error != null && (plans == null || plans.isEmpty)) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline,
-                        size: 48, color: AppColors.error),
-                    const SizedBox(height: 16),
-                    Text(
-                      ApiErrorMessageParser.parse(error),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => AppRouter.pop(),
-                      child: const Text('Back'),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          final displayPlans = plans ?? [];
-
-          return SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(height: AppSpacing.md),
-                  if (!isOwner) ...[
-                    _buildEmployeeWarning(context),
-                    SizedBox(height: AppSpacing.lg),
-                  ],
-                  Text(
-                    l10n.translate('subscription.header_title'),
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.titleLarge.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  SizedBox(height: AppSpacing.sm),
-                  Text(
-                    l10n.translate('subscription.header_subtitle'),
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: AppSpacing.lg),
-                  
-                  ...displayPlans.map((plan) {
-                    final isFree = plan.name.toLowerCase().contains('free');
-                    final isBusiness = plan.name.toLowerCase().contains('business');
-                    final isCurrentPlan = currentSub?.isActive == true &&
-                        currentSub?.plan?.subscriptionPlanId == plan.subscriptionPlanId;
-                    
-                    return Column(
+              if (error != null && (plans == null || plans.isEmpty)) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _DynamicPlanCard(
-                          plan: plan,
-                          l10n: l10n,
-                          type: isFree ? _PlanType.free : (isBusiness ? _PlanType.business : _PlanType.premium),
-                          onUpgrade: () => _handleUpgrade(context, plan),
-                          isOwner: isOwner,
-                          isCurrentPlan: isCurrentPlan,
+                        const Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: AppColors.error,
                         ),
+                        const SizedBox(height: 16),
+                        Text(
+                          ApiErrorMessageParser.parse(error),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => AppRouter.pop(),
+                          child: Text(l10n.translate('common.back')),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              final displayPlans = plans ?? [];
+
+              return SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(height: AppSpacing.md),
+                      if (!isOwner) ...[
+                        _buildEmployeeWarning(context),
                         SizedBox(height: AppSpacing.lg),
                       ],
-                    );
-                  }),
+                      Text(
+                        l10n.translate('subscription.header_title'),
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.titleLarge.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.sm),
+                      Text(
+                        l10n.translate('subscription.header_subtitle'),
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.lg),
 
-                  _BenefitsSection(l10n: l10n),
-                  SizedBox(height: AppSpacing.lg),
+                      ...displayPlans.map((plan) {
+                        final normalizedPlanName = plan.name.toLowerCase();
+                        final isFree =
+                            (plan.currentPrice?.effectivePrice ?? 0) <= 0 ||
+                            normalizedPlanName.contains('free') ||
+                            normalizedPlanName.contains('miễn phí');
+                        final isBusiness =
+                            normalizedPlanName.contains('business') ||
+                            normalizedPlanName.contains('doanh nghiệp');
+                        final isCurrentPlan =
+                            currentSub?.isActive == true &&
+                            currentSub?.plan?.subscriptionPlanId ==
+                                plan.subscriptionPlanId;
 
-                  _FaqSection(l10n: l10n),
-                  SizedBox(height: AppSpacing.xl),
-                  const SafeArea(top: false, child: SizedBox.shrink()),
-                ],
-              ),
-            ),
+                        return Column(
+                          children: [
+                            _DynamicPlanCard(
+                              plan: plan,
+                              l10n: l10n,
+                              type: isFree
+                                  ? _PlanType.free
+                                  : (isBusiness
+                                        ? _PlanType.business
+                                        : _PlanType.premium),
+                              onUpgrade: () => _handleUpgrade(context, plan),
+                              isOwner: isOwner,
+                              isCurrentPlan: isCurrentPlan,
+                            ),
+                            SizedBox(height: AppSpacing.lg),
+                          ],
+                        );
+                      }),
+
+                      _BenefitsSection(l10n: l10n),
+                      SizedBox(height: AppSpacing.lg),
+
+                      SizedBox(height: AppSpacing.xl),
+                      const SafeArea(top: false, child: SizedBox.shrink()),
+                    ],
+                  ),
+                ),
+              );
+            },
           );
-        },
-      );
         },
       ),
     );
@@ -183,12 +197,22 @@ class SubscriptionPlansPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.error,
+            size: 24,
+          ),
           SizedBox(width: AppSpacing.md),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Chỉ chủ cửa sở mới có quyền đăng ký hoặc nâng cấp gói dịch vụ.',
-              style: TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w600),
+              AppLocalizations.of(
+                context,
+              ).translate('subscription.owner_only_upgrade_notice'),
+              style: TextStyle(
+                color: AppColors.error,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -197,7 +221,9 @@ class SubscriptionPlansPage extends StatelessWidget {
   }
 
   Future<void> _handleUpgrade(
-      BuildContext context, SubscriptionPlanDto plan) async {
+    BuildContext context,
+    SubscriptionPlanDto plan,
+  ) async {
     final repo = context.read<SubscriptionRepository>();
 
     try {
@@ -206,23 +232,31 @@ class SubscriptionPlansPage extends StatelessWidget {
         final uri = Uri.parse(checkout.sessionUrl);
         if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Could not launch payment URL'),
-                backgroundColor: AppColors.error,
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    AppLocalizations.of(
+                      context,
+                    ).translate('subscription.launch_payment_failed'),
+                  ),
+                  backgroundColor: AppColors.error,
+                ),
+              );
           }
         }
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ApiErrorMessageParser.parse(e)),
-            backgroundColor: AppColors.error,
-          ),
-        );
+        ScaffoldMessenger.of(context)
+          ..removeCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(ApiErrorMessageParser.parse(e)),
+              backgroundColor: AppColors.error,
+            ),
+          );
       }
     }
   }
@@ -251,19 +285,21 @@ class _DynamicPlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final price = plan.currentPrice;
-    final priceText = price != null 
-        ? (price.effectivePrice == 0 ? l10n.translate('subscription.free.price') : price.effectivePrice.toStringAsFixed(0))
+    final priceText = price != null
+        ? (price.effectivePrice == 0
+              ? l10n.translate('subscription.free.price')
+              : price.effectivePrice.toStringAsFixed(0))
         : 'Contact Us';
-        
+
     final currency = price?.currency ?? 'VND';
-    final formattedPrice = price != null && price.effectivePrice > 0 
-      ? '$priceText $currency'
+    final formattedPrice = price != null && price.effectivePrice > 0
+        ? '$priceText $currency'
         : priceText;
 
     final borderColor = isCurrentPlan
-      ? AppColors.success
-      : (type == _PlanType.premium ? AppColors.warning : AppColors.divider);
-    
+        ? AppColors.success
+        : (type == _PlanType.premium ? AppColors.warning : AppColors.divider);
+
     // Check if it's premium to show popular badge
     final showBadge = type == _PlanType.premium;
 
@@ -279,11 +315,13 @@ class _DynamicPlanCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (isCurrentPlan) ...[
-            _PopularBadge(text: l10n.translate('subscription.registered_label')),
-            SizedBox(height: AppSpacing.sm)
+            _PopularBadge(
+              text: l10n.translate('subscription.registered_label'),
+            ),
+            SizedBox(height: AppSpacing.sm),
           ] else if (showBadge) ...[
             _PopularBadge(text: l10n.translate('subscription.premium.badge')),
-            SizedBox(height: AppSpacing.sm)
+            SizedBox(height: AppSpacing.sm),
           ],
           Text(
             plan.name,
@@ -312,7 +350,9 @@ class _DynamicPlanCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (plan.durationDays > 0 && price != null && price.effectivePrice > 0)
+                if (plan.durationDays > 0 &&
+                    price != null &&
+                    price.effectivePrice > 0)
                   TextSpan(
                     text: ' / ${plan.durationDays} days',
                     style: AppTextStyles.bodySmall.copyWith(
@@ -323,12 +363,19 @@ class _DynamicPlanCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          ...plan.features.map((f) => Column(
-            children: [
-              _FeatureRow(data: _FeatureRowData(enabled: true, text: '${f.featureName}: ${f.usageLimit == -1 ? l10n.translate('subscription.unlimited') : f.usageLimit}')),
-              SizedBox(height: AppSpacing.xs),
-            ],
-          )),
+          ...plan.features.map(
+            (f) => Column(
+              children: [
+                _FeatureRow(
+                  data: _FeatureRowData(
+                    enabled: true,
+                    text: _buildFeatureText(f),
+                  ),
+                ),
+                SizedBox(height: AppSpacing.xs),
+              ],
+            ),
+          ),
           SizedBox(height: AppSpacing.md),
           _buildActionButton(context),
         ],
@@ -375,14 +422,16 @@ class _DynamicPlanCard extends StatelessWidget {
       child: ElevatedButton(
         onPressed: onUpgrade,
         style: ElevatedButton.styleFrom(
-          backgroundColor: type == _PlanType.premium ? AppColors.warning : AppColors.primary,
+          backgroundColor: type == _PlanType.premium
+              ? AppColors.warning
+              : AppColors.primary,
           foregroundColor: AppColors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(
-          type == _PlanType.business ? l10n.translate('subscription.business.cta') : l10n.translate('subscription.premium.cta'),
+          type == _PlanType.business
+              ? l10n.translate('subscription.business.cta')
+              : l10n.translate('subscription.premium.cta'),
           style: AppTextStyles.titleSmall.copyWith(
             color: AppColors.white,
             fontWeight: FontWeight.w600,
@@ -390,6 +439,56 @@ class _DynamicPlanCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _buildFeatureText(PlanFeatureDto feature) {
+    final featureName = feature.featureName.trim();
+    final featureDescription = feature.featureDescription.trim();
+    final featureCode = feature.featureCode.trim();
+
+    final displayName = featureName.isNotEmpty
+        ? featureName
+        : (featureDescription.isNotEmpty
+              ? featureDescription
+              : _humanizeFeatureCode(featureCode));
+
+    if (feature.usageLimit < 0) {
+      return '$displayName: ${l10n.translate('subscription.unlimited')}';
+    }
+
+    // Some payloads still return missing code/name with usageLimit=0; show description only.
+    if (feature.usageLimit == 0 &&
+        featureName.isEmpty &&
+        featureCode.isEmpty &&
+        featureDescription.isNotEmpty) {
+      return displayName;
+    }
+
+    if (feature.usageLimit == 0) {
+      return displayName;
+    }
+
+    return '$displayName: ${feature.usageLimit}';
+  }
+
+  String _humanizeFeatureCode(String featureCode) {
+    if (featureCode.isEmpty) return '-';
+
+    final normalized = featureCode.replaceAll('_', ' ').trim();
+    if (normalized.isEmpty) return '-';
+
+    final parts = normalized
+        .split(' ')
+        .where((part) => part.trim().isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '-';
+
+    return parts
+        .map(
+          (part) =>
+              '${part[0].toUpperCase()}${part.length > 1 ? part.substring(1).toLowerCase() : ''}',
+        )
+        .join(' ');
   }
 }
 

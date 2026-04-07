@@ -37,6 +37,7 @@ class AppBottomSheet extends StatelessWidget {
       isDismissible: isDismissible,
       enableDrag: isDismissible,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => AppBottomSheet(
         title: title,
@@ -76,6 +77,12 @@ class AppBottomSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     final maxSheetHeight = maxHeight ?? screenHeight * 0.9;
+    final resolvedPadding =
+        (padding ?? AppSpacing.paddingMd).resolve(Directionality.of(context));
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final contentPadding = resolvedPadding.copyWith(
+      bottom: resolvedPadding.bottom + bottomInset,
+    );
 
     return Container(
       constraints: BoxConstraints(maxHeight: maxSheetHeight),
@@ -132,7 +139,7 @@ class AppBottomSheet extends StatelessWidget {
           // Content
           Flexible(
             child: SingleChildScrollView(
-              padding: padding ?? AppSpacing.paddingMd,
+              padding: contentPadding,
               child: child,
             ),
           ),

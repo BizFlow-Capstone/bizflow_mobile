@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../core/services/firebase_messaging_service.dart';
+import '../../../../shared/utils/action_guard.dart';
 
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../core/routing/app_router.dart';
@@ -28,11 +29,13 @@ class EmployeeListPage extends StatefulWidget {
   State<EmployeeListPage> createState() => _EmployeeListPageState();
 }
 
-class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerProviderStateMixin {
+class _EmployeeListPageState extends State<EmployeeListPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   StreamSubscription<Map<String, dynamic>>? _messageSubscription;
   late BusinessContext _businessContext;
+  final ActionGuard _deleteEmployeeGuard = ActionGuard();
 
   @override
   void initState() {
@@ -42,9 +45,14 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
 
     // Initial load based on business context
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final businessId = Provider.of<BusinessContext>(context, listen: false).currentBusinessId;
+      final businessId = Provider.of<BusinessContext>(
+        context,
+        listen: false,
+      ).currentBusinessId;
       if (businessId != null) {
-        context.read<EmployeeBloc>().add(LoadEmployeesRequested(businessId: businessId));
+        context.read<EmployeeBloc>().add(
+          LoadEmployeesRequested(businessId: businessId),
+        );
       }
     });
 
@@ -62,33 +70,44 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
   }
 
   void _attachMessageSubscription() {
-    _messageSubscription ??= FirebaseMessagingService.messageDataStream.listen((data) {
+    _messageSubscription ??= FirebaseMessagingService.messageDataStream.listen((
+      data,
+    ) {
       if (!mounted) return;
 
       final type = data['type']?.toString();
       if (type == 'employee_removed') {
-        final businessId =
-            Provider.of<BusinessContext>(context, listen: false).currentBusinessId;
+        final businessId = Provider.of<BusinessContext>(
+          context,
+          listen: false,
+        ).currentBusinessId;
         if (businessId != null) {
           context.read<EmployeeBloc>().add(
-                LoadEmployeesRequested(businessId: businessId),
-              );
+            LoadEmployeesRequested(businessId: businessId),
+          );
         }
       }
     });
   }
 
   void _onBusinessContextChanged() {
-    final businessId = Provider.of<BusinessContext>(context, listen: false).currentBusinessId;
+    final businessId = Provider.of<BusinessContext>(
+      context,
+      listen: false,
+    ).currentBusinessId;
     _attachMessageSubscription();
     if (businessId != null) {
-      context.read<EmployeeBloc>().add(LoadEmployeesRequested(businessId: businessId));
+      context.read<EmployeeBloc>().add(
+        LoadEmployeesRequested(businessId: businessId),
+      );
     }
   }
 
   void _onTabChanged() {
     if (!_tabController.indexIsChanging) {
-      context.read<EmployeeBloc>().add(SelectEmployeeTabRequested(_tabController.index));
+      context.read<EmployeeBloc>().add(
+        SelectEmployeeTabRequested(_tabController.index),
+      );
     }
   }
 
@@ -131,21 +150,26 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
             );
           },
           onDelete: () async {
-            // Show confirmation dialog
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (dialogContext) => DeleteEmployeeDialog(employeeName: employee.name),
-            );
+            await _deleteEmployeeGuard.run(() async {
+              // Show confirmation dialog
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) =>
+                    DeleteEmployeeDialog(employeeName: employee.name),
+              );
 
-            if (confirm == true && context.mounted) {
-                  final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-                    context,
-                    featureCode: SubscriptionFeatureCodes.employeeManagement,
-                  );
-                  if (!allowed || !context.mounted) return;
+              if (confirm == true && context.mounted) {
+                final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                  context,
+                  featureCode: SubscriptionFeatureCodes.employeeManagement,
+                );
+                if (!allowed || !context.mounted) return;
 
-              context.read<EmployeeBloc>().add(DeleteEmployeeRequested(employee.id));
-            }
+                context.read<EmployeeBloc>().add(
+                  DeleteEmployeeRequested(employee.id),
+                );
+              }
+            });
           },
         );
       },
@@ -170,9 +194,9 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(t.translate('employee.title')), 
-        centerTitle: true, 
-        backgroundColor: AppColors.white, 
+        title: Text(t.translate('employee.title')),
+        centerTitle: true,
+        backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         iconTheme: const IconThemeData(color: Colors.black),
         systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -185,13 +209,23 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
             }
 
             if (state is EmployeeFailure) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
-              );
+              ScaffoldMessenger.of(context)
+                ..removeCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
             } else if (state is EmployeeActionSuccess) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(state.message), backgroundColor: AppColors.success),
-              );
+              ScaffoldMessenger.of(context)
+                ..removeCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
             }
           },
           builder: (context, state) {
@@ -211,8 +245,8 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
                       prefixIcon: const Icon(Icons.search),
                       onChanged: (value) {
                         context.read<EmployeeBloc>().add(
-                              SearchEmployeeKeywordChanged(value),
-                            );
+                          SearchEmployeeKeywordChanged(value),
+                        );
                       },
                     ),
                   ),
@@ -323,7 +357,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
           ownerProfileId: context.read<BusinessContext>().currentOwnerProfileId,
         ),
         builder: (context, snapshot) {
-          final canAddEmployee = snapshot.data ?? true;
+          final canAddEmployee = snapshot.data ?? false;
           return SafeArea(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 16.0),
@@ -344,7 +378,9 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
                         border: Border.all(color: const Color(0xFFFFE08A)),
                       ),
                       child: Text(
-                        AppLocalizations.of(context).translate('subscription.limit_warning'),
+                        AppLocalizations.of(
+                          context,
+                        ).translate('subscription.limit_warning'),
                         style: const TextStyle(
                           color: Color(0xFF8A6100),
                           fontSize: 12,
@@ -371,5 +407,4 @@ class _EmployeeListPageState extends State<EmployeeListPage> with SingleTickerPr
       ),
     );
   }
-
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../data/revenue_repository.dart';
 import 'revenue_event.dart';
 import 'revenue_state.dart';
@@ -52,12 +53,12 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
         },
         onError: (error) {
           if (!emit.isDone) {
-            emit(RevenueError(message: error.toString()));
+            emit(RevenueError(message: ApiErrorMessageParser.parse(error)));
           }
         },
       );
     } catch (e) {
-      emit(RevenueError(message: e.toString()));
+      emit(RevenueError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -70,10 +71,14 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
       emit(RevenueCreated(revenue: revenue));
 
       if (event.body['businessLocationId'] != null) {
-        add(LoadRevenuesRequested(businessLocationId: event.body['businessLocationId'].toString()));
+        add(
+          LoadRevenuesRequested(
+            businessLocationId: event.body['businessLocationId'].toString(),
+          ),
+        );
       }
     } catch (e) {
-      emit(RevenueError(message: e.toString()));
+      emit(RevenueError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -86,7 +91,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
       emit(RevenueDeleted(revenueId: event.revenueId));
       add(const LoadRevenuesRequested());
     } catch (e) {
-      emit(RevenueError(message: e.toString()));
+      emit(RevenueError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -95,13 +100,16 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
     Emitter<RevenueState> emit,
   ) async {
     try {
-      final revenue = await repository.updateManualRevenue(event.revenueId, event.body);
+      final revenue = await repository.updateManualRevenue(
+        event.revenueId,
+        event.body,
+      );
       emit(RevenueUpdated(revenue: revenue));
 
       final locationId = event.body['businessLocationId']?.toString();
       add(LoadRevenuesRequested(businessLocationId: locationId));
     } catch (e) {
-      emit(RevenueError(message: e.toString()));
+      emit(RevenueError(message: ApiErrorMessageParser.parse(e)));
     }
   }
 }

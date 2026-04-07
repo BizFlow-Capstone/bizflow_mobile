@@ -26,6 +26,7 @@ class EmployeeInvitationsPage extends StatefulWidget {
 class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
   late Future<List<EmployeeInvitationDto>> _invitationsFuture;
   StreamSubscription<Map<String, dynamic>>? _realtimeSubscription;
+  final Set<int> _processingInvitationIds = <int>{};
 
   @override
   void initState() {
@@ -57,6 +58,12 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
   }
 
   Future<void> _acceptInvitation(EmployeeInvitationDto invitation) async {
+    if (_processingInvitationIds.contains(invitation.hireId)) return;
+
+    setState(() {
+      _processingInvitationIds.add(invitation.hireId);
+    });
+
     final messenger = ScaffoldMessenger.of(context);
     try {
       await context.read<EmployeeRepository>().acceptInvitation(invitation);
@@ -73,10 +80,22 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
           backgroundColor: AppColors.danger,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _processingInvitationIds.remove(invitation.hireId);
+        });
+      }
     }
   }
 
   Future<void> _rejectInvitation(EmployeeInvitationDto invitation) async {
+    if (_processingInvitationIds.contains(invitation.hireId)) return;
+
+    setState(() {
+      _processingInvitationIds.add(invitation.hireId);
+    });
+
     final messenger = ScaffoldMessenger.of(context);
     try {
       await context.read<EmployeeRepository>().rejectInvitation(invitation);
@@ -93,6 +112,12 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
           backgroundColor: AppColors.danger,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _processingInvitationIds.remove(invitation.hireId);
+        });
+      }
     }
   }
 
@@ -174,6 +199,9 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
                   const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
                 final invitation = invitations[index];
+                final isProcessing = _processingInvitationIds.contains(
+                  invitation.hireId,
+                );
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(AppSpacing.md),
@@ -197,7 +225,9 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
                           children: [
                             Expanded(
                               child: OutlinedButton(
-                                onPressed: () => _rejectInvitation(invitation),
+                                onPressed: isProcessing
+                                    ? null
+                                    : () => _rejectInvitation(invitation),
                                 child: Text(
                                   context.l10n.tr('invitation.reject'),
                                 ),
@@ -206,10 +236,21 @@ class _EmployeeInvitationsPageState extends State<EmployeeInvitationsPage> {
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: () => _acceptInvitation(invitation),
-                                child: Text(
-                                  context.l10n.tr('invitation.accept'),
-                                ),
+                                onPressed: isProcessing
+                                    ? null
+                                    : () => _acceptInvitation(invitation),
+                                child: isProcessing
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        context.l10n.tr('invitation.accept'),
+                                      ),
                               ),
                             ),
                           ],

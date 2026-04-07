@@ -111,11 +111,18 @@ class AppTextField extends StatelessWidget {
           focusNode: focusNode,
           validator: validator,
           autovalidateMode: autovalidateMode,
-          style: AppTextStyles.bodyMedium,
+          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
+          cursorColor: AppColors.textPrimary,
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textHint,
+            ),
+            labelStyle: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+            floatingLabelStyle: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.primary,
             ),
             errorText: errorText,
             helperText: helperText,
@@ -128,7 +135,7 @@ class AppTextField extends StatelessWidget {
                   vertical: AppSpacing.sm,
                 ),
             filled: true,
-            fillColor: enabled ? AppColors.surface : AppColors.divider,
+            fillColor: enabled ? AppColors.white : AppColors.divider,
             border: OutlineInputBorder(
               borderRadius: AppSpacing.borderRadiusSm,
               borderSide: BorderSide(color: AppColors.divider),

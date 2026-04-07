@@ -47,6 +47,30 @@ class DebtorRepository {
     }
   }
 
+  Future<void> getDebtorDetailSWR({
+    required int debtorId,
+    required void Function(DebtorEntity? detail, bool isFromCache) onData,
+    void Function(dynamic error)? onError,
+  }) async {
+    final cacheKey = 'cache_debtor_detail_$debtorId';
+    await CacheManager().fetchWithSWR<DebtorEntity?>(
+      key: cacheKey,
+      fetcher: ({cancelToken}) => getDebtorDetail(debtorId),
+      fromJson: (json) {
+        final data = json['data'];
+        if (data is Map<String, dynamic>) {
+          return DebtorEntity.fromMap(data);
+        }
+        return null;
+      },
+      toJson: (detail) {
+        return {'data': detail?.toMap()};
+      },
+      onData: onData,
+      onError: onError,
+    );
+  }
+
   Future<DebtorEntity?> createDebtor({
     required int businessLocationId,
     required String name,
@@ -147,18 +171,66 @@ class DebtorRepository {
     }
   }
 
+  Future<void> getDebtPaymentHistorySWR({
+    required int debtorId,
+    required void Function(List<DebtPaymentEntity> items, bool isFromCache)
+    onData,
+    void Function(dynamic error)? onError,
+  }) async {
+    final cacheKey = 'cache_debtor_payment_history_$debtorId';
+    await CacheManager().fetchWithSWR<List<DebtPaymentEntity>>(
+      key: cacheKey,
+      fetcher: ({cancelToken}) => getDebtPaymentHistory(debtorId),
+      fromJson: (json) {
+        final rawItems = json['items'];
+        if (rawItems is! List) {
+          return <DebtPaymentEntity>[];
+        }
+        return rawItems
+            .whereType<Map<String, dynamic>>()
+            .map(DebtPaymentEntity.fromMap)
+            .toList();
+      },
+      toJson: (items) {
+        return {
+          'items': items
+              .map(
+                (item) => {
+                  'paymentId': item.paymentId,
+                  'amount': item.amount,
+                  'paymentMethod': item.paymentMethod,
+                  'notes': item.notes,
+                  'createdAt': item.createdAt?.toIso8601String(),
+                  'createdByName': item.createdByName,
+                  'balanceAfter': item.balanceAfter,
+                },
+              )
+              .toList(),
+        };
+      },
+      onData: onData,
+      onError: onError,
+    );
+  }
+
   Future<List<DebtorEntity>> getActiveDebtorsByLocation(int locationId) async {
     try {
       final response = await _service.getActiveDebtorsByLocation(locationId);
       // Response shape: { "data": [ ...debtors ] } or { "data": { "items": [...] } }
       final raw = response['data'];
       if (raw is List) {
-        return raw.whereType<Map<String, dynamic>>().map(DebtorEntity.fromMap).toList();
+        return raw
+            .whereType<Map<String, dynamic>>()
+            .map(DebtorEntity.fromMap)
+            .toList();
       }
       if (raw is Map<String, dynamic>) {
         final items = raw['items'];
         if (items is List) {
-          return items.whereType<Map<String, dynamic>>().map(DebtorEntity.fromMap).toList();
+          return items
+              .whereType<Map<String, dynamic>>()
+              .map(DebtorEntity.fromMap)
+              .toList();
         }
       }
       return <DebtorEntity>[];
@@ -206,5 +278,7 @@ class DebtorRepository {
   Future<void> clearCache() async {
     await CacheManager().removeByPrefix("cache_debtors_");
     await CacheManager().removeByPrefix("cache_debtor_detail_");
+    await CacheManager().removeByPrefix("cache_debtor_payment_history_");
+    await CacheManager().removeByPrefix("cache_debtors_active_location_");
   }
 }

@@ -115,7 +115,8 @@ class TokenRefreshInterceptor implements ResponseInterceptor {
   final Future<void> Function({
     required String accessToken,
     required String refreshToken,
-  }) onTokenRefreshed;
+  })
+  onTokenRefreshed;
   final Future<void> Function() onRefreshFailed;
   final String baseUrl;
   final String refreshEndpoint;
@@ -185,8 +186,11 @@ class TokenRefreshInterceptor implements ResponseInterceptor {
         headers.forEach((key, value) => request.headers.set(key, value));
 
         final body = json.encode({'refreshToken': storedRefreshToken});
-        request.headers.contentType =
-            ContentType('application', 'json', charset: 'utf-8');
+        request.headers.contentType = ContentType(
+          'application',
+          'json',
+          charset: 'utf-8',
+        );
         request.write(body);
 
         final response = await request.close().timeout(timeout);
@@ -194,8 +198,8 @@ class TokenRefreshInterceptor implements ResponseInterceptor {
         final jsonResponse = json.decode(responseBody) as Map<String, dynamic>;
 
         if (response.statusCode >= 200 && response.statusCode < 300) {
-          final data = jsonResponse['data'] as Map<String, dynamic>? ??
-              jsonResponse;
+          final data =
+              jsonResponse['data'] as Map<String, dynamic>? ?? jsonResponse;
           final newAccessToken =
               data['token'] as String? ?? data['accessToken'] as String?;
           final newRefreshToken = data['refreshToken'] as String?;
@@ -235,6 +239,10 @@ class ApiClient {
   static const Set<String> _nonRefreshable401MessageCodes = {
     'AUTH_CURRENT_PASSWORD_INCORRECT',
   };
+
+  static const Duration _mutationCooldown = Duration(milliseconds: 900);
+  final Map<String, DateTime> _inFlightMutationRequests = <String, DateTime>{};
+  final Map<String, DateTime> _recentMutationRequests = <String, DateTime>{};
 
   ApiClient({
     required this.baseUrl,
@@ -353,12 +361,22 @@ class ApiClient {
     Map<String, String>? headers,
     T Function(dynamic)? parser,
   }) async {
+    final mutationKey = _buildMutationKey(
+      method: HttpMethod.post,
+      path: path,
+      body: <String, dynamic>{
+        'fields': fields,
+        if (files != null) 'files': files.keys.toList()..sort(),
+      },
+    );
+    _guardMutationRequestOrThrow(mutationKey);
+
     const boundary = '----BizFlowBoundary';
     final uri = Uri.parse('$baseUrl$path');
 
     try {
       final request = await _client.postUrl(uri);
-      
+
       var requestHeaders = <String, String>{
         'Content-Type': 'multipart/form-data; boundary=$boundary',
         'Accept': 'application/json',
@@ -372,7 +390,7 @@ class ApiClient {
 
       // Build body
       final sink = request;
-      
+
       // Fields
       fields.forEach((key, value) {
         sink.write('--$boundary\r\n');
@@ -424,6 +442,8 @@ class ApiClient {
     } on Exception catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(statusCode: -3, message: e.toString());
+    } finally {
+      _releaseMutationRequest(mutationKey);
     }
   }
 
@@ -435,12 +455,22 @@ class ApiClient {
     Map<String, String>? headers,
     T Function(dynamic)? parser,
   }) async {
+    final mutationKey = _buildMutationKey(
+      method: HttpMethod.put,
+      path: path,
+      body: <String, dynamic>{
+        'fields': fields,
+        if (files != null) 'files': files.keys.toList()..sort(),
+      },
+    );
+    _guardMutationRequestOrThrow(mutationKey);
+
     const boundary = '----BizFlowBoundary';
     final uri = Uri.parse('$baseUrl$path');
 
     try {
       final request = await _client.putUrl(uri);
-      
+
       var requestHeaders = <String, String>{
         'Content-Type': 'multipart/form-data; boundary=$boundary',
         'Accept': 'application/json',
@@ -454,7 +484,7 @@ class ApiClient {
 
       // Build body
       final sink = request;
-      
+
       // Fields
       fields.forEach((key, value) {
         sink.write('--$boundary\r\n');
@@ -506,6 +536,8 @@ class ApiClient {
     } on Exception catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(statusCode: -3, message: e.toString());
+    } finally {
+      _releaseMutationRequest(mutationKey);
     }
   }
 
@@ -518,6 +550,18 @@ class ApiClient {
     Map<String, String>? headers,
     T Function(dynamic)? parser,
   }) async {
+    final isMutation = _isMutationMethod(method);
+    final mutationKey = _buildMutationKey(
+      method: method,
+      path: path,
+      queryParams: queryParams,
+      body: body,
+    );
+
+    if (isMutation) {
+      _guardMutationRequestOrThrow(mutationKey);
+    }
+
     ApiResponse<T>? result;
     try {
       result = await _doRequest<T>(
@@ -552,8 +596,79 @@ class ApiClient {
       }
       // No refresh possible — propagate
       rethrow;
+    } finally {
+      if (isMutation) {
+        _releaseMutationRequest(mutationKey);
+      }
     }
     return result;
+  }
+
+  bool _isMutationMethod(HttpMethod method) {
+    return method == HttpMethod.post ||
+        method == HttpMethod.put ||
+        method == HttpMethod.patch ||
+        method == HttpMethod.delete;
+  }
+
+  String _buildMutationKey({
+    required HttpMethod method,
+    required String path,
+    Map<String, dynamic>? queryParams,
+    dynamic body,
+  }) {
+    String normalize(dynamic value) {
+      if (value == null) return '';
+      if (value is Map) {
+        final entries = value.entries.toList()
+          ..sort((a, b) => a.key.toString().compareTo(b.key.toString()));
+        return entries.map((e) => '${e.key}:${normalize(e.value)}').join('|');
+      }
+      if (value is List) {
+        return value.map(normalize).join(',');
+      }
+      return value.toString();
+    }
+
+    final queryPart = normalize(queryParams ?? const <String, dynamic>{});
+    final bodyPart = normalize(body);
+    return '${method.name}|$path|$queryPart|$bodyPart';
+  }
+
+  void _guardMutationRequestOrThrow(String key) {
+    final now = DateTime.now();
+
+    final inFlightAt = _inFlightMutationRequests[key];
+    if (inFlightAt != null) {
+      throw ApiException(
+        statusCode: -4,
+        message: 'Yeu cau dang duoc xu ly, vui long doi trong giay lat.',
+      );
+    }
+
+    final recentAt = _recentMutationRequests[key];
+    if (recentAt != null && now.difference(recentAt) < _mutationCooldown) {
+      throw ApiException(
+        statusCode: -4,
+        message: 'Ban thao tac qua nhanh, vui long thu lai sau it giay.',
+      );
+    }
+
+    _inFlightMutationRequests[key] = now;
+  }
+
+  void _releaseMutationRequest(String key) {
+    _inFlightMutationRequests.remove(key);
+    _recentMutationRequests[key] = DateTime.now();
+    _cleanupExpiredRecentMutations();
+  }
+
+  void _cleanupExpiredRecentMutations() {
+    final now = DateTime.now();
+    _recentMutationRequests.removeWhere(
+      (_, timestamp) =>
+          now.difference(timestamp) > const Duration(milliseconds: 5000),
+    );
   }
 
   /// Performs the actual HTTP request (no retry logic)
@@ -738,9 +853,15 @@ class ApiClient {
         throw error;
       }
     } on SocketException {
-      throw ApiException(statusCode: -1, message: 'Không có kết nối mạng, vui lòng kiểm tra lại');
+      throw ApiException(
+        statusCode: -1,
+        message: 'Không có kết nối mạng, vui lòng kiểm tra lại',
+      );
     } on TimeoutException {
-      throw ApiException(statusCode: -2, message: 'Kết nối máy chủ bị gián đoạn (Timeout)');
+      throw ApiException(
+        statusCode: -2,
+        message: 'Kết nối máy chủ bị gián đoạn (Timeout)',
+      );
     } on ApiException {
       rethrow;
     } catch (e) {

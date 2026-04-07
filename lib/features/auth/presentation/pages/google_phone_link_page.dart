@@ -56,6 +56,8 @@ class _GooglePhoneLinkPageState extends State<GooglePhoneLinkPage> {
           });
         } else if (state is GoogleLoginSetPasswordRequired) {
           AppRouter.navigateAndClearStack(AppRoutes.setPassword);
+        } else if (state is LinkCredentialSuccess) {
+          AppRouter.navigateAndClearStack(AppRoutes.setPassword);
         } else if (state is LinkCredentialFailure) {
           AppSnackBar.error(context, state.message);
         }
@@ -136,9 +138,12 @@ class _GooglePhoneLinkPageState extends State<GooglePhoneLinkPage> {
                     const SizedBox(height: AppSpacing.md),
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        const gap = 8.0;
-                        final rawWidth = (constraints.maxWidth - (5 * gap)) / 6;
-                        final boxWidth = rawWidth.clamp(44.0, 56.0);
+                        const gap = 6.0;
+                        final boxWidth =
+                            ((constraints.maxWidth - (5 * gap)) / 6).clamp(
+                              40.0,
+                              54.0,
+                            );
 
                         return Row(
                           children: List.generate(6, (index) {
@@ -146,40 +151,49 @@ class _GooglePhoneLinkPageState extends State<GooglePhoneLinkPage> {
                               padding: EdgeInsets.only(
                                 right: index == 5 ? 0 : gap,
                               ),
-                              child: SizedBox(
-                                width: boxWidth,
-                                height: 76,
-                                child: TextField(
-                                  controller: _otpControllers[index],
-                                  focusNode: _otpFocusNodes[index],
-                                  maxLength: 1,
-                                  keyboardType: TextInputType.number,
-                                  textAlign: TextAlign.center,
-                                  textAlignVertical: TextAlignVertical.center,
-                                  style: AppTextStyles.titleLarge.copyWith(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.0,
-                                  ),
-                                  inputFormatters: [
-                                    ...?AppInputFormatters.withSqlInjectionGuard(
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                      ],
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: 40,
+                                  maxWidth: boxWidth,
+                                ),
+                                child: SizedBox(
+                                  width: boxWidth,
+                                  height: 76,
+                                  child: TextField(
+                                    controller: _otpControllers[index],
+                                    focusNode: _otpFocusNodes[index],
+                                    maxLength: 1,
+                                    keyboardType: TextInputType.number,
+                                    textAlign: TextAlign.center,
+                                    textAlignVertical: TextAlignVertical.center,
+                                    style: AppTextStyles.titleLarge.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.0,
                                     ),
-                                  ],
-                                  decoration: const InputDecoration(
-                                    counterText: '',
-                                    isCollapsed: true,
-                                    contentPadding: EdgeInsets.zero,
+                                    inputFormatters: [
+                                      ...?AppInputFormatters.withSqlInjectionGuard(
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter
+                                              .digitsOnly,
+                                        ],
+                                      ),
+                                    ],
+                                    decoration: const InputDecoration(
+                                      counterText: '',
+                                      isCollapsed: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                    onChanged: (value) {
+                                      if (value.isNotEmpty && index < 5) {
+                                        _otpFocusNodes[index + 1]
+                                            .requestFocus();
+                                      } else if (value.isEmpty && index > 0) {
+                                        _otpFocusNodes[index - 1]
+                                            .requestFocus();
+                                      }
+                                    },
                                   ),
-                                  onChanged: (value) {
-                                    if (value.isNotEmpty && index < 5) {
-                                      _otpFocusNodes[index + 1].requestFocus();
-                                    } else if (value.isEmpty && index > 0) {
-                                      _otpFocusNodes[index - 1].requestFocus();
-                                    }
-                                  },
                                 ),
                               ),
                             );

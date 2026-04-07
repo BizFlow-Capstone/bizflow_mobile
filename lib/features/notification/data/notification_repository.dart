@@ -5,16 +5,57 @@ import 'notification_api_service.dart';
 
 class NotificationRepository {
   final NotificationApiService _apiService;
+  final CacheManager _cache;
   final LocalApiCacheStore _localApiCache;
 
   NotificationRepository({
     required NotificationApiService apiService,
+    CacheManager? cacheManager,
     LocalApiCacheStore? localApiCacheStore,
-  })  : _apiService = apiService,
-        _localApiCache = localApiCacheStore ?? LocalApiCacheStore();
+  }) : _apiService = apiService,
+       _cache = cacheManager ?? CacheManager(),
+       _localApiCache = localApiCacheStore ?? LocalApiCacheStore();
 
   String _cacheKey(int pageNumber, int pageSize) =>
       'notifications_page_${pageNumber}_size_$pageSize';
+  static const String _unreadCacheKey = 'notifications_unread_count';
+
+  Future<void> fetchNotificationsSWR({
+    int pageNumber = 1,
+    int pageSize = 20,
+    required void Function(PaginatedNotificationsDto page, bool isFromCache)
+    onData,
+    void Function(dynamic error)? onError,
+  }) async {
+    final key = _cacheKey(pageNumber, pageSize);
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      onData(PaginatedNotificationsDto.fromJson(localCached), true);
+    }
+
+    await _cache.fetchWithSWR<Map<String, dynamic>>(
+      key: key,
+      fetcher: ({cancelToken}) async {
+        final page = await _apiService.getMyNotifications(
+          pageNumber: pageNumber,
+          pageSize: pageSize,
+        );
+        return page.toJson();
+      },
+      fromJson: (json) => json,
+      toJson: (data) => data,
+      onData: (json, isFromCache) {
+        _localApiCache.setMap(
+          key,
+          json,
+          groupKey: 'notifications',
+          cacheType: 'list',
+        );
+        onData(PaginatedNotificationsDto.fromJson(json), isFromCache);
+      },
+      onError: onError,
+    );
+  }
 
   Future<PaginatedNotificationsDto> getMyNotifications({
     int pageNumber = 1,
@@ -43,6 +84,22 @@ class NotificationRepository {
   }
 
   Future<int> getUnreadCount() => _apiService.getUnreadCount();
+
+  Future<int> getUnreadCountSWR() async {
+    try {
+      final unreadCount = await _apiService.getUnreadCount();
+      await _localApiCache.setMap(
+        _unreadCacheKey,
+        {'unreadCount': unreadCount},
+        groupKey: 'notifications',
+        cacheType: 'meta',
+      );
+      return unreadCount;
+    } catch (_) {
+      final localCached = await _localApiCache.getMap(_unreadCacheKey);
+      return (localCached?['unreadCount'] as num?)?.toInt() ?? 0;
+    }
+  }
 
   Future<void> markAsRead(int userNotificationId) async {
     await _apiService.markAsRead(userNotificationId);
