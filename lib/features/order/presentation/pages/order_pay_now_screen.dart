@@ -79,25 +79,34 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
             setState(() {
               _isSubmitting = false;
             });
-            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-              SnackBar(
-                content: const Text('Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)'),
-                backgroundColor: AppColors.success,
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)',
+                  ),
+                  backgroundColor: AppColors.success,
+                ),
+              );
             // Pop back to OrderDetailScreen or Accounting Hub
-            Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name == '/order_detail');
+            Navigator.of(context).popUntil(
+              (route) =>
+                  route.isFirst || route.settings.name == '/order_detail',
+            );
           } else if (state is OrderError) {
             if (!mounted) return;
             setState(() {
               _isSubmitting = false;
             });
-            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.error,
+                ),
+              );
           }
         },
         child: SafeArea(
@@ -257,7 +266,9 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
                                   ),
                                 )
                               : Text(
-                                  l10n.translate('order_create.proceed_payment'),
+                                  l10n.translate(
+                                    'order_create.proceed_payment',
+                                  ),
                                   style: AppTextStyles.labelLarge.copyWith(
                                     color: AppColors.white,
                                   ),
@@ -277,51 +288,66 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
+
     final l10n = AppLocalizations.of(context);
     final locationIdText = widget.locationId?.trim();
     final businessLocationId = int.tryParse(locationIdText ?? '');
     if (businessLocationId == null || businessLocationId <= 0) {
-      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-        SnackBar(content: Text(l10n.translate('debt.location_required'))),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(l10n.translate('debt.location_required'))),
+        );
       return;
     }
 
     final pendingOrderId = widget.pendingOrderId.trim();
     if (pendingOrderId.isEmpty) {
-      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-        SnackBar(content: Text(l10n.translate('order.pending_required'))),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(l10n.translate('order.pending_required'))),
+        );
       return;
     }
-
-    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-      context,
-      featureCode: SubscriptionFeatureCodes.orderManagement,
-    );
-    if (!allowed) return;
 
     setState(() {
       _isSubmitting = true;
     });
 
-    final cashAmount =
-        _selectedMethod == 'cash' ? widget.totalAmount.roundToDouble() : 0.0;
-    final bankAmount =
-        _selectedMethod == 'transfer' ? widget.totalAmount.roundToDouble() : 0.0;
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.orderManagement,
+    );
+    if (!allowed) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+      return;
+    }
+
+    final cashAmount = _selectedMethod == 'cash'
+        ? widget.totalAmount.roundToDouble()
+        : 0.0;
+    final bankAmount = _selectedMethod == 'transfer'
+        ? widget.totalAmount.roundToDouble()
+        : 0.0;
 
     context.read<OrderBloc>().add(
-          UpdateOrderRequested(
-            orderId: pendingOrderId,
-            businessLocationId: businessLocationId.toString(),
-            items: widget.items,
-            cashAmount: cashAmount,
-            bankAmount: bankAmount,
-            debtAmount: 0,
-            debtorId: widget.debtorId,
-            note: widget.note,
-          ),
-        );
+      UpdateOrderRequested(
+        orderId: pendingOrderId,
+        businessLocationId: businessLocationId.toString(),
+        items: widget.items,
+        cashAmount: cashAmount,
+        bankAmount: bankAmount,
+        debtAmount: 0,
+        debtorId: widget.debtorId,
+        note: widget.note,
+      ),
+    );
   }
 
   Widget _buildMethodButton({

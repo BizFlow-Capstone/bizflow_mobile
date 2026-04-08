@@ -6,6 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -24,6 +27,52 @@ class OrderAudioUploadScreen extends StatefulWidget {
 class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
   String? _selectedFileName;
   bool _isProcessing = false;
+  String? _inlineError;
+
+  String _resolveDirectNetworkError(AppLocalizations l10n, Object error) {
+    if (!ConnectivityService().isOnline) {
+      return l10n.translate('error.no_internet');
+    }
+    if (error is ApiException && error.statusCode == -3) {
+      return l10n.translate('error.no_internet');
+    }
+    final parsed = ApiErrorMessageParser.parse(
+      error,
+      fallback: l10n.translate('common.error_occurred'),
+    );
+    final normalized = parsed.toLowerCase();
+    if (normalized.contains('khong ket noi') ||
+        normalized.contains('network') ||
+        normalized.contains('connection')) {
+      return l10n.translate('error.no_internet');
+    }
+    return parsed;
+  }
+
+  Widget _buildInlineError(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 18, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _pickAudioFile() async {
     if (_isProcessing) return;
@@ -39,6 +88,7 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
 
       setState(() {
         _selectedFileName = selected.name;
+        _inlineError = null;
       });
 
       if (selectedPath == null || selectedPath.trim().isEmpty) {
@@ -61,6 +111,7 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
   }
 
   Future<void> _parseAndNavigate({required File audioFile}) async {
+    final l10n = AppLocalizations.of(context);
     final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
     if (locationId == null || locationId <= 0) {
       AppSnackBar.show(
@@ -70,6 +121,14 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
         ).translate('common.error_occurred'),
         type: AppSnackBarType.error,
       );
+      return;
+    }
+
+    if (!ConnectivityService().isOnline) {
+      if (!mounted) return;
+      setState(() {
+        _inlineError = l10n.translate('error.no_internet');
+      });
       return;
     }
 
@@ -100,28 +159,28 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
         locationId: locationId,
         rawTranscript: transcript,
         customerName: result.items
-            .where((item) => item.matched && (item.customerName?.trim().isNotEmpty ?? false))
+            .where(
+              (item) =>
+                  item.matched &&
+                  (item.customerName?.trim().isNotEmpty ?? false),
+            )
             .map((item) => item.customerName!.trim())
             .firstWhere((name) => name.isNotEmpty, orElse: () => ''),
-        items: matchedItems
-            .map((item) {
-              final quantity = item.quantity <= 0 ? 1 : item.quantity;
-              final calculatedPrice =
-                  item.unitPrice ??
-                  ((item.lineTotal ?? 0) > 0
-                      ? (item.lineTotal! / quantity)
-                      : 0);
-              return OrderItemEntity(
-                productId: item.productId ?? '',
-                saleItemId: item.saleItemId,
-                unitName: item.unit,
-                productName: item.productName ?? '',
-                price: calculatedPrice,
-                quantity: quantity,
-                discount: 0,
-              );
-            })
-            .toList(),
+        items: matchedItems.map((item) {
+          final quantity = item.quantity <= 0 ? 1 : item.quantity;
+          final calculatedPrice =
+              item.unitPrice ??
+              ((item.lineTotal ?? 0) > 0 ? (item.lineTotal! / quantity) : 0);
+          return OrderItemEntity(
+            productId: item.productId ?? '',
+            saleItemId: item.saleItemId,
+            unitName: item.unit,
+            productName: item.productName ?? '',
+            price: calculatedPrice,
+            quantity: quantity,
+            discount: 0,
+          );
+        }).toList(),
         totalAmount: result.totalAmount,
         hasDebt: hasDebt,
         aiConfidence: result.confidence,
@@ -134,15 +193,11 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
               OrderFormScreen(inputType: 'audio', initialOrder: initialOrder),
         ),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      AppSnackBar.show(
-        context,
-        message: AppLocalizations.of(
-          context,
-        ).translate('common.error_occurred'),
-        type: AppSnackBarType.error,
-      );
+      setState(() {
+        _inlineError = _resolveDirectNetworkError(l10n, error);
+      });
     }
   }
 
@@ -248,6 +303,10 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
                     ),
                   ),
                 ),
+                if (_inlineError != null) ...[
+                  const SizedBox(height: 16),
+                  _buildInlineError(_inlineError!),
+                ],
               ],
             ),
           ),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 
+import '../config/app_config.dart';
 import '../storage/secure_storage.dart';
 import 'api_client.dart';
 import 'api_endpoints.dart';
@@ -49,12 +50,19 @@ class MultipartAuthHelper {
   }
 
   Dio _createMultipartDio({String? accessToken}) {
-    final dio = Dio();
-    dio.options.headers = {
-      'Accept': 'application/json',
-      if (accessToken != null && accessToken.isNotEmpty)
-        'Authorization': 'Bearer $accessToken',
-    };
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: _apiClient.baseUrl,
+        connectTimeout: AppConfig.connectionTimeout,
+        sendTimeout: AppConfig.apiTimeout,
+        receiveTimeout: AppConfig.apiTimeout,
+        headers: {
+          'Accept': 'application/json',
+          if (accessToken != null && accessToken.isNotEmpty)
+            'Authorization': 'Bearer $accessToken',
+        },
+      ),
+    );
 
     (dio.httpClientAdapter as IOHttpClientAdapter).onHttpClientCreate =
         (HttpClient client) {
@@ -73,7 +81,7 @@ class MultipartAuthHelper {
 
     final dio = _createMultipartDio();
     final response = await dio.post(
-      '${_apiClient.baseUrl}${ApiEndpoints.refreshTokenEndpoint}',
+      ApiEndpoints.refreshTokenEndpoint,
       data: {'refreshToken': refreshToken},
       options: Options(contentType: Headers.jsonContentType),
     );

@@ -29,6 +29,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
   final ActionGuard _publishOrderGuard = ActionGuard();
   final ActionGuard _cancelOrderGuard = ActionGuard();
   final ActionGuard _openOrderFormGuard = ActionGuard();
+  String? _processingOrderId;
 
   @override
   void initState() {
@@ -195,6 +196,16 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
       ),
       body: BlocConsumer<OrderBloc, OrderState>(
         listener: (context, state) {
+          if (state is OrderPublished ||
+              state is OrderCancelled ||
+              state is OrderError) {
+            if (_processingOrderId != null && mounted) {
+              setState(() {
+                _processingOrderId = null;
+              });
+            }
+          }
+
           if (state is OrderError) {
             AppSnackBar.show(
               context,
@@ -278,11 +289,24 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
             },
             onPublish: () {
               _publishOrderGuard.run(() async {
+                if (!mounted) return;
+                setState(() {
+                  _processingOrderId = order.id;
+                });
+
                 final allowed = await SubscriptionFeatureGuard.ensureAllowed(
                   context,
                   featureCode: SubscriptionFeatureCodes.orderManagement,
                 );
-                if (!allowed || !context.mounted) return;
+                if (!allowed || !context.mounted) {
+                  if (mounted) {
+                    setState(() {
+                      _processingOrderId = null;
+                    });
+                  }
+                  return;
+                }
+
                 context.read<OrderBloc>().add(
                   PublishOrderRequested(orderId: order.id),
                 );
@@ -291,6 +315,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
             onCancel: () {
               _showCancelConfirmDialog(context, order.id);
             },
+            isPublishing: _processingOrderId == order.id,
           );
         },
       ),
@@ -402,11 +427,24 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
                 return;
               }
               await _cancelOrderGuard.run(() async {
+                if (!mounted) return;
+                setState(() {
+                  _processingOrderId = orderId;
+                });
+
                 final allowed = await SubscriptionFeatureGuard.ensureAllowed(
                   context,
                   featureCode: SubscriptionFeatureCodes.orderManagement,
                 );
-                if (!allowed || !context.mounted) return;
+                if (!allowed || !context.mounted) {
+                  if (mounted) {
+                    setState(() {
+                      _processingOrderId = null;
+                    });
+                  }
+                  return;
+                }
+
                 context.read<OrderBloc>().add(
                   CancelOrderRequested(orderId: orderId, cancelReason: reason),
                 );

@@ -6,10 +6,15 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/models/ocr_purchase_invoice_dto.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/utils/name_similarity.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
@@ -87,6 +92,11 @@ class _StockImportViewState extends State<_StockImportView> {
   late TextEditingController _searchController;
   late TextEditingController _documentNumberController;
   DateTime? _documentDate;
+  bool _isOcrProcessing = false;
+  String? _ocrInlineError;
+  OcrPurchaseInvoiceResultDto? _ocrResult;
+  List<String> _ocrUnmatchedProducts = const [];
+  int _ocrMatchedProductCount = 0;
 
   @override
   void initState() {
@@ -144,6 +154,10 @@ class _StockImportViewState extends State<_StockImportView> {
         setState(() {
           _selectedImagePath = pickedFile.path;
           _removeImage = false;
+          _ocrInlineError = null;
+          _ocrResult = null;
+          _ocrUnmatchedProducts = const [];
+          _ocrMatchedProductCount = 0;
         });
         ScaffoldMessenger.of(context)
           ..removeCurrentSnackBar()
@@ -211,9 +225,268 @@ class _StockImportViewState extends State<_StockImportView> {
     );
   }
 
+  DateTime? _tryParseInvoiceDate(String? value) {
+    final normalized = value?.trim() ?? '';
+    if (normalized.isEmpty) return null;
+    return DateTime.tryParse(normalized);
+  }
+
+  String _resolveDirectNetworkError(Object error) {
+    if (!ConnectivityService().isOnline) {
+      return l10n.translate('error.no_internet');
+    }
+
+    if (error is ApiException && error.statusCode == -3) {
+      return l10n.translate('error.no_internet');
+    }
+
+    final parsed = ApiErrorMessageParser.parse(
+      error,
+      fallback: l10n.translate('common.error'),
+    );
+    final normalized = parsed.toLowerCase();
+    if (normalized.contains('khong ket noi') ||
+        normalized.contains('network') ||
+        normalized.contains('connection')) {
+      return l10n.translate('error.no_internet');
+    }
+    return parsed;
+  }
+
+  Future<List<ProductEntity>> _loadProductsForOcrMapping() async {
+    final repository = context.read<ProductBloc>().repository;
+    final cached = await repository.getCachedProducts(widget.locationId);
+    if (cached.isNotEmpty) {
+      return cached;
+    }
+
+    try {
+      return await repository.getLocationProducts(widget.locationId);
+    } catch (_) {
+      return const <ProductEntity>[];
+    }
+  }
+
+  Future<void> _scanPurchaseInvoice() async {
+    if (_isOcrProcessing) return;
+
+    final imagePath = _selectedImagePath;
+    if (imagePath == null || imagePath.trim().isEmpty) {
+      setState(() {
+        _ocrInlineError = l10n.translate('stock_import.ocr_select_local_image');
+      });
+      return;
+    }
+
+    if (!ConnectivityService().isOnline) {
+      setState(() {
+        _ocrInlineError = l10n.translate('error.no_internet');
+      });
+      return;
+    }
+
+    final locationId = int.tryParse(widget.locationId);
+    if (locationId == null || locationId <= 0) {
+      setState(() {
+        _ocrInlineError = l10n.translate('common.error');
+      });
+      return;
+    }
+
+    setState(() {
+      _isOcrProcessing = true;
+      _ocrInlineError = null;
+    });
+
+    try {
+      final result = await context.read<ImportRepository>().ocrPurchaseInvoice(
+        locationId: locationId,
+        imageFile: File(imagePath),
+      );
+      final products = await _loadProductsForOcrMapping();
+      final matchedItemsByProductId = <int, ImportItemModel>{};
+      final unmatchedProducts = <String>[];
+
+      for (final item in result.items) {
+        final matchedProduct = NameSimilarity.findBestMatch<ProductEntity>(
+          item.productName,
+          products,
+          (product) => product.name,
+        );
+        final matchedProductId = int.tryParse(matchedProduct?.id ?? '');
+        if (matchedProduct == null ||
+            matchedProductId == null ||
+            matchedProductId <= 0) {
+          if (item.productName.trim().isNotEmpty) {
+            unmatchedProducts.add(item.productName.trim());
+          }
+          continue;
+        }
+
+        final quantity = item.quantity > 0 ? item.quantity.round() : 1;
+        final existing = matchedItemsByProductId[matchedProductId];
+        matchedItemsByProductId[matchedProductId] = ImportItemModel(
+          productId: matchedProductId,
+          productName: matchedProduct.name,
+          quantity: (existing?.quantity ?? 0) + quantity,
+          costPrice: item.unitPrice > 0
+              ? item.unitPrice
+              : (existing?.costPrice ?? matchedProduct.costPrice ?? 0),
+          baseUnit: (matchedProduct.unit?.trim().isNotEmpty ?? false)
+              ? matchedProduct.unit
+              : (item.unit.trim().isNotEmpty ? item.unit.trim() : null),
+        );
+      }
+
+      final parsedInvoiceDate = _tryParseInvoiceDate(result.invoiceDate);
+      final hasFillableData =
+          (result.supplierName?.trim().isNotEmpty ?? false) ||
+          parsedInvoiceDate != null ||
+          matchedItemsByProductId.isNotEmpty;
+
+      setState(() {
+        _ocrResult = result;
+        _ocrMatchedProductCount = matchedItemsByProductId.length;
+        _ocrUnmatchedProducts = unmatchedProducts;
+        if (result.supplierName?.trim().isNotEmpty ?? false) {
+          _supplierController.text = result.supplierName!.trim();
+        }
+        if (parsedInvoiceDate != null) {
+          _documentDate = parsedInvoiceDate;
+        }
+        if (matchedItemsByProductId.isNotEmpty) {
+          _selectedItems = matchedItemsByProductId.values.toList();
+        }
+        _ocrInlineError = hasFillableData
+            ? null
+            : l10n.translate('stock_import.ocr_no_fillable_data');
+      });
+    } catch (error) {
+      setState(() {
+        _ocrResult = null;
+        _ocrMatchedProductCount = 0;
+        _ocrUnmatchedProducts = const [];
+        _ocrInlineError = _resolveDirectNetworkError(error);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOcrProcessing = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildOcrInlineMessage(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: AppColors.error, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOcrSummaryCard(NumberFormat formatCurrency) {
+    final result = _ocrResult;
+    if (result == null) {
+      return const SizedBox.shrink();
+    }
+
+    final supplierName = result.supplierName?.trim() ?? '';
+    final invoiceDate = result.invoiceDate?.trim() ?? '';
+    final totalAmount = result.totalAmount;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.translate('stock_import.ocr_result_title'),
+            style: AppTextStyles.titleSmall.copyWith(
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${l10n.translate('accounting.ai_confidence')}: ${result.confidence}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (supplierName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${l10n.translate('stock_import.receipt_supplier')}: $supplierName',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
+          if (invoiceDate.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${l10n.translate('stock_import.document_date')}: $invoiceDate',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
+          if (totalAmount != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${l10n.translate('stock_import.receipt_total')}: ${formatCurrency.format(totalAmount)}',
+              style: AppTextStyles.bodySmall,
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            l10n.translate(
+              'stock_import.ocr_matched_count',
+              params: {'count': _ocrMatchedProductCount.toString()},
+            ),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.success,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (_ocrUnmatchedProducts.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${l10n.translate('stock_import.ocr_unmatched_label')}: ${_ocrUnmatchedProducts.join(', ')}',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   AppLocalizations get l10n => AppLocalizations.of(context);
 
+  bool _isActionGuardLoading = false;
   Future<void> _onSaveDraft() async {
+    if (_isActionGuardLoading) return;
     if (_selectedItems.isEmpty) {
       _showErrorSnackBar(l10n.translate('stock_import.add_product_required'));
       return;
@@ -227,12 +500,19 @@ class _StockImportViewState extends State<_StockImportView> {
       return;
     }
 
+    if (mounted) {
+      setState(() => _isActionGuardLoading = true);
+    }
+
+    var hasDispatchedSubmitEvent = false;
     await _saveDraftGuard.run(() async {
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
         featureCode: SubscriptionFeatureCodes.inventoryImport,
       );
       if (!allowed || !mounted) return;
+
+      hasDispatchedSubmitEvent = true;
 
       if (widget.importId == null) {
         final req = CreateImportRequest(
@@ -269,9 +549,14 @@ class _StockImportViewState extends State<_StockImportView> {
         );
       }
     });
+
+    if (!hasDispatchedSubmitEvent && mounted) {
+      setState(() => _isActionGuardLoading = false);
+    }
   }
 
   Future<void> _onConfirm() async {
+    if (_isActionGuardLoading) return;
     if (_selectedItems.isEmpty) {
       _showErrorSnackBar(l10n.translate('stock_import.add_product_required'));
       return;
@@ -285,11 +570,24 @@ class _StockImportViewState extends State<_StockImportView> {
       return;
     }
 
+    if (mounted) {
+      setState(() => _isActionGuardLoading = true);
+    }
+
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.inventoryImport,
     );
-    if (!allowed) return;
+    if (!allowed) {
+      if (mounted) {
+        setState(() => _isActionGuardLoading = false);
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isActionGuardLoading = false);
+    }
 
     showDialog(
       context: context,
@@ -382,11 +680,26 @@ class _StockImportViewState extends State<_StockImportView> {
   }
 
   Future<void> _onCancelDelete() async {
+    if (_isActionGuardLoading) return;
+
+    if (mounted) {
+      setState(() => _isActionGuardLoading = true);
+    }
+
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.inventoryImport,
     );
-    if (!allowed) return;
+    if (!allowed) {
+      if (mounted) {
+        setState(() => _isActionGuardLoading = false);
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isActionGuardLoading = false);
+    }
 
     showDialog(
       context: context,
@@ -659,6 +972,11 @@ class _StockImportViewState extends State<_StockImportView> {
 
     return BlocConsumer<ImportActionBloc, ImportActionState>(
       listener: (context, state) {
+        if (_isActionGuardLoading &&
+            state.status != ImportActionStatus.initial) {
+          setState(() => _isActionGuardLoading = false);
+        }
+
         if (state.status == ImportActionStatus.success) {
           final isDeleteSuccess = state.actionType == ImportActionType.delete;
 
@@ -713,7 +1031,9 @@ class _StockImportViewState extends State<_StockImportView> {
         }
       },
       builder: (context, state) {
-        final isSubmitting = state.status == ImportActionStatus.submitting;
+        final isSubmitting =
+            _isActionGuardLoading ||
+            state.status == ImportActionStatus.submitting;
 
         if (widget.importId != null &&
             state.importDetail == null &&
@@ -798,6 +1118,8 @@ class _StockImportViewState extends State<_StockImportView> {
           );
         }
 
+        final hasBottomActions = _status == 'DRAFT' || widget.importId == null;
+
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
@@ -834,11 +1156,11 @@ class _StockImportViewState extends State<_StockImportView> {
             isLoading: isSubmitting,
             child: SafeArea(
               top: true,
-              bottom: false,
+              bottom: !hasBottomActions,
               child: _buildBody(formatCurrency),
             ),
           ),
-          bottomNavigationBar: _status == 'DRAFT' || widget.importId == null
+          bottomNavigationBar: hasBottomActions
               ? _buildBottomActions(isSubmitting: isSubmitting)
               : null,
         );
@@ -848,6 +1170,10 @@ class _StockImportViewState extends State<_StockImportView> {
 
   Widget _buildBody(NumberFormat formatCurrency) {
     final isEditable = _status == 'DRAFT' || widget.importId == null;
+    final totalAmount = _selectedItems.fold<double>(
+      0,
+      (sum, item) => sum + (item.quantity * item.costPrice),
+    );
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -883,7 +1209,13 @@ class _StockImportViewState extends State<_StockImportView> {
                       _buildChip(
                         l10n.translate('stock_import.without_invoice'),
                         !_hasInvoice,
-                        () => setState(() => _hasInvoice = false),
+                        () => setState(() {
+                          _hasInvoice = false;
+                          _ocrInlineError = null;
+                          _ocrResult = null;
+                          _ocrUnmatchedProducts = const [];
+                          _ocrMatchedProductCount = 0;
+                        }),
                       ),
                     ],
                   ),
@@ -955,6 +1287,10 @@ class _StockImportViewState extends State<_StockImportView> {
                                               _existingImageUrl!.isNotEmpty) {
                                             _removeImage = true;
                                           }
+                                          _ocrInlineError = null;
+                                          _ocrResult = null;
+                                          _ocrUnmatchedProducts = const [];
+                                          _ocrMatchedProductCount = 0;
                                         });
                                       },
                                       child: Container(
@@ -997,6 +1333,28 @@ class _StockImportViewState extends State<_StockImportView> {
                               ),
                       ),
                     ),
+                    SizedBox(height: AppSpacing.md),
+                    OutlinedButton.icon(
+                      onPressed: _isOcrProcessing ? null : _scanPurchaseInvoice,
+                      icon: _isOcrProcessing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.document_scanner_outlined),
+                      label: Text(
+                        l10n.translate('stock_import.ocr_scan_button'),
+                      ),
+                    ),
+                    if (_ocrInlineError != null) ...[
+                      SizedBox(height: AppSpacing.sm),
+                      _buildOcrInlineMessage(_ocrInlineError!),
+                    ],
+                    if (_ocrResult != null) ...[
+                      SizedBox(height: AppSpacing.sm),
+                      _buildOcrSummaryCard(formatCurrency),
+                    ],
                     SizedBox(height: AppSpacing.md),
                   ],
                 ] else if (_hasInvoice) ...[
@@ -1362,6 +1720,29 @@ class _StockImportViewState extends State<_StockImportView> {
                       );
                     },
                   ),
+                if (_selectedItems.isNotEmpty) ...[
+                  SizedBox(height: AppSpacing.md),
+                  const Divider(color: AppColors.divider),
+                  SizedBox(height: AppSpacing.sm),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        l10n.translate('stock_import.receipt_total'),
+                        style: AppTextStyles.titleSmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        formatCurrency.format(totalAmount),
+                        style: AppTextStyles.titleSmall.copyWith(
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

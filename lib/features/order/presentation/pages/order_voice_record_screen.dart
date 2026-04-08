@@ -8,6 +8,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -28,6 +31,52 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
   bool _isRecording = false;
   bool _isProcessing = false;
   String _transcribedText = '';
+  String? _inlineError;
+
+  String _resolveDirectNetworkError(AppLocalizations l10n, Object error) {
+    if (!ConnectivityService().isOnline) {
+      return l10n.translate('error.no_internet');
+    }
+    if (error is ApiException && error.statusCode == -3) {
+      return l10n.translate('error.no_internet');
+    }
+    final parsed = ApiErrorMessageParser.parse(
+      error,
+      fallback: l10n.translate('common.error_occurred'),
+    );
+    final normalized = parsed.toLowerCase();
+    if (normalized.contains('khong ket noi') ||
+        normalized.contains('network') ||
+        normalized.contains('connection')) {
+      return l10n.translate('error.no_internet');
+    }
+    return parsed;
+  }
+
+  Widget _buildInlineError(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 18, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -105,6 +154,7 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
     setState(() {
       _isRecording = true;
       _transcribedText = l10n.translate('common.loading');
+      _inlineError = null;
     });
   }
 
@@ -126,7 +176,16 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
     setState(() {
       _isProcessing = true;
       _transcribedText = l10n.translate('common.loading');
+      _inlineError = null;
     });
+
+    if (!ConnectivityService().isOnline) {
+      setState(() {
+        _isProcessing = false;
+        _inlineError = l10n.translate('error.no_internet');
+      });
+      return;
+    }
 
     try {
       final result = await context
@@ -161,28 +220,28 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
         locationId: locationId,
         rawTranscript: transcript,
         customerName: result.items
-            .where((item) => item.matched && (item.customerName?.trim().isNotEmpty ?? false))
+            .where(
+              (item) =>
+                  item.matched &&
+                  (item.customerName?.trim().isNotEmpty ?? false),
+            )
             .map((item) => item.customerName!.trim())
             .firstWhere((name) => name.isNotEmpty, orElse: () => ''),
-        items: matchedItems
-            .map((item) {
-              final quantity = item.quantity <= 0 ? 1 : item.quantity;
-              final calculatedPrice =
-                  item.unitPrice ??
-                  ((item.lineTotal ?? 0) > 0
-                      ? (item.lineTotal! / quantity)
-                      : 0);
-              return OrderItemEntity(
-                productId: item.productId ?? '',
-                saleItemId: item.saleItemId,
-                unitName: item.unit,
-                productName: item.productName ?? '',
-                price: calculatedPrice,
-                quantity: quantity,
-                discount: 0,
-              );
-            })
-            .toList(),
+        items: matchedItems.map((item) {
+          final quantity = item.quantity <= 0 ? 1 : item.quantity;
+          final calculatedPrice =
+              item.unitPrice ??
+              ((item.lineTotal ?? 0) > 0 ? (item.lineTotal! / quantity) : 0);
+          return OrderItemEntity(
+            productId: item.productId ?? '',
+            saleItemId: item.saleItemId,
+            unitName: item.unit,
+            productName: item.productName ?? '',
+            price: calculatedPrice,
+            quantity: quantity,
+            discount: 0,
+          );
+        }).toList(),
         totalAmount: result.totalAmount,
         hasDebt: hasDebt,
         aiConfidence: result.confidence,
@@ -197,13 +256,11 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
               OrderFormScreen(inputType: 'voice', initialOrder: initialOrder),
         ),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('common.error_occurred'),
-        type: AppSnackBarType.error,
-      );
+      setState(() {
+        _inlineError = _resolveDirectNetworkError(l10n, error);
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -344,6 +401,10 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (_inlineError != null) ...[
+                  const SizedBox(height: 16),
+                  _buildInlineError(_inlineError!),
+                ],
                 const SizedBox(height: 32),
               ],
             ),

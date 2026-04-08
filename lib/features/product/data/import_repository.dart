@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'datasources/import_local_datasource.dart';
 import 'import_api_service.dart';
 import 'models/import_model.dart';
 import '../../../shared/cache/local_api_cache_store.dart';
+import '../../../shared/models/ocr_purchase_invoice_dto.dart';
 
 class ImportRepository {
   final ImportApiService _apiService;
@@ -198,5 +201,15 @@ class ImportRepository {
     } catch (e) {
       throw Exception(e.toString());
     }
+  }
+
+  Future<OcrPurchaseInvoiceResultDto> ocrPurchaseInvoice({
+    required int locationId,
+    required File imageFile,
+  }) {
+    return _apiService.ocrPurchaseInvoice(
+      locationId: locationId,
+      imageFile: imageFile,
+    );
   }
 }

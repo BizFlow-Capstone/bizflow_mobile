@@ -46,6 +46,25 @@ class _SwrBuilderState<T> extends State<SwrBuilder<T>> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant SwrBuilder<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final shouldRefetchByCacheKey = oldWidget.cacheKey != widget.cacheKey;
+    final shouldRefetchByFetchOnMount =
+        !oldWidget.fetchOnMount && widget.fetchOnMount;
+
+    if (shouldRefetchByCacheKey || shouldRefetchByFetchOnMount) {
+      // Reset old state to avoid showing stale data for a different cache key.
+      _data = null;
+      _error = null;
+      _hasLocalData = false;
+      if (widget.fetchOnMount) {
+        _fetchData();
+      }
+    }
+  }
+
   Future<void> _fetchData() async {
     if (!mounted) return;
     setState(() {

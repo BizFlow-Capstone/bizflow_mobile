@@ -1,14 +1,21 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../core/storage/local_storage.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/models/ocr_purchase_invoice_dto.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/utils/name_similarity.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -22,6 +29,7 @@ import '../../../product/presentation/bloc/product_event.dart';
 import '../../../product/presentation/bloc/product_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
+import '../bloc/order_bloc.dart';
 import '../../domain/entities/order_entity.dart';
 import '../../domain/entities/order_item_entity.dart';
 import 'order_payment_screen.dart';
@@ -58,6 +66,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   bool _isSavingDraft = false;
   bool _isProceedingPayment = false;
   bool _hasAttemptedDebtorAutoMatch = false;
+  bool _showPurchaseInvoiceOcr = false;
+  bool _isPurchaseInvoiceOcrProcessing = false;
+  String? _purchaseInvoiceOcrImagePath;
+  String? _purchaseInvoiceOcrError;
+  OcrPurchaseInvoiceResultDto? _purchaseInvoiceOcrResult;
+  List<String> _purchaseInvoiceOcrUnmatchedProducts = const [];
+  int _purchaseInvoiceOcrMatchedCount = 0;
+  final ImagePicker _imagePicker = ImagePicker();
 
   static const int _phoneLength = 10;
   late final String _draftId;
@@ -169,28 +185,94 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   String _normalizePersonName(String input) {
     const vietnameseMap = {
       'a': 'a',
-      'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
-      'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
-      'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+      'à': 'a',
+      'á': 'a',
+      'ả': 'a',
+      'ã': 'a',
+      'ạ': 'a',
+      'ă': 'a',
+      'ằ': 'a',
+      'ắ': 'a',
+      'ẳ': 'a',
+      'ẵ': 'a',
+      'ặ': 'a',
+      'â': 'a',
+      'ầ': 'a',
+      'ấ': 'a',
+      'ẩ': 'a',
+      'ẫ': 'a',
+      'ậ': 'a',
       'b': 'b',
       'c': 'c',
-      'd': 'd', 'đ': 'd',
+      'd': 'd',
+      'đ': 'd',
       'e': 'e',
-      'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
-      'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
-      'g': 'g', 'h': 'h', 'i': 'i',
-      'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
-      'k': 'k', 'l': 'l', 'm': 'm', 'n': 'n',
+      'è': 'e',
+      'é': 'e',
+      'ẻ': 'e',
+      'ẽ': 'e',
+      'ẹ': 'e',
+      'ê': 'e',
+      'ề': 'e',
+      'ế': 'e',
+      'ể': 'e',
+      'ễ': 'e',
+      'ệ': 'e',
+      'g': 'g',
+      'h': 'h',
+      'i': 'i',
+      'ì': 'i',
+      'í': 'i',
+      'ỉ': 'i',
+      'ĩ': 'i',
+      'ị': 'i',
+      'k': 'k',
+      'l': 'l',
+      'm': 'm',
+      'n': 'n',
       'o': 'o',
-      'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
-      'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
-      'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
-      'p': 'p', 'q': 'q', 'r': 'r', 's': 's', 't': 't',
+      'ò': 'o',
+      'ó': 'o',
+      'ỏ': 'o',
+      'õ': 'o',
+      'ọ': 'o',
+      'ô': 'o',
+      'ồ': 'o',
+      'ố': 'o',
+      'ổ': 'o',
+      'ỗ': 'o',
+      'ộ': 'o',
+      'ơ': 'o',
+      'ờ': 'o',
+      'ớ': 'o',
+      'ở': 'o',
+      'ỡ': 'o',
+      'ợ': 'o',
+      'p': 'p',
+      'q': 'q',
+      'r': 'r',
+      's': 's',
+      't': 't',
       'u': 'u',
-      'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
-      'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
-      'v': 'v', 'x': 'x', 'y': 'y',
-      'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+      'ù': 'u',
+      'ú': 'u',
+      'ủ': 'u',
+      'ũ': 'u',
+      'ụ': 'u',
+      'ư': 'u',
+      'ừ': 'u',
+      'ứ': 'u',
+      'ử': 'u',
+      'ữ': 'u',
+      'ự': 'u',
+      'v': 'v',
+      'x': 'x',
+      'y': 'y',
+      'ỳ': 'y',
+      'ý': 'y',
+      'ỷ': 'y',
+      'ỹ': 'y',
+      'ỵ': 'y',
     };
 
     final lower = input.trim().toLowerCase();
@@ -249,7 +331,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     final targetTokens = target.split(' ').where((e) => e.isNotEmpty).toSet();
     final intersectionCount = sourceTokens.intersection(targetTokens).length;
     final unionCount = sourceTokens.union(targetTokens).length;
-    final tokenSimilarity = unionCount == 0 ? 0 : intersectionCount / unionCount;
+    final tokenSimilarity = unionCount == 0
+        ? 0
+        : intersectionCount / unionCount;
 
     return (editSimilarity * 0.7) + (tokenSimilarity * 0.3);
   }
@@ -279,6 +363,352 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     return null;
   }
 
+  void _maybeAutoSelectDebtor(List<DebtorEntity> debtors) {
+    if (!mounted || _hasAttemptedDebtorAutoMatch) return;
+    if (_selectedDebtor != null || debtors.isEmpty) return;
+
+    final aiName = _customerNameController.text.trim();
+    if (aiName.isEmpty) return;
+
+    _hasAttemptedDebtorAutoMatch = true;
+    final matchedDebtor = _findBestDebtorMatch(aiName, debtors);
+    if (matchedDebtor == null) return;
+
+    setState(() {
+      _customerType = 'debtor';
+      _selectedDebtor = matchedDebtor;
+      _customerNameController.text = matchedDebtor.name;
+      _customerPhoneController.text = matchedDebtor.phone;
+    });
+  }
+
+  String _resolveDirectNetworkError(AppLocalizations l10n, Object error) {
+    if (!ConnectivityService().isOnline) {
+      return l10n.translate('error.no_internet');
+    }
+
+    if (error is ApiException && error.statusCode == -3) {
+      return l10n.translate('error.no_internet');
+    }
+
+    final parsed = ApiErrorMessageParser.parse(
+      error,
+      fallback: l10n.translate('common.error_occurred'),
+    );
+    final normalized = parsed.toLowerCase();
+    if (normalized.contains('khong ket noi') ||
+        normalized.contains('network') ||
+        normalized.contains('connection')) {
+      return l10n.translate('error.no_internet');
+    }
+    return parsed;
+  }
+
+  Future<void> _pickPurchaseInvoiceImage(ImageSource source) async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+      if (pickedFile == null || !mounted) return;
+
+      setState(() {
+        _purchaseInvoiceOcrImagePath = pickedFile.path;
+        _purchaseInvoiceOcrError = null;
+        _purchaseInvoiceOcrResult = null;
+        _purchaseInvoiceOcrUnmatchedProducts = const [];
+        _purchaseInvoiceOcrMatchedCount = 0;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _purchaseInvoiceOcrError = _resolveDirectNetworkError(
+          AppLocalizations.of(context),
+          error,
+        );
+      });
+    }
+  }
+
+  Future<List<ProductEntity>> _loadProductsForOcrMapping() async {
+    final locationId = (BusinessContext().currentBusinessId ?? '').trim();
+    if (locationId.isEmpty) {
+      return const <ProductEntity>[];
+    }
+
+    final repository = context.read<ProductBloc>().repository;
+    final cached = await repository.getCachedProducts(locationId);
+    if (cached.isNotEmpty) {
+      return cached;
+    }
+
+    try {
+      return await repository.getLocationProducts(locationId);
+    } catch (_) {
+      return const <ProductEntity>[];
+    }
+  }
+
+  List<Map<String, dynamic>> _normalizedSaleItemsForOcr(ProductEntity product) {
+    if (product.saleItems.isEmpty) {
+      return [
+        {
+          'key': '__default__',
+          'saleItemId': null,
+          'unit': (product.unit ?? '').trim(),
+          'price': product.salePrice ?? product.price,
+        },
+      ];
+    }
+
+    return product.saleItems.map((item) {
+      final rawId = item['saleItemId'] ?? item['SaleItemId'] ?? item['id'];
+      int? saleItemId;
+      if (rawId is num) {
+        saleItemId = rawId.toInt();
+      } else if (rawId is String) {
+        saleItemId = int.tryParse(rawId);
+      }
+
+      final rawPrice = item['price'] ?? item['Price'];
+      final unitPrice = rawPrice is num
+          ? rawPrice.toDouble()
+          : double.tryParse(rawPrice?.toString() ?? '') ??
+                (product.salePrice ?? product.price);
+      final rawUnit = (item['unit'] ?? item['Unit'] ?? '').toString().trim();
+      final fallbackUnit = (product.unit ?? '').trim();
+
+      return {
+        'key': saleItemId?.toString() ?? '__default__',
+        'saleItemId': saleItemId,
+        'unit': rawUnit.isNotEmpty
+            ? rawUnit
+            : (fallbackUnit.isNotEmpty
+                  ? fallbackUnit
+                  : AppLocalizations.of(
+                      context,
+                    ).translate('order_create.default_unit')),
+        'price': unitPrice,
+      };
+    }).toList();
+  }
+
+  Map<String, dynamic> _resolveSaleItemForOcr(
+    ProductEntity product,
+    String ocrUnit,
+  ) {
+    final saleItems = _normalizedSaleItemsForOcr(product);
+    final normalizedOcrUnit = ocrUnit.trim();
+    if (normalizedOcrUnit.isNotEmpty) {
+      for (final saleItem in saleItems) {
+        final unitName = (saleItem['unit'] ?? '').toString();
+        if (NameSimilarity.score(normalizedOcrUnit, unitName) >= 0.9) {
+          return saleItem;
+        }
+      }
+    }
+    return saleItems.first;
+  }
+
+  Future<void> _scanPurchaseInvoiceOcr() async {
+    if (_isPurchaseInvoiceOcrProcessing) return;
+
+    final l10n = AppLocalizations.of(context);
+    final imagePath = _purchaseInvoiceOcrImagePath;
+    if (imagePath == null || imagePath.trim().isEmpty) {
+      setState(() {
+        _purchaseInvoiceOcrError = l10n.translate(
+          'order_create.ocr_select_local_image',
+        );
+      });
+      return;
+    }
+
+    if (!ConnectivityService().isOnline) {
+      setState(() {
+        _purchaseInvoiceOcrError = l10n.translate('error.no_internet');
+      });
+      return;
+    }
+
+    final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
+    if (locationId == null || locationId <= 0) {
+      setState(() {
+        _purchaseInvoiceOcrError = l10n.translate('common.error_occurred');
+      });
+      return;
+    }
+
+    setState(() {
+      _isPurchaseInvoiceOcrProcessing = true;
+      _purchaseInvoiceOcrError = null;
+    });
+
+    try {
+      final result = await context
+          .read<OrderBloc>()
+          .repository
+          .ocrPurchaseInvoice(
+            locationId: locationId,
+            imageFile: File(imagePath),
+          );
+      final products = await _loadProductsForOcrMapping();
+      final matchedItems = <String, OrderItemEntity>{};
+      final unmatchedProducts = <String>[];
+
+      for (final item in result.items) {
+        final matchedProduct = NameSimilarity.findBestMatch<ProductEntity>(
+          item.productName,
+          products,
+          (product) => product.name,
+        );
+        if (matchedProduct == null) {
+          if (item.productName.trim().isNotEmpty) {
+            unmatchedProducts.add(item.productName.trim());
+          }
+          continue;
+        }
+
+        final saleItem = _resolveSaleItemForOcr(matchedProduct, item.unit);
+        final saleItemId = saleItem['saleItemId'] as int?;
+        final unitName = saleItem['unit'] as String?;
+        final itemKey =
+            '${matchedProduct.id}_${saleItemId ?? unitName ?? 'default'}';
+        final existing = matchedItems[itemKey];
+        matchedItems[itemKey] = OrderItemEntity(
+          productId: matchedProduct.id,
+          saleItemId: saleItemId,
+          unitName: unitName,
+          productName: matchedProduct.name,
+          price: (saleItem['price'] as num).toDouble(),
+          quantity:
+              (existing?.quantity ?? 0) +
+              (item.quantity > 0 ? item.quantity.round() : 1),
+          discount: existing?.discount ?? 0,
+        );
+      }
+
+      final parsedInvoiceDate = DateTime.tryParse(
+        result.invoiceDate?.trim() ?? '',
+      );
+      final hasFillableData =
+          parsedInvoiceDate != null || matchedItems.isNotEmpty;
+
+      setState(() {
+        _purchaseInvoiceOcrResult = result;
+        _purchaseInvoiceOcrMatchedCount = matchedItems.length;
+        _purchaseInvoiceOcrUnmatchedProducts = unmatchedProducts;
+        if (parsedInvoiceDate != null) {
+          _documentDate = parsedInvoiceDate;
+        }
+        if (matchedItems.isNotEmpty) {
+          _items
+            ..clear()
+            ..addAll(matchedItems.values);
+        }
+        _purchaseInvoiceOcrError = hasFillableData
+            ? null
+            : l10n.translate('order_create.ocr_no_fillable_data');
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _purchaseInvoiceOcrResult = null;
+        _purchaseInvoiceOcrMatchedCount = 0;
+        _purchaseInvoiceOcrUnmatchedProducts = const [];
+        _purchaseInvoiceOcrError = _resolveDirectNetworkError(l10n, error);
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPurchaseInvoiceOcrProcessing = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildPurchaseInvoiceOcrError(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.wifi_off_rounded, size: 18, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.red, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPurchaseInvoiceOcrSummary(AppLocalizations l10n) {
+    final result = _purchaseInvoiceOcrResult;
+    if (result == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.translate('order_create.ocr_result_title'),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${l10n.translate('accounting.ai_confidence')}: ${_confidenceLabel(l10n, result.confidence)}',
+            style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+          ),
+          if ((result.invoiceDate?.trim().isNotEmpty ?? false)) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${l10n.translate('stock_import.document_date')}: ${result.invoiceDate!.trim()}',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            l10n.translate(
+              'order_create.ocr_matched_count',
+              params: {'count': _purchaseInvoiceOcrMatchedCount.toString()},
+            ),
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.green,
+            ),
+          ),
+          if (_purchaseInvoiceOcrUnmatchedProducts.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${l10n.translate('order_create.ocr_unmatched_label')}: ${_purchaseInvoiceOcrUnmatchedProducts.join(', ')}',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -306,651 +736,785 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
           await _saveLocalDraft(showFeedback: false);
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(l10n.translate('order_create.form_title')),
-          elevation: 0,
-          systemOverlayStyle: SystemUiOverlayStyle.dark,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              await _saveLocalDraft(showFeedback: false);
-              if (mounted) {
-                Navigator.pop(context);
-              }
-            },
-            color: Colors.black,
-          ),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          actions: [
-            TextButton(
-              onPressed: _isSavingDraft
-                  ? null
-                  : () async {
-                      setState(() => _isSavingDraft = true);
-                      try {
-                        await _saveLocalDraft(showFeedback: true);
-                        if (mounted) {
-                          Navigator.popUntil(
-                            context,
-                            ModalRoute.withName('/home'),
-                          );
-                        }
-                      } finally {
-                        if (mounted) {
-                          setState(() => _isSavingDraft = false);
-                        }
-                      }
-                    },
-              child: Text(
-                l10n.translate('order_create.save_draft'),
-                style: const TextStyle(color: Colors.black),
-              ),
+      child: BlocListener<DebtorBloc, DebtorState>(
+        listener: (context, state) {
+          _maybeAutoSelectDebtor(state.activeDebtorsByLocation);
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(l10n.translate('order_create.form_title')),
+            elevation: 0,
+            systemOverlayStyle: SystemUiOverlayStyle.dark,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () async {
+                await _saveLocalDraft(showFeedback: false);
+                if (mounted) {
+                  Navigator.pop(context);
+                }
+              },
+              color: Colors.black,
             ),
-          ],
-          bottom: const AppSyncStatusText(),
-        ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Business Location
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            actions: [
+              TextButton(
+                onPressed: _isSavingDraft
+                    ? null
+                    : () async {
+                        setState(() => _isSavingDraft = true);
+                        try {
+                          await _saveLocalDraft(showFeedback: true);
+                          if (mounted) {
+                            Navigator.popUntil(
+                              context,
+                              ModalRoute.withName('/home'),
+                            );
+                          }
+                        } finally {
+                          if (mounted) {
+                            setState(() => _isSavingDraft = false);
+                          }
+                        }
+                      },
+                child: Text(
+                  l10n.translate('order_create.save_draft'),
+                  style: const TextStyle(color: Colors.black),
+                ),
+              ),
+            ],
+            bottom: const AppSyncStatusText(),
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Business Location
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.store, color: Colors.blue),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.translate(
+                                    'order_create.business_location',
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue[800],
+                                  ),
+                                ),
+                                Text(
+                                  currentLocationName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.store, color: Colors.blue),
-                        const SizedBox(width: 8),
-                        Expanded(
+                    const SizedBox(height: 16),
+
+                    // AI Transcript Section (only for voice/audio input)
+                    if (_aiRawTranscript != null &&
+                        _aiRawTranscript!.isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.purple.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.mic,
+                                  size: 14,
+                                  color: Colors.purple[700],
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  l10n.translate(
+                                    'order_create.voice_text_title',
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.purple[700],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.subtitles_outlined,
+                                  size: 16,
+                                  color: Colors.grey[600],
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: SelectableText(
+                                    _aiRawTranscript!,
+                                    style: const TextStyle(fontSize: 14),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            if (_aiConfidence != null &&
+                                _aiConfidence!.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _confidenceBackgroundColor(
+                                    _aiConfidence,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${l10n.translate('accounting.ai_confidence')}: ${_confidenceLabel(l10n, _aiConfidence)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: _confidenceTextColor(_aiConfidence),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _showPurchaseInvoiceOcr = !_showPurchaseInvoiceOcr;
+                          });
+                        },
+                        icon: Icon(
+                          _showPurchaseInvoiceOcr
+                              ? Icons.expand_less
+                              : Icons.document_scanner_outlined,
+                          size: 18,
+                        ),
+                        label: Text(
+                          l10n.translate('order_create.ocr_toggle_button'),
+                        ),
+                      ),
+                    ),
+                    if (_showPurchaseInvoiceOcr) ...[
+                      Card(
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.grey[200]!),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 l10n.translate(
-                                  'order_create.business_location',
+                                  'order_create.ocr_section_title',
                                 ),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blue[800],
-                                ),
-                              ),
-                              Text(
-                                currentLocationName,
                                 style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // AI Transcript Section (only for voice/audio input)
-                  if (_aiRawTranscript != null &&
-                      _aiRawTranscript!.isNotEmpty) ...[  
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.purple.withValues(alpha: 0.2),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.mic,
-                                size: 14,
-                                color: Colors.purple[700],
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                l10n.translate(
-                                  'order_create.voice_text_title',
-                                ),
-                                style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.purple[700],
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(
-                                Icons.subtitles_outlined,
-                                size: 16,
-                                color: Colors.grey[600],
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: SelectableText(
-                                  _aiRawTranscript!,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (_aiConfidence != null && _aiConfidence!.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _confidenceBackgroundColor(_aiConfidence),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                '${l10n.translate('accounting.ai_confidence')}: ${_confidenceLabel(l10n, _aiConfidence)}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: _confidenceTextColor(_aiConfidence),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Customer Info Section
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey[200]!),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.translate('order_create.customer_type'),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: ChoiceChip(
-                                  label: Text(
-                                    l10n.translate(
-                                      'order_create.customer_walkin',
-                                    ),
-                                  ),
-                                  selected: _customerType == 'walkin',
-                                  onSelected: (_) {
-                                    setState(() {
-                                      _customerType = 'walkin';
-                                      _selectedDebtor = null;
-                                      _customerNameController.clear();
-                                      _customerPhoneController.clear();
-                                    });
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: ChoiceChip(
-                                  label: Text(
-                                    l10n.translate(
-                                      'order_create.customer_loyal',
-                                    ),
-                                  ),
-                                  selected: _customerType == 'debtor',
-                                  onSelected: (_) {
-                                    setState(() {
-                                      _customerType = 'debtor';
-                                    });
-
-                                    final locationId = int.tryParse(
-                                      BusinessContext().currentBusinessId ?? '',
-                                    );
-                                    if (locationId != null && locationId > 0) {
-                                      context.read<DebtorBloc>().add(
-                                        LoadActiveDebtorsByLocationRequested(
-                                          locationId: locationId,
-                                        ),
-                                      );
-                                    }
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          if (_customerType == 'debtor')
-                            BlocBuilder<DebtorBloc, DebtorState>(
-                              builder: (context, debtState) {
-                                final debtors =
-                                    debtState.activeDebtorsByLocation;
-
-                                // Auto-select debtor only when name matching confidence is high.
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  if (!mounted || _hasAttemptedDebtorAutoMatch) {
-                                    return;
-                                  }
-                                  if (_selectedDebtor != null || debtors.isEmpty) {
-                                    return;
-                                  }
-
-                                  final aiName = _customerNameController.text.trim();
-                                  if (aiName.isEmpty) return;
-
-                                  _hasAttemptedDebtorAutoMatch = true;
-                                  final matchedDebtor = _findBestDebtorMatch(aiName, debtors);
-                                  if (matchedDebtor == null) return;
-
-                                  setState(() {
-                                    _selectedDebtor = matchedDebtor;
-                                    _customerPhoneController.text = matchedDebtor.phone;
-                                  });
-                                });
-
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    InkWell(
-                                      borderRadius: BorderRadius.circular(12),
-                                      onTap: () => _openDebtorPicker(debtors),
-                                      child: InputDecorator(
-                                        decoration: InputDecoration(
-                                          labelText: l10n.translate(
-                                            'debt.select_debtor',
-                                          ),
-                                          prefixIcon: const Icon(
-                                            Icons.person_search,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                _selectedDebtor == null
-                                                    ? l10n.translate(
-                                                        'debt.select_debtor',
-                                                      )
-                                                    : '${_selectedDebtor!.name} - ${_selectedDebtor!.phone}',
-                                                style: TextStyle(
-                                                  color: _selectedDebtor == null
-                                                      ? Colors.grey[600]
-                                                      : Colors.black,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const Icon(Icons.arrow_drop_down),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    if (_selectedDebtor != null) ...[
-                                      const SizedBox(height: 12),
-                                      _buildReadOnlyCustomerField(
-                                        label: l10n.translate(
-                                          'order_create.customer_name',
-                                        ),
-                                        icon: Icons.person,
-                                        value: _selectedDebtor!.name,
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _buildReadOnlyCustomerField(
-                                        label: l10n.translate(
-                                          'order_create.customer_phone',
-                                        ),
-                                        icon: Icons.phone,
-                                        value: _selectedDebtor!.phone,
-                                      ),
-                                    ],
-                                  ],
-                                );
-                              },
-                            ),
-                          if (_customerType == 'walkin') ...[
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: _isCreatingDebtorProfile
-                                    ? null
-                                    : _showCreateDebtProfileDialog,
-                                icon: _isCreatingDebtorProfile
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.person_add_alt_1),
-                                label: Text(
-                                  l10n.translate(
-                                    'order_create.create_debt_profile',
+                              const SizedBox(height: 12),
+                              if (_purchaseInvoiceOcrImagePath != null) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.file(
+                                    File(_purchaseInvoiceOcrImagePath!),
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Product Info Section
-                  Text(
-                    l10n.translate('order_create.form_title'),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  if (_items.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(
-                        l10n.translate('common.no_data'),
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    )
-                  else
-                    ..._items.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final p = entry.value;
-                      final lineTotal = p.price * p.quantity;
-                      final lineAfterDiscount = (lineTotal - p.discount).clamp(
-                        0,
-                        double.infinity,
-                      );
-                      final unitName = (p.unitName ?? '').trim();
-
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                const SizedBox(height: 12),
+                              ],
+                              Row(
                                 children: [
-                                  Text(
-                                    p.productName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isPurchaseInvoiceOcrProcessing
+                                          ? null
+                                          : () => _pickPurchaseInvoiceImage(
+                                              ImageSource.gallery,
+                                            ),
+                                      icon: const Icon(
+                                        Icons.photo_library_outlined,
+                                      ),
+                                      label: Text(
+                                        l10n.translate('common.source_gallery'),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${CurrencyFormatter.formatVND(p.price)}${unitName.isNotEmpty ? ' / $unitName' : ''} x ${p.quantity}',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${l10n.translate('order_create.discount')}: ${CurrencyFormatter.formatVND(p.discount)}',
-                                    style: TextStyle(color: Colors.grey[700]),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  SizedBox(
-                                    width: 170,
-                                    child: TextFormField(
-                                      key: ValueKey(
-                                        'discount_${p.productId}_$index',
-                                      ),
-                                      initialValue:
-                                          CurrencyFormatter.formatNumber(
-                                            p.discount,
-                                          ),
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters:
-                                          AppInputFormatters.withSqlInjectionGuard(
-                                            inputFormatters: [
-                                              CurrencyInputFormatter(),
-                                            ],
-                                          ),
-                                      decoration: InputDecoration(
-                                        isDense: true,
-                                        hintText: l10n.translate(
-                                          'order_create.discount',
-                                        ),
-                                        prefixText: '₫ ',
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 12,
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: _isPurchaseInvoiceOcrProcessing
+                                          ? null
+                                          : () => _pickPurchaseInvoiceImage(
+                                              ImageSource.camera,
                                             ),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: Colors.grey[300]!,
-                                          ),
-                                        ),
+                                      icon: const Icon(
+                                        Icons.camera_alt_outlined,
                                       ),
-                                      onChanged: (value) {
-                                        _updateItemDiscount(
-                                          index,
-                                          value,
-                                          lineTotal,
-                                        );
-                                      },
+                                      label: Text(
+                                        l10n.translate('common.source_camera'),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  CurrencyFormatter.formatVND(
-                                    lineAfterDiscount,
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isPurchaseInvoiceOcrProcessing
+                                      ? null
+                                      : _scanPurchaseInvoiceOcr,
+                                  icon: _isPurchaseInvoiceOcrProcessing
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          Icons.document_scanner_outlined,
+                                        ),
+                                  label: Text(
+                                    l10n.translate(
+                                      'order_create.ocr_scan_button',
+                                    ),
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  tooltip: l10n.translate('common.delete'),
-                                  onPressed: () {
-                                    setState(() {
-                                      _items.removeAt(index);
-                                    });
-                                  },
+                              ),
+                              if (_purchaseInvoiceOcrError != null) ...[
+                                const SizedBox(height: 12),
+                                _buildPurchaseInvoiceOcrError(
+                                  _purchaseInvoiceOcrError!,
+                                ),
+                              ],
+                              if (_purchaseInvoiceOcrResult != null) ...[
+                                const SizedBox(height: 12),
+                                _buildPurchaseInvoiceOcrSummary(l10n),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Customer Info Section
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey[200]!),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.translate('order_create.customer_type'),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      l10n.translate(
+                                        'order_create.customer_walkin',
+                                      ),
+                                    ),
+                                    selected: _customerType == 'walkin',
+                                    onSelected: (_) {
+                                      setState(() {
+                                        _customerType = 'walkin';
+                                        _selectedDebtor = null;
+                                        _customerNameController.clear();
+                                        _customerPhoneController.clear();
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      l10n.translate(
+                                        'order_create.customer_loyal',
+                                      ),
+                                    ),
+                                    selected: _customerType == 'debtor',
+                                    onSelected: (_) {
+                                      setState(() {
+                                        _customerType = 'debtor';
+                                      });
+
+                                      final locationId = int.tryParse(
+                                        BusinessContext().currentBusinessId ??
+                                            '',
+                                      );
+                                      if (locationId != null &&
+                                          locationId > 0) {
+                                        context.read<DebtorBloc>().add(
+                                          LoadActiveDebtorsByLocationRequested(
+                                            locationId: locationId,
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 12),
+                            if (_customerType == 'debtor')
+                              BlocBuilder<DebtorBloc, DebtorState>(
+                                builder: (context, debtState) {
+                                  final debtors =
+                                      debtState.activeDebtorsByLocation;
+
+                                  // Auto-select debtor only when name matching confidence is high.
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    _maybeAutoSelectDebtor(debtors);
+                                  });
+
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      InkWell(
+                                        borderRadius: BorderRadius.circular(12),
+                                        onTap: () => _openDebtorPicker(debtors),
+                                        child: InputDecorator(
+                                          decoration: InputDecoration(
+                                            labelText: l10n.translate(
+                                              'debt.select_debtor',
+                                            ),
+                                            prefixIcon: const Icon(
+                                              Icons.person_search,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  _selectedDebtor == null
+                                                      ? l10n.translate(
+                                                          'debt.select_debtor',
+                                                        )
+                                                      : '${_selectedDebtor!.name} - ${_selectedDebtor!.phone}',
+                                                  style: TextStyle(
+                                                    color:
+                                                        _selectedDebtor == null
+                                                        ? Colors.grey[600]
+                                                        : Colors.black,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const Icon(Icons.arrow_drop_down),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      if (_selectedDebtor != null) ...[
+                                        const SizedBox(height: 12),
+                                        _buildReadOnlyCustomerField(
+                                          label: l10n.translate(
+                                            'order_create.customer_name',
+                                          ),
+                                          icon: Icons.person,
+                                          value: _selectedDebtor!.name,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _buildReadOnlyCustomerField(
+                                          label: l10n.translate(
+                                            'order_create.customer_phone',
+                                          ),
+                                          icon: Icons.phone,
+                                          value: _selectedDebtor!.phone,
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                },
+                              ),
+                            if (_customerType == 'walkin') ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _isCreatingDebtorProfile
+                                      ? null
+                                      : _showCreateDebtProfileDialog,
+                                  icon: _isCreatingDebtorProfile
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(Icons.person_add_alt_1),
+                                  label: Text(
+                                    l10n.translate(
+                                      'order_create.create_debt_profile',
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                      );
-                    }),
-
-                  OutlinedButton.icon(
-                    onPressed: _openProductPicker,
-                    icon: const Icon(Icons.add),
-                    label: Text(l10n.translate('order_create.add_product')),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Document Number
-                  TextField(
-                    controller: _documentNumberController,
-                    decoration: InputDecoration(
-                      labelText: 'Số chứng từ',
-                      hintText: 'Nhập số chứng từ (nếu có)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // Document Date
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _documentDate ?? DateTime.now(),
-                        firstDate: DateTime(2020),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setState(() => _documentDate = picked);
-                      }
-                    },
-                    child: InputDecorator(
+                    const SizedBox(height: 16),
+
+                    // Product Info Section
+                    Text(
+                      l10n.translate('order_create.form_title'),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    if (_items.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          l10n.translate('common.no_data'),
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      )
+                    else
+                      ..._items.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final p = entry.value;
+                        final lineTotal = p.price * p.quantity;
+                        final lineAfterDiscount = (lineTotal - p.discount)
+                            .clamp(0, double.infinity);
+                        final unitName = (p.unitName ?? '').trim();
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.productName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${CurrencyFormatter.formatVND(p.price)}${unitName.isNotEmpty ? ' / $unitName' : ''} x ${p.quantity}',
+                                      style: TextStyle(color: Colors.grey[700]),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${l10n.translate('order_create.discount')}: ${CurrencyFormatter.formatVND(p.discount)}',
+                                      style: TextStyle(color: Colors.grey[700]),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    SizedBox(
+                                      width: 170,
+                                      child: TextFormField(
+                                        key: ValueKey(
+                                          'discount_${p.productId}_$index',
+                                        ),
+                                        initialValue:
+                                            CurrencyFormatter.formatNumber(
+                                              p.discount,
+                                            ),
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters:
+                                            AppInputFormatters.withSqlInjectionGuard(
+                                              inputFormatters: [
+                                                CurrencyInputFormatter(),
+                                              ],
+                                            ),
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          hintText: l10n.translate(
+                                            'order_create.discount',
+                                          ),
+                                          prefixText: '₫ ',
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 12,
+                                              ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Colors.grey[300]!,
+                                            ),
+                                          ),
+                                        ),
+                                        onChanged: (value) {
+                                          _updateItemDiscount(
+                                            index,
+                                            value,
+                                            lineTotal,
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    CurrencyFormatter.formatVND(
+                                      lineAfterDiscount,
+                                    ),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline),
+                                    tooltip: l10n.translate('common.delete'),
+                                    onPressed: () {
+                                      setState(() {
+                                        _items.removeAt(index);
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+
+                    OutlinedButton.icon(
+                      onPressed: _openProductPicker,
+                      icon: const Icon(Icons.add),
+                      label: Text(l10n.translate('order_create.add_product')),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Document Number
+                    TextField(
+                      controller: _documentNumberController,
                       decoration: InputDecoration(
-                        labelText: 'Ngày chứng từ',
+                        labelText: 'Số chứng từ',
+                        hintText: 'Nhập số chứng từ (nếu có)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        suffixIcon: const Icon(Icons.calendar_today, size: 20),
-                      ),
-                      child: Text(
-                        _documentDate != null
-                            ? DateFormatter.formatDate(_documentDate)
-                            : 'Chọn ngày chứng từ (nếu có)',
-                        style: _documentDate != null
-                            ? null
-                            : TextStyle(color: Colors.grey[500]),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Summary Section
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(l10n.translate('order_create.sub_total')),
-                      Text(CurrencyFormatter.formatVND(subTotal)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(l10n.translate('order_create.discount')),
-                      Text('-${CurrencyFormatter.formatVND(totalDiscount)}'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Divider(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        l10n.translate('order_create.total'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                    const SizedBox(height: 12),
+                    // Document Date
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _documentDate ?? DateTime.now(),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setState(() => _documentDate = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'Ngày chứng từ',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          suffixIcon: const Icon(
+                            Icons.calendar_today,
+                            size: 20,
+                          ),
+                        ),
+                        child: Text(
+                          _documentDate != null
+                              ? DateFormatter.formatDate(_documentDate)
+                              : 'Chọn ngày chứng từ (nếu có)',
+                          style: _documentDate != null
+                              ? null
+                              : TextStyle(color: Colors.grey[500]),
                         ),
                       ),
-                      Text(
-                        CurrencyFormatter.formatVND(total),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue,
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    // Summary Section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(l10n.translate('order_create.sub_total')),
+                        Text(CurrencyFormatter.formatVND(subTotal)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(l10n.translate('order_create.discount')),
+                        Text('-${CurrencyFormatter.formatVND(totalDiscount)}'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          l10n.translate('order_create.total'),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                ],
+                        Text(
+                          CurrencyFormatter.formatVND(total),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        bottomNavigationBar: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onPressed: _items.isEmpty || _isProceedingPayment
-                  ? null
-                  : () async {
-                      if (_isProceedingPayment) return;
-                      setState(() => _isProceedingPayment = true);
-                      final locationId = BusinessContext().currentBusinessId;
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                onPressed: _items.isEmpty || _isProceedingPayment
+                    ? null
+                    : () async {
+                        if (_isProceedingPayment) return;
+                        setState(() => _isProceedingPayment = true);
+                        final locationId = BusinessContext().currentBusinessId;
 
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => OrderPaymentScreen(
-                            totalAmount: total,
-                            items: List.from(_items),
-                            locationId: locationId,
-                            locationName: BusinessContext().currentBusinessName,
-                            pendingOrderId: widget.pendingOrderId,
-                            initialDebtorId: _customerType == 'debtor'
-                                ? _selectedDebtor?.debtorId
-                                : null,
-                            initialDebtorName: _customerType == 'debtor'
-                                ? _selectedDebtor?.name
-                                : null,
-                            customerName: _customerNameController.text.trim(),
-                            customerPhone: _customerPhoneController.text.trim(),
-                            note: _notesController.text.trim().isNotEmpty
-                                ? _notesController.text.trim()
-                                : null,
-                            documentDate: _documentDate,
-                            documentNumber:
-                                _documentNumberController.text.trim().isNotEmpty
-                                ? _documentNumberController.text.trim()
-                                : null,
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderPaymentScreen(
+                              totalAmount: total,
+                              items: List.from(_items),
+                              locationId: locationId,
+                              locationName:
+                                  BusinessContext().currentBusinessName,
+                              pendingOrderId: widget.pendingOrderId,
+                              initialDebtorId: _customerType == 'debtor'
+                                  ? _selectedDebtor?.debtorId
+                                  : null,
+                              initialDebtorName: _customerType == 'debtor'
+                                  ? _selectedDebtor?.name
+                                  : null,
+                              customerName: _customerNameController.text.trim(),
+                              customerPhone: _customerPhoneController.text
+                                  .trim(),
+                              note: _notesController.text.trim().isNotEmpty
+                                  ? _notesController.text.trim()
+                                  : null,
+                              documentDate: _documentDate,
+                              documentNumber:
+                                  _documentNumberController.text
+                                      .trim()
+                                      .isNotEmpty
+                                  ? _documentNumberController.text.trim()
+                                  : null,
+                            ),
                           ),
-                        ),
-                      );
-                      if (mounted) {
-                        setState(() => _isProceedingPayment = false);
-                      }
-                    },
-              child: Text(
-                l10n.translate('order_create.proceed_payment'),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                        );
+                        if (mounted) {
+                          setState(() => _isProceedingPayment = false);
+                        }
+                      },
+                child: Text(
+                  l10n.translate('order_create.proceed_payment'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -1288,6 +1852,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     required String notes,
     required String creditLimitText,
   }) async {
+    if (_isCreatingDebtorProfile) return;
+
     final l10n = AppLocalizations.of(context);
     final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
     final customerName = name;
@@ -1323,13 +1889,19 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       return;
     }
 
+    setState(() => _isCreatingDebtorProfile = true);
+
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.debtorManagement,
     );
-    if (!allowed) return;
+    if (!allowed) {
+      if (mounted) {
+        setState(() => _isCreatingDebtorProfile = false);
+      }
+      return;
+    }
 
-    setState(() => _isCreatingDebtorProfile = true);
     try {
       final repository = context.read<DebtorBloc>().repository;
       final createdDebtor = await repository.createDebtor(

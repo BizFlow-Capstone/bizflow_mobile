@@ -60,6 +60,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   String? _nameError;
   String? _addressError;
   bool _showRequiredValidation = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -133,6 +134,11 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
       completer.complete();
     }
     _submitCompleter = null;
+    if (_isSubmitting && mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 
   Future<void> _runEmployeeMutation(Future<void> Function() action) async {
@@ -218,9 +224,19 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   }
 
   Future<void> _handleSubmit() async {
+    if (_isSubmitting) {
+      return;
+    }
+
     if (!_validateRequiredFields(shouldFocus: true)) {
       return;
     }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    var hasDispatchedSubmitEvent = false;
 
     await _submitGuard.run(() async {
       if (widget.location == null) {
@@ -233,6 +249,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
 
       final completer = Completer<void>();
       _submitCompleter = completer;
+      hasDispatchedSubmitEvent = true;
 
       if (widget.location != null) {
         context.read<LocationBloc>().add(
@@ -267,6 +284,12 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
 
       await completer.future;
     });
+
+    if (!hasDispatchedSubmitEvent && mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 
   @override
@@ -542,6 +565,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
             BlocBuilder<LocationBloc, LocationState>(
               builder: (context, state) {
                 final isLoading =
+                    _isSubmitting ||
                     state is LocationAddInProgress ||
                     state is LocationEditInProgress;
 

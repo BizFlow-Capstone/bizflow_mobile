@@ -42,6 +42,7 @@ class _DebtListPageState extends State<DebtListPage> {
   int? _selectedLocationId;
   Completer<void>? _debtorActionCompleter;
   late final Future<bool> _canManageDebtFuture;
+  bool _isPermissionChecking = false;
 
   @override
   void initState() {
@@ -92,6 +93,14 @@ class _DebtListPageState extends State<DebtListPage> {
       _debtorActionCompleter = completer;
       action();
       await completer.future;
+    });
+  }
+
+  void _setPermissionChecking(bool value) {
+    if (!mounted) return;
+    if (_isPermissionChecking == value) return;
+    setState(() {
+      _isPermissionChecking = value;
     });
   }
 
@@ -279,6 +288,7 @@ class _DebtListPageState extends State<DebtListPage> {
       future: _canManageDebtFuture,
       builder: (context, featureSnapshot) {
         final canManageDebt = featureSnapshot.data ?? false;
+        final disableActions = _isPermissionChecking;
         final limitWarning = l10n.translate('subscription.limit_warning');
 
         return Scaffold(
@@ -304,7 +314,9 @@ class _DebtListPageState extends State<DebtListPage> {
             actions: [
               if (canCreateDebtor)
                 IconButton(
-                  onPressed: canManageDebt ? () => _showDebtorForm() : null,
+                  onPressed: (canManageDebt && !disableActions)
+                      ? () => _showDebtorForm()
+                      : null,
                   icon: const Icon(Icons.person_add_alt_1_outlined),
                 ),
             ],
@@ -588,6 +600,7 @@ class _DebtListPageState extends State<DebtListPage> {
                                 l10n,
                                 canManageDebt,
                                 canDeleteDebtor,
+                                disableActions,
                               );
                             },
                           ),
@@ -631,7 +644,9 @@ class _DebtListPageState extends State<DebtListPage> {
                         ),
                       ),
                     FloatingActionButton(
-                      onPressed: canManageDebt ? () => _showDebtorForm() : null,
+                      onPressed: (canManageDebt && !disableActions)
+                          ? () => _showDebtorForm()
+                          : null,
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       child: const Icon(Icons.add),
@@ -684,6 +699,7 @@ class _DebtListPageState extends State<DebtListPage> {
     AppLocalizations l10n,
     bool canManageDebt,
     bool canDeleteDebtor,
+    bool disableActions,
   ) {
     final isExpanded = _expandedCards.contains(index);
     final locationDisplay = customer.businessLocationName.trim().isNotEmpty
@@ -842,7 +858,7 @@ class _DebtListPageState extends State<DebtListPage> {
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: canManageDebt
+                          onPressed: (canManageDebt && !disableActions)
                               ? () => _showDebtAdjustmentDialog(customer)
                               : null,
                           icon: const Icon(Icons.swap_vert_circle_outlined),
@@ -861,7 +877,8 @@ class _DebtListPageState extends State<DebtListPage> {
                               children: [
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: canManageDebt
+                                    onPressed:
+                                        (canManageDebt && !disableActions)
                                         ? () => _showDebtorForm(
                                             existing: customer,
                                           )
@@ -873,7 +890,8 @@ class _DebtListPageState extends State<DebtListPage> {
                                 const SizedBox(width: AppSpacing.sm),
                                 Expanded(
                                   child: OutlinedButton.icon(
-                                    onPressed: canManageDebt
+                                    onPressed:
+                                        (canManageDebt && !disableActions)
                                         ? () {
                                             _runDebtorAction(() {
                                               context.read<DebtorBloc>().add(
@@ -904,7 +922,10 @@ class _DebtListPageState extends State<DebtListPage> {
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  onPressed: (canManageDebt && canDeleteDebtor)
+                                  onPressed:
+                                      (canManageDebt &&
+                                          canDeleteDebtor &&
+                                          !disableActions)
                                       ? () => _confirmDelete(customer)
                                       : null,
                                   icon: const Icon(Icons.delete_outline),
@@ -924,7 +945,7 @@ class _DebtListPageState extends State<DebtListPage> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: canManageDebt
+                              onPressed: (canManageDebt && !disableActions)
                                   ? () => _showDebtorForm(existing: customer)
                                   : null,
                               icon: const Icon(Icons.edit_outlined),
@@ -934,7 +955,7 @@ class _DebtListPageState extends State<DebtListPage> {
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: canManageDebt
+                              onPressed: (canManageDebt && !disableActions)
                                   ? () {
                                       _runDebtorAction(() {
                                         context.read<DebtorBloc>().add(
@@ -962,7 +983,10 @@ class _DebtListPageState extends State<DebtListPage> {
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: (canManageDebt && canDeleteDebtor)
+                                onPressed:
+                                    (canManageDebt &&
+                                        canDeleteDebtor &&
+                                        !disableActions)
                                     ? () => _confirmDelete(customer)
                                     : null,
                                 icon: const Icon(Icons.delete_outline),
@@ -1043,10 +1067,12 @@ class _DebtListPageState extends State<DebtListPage> {
 
     if (normalDelete != true || !mounted) return;
 
+    _setPermissionChecking(true);
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.debtManagement,
     );
+    _setPermissionChecking(false);
     if (!allowed) return;
 
     try {
@@ -1215,10 +1241,12 @@ class _DebtListPageState extends State<DebtListPage> {
     );
 
     if (existing == null) {
+      _setPermissionChecking(true);
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
         featureCode: SubscriptionFeatureCodes.debtManagement,
       );
+      _setPermissionChecking(false);
       if (!allowed) return;
 
       final locationId = int.tryParse(
@@ -1251,10 +1279,12 @@ class _DebtListPageState extends State<DebtListPage> {
         );
       });
     } else {
+      _setPermissionChecking(true);
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
         featureCode: SubscriptionFeatureCodes.debtManagement,
       );
+      _setPermissionChecking(false);
       if (!allowed) return;
 
       await _runDebtorAction(() {
@@ -1402,10 +1432,12 @@ class _DebtListPageState extends State<DebtListPage> {
 
     if (confirmed != true || !mounted) return;
 
+    _setPermissionChecking(true);
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.debtManagement,
     );
+    _setPermissionChecking(false);
     if (!allowed) return;
 
     final rawAmount = double.tryParse(

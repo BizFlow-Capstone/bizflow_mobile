@@ -89,6 +89,8 @@ class _EditProductPageState extends State<EditProductPage> {
   final ImagePicker _imagePicker = ImagePicker();
   final ActionGuard _submitGuard = ActionGuard();
   final ActionGuard _deleteGuard = ActionGuard();
+  bool _isSubmitting = false;
+  bool _isDeleting = false;
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -389,6 +391,13 @@ class _EditProductPageState extends State<EditProductPage> {
 
   /// Delete product
   Future<void> _deleteProduct() async {
+    if (_isDeleting || _isSubmitting) return;
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    var hasDispatchedDeleteEvent = false;
     await _deleteGuard.run(() async {
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
@@ -396,6 +405,7 @@ class _EditProductPageState extends State<EditProductPage> {
       );
       if (!allowed || !mounted) return;
 
+      hasDispatchedDeleteEvent = true;
       context.read<ProductBloc>().add(
         DeleteProductRequested(
           locationId: widget.locationId,
@@ -403,10 +413,18 @@ class _EditProductPageState extends State<EditProductPage> {
         ),
       );
     });
+
+    if (!hasDispatchedDeleteEvent && mounted) {
+      setState(() {
+        _isDeleting = false;
+      });
+    }
   }
 
   /// Submit form to update product
   Future<void> _submitForm() async {
+    if (_isSubmitting || _isDeleting) return;
+
     final requiredMessage = l10n.translate('common.required_field');
     final invalidCostPriceMessage = l10n.translate(
       'product.invalid_cost_price',
@@ -463,6 +481,12 @@ class _EditProductPageState extends State<EditProductPage> {
       return;
     }
 
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    var hasDispatchedUpdateEvent = false;
+
     await _submitGuard.run(() async {
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
@@ -482,6 +506,7 @@ class _EditProductPageState extends State<EditProductPage> {
         'EditProductPage: Updating product with ID: ${widget.productId}',
       );
 
+      hasDispatchedUpdateEvent = true;
       context.read<ProductBloc>().add(
         UpdateProductRequested(
           productId: widget.productId,
@@ -508,6 +533,12 @@ class _EditProductPageState extends State<EditProductPage> {
         ),
       );
     });
+
+    if (!hasDispatchedUpdateEvent && mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 
   @override
@@ -534,6 +565,12 @@ class _EditProductPageState extends State<EditProductPage> {
       body: BlocListener<ProductBloc, ProductState>(
         listener: (context, state) {
           if (state is ProductUpdateSuccess) {
+            if (_isSubmitting || _isDeleting) {
+              setState(() {
+                _isSubmitting = false;
+                _isDeleting = false;
+              });
+            }
             // Show success message
             AppSnackBar.show(
               context,
@@ -545,6 +582,12 @@ class _EditProductPageState extends State<EditProductPage> {
               if (mounted) Navigator.pop(context, true);
             });
           } else if (state is ProductDeleteSuccess) {
+            if (_isSubmitting || _isDeleting) {
+              setState(() {
+                _isSubmitting = false;
+                _isDeleting = false;
+              });
+            }
             // Show delete success message
             AppSnackBar.show(
               context,
@@ -595,6 +638,12 @@ class _EditProductPageState extends State<EditProductPage> {
               _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
+            if (_isSubmitting || _isDeleting) {
+              setState(() {
+                _isSubmitting = false;
+                _isDeleting = false;
+              });
+            }
             AppSnackBar.show(
               context,
               message: state.message,
@@ -974,13 +1023,13 @@ class _EditProductPageState extends State<EditProductPage> {
                         Expanded(
                           child: BlocBuilder<ProductBloc, ProductState>(
                             builder: (context, state) {
+                              final isUpdateBusy =
+                                  _isSubmitting ||
+                                  state is ProductUpdateInProgress ||
+                                  state is ProductDeleteInProgress;
                               return ElevatedButton(
-                                onPressed:
-                                    state is ProductUpdateInProgress ||
-                                        state is ProductDeleteInProgress
-                                    ? null
-                                    : _submitForm,
-                                child: state is ProductUpdateInProgress
+                                onPressed: isUpdateBusy ? null : _submitForm,
+                                child: isUpdateBusy
                                     ? SizedBox(
                                         height: 20,
                                         width: 20,
@@ -1003,17 +1052,19 @@ class _EditProductPageState extends State<EditProductPage> {
                     SizedBox(height: AppSpacing.md),
                     BlocBuilder<ProductBloc, ProductState>(
                       builder: (context, state) {
+                        final isDeleteBusy =
+                            _isDeleting ||
+                            state is ProductDeleteInProgress ||
+                            state is ProductUpdateInProgress;
                         return ElevatedButton(
-                          onPressed:
-                              state is ProductDeleteInProgress ||
-                                  state is ProductUpdateInProgress
+                          onPressed: isDeleteBusy
                               ? null
                               : _showDeleteConfirmDialog,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.error,
                             minimumSize: const Size(double.infinity, 48),
                           ),
-                          child: state is ProductDeleteInProgress
+                          child: isDeleteBusy
                               ? SizedBox(
                                   height: 20,
                                   width: 20,

@@ -84,6 +84,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           elevation: 0,
           backgroundColor: AppColors.surface,
           surfaceTintColor: AppColors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => AppRouter.pop(),
@@ -153,9 +154,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     const SizedBox(height: AppSpacing.md),
                     LayoutBuilder(
                       builder: (context, constraints) {
-                        const gap = 8.0;
-                        final rawWidth = (constraints.maxWidth - (5 * gap)) / 6;
-                        final boxWidth = rawWidth.clamp(44.0, 56.0);
+                        final gap = constraints.maxWidth < 320 ? 6.0 : 8.0;
+                        final availableWidth = constraints.maxWidth - (5 * gap);
+                        final rawWidth = availableWidth / 6;
+                        final boxWidth = rawWidth.clamp(34.0, 56.0);
 
                         return Row(
                           children: List.generate(6, (index) {

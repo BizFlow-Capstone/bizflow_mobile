@@ -267,6 +267,130 @@ class ApiClient {
       };
   }
 
+  String _sanitizeMultipartFilename(String filename) {
+    const vietnameseMap = {
+      'à': 'a',
+      'á': 'a',
+      'ả': 'a',
+      'ã': 'a',
+      'ạ': 'a',
+      'ă': 'a',
+      'ằ': 'a',
+      'ắ': 'a',
+      'ẳ': 'a',
+      'ẵ': 'a',
+      'ặ': 'a',
+      'â': 'a',
+      'ầ': 'a',
+      'ấ': 'a',
+      'ẩ': 'a',
+      'ẫ': 'a',
+      'ậ': 'a',
+      'đ': 'd',
+      'è': 'e',
+      'é': 'e',
+      'ẻ': 'e',
+      'ẽ': 'e',
+      'ẹ': 'e',
+      'ê': 'e',
+      'ề': 'e',
+      'ế': 'e',
+      'ể': 'e',
+      'ễ': 'e',
+      'ệ': 'e',
+      'ì': 'i',
+      'í': 'i',
+      'ỉ': 'i',
+      'ĩ': 'i',
+      'ị': 'i',
+      'ò': 'o',
+      'ó': 'o',
+      'ỏ': 'o',
+      'õ': 'o',
+      'ọ': 'o',
+      'ô': 'o',
+      'ồ': 'o',
+      'ố': 'o',
+      'ổ': 'o',
+      'ỗ': 'o',
+      'ộ': 'o',
+      'ơ': 'o',
+      'ờ': 'o',
+      'ớ': 'o',
+      'ở': 'o',
+      'ỡ': 'o',
+      'ợ': 'o',
+      'ù': 'u',
+      'ú': 'u',
+      'ủ': 'u',
+      'ũ': 'u',
+      'ụ': 'u',
+      'ư': 'u',
+      'ừ': 'u',
+      'ứ': 'u',
+      'ử': 'u',
+      'ữ': 'u',
+      'ự': 'u',
+      'ỳ': 'y',
+      'ý': 'y',
+      'ỷ': 'y',
+      'ỹ': 'y',
+      'ỵ': 'y',
+    };
+
+    var normalized = '';
+    for (final ch in filename.toLowerCase().split('')) {
+      normalized += vietnameseMap[ch] ?? ch;
+    }
+
+    final sanitized = normalized.replaceAll(RegExp(r'[^a-z0-9._-]'), '_');
+    return sanitized.isEmpty ? 'upload.bin' : sanitized;
+  }
+
+  String _guessMimeTypeFromPath(String filePath) {
+    final filename = filePath.split(Platform.pathSeparator).last.toLowerCase();
+    if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (filename.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (filename.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    if (filename.endsWith('.gif')) {
+      return 'image/gif';
+    }
+    if (filename.endsWith('.heic')) {
+      return 'image/heic';
+    }
+    if (filename.endsWith('.heif')) {
+      return 'image/heif';
+    }
+    if (filename.endsWith('.mp3')) {
+      return 'audio/mpeg';
+    }
+    if (filename.endsWith('.wav')) {
+      return 'audio/wav';
+    }
+    if (filename.endsWith('.ogg')) {
+      return 'audio/ogg';
+    }
+    if (filename.endsWith('.m4a')) {
+      return 'audio/m4a';
+    }
+    if (filename.endsWith('.aac')) {
+      return 'audio/aac';
+    }
+    if (filename.endsWith('.mp4')) {
+      return 'audio/mp4';
+    }
+    if (filename.endsWith('.webm')) {
+      return 'audio/webm';
+    }
+    return 'application/octet-stream';
+  }
+
   /// GET request
   Future<ApiResponse<T>> get<T>(
     String path, {
@@ -353,6 +477,42 @@ class ApiClient {
     );
   }
 
+  void _writeAscii(HttpClientRequest request, String value) {
+    request.add(ascii.encode(value));
+  }
+
+  void _writeUtf8(HttpClientRequest request, String value) {
+    request.add(utf8.encode(value));
+  }
+
+  void _writeMultipartField(
+    HttpClientRequest request, {
+    required String boundary,
+    required String name,
+    required String value,
+  }) {
+    _writeAscii(request, '--$boundary\r\n');
+    _writeAscii(request, 'Content-Disposition: form-data; name="$name"\r\n');
+    _writeAscii(request, 'Content-Type: text/plain; charset=utf-8\r\n\r\n');
+    _writeUtf8(request, value);
+    _writeAscii(request, '\r\n');
+  }
+
+  void _writeMultipartFileHeader(
+    HttpClientRequest request, {
+    required String boundary,
+    required String fieldName,
+    required String filename,
+    required String mimeType,
+  }) {
+    _writeAscii(request, '--$boundary\r\n');
+    _writeAscii(
+      request,
+      'Content-Disposition: form-data; name="$fieldName"; filename="$filename"\r\n',
+    );
+    _writeAscii(request, 'Content-Type: $mimeType\r\n\r\n');
+  }
+
   /// POST Multipart request (supports files)
   Future<ApiResponse<T>> postMultipart<T>(
     String path, {
@@ -378,7 +538,7 @@ class ApiClient {
       final request = await _client.postUrl(uri);
 
       var requestHeaders = <String, String>{
-        'Content-Type': 'multipart/form-data; boundary=$boundary',
+        'Content-Type': 'multipart/form-data; boundary=$boundary; charset=utf-8',
         'Accept': 'application/json',
         ...?headers,
       };
@@ -388,32 +548,36 @@ class ApiClient {
       }
       requestHeaders.forEach((key, value) => request.headers.set(key, value));
 
-      // Build body
-      final sink = request;
-
       // Fields
       fields.forEach((key, value) {
-        sink.write('--$boundary\r\n');
-        sink.write('Content-Disposition: form-data; name="$key"\r\n\r\n');
-        sink.write('$value\r\n');
+        _writeMultipartField(
+          request,
+          boundary: boundary,
+          name: key,
+          value: value,
+        );
       });
 
       // Files
       if (files != null) {
         for (final entry in files.entries) {
           final file = entry.value;
-          final filename = file.path.split(Platform.pathSeparator).last;
-          sink.write('--$boundary\r\n');
-          sink.write(
-            'Content-Disposition: form-data; name="${entry.key}"; filename="$filename"\r\n',
+          final originalFilename = file.path.split(Platform.pathSeparator).last;
+          final filename = _sanitizeMultipartFilename(originalFilename);
+          final mimeType = _guessMimeTypeFromPath(file.path);
+          _writeMultipartFileHeader(
+            request,
+            boundary: boundary,
+            fieldName: entry.key,
+            filename: filename,
+            mimeType: mimeType,
           );
-          sink.write('Content-Type: application/octet-stream\r\n\r\n');
-          await sink.addStream(file.openRead());
-          sink.write('\r\n');
+          await request.addStream(file.openRead());
+          _writeAscii(request, '\r\n');
         }
       }
 
-      sink.write('--$boundary--\r\n');
+      _writeAscii(request, '--$boundary--\r\n');
 
       final response = await request.close().timeout(timeout);
       final responseBody = await response.transform(utf8.decoder).join();
@@ -472,7 +636,7 @@ class ApiClient {
       final request = await _client.putUrl(uri);
 
       var requestHeaders = <String, String>{
-        'Content-Type': 'multipart/form-data; boundary=$boundary',
+        'Content-Type': 'multipart/form-data; boundary=$boundary; charset=utf-8',
         'Accept': 'application/json',
         ...?headers,
       };
@@ -482,32 +646,36 @@ class ApiClient {
       }
       requestHeaders.forEach((key, value) => request.headers.set(key, value));
 
-      // Build body
-      final sink = request;
-
       // Fields
       fields.forEach((key, value) {
-        sink.write('--$boundary\r\n');
-        sink.write('Content-Disposition: form-data; name="$key"\r\n\r\n');
-        sink.write('$value\r\n');
+        _writeMultipartField(
+          request,
+          boundary: boundary,
+          name: key,
+          value: value,
+        );
       });
 
       // Files
       if (files != null) {
         for (final entry in files.entries) {
           final file = entry.value;
-          final filename = file.path.split(Platform.pathSeparator).last;
-          sink.write('--$boundary\r\n');
-          sink.write(
-            'Content-Disposition: form-data; name="${entry.key}"; filename="$filename"\r\n',
+          final originalFilename = file.path.split(Platform.pathSeparator).last;
+          final filename = _sanitizeMultipartFilename(originalFilename);
+          final mimeType = _guessMimeTypeFromPath(file.path);
+          _writeMultipartFileHeader(
+            request,
+            boundary: boundary,
+            fieldName: entry.key,
+            filename: filename,
+            mimeType: mimeType,
           );
-          sink.write('Content-Type: application/octet-stream\r\n\r\n');
-          await sink.addStream(file.openRead());
-          sink.write('\r\n');
+          await request.addStream(file.openRead());
+          _writeAscii(request, '\r\n');
         }
       }
 
-      sink.write('--$boundary--\r\n');
+      _writeAscii(request, '--$boundary--\r\n');
 
       final response = await request.close().timeout(timeout);
       final responseBody = await response.transform(utf8.decoder).join();

@@ -96,14 +96,16 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
           if (state is OrderCreated || state is OrderUpdated) {
             if (!mounted) return;
             setState(() => _isSubmitting = false);
-            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-              SnackBar(
-                content: const Text(
-                  'Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)',
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)',
+                  ),
+                  backgroundColor: AppColors.success,
                 ),
-                backgroundColor: AppColors.success,
-              ),
-            );
+              );
             // Pop back to OrderDetailScreen or Accounting Hub
             Navigator.of(context).popUntil(
               (route) =>
@@ -122,12 +124,14 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
           } else if (state is OrderError) {
             if (!mounted) return;
             setState(() => _isSubmitting = false);
-            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.error,
+                ),
+              );
           }
         },
         child: SafeArea(
@@ -363,6 +367,8 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
     required double amountPaid,
     required double debtAmount,
   }) async {
+    if (_isSubmitting) return;
+
     final l10n = AppLocalizations.of(context);
 
     if (_selectedDebtType == 'partial') {
@@ -421,19 +427,26 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
       return;
     }
 
+    setState(() => _isSubmitting = true);
+
     final canManageOrder = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.orderManagement,
     );
-    if (!canManageOrder) return;
+    if (!canManageOrder) {
+      if (mounted) setState(() => _isSubmitting = false);
+      return;
+    }
 
     final canManageDebtor = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.debtorManagement,
     );
-    if (!canManageDebtor) return;
+    if (!canManageDebtor) {
+      if (mounted) setState(() => _isSubmitting = false);
+      return;
+    }
 
-    setState(() => _isSubmitting = true);
     try {
       final repository = context.read<DebtorBloc>().repository;
       int debtorId = widget.debtorId ?? 0;

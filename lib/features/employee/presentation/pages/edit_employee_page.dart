@@ -43,7 +43,8 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
 
     if (widget.mode != EmployeeEditMode.detail) {
       final locationState = context.read<LocationBloc>().state;
-      if (locationState is! LocationsLoaded && locationState is! LocationLoading) {
+      if (locationState is! LocationsLoaded &&
+          locationState is! LocationLoading) {
         context.read<LocationBloc>().add(const LoadLocationsRequested());
       }
     }
@@ -51,7 +52,9 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
     final employeeState = context.read<EmployeeBloc>().state;
     if (employeeState is EmployeeLoaded) {
       try {
-        _employee = employeeState.allEmployees.firstWhere((e) => e.id == widget.employeeId);
+        _employee = employeeState.allEmployees.firstWhere(
+          (e) => e.id == widget.employeeId,
+        );
         _selectedLocationIds = List.from(_employee!.assignedLocationIds);
         _originalLocationIds = _employee!.assignedLocationIds.toSet();
       } catch (_) {}
@@ -60,12 +63,20 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
 
   Future<void> _onSave() async {
     if (_employee == null || widget.mode == EmployeeEditMode.detail) return;
+    if (_isLoading) return;
+
+    setState(() => _isLoading = true);
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.employeeManagement,
     );
-    if (!allowed) return;
+    if (!allowed) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
 
     final updatedEmployee = _employee!.copyWith(
       assignedLocationIds: _selectedLocationIds,
@@ -122,9 +133,14 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
                 );
                 Navigator.pop(context);
               } else if (state is EmployeeFailure) {
-                ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-                  SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
-                );
+                ScaffoldMessenger.of(context)
+                  ..removeCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(state.message),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
               }
             }
           },
@@ -135,7 +151,9 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
               children: [
                 Text(
                   t.translate('employee.personal_info'),
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _buildReadOnlyField(
@@ -163,18 +181,26 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       t.translate('employee.cannot_edit_info'),
-                      style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
                 Text(
                   t.translate('employee.assigned_warehouses'),
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 _buildAssignmentSection(theme, t),
@@ -273,7 +299,9 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
               padding: const EdgeInsets.all(16),
               child: Text(
                 emptyText,
-                style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
             );
           }
@@ -282,16 +310,14 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: candidateLocations.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.divider),
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, color: AppColors.divider),
             itemBuilder: (context, index) {
               final location = candidateLocations[index];
               final isSelected = _selectedLocationIds.contains(location.id);
 
               return CheckboxListTile(
-                title: Text(
-                  location.name,
-                  style: theme.textTheme.bodyLarge,
-                ),
+                title: Text(location.name, style: theme.textTheme.bodyLarge),
                 value: isSelected,
                 activeColor: AppColors.primary,
                 controlAffinity: ListTileControlAffinity.leading,
@@ -312,7 +338,12 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
     );
   }
 
-  Widget _buildReadOnlyField(String label, String value, IconData icon, ThemeData theme) {
+  Widget _buildReadOnlyField(
+    String label,
+    String value,
+    IconData icon,
+    ThemeData theme,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -330,7 +361,9 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
               children: [
                 Text(
                   label,
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 Text(
                   value,
@@ -344,7 +377,11 @@ class _EditEmployeePageState extends State<EditEmployeePage> {
               ],
             ),
           ),
-          const Icon(Icons.lock_outline, color: AppColors.textSecondary, size: 20),
+          const Icon(
+            Icons.lock_outline,
+            color: AppColors.textSecondary,
+            size: 20,
+          ),
         ],
       ),
     );

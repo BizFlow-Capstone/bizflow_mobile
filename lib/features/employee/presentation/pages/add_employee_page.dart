@@ -38,21 +38,43 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
   }
 
   Future<void> _onSave() async {
+    if (_isLoading) return;
+
     FocusScope.of(context).unfocus();
     if (_selectedEmployees.isEmpty) {
-      AppSnackBar.error(context, 'Vui lòng tìm và chọn ít nhất một nhân viên để gửi lời mời.');
+      AppSnackBar.error(
+        context,
+        'Vui lòng tìm và chọn ít nhất một nhân viên để gửi lời mời.',
+      );
       return;
     }
+
+    setState(() => _isLoading = true);
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.employees,
     );
-    if (!allowed) return;
+    if (!allowed) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
 
-    final businessId = Provider.of<BusinessContext>(context, listen: false).currentBusinessId ?? '';
+    final businessId =
+        Provider.of<BusinessContext>(
+          context,
+          listen: false,
+        ).currentBusinessId ??
+        '';
     final employeeIds = _selectedEmployees.map((e) => e.id).toList();
-    context.read<EmployeeBloc>().add(AddMultipleEmployeesRequested(businessId: businessId, employeeIds: employeeIds));
+    context.read<EmployeeBloc>().add(
+      AddMultipleEmployeesRequested(
+        businessId: businessId,
+        employeeIds: employeeIds,
+      ),
+    );
   }
 
   void _selectSearchResult(EmployeeEntity employee) {
@@ -81,9 +103,9 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(t.translate('employee.add_employee')), 
-        centerTitle: true, 
-        backgroundColor: AppColors.white, 
+        title: Text(t.translate('employee.add_employee')),
+        centerTitle: true,
+        backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         iconTheme: const IconThemeData(color: Colors.black),
         systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -95,7 +117,7 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
               setState(() => _isLoading = true);
             } else {
               setState(() => _isLoading = false);
-              
+
               if (state is EmployeeActionSuccess) {
                 AppSnackBar.success(context, 'Gửi lời mời thành công');
                 Navigator.pop(context);
@@ -104,11 +126,15 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                   _searchResults = state.results;
                 });
               } else if (state is EmployeeFailure) {
-                final isAlreadyInvited = state.message.contains('đã được mời') || state.message.contains('409');
+                final isAlreadyInvited =
+                    state.message.contains('đã được mời') ||
+                    state.message.contains('409');
                 AppSnackBar.show(
                   context,
                   message: state.message,
-                  type: isAlreadyInvited ? AppSnackBarType.warning : AppSnackBarType.error,
+                  type: isAlreadyInvited
+                      ? AppSnackBarType.warning
+                      : AppSnackBarType.error,
                 );
               }
             }
@@ -121,7 +147,9 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                 // Info Section
                 Text(
                   t.translate('employee.personal_info'),
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 16),
 
@@ -131,7 +159,9 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                   hintText: t.translate('employee.email_or_phone_hint'),
                   prefixIcon: const Icon(Icons.search),
                   onChanged: (value) {
-                    context.read<EmployeeBloc>().add(SearchEmployeesRequested(value));
+                    context.read<EmployeeBloc>().add(
+                      SearchEmployeesRequested(value),
+                    );
                   },
                 ),
                 if (_searchResults.isNotEmpty) ...[
@@ -146,12 +176,15 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: _searchResults.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.divider),
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, color: AppColors.divider),
                       itemBuilder: (context, index) {
                         final item = _searchResults[index];
                         return ListTile(
                           title: Text(item.name),
-                          subtitle: Text(item.phone.isNotEmpty ? item.phone : item.email),
+                          subtitle: Text(
+                            item.phone.isNotEmpty ? item.phone : item.email,
+                          ),
                           onTap: () => _selectSearchResult(item),
                         );
                       },
@@ -165,7 +198,10 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                 if (_selectedEmployees.isNotEmpty) ...[
                   Text(
                     'Đã chọn (${_selectedEmployees.length})',
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   ListView.builder(
@@ -185,23 +221,37 @@ class _AddEmployeePageState extends State<AddEmployeePage> {
                           leading: CircleAvatar(
                             backgroundColor: AppColors.primaryLight,
                             child: Text(
-                              emp.name.isNotEmpty ? emp.name[0].toUpperCase() : '?',
-                              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                              emp.name.isNotEmpty
+                                  ? emp.name[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                           title: Text(
-                            emp.name, 
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+                            emp.name,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           subtitle: Text(
                             emp.phone.isNotEmpty ? emp.phone : emp.email,
-                            style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                           trailing: IconButton(
-                            icon: const Icon(Icons.close, color: AppColors.error),
+                            icon: const Icon(
+                              Icons.close,
+                              color: AppColors.error,
+                            ),
                             onPressed: () {
                               setState(() {
-                                _selectedEmployees.removeWhere((e) => e.id == emp.id);
+                                _selectedEmployees.removeWhere(
+                                  (e) => e.id == emp.id,
+                                );
                               });
                             },
                           ),

@@ -57,6 +57,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
   final ImagePicker _imagePicker = ImagePicker();
   final ActionGuard _submitGuard = ActionGuard();
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -296,6 +297,8 @@ class _AddProductPageState extends State<AddProductPage> {
   // }
 
   Future<void> _submitForm() async {
+    if (_isSubmitting) return;
+
     final requiredMessage =
         l10n?.translate('common.required_field') ?? 'Trường này là bắt buộc';
     final invalidCostPriceMessage =
@@ -352,6 +355,12 @@ class _AddProductPageState extends State<AddProductPage> {
       return;
     }
 
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    var hasDispatchedAddEvent = false;
+
     await _submitGuard.run(() async {
       final allowed = await SubscriptionFeatureGuard.ensureAllowed(
         context,
@@ -359,6 +368,7 @@ class _AddProductPageState extends State<AddProductPage> {
       );
       if (!allowed || !mounted) return;
 
+      hasDispatchedAddEvent = true;
       context.read<ProductBloc>().add(
         AddProductRequested(
           locationId: widget.locationId,
@@ -383,6 +393,12 @@ class _AddProductPageState extends State<AddProductPage> {
         ),
       );
     });
+
+    if (!hasDispatchedAddEvent && mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 
   AppLocalizations? get l10n => AppLocalizations.of(context);
@@ -413,6 +429,11 @@ class _AddProductPageState extends State<AddProductPage> {
       body: BlocListener<ProductBloc, ProductState>(
         listener: (context, state) {
           if (state is ProductAddSuccess) {
+            if (_isSubmitting) {
+              setState(() {
+                _isSubmitting = false;
+              });
+            }
             // Show success message
             AppSnackBar.show(
               context,
@@ -428,6 +449,11 @@ class _AddProductPageState extends State<AddProductPage> {
               _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
+            if (_isSubmitting) {
+              setState(() {
+                _isSubmitting = false;
+              });
+            }
             AppSnackBar.show(
               context,
               message: state.message,
@@ -820,11 +846,11 @@ class _AddProductPageState extends State<AddProductPage> {
               Expanded(
                 child: BlocBuilder<ProductBloc, ProductState>(
                   builder: (context, state) {
+                    final isAdding =
+                        _isSubmitting || state is ProductAddInProgress;
                     return ElevatedButton(
-                      onPressed: state is ProductAddInProgress
-                          ? null
-                          : _submitForm,
-                      child: state is ProductAddInProgress
+                      onPressed: isAdding ? null : _submitForm,
+                      child: isAdding
                           ? SizedBox(
                               height: 20,
                               width: 20,

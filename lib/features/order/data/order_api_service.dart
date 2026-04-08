@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/network/api_error_message_parser.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../shared/models/ocr_purchase_invoice_dto.dart';
 import 'models/ai_draft_order_dto.dart';
 import 'models/order_dto.dart';
 
@@ -162,25 +163,79 @@ class OrderApiService {
   }
 
   /// Sanitize filename to ASCII-safe for multipart form-data
-  /// 
+  ///
   /// Removes Vietnamese diacritics and non-ASCII characters that can cause
   /// Content-Disposition header encoding issues.
   String _sanitizeFilename(String filename) {
     // Map of Vietnamese characters to ASCII equivalents
     const mapping = {
-      'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
-      'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
-      'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+      'à': 'a',
+      'á': 'a',
+      'ả': 'a',
+      'ã': 'a',
+      'ạ': 'a',
+      'ă': 'a',
+      'ằ': 'a',
+      'ắ': 'a',
+      'ẳ': 'a',
+      'ẵ': 'a',
+      'ặ': 'a',
+      'â': 'a',
+      'ầ': 'a',
+      'ấ': 'a',
+      'ẩ': 'a',
+      'ẫ': 'a',
+      'ậ': 'a',
       'đ': 'd',
-      'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
-      'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
-      'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
-      'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
-      'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
-      'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
-      'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
-      'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
-      'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+      'è': 'e',
+      'é': 'e',
+      'ẻ': 'e',
+      'ẽ': 'e',
+      'ẹ': 'e',
+      'ê': 'e',
+      'ề': 'e',
+      'ế': 'e',
+      'ể': 'e',
+      'ễ': 'e',
+      'ệ': 'e',
+      'ì': 'i',
+      'í': 'i',
+      'ỉ': 'i',
+      'ĩ': 'i',
+      'ị': 'i',
+      'ò': 'o',
+      'ó': 'o',
+      'ỏ': 'o',
+      'õ': 'o',
+      'ọ': 'o',
+      'ô': 'o',
+      'ồ': 'o',
+      'ố': 'o',
+      'ổ': 'o',
+      'ỗ': 'o',
+      'ộ': 'o',
+      'ơ': 'o',
+      'ờ': 'o',
+      'ớ': 'o',
+      'ở': 'o',
+      'ỡ': 'o',
+      'ợ': 'o',
+      'ù': 'u',
+      'ú': 'u',
+      'ủ': 'u',
+      'ũ': 'u',
+      'ụ': 'u',
+      'ư': 'u',
+      'ừ': 'u',
+      'ứ': 'u',
+      'ử': 'u',
+      'ữ': 'u',
+      'ự': 'u',
+      'ỳ': 'y',
+      'ý': 'y',
+      'ỷ': 'y',
+      'ỹ': 'y',
+      'ỵ': 'y',
     };
 
     var result = '';
@@ -201,9 +256,11 @@ class OrderApiService {
   }) async {
     try {
       // Sanitize filename to avoid Content-Disposition encoding issues with Vietnamese chars
-      final originalFilename = audioFile.path.split(Platform.pathSeparator).last;
+      final originalFilename = audioFile.path
+          .split(Platform.pathSeparator)
+          .last;
       final sanitized = _sanitizeFilename(originalFilename);
-      
+
       // Create a temporary copy with safe filename in system temp dir
       final tempDir = Directory.systemTemp;
       final safeTempFile = File('${tempDir.path}/$sanitized');
@@ -233,6 +290,30 @@ class OrderApiService {
       rethrow;
     } catch (e) {
       debugPrint('OrderApiService.parseDraftOrderFromAudio error: $e');
+      throw Exception(ApiErrorMessageParser.parse(e));
+    }
+  }
+
+  Future<OcrPurchaseInvoiceResultDto> ocrPurchaseInvoice({
+    required int locationId,
+    required File imageFile,
+  }) async {
+    try {
+      final response = await _apiClient.postMultipart<Map<String, dynamic>>(
+        ApiEndpoints.aiOcrPurchaseInvoice,
+        fields: {'locationId': locationId.toString()},
+        files: {'image': imageFile},
+      );
+
+      if (!response.isSuccess || response.data == null) {
+        throw Exception(response.message ?? 'OCR purchase invoice failed');
+      }
+
+      return OcrPurchaseInvoiceResultDto.fromJson(response.data!);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      debugPrint('OrderApiService.ocrPurchaseInvoice error: $e');
       throw Exception(ApiErrorMessageParser.parse(e));
     }
   }

@@ -9,6 +9,7 @@ import 'datasources/order_local_datasource.dart';
 import 'models/ai_draft_order_dto.dart';
 import 'models/order_dto.dart';
 import 'order_api_service.dart';
+import '../../../shared/models/ocr_purchase_invoice_dto.dart';
 
 /// Real Order Repository - Connects to OrderApiService & implements SWR
 class OrderRepository {
@@ -80,6 +81,16 @@ class OrderRepository {
     return _apiService.parseDraftOrderFromAudio(
       locationId: locationId,
       audioFile: audioFile,
+    );
+  }
+
+  Future<OcrPurchaseInvoiceResultDto> ocrPurchaseInvoice({
+    required int locationId,
+    required File imageFile,
+  }) {
+    return _apiService.ocrPurchaseInvoice(
+      locationId: locationId,
+      imageFile: imageFile,
     );
   }
 

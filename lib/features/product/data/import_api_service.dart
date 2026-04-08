@@ -3,6 +3,7 @@ import 'dart:io';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../shared/models/ocr_purchase_invoice_dto.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import 'models/import_model.dart';
 
@@ -71,6 +72,11 @@ class ImportApiService {
         'Supplier': request.supplier,
         'Note': request.note,
         'SaveAsDraft': request.saveAsDraft.toString(),
+        if (request.documentDate != null)
+          'DocumentDate': DateFormatter.toApiDateOnly(request.documentDate!),
+        if (request.documentNumber != null &&
+            request.documentNumber!.isNotEmpty)
+          'DocumentNumber': request.documentNumber!,
         if (request.receivedAt != null)
           'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
         'Items': jsonEncode(
@@ -111,6 +117,11 @@ class ImportApiService {
         'Supplier': request.supplier,
         'Note': request.note,
         'RemoveImage': request.removeImage.toString(),
+        if (request.documentDate != null)
+          'DocumentDate': DateFormatter.toApiDateOnly(request.documentDate!),
+        if (request.documentNumber != null &&
+            request.documentNumber!.isNotEmpty)
+          'DocumentNumber': request.documentNumber!,
         if (request.receivedAt != null)
           'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
         'Items': jsonEncode(
@@ -168,5 +179,27 @@ class ImportApiService {
 
     return response.data ?? {};
   }
-}
 
+  Future<OcrPurchaseInvoiceResultDto> ocrPurchaseInvoice({
+    required int locationId,
+    required File imageFile,
+  }) async {
+    try {
+      final response = await _apiClient.postMultipart<Map<String, dynamic>>(
+        ApiEndpoints.aiOcrPurchaseInvoice,
+        fields: {'locationId': locationId.toString()},
+        files: {'image': imageFile},
+      );
+
+      if (!response.isSuccess || response.data == null) {
+        throw Exception(response.message ?? 'OCR purchase invoice failed');
+      }
+
+      return OcrPurchaseInvoiceResultDto.fromJson(response.data!);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw Exception(ApiErrorMessageParser.parse(e));
+    }
+  }
+}

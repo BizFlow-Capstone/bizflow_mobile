@@ -792,6 +792,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       return const <String>[];
     }
 
+    bool isSubmitting = false;
+
     await showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
@@ -882,70 +884,102 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
+              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
-              onPressed: () async {
-                final amountString = amountController.text.replaceAll(',', '');
-                final amount = double.tryParse(amountString) ?? 0;
-                if (amount <= 0) return;
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      final amountString = amountController.text.replaceAll(
+                        ',',
+                        '',
+                      );
+                      final amount = double.tryParse(amountString) ?? 0;
+                      if (amount <= 0) {
+                        setDialogState(() => isSubmitting = false);
+                        return;
+                      }
 
-                if ((selectedMoneyChannel ?? '').trim().isEmpty) {
-                  AppSnackBar.warning(
-                    dialogCtx,
-                    l10n.translate('accounting.money_channel_required'),
-                  );
-                  return;
-                }
+                      if ((selectedMoneyChannel ?? '').trim().isEmpty) {
+                        AppSnackBar.warning(
+                          dialogCtx,
+                          l10n.translate('accounting.money_channel_required'),
+                        );
+                        setDialogState(() => isSubmitting = false);
+                        return;
+                      }
 
-                final ok = await _confirmAction(
-                  title: l10n.translate('accounting.confirm_title'),
-                  message: l10n.translate('accounting.confirm_create_revenue'),
-                );
-                if (!ok || !context.mounted) return;
+                      final ok = await _confirmAction(
+                        title: l10n.translate('accounting.confirm_title'),
+                        message: l10n.translate(
+                          'accounting.confirm_create_revenue',
+                        ),
+                      );
+                      if (!ok || !context.mounted) {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                        return;
+                      }
 
-                final allowed = await _checkFeatureAccess(
-                  _featureManualRevenue,
-                );
-                if (!allowed) return;
+                      final allowed = await _checkFeatureAccess(
+                        _featureManualRevenue,
+                      );
+                      if (!allowed) {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                        return;
+                      }
 
-                if (!mounted) return;
-                if (!dialogCtx.mounted) return;
+                      if (!mounted) return;
+                      if (!dialogCtx.mounted) {
+                        return;
+                      }
 
-                // Use outer page context — dialog ctx has no Providers
-                final locationId = context
-                    .read<BusinessContext>()
-                    .currentBusinessId;
-                final referenceOrderId = int.tryParse(
-                  referenceOrderIdController.text.trim(),
-                );
+                      // Use outer page context — dialog ctx has no Providers
+                      final locationId = context
+                          .read<BusinessContext>()
+                          .currentBusinessId;
+                      final referenceOrderId = int.tryParse(
+                        referenceOrderIdController.text.trim(),
+                      );
 
-                context.read<RevenueBloc>().add(
-                  CreateManualRevenueRequested(
-                    body: {
-                      'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
-                      'amount': amount,
-                      'revenueDate': DateFormat(
-                        'yyyy-MM-dd',
-                      ).format(selectedDate),
-                      if (selectedDocumentDate != null)
-                        'documentDate': DateFormat(
-                          'yyyy-MM-dd',
-                        ).format(selectedDocumentDate!),
-                      'description': descriptionController.text,
-                      'moneyChannel': selectedMoneyChannel,
-                      if ((selectedBusinessTypeId ?? '').isNotEmpty)
-                        'businessTypeId': selectedBusinessTypeId,
-                      if (referenceOrderId != null) 'referenceType': 'order',
-                      if (referenceOrderId != null)
-                        'referenceId': referenceOrderId,
+                      context.read<RevenueBloc>().add(
+                        CreateManualRevenueRequested(
+                          body: {
+                            'businessLocationId':
+                                int.tryParse(locationId ?? '') ?? 0,
+                            'amount': amount,
+                            'revenueDate': DateFormat(
+                              'yyyy-MM-dd',
+                            ).format(selectedDate),
+                            if (selectedDocumentDate != null)
+                              'documentDate': DateFormat(
+                                'yyyy-MM-dd',
+                              ).format(selectedDocumentDate!),
+                            'description': descriptionController.text,
+                            'moneyChannel': selectedMoneyChannel,
+                            if ((selectedBusinessTypeId ?? '').isNotEmpty)
+                              'businessTypeId': selectedBusinessTypeId,
+                            if (referenceOrderId != null)
+                              'referenceType': 'order',
+                            if (referenceOrderId != null)
+                              'referenceId': referenceOrderId,
+                          },
+                        ),
+                      );
+                      Navigator.of(dialogCtx).pop();
                     },
-                  ),
-                );
-                Navigator.of(dialogCtx).pop();
-              },
-              child: Text(l10n.translate('common.save')),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.translate('common.save')),
             ),
           ],
         ),
@@ -1000,6 +1034,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       }
       return const <String>[];
     }
+
+    bool isSubmitting = false;
 
     await showDialog(
       context: context,
@@ -1068,43 +1104,56 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
+              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
-              onPressed: () async {
-                final amount =
-                    (CurrencyFormatter.parse(amountController.text) ?? 0)
-                        .toDouble();
-                if (descriptionController.text.trim().isEmpty ||
-                    amount <= 0 ||
-                    selectedCostType == null ||
-                    selectedPaymentMethod == null) {
-                  return;
-                }
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      final amount =
+                          (CurrencyFormatter.parse(amountController.text) ?? 0)
+                              .toDouble();
+                      if (descriptionController.text.trim().isEmpty ||
+                          amount <= 0 ||
+                          selectedCostType == null ||
+                          selectedPaymentMethod == null) {
+                        setDialogState(() => isSubmitting = false);
+                        return;
+                      }
 
-                final locationId = context
-                    .read<BusinessContext>()
-                    .currentBusinessId;
-                context.read<CostBloc>().add(
-                  CreateManualCostRequested(
-                    body: {
-                      'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
-                      'amount': amount,
-                      'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
-                      if (selectedDocumentDate != null)
-                        'documentDate': DateFormat(
-                          'yyyy-MM-dd',
-                        ).format(selectedDocumentDate!),
-                      'description': descriptionController.text,
-                      'costType': selectedCostType,
-                      'paymentMethod': selectedPaymentMethod,
+                      final locationId = context
+                          .read<BusinessContext>()
+                          .currentBusinessId;
+                      context.read<CostBloc>().add(
+                        CreateManualCostRequested(
+                          body: {
+                            'businessLocationId':
+                                int.tryParse(locationId ?? '') ?? 0,
+                            'amount': amount,
+                            'costDate': DateFormat(
+                              'yyyy-MM-dd',
+                            ).format(selectedDate),
+                            if (selectedDocumentDate != null)
+                              'documentDate': DateFormat(
+                                'yyyy-MM-dd',
+                              ).format(selectedDocumentDate!),
+                            'description': descriptionController.text,
+                            'costType': selectedCostType,
+                            'paymentMethod': selectedPaymentMethod,
+                          },
+                        ),
+                      );
+                      Navigator.pop(dialogCtx);
                     },
-                  ),
-                );
-                Navigator.pop(dialogCtx);
-              },
-              child: Text(l10n.translate('common.save')),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.translate('common.save')),
             ),
           ],
         ),
@@ -1147,6 +1196,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       }
       return const <String>[];
     }
+
+    bool isSubmitting = false;
 
     await showDialog(
       context: context,
@@ -1215,53 +1266,73 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
+              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
-              onPressed: () async {
-                final amount =
-                    (CurrencyFormatter.parse(amountController.text) ?? 0)
-                        .toDouble();
-                if (descriptionController.text.trim().isEmpty ||
-                    amount <= 0 ||
-                    selectedCostType == null ||
-                    selectedPaymentMethod == null) {
-                  return;
-                }
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      final amount =
+                          (CurrencyFormatter.parse(amountController.text) ?? 0)
+                              .toDouble();
+                      if (descriptionController.text.trim().isEmpty ||
+                          amount <= 0 ||
+                          selectedCostType == null ||
+                          selectedPaymentMethod == null) {
+                        setDialogState(() => isSubmitting = false);
+                        return;
+                      }
 
-                final ok = await _confirmAction(
-                  title: l10n.translate('accounting.confirm_title'),
-                  message: l10n.translate('accounting.confirm_update_item'),
-                );
-                if (!ok) return;
+                      final ok = await _confirmAction(
+                        title: l10n.translate('accounting.confirm_title'),
+                        message: l10n.translate(
+                          'accounting.confirm_update_item',
+                        ),
+                      );
+                      if (!ok) {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                        return;
+                      }
 
-                if (!mounted) return;
-                if (!dialogCtx.mounted) return;
+                      if (!mounted || !dialogCtx.mounted) {
+                        return;
+                      }
 
-                // Use outer context to read BLoC safely
-                context.read<CostBloc>().add(
-                  UpdateManualCostRequested(
-                    costId: item.id,
-                    body: {
-                      'amount': amount,
-                      'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
-                      'documentDate': selectedDocumentDate == null
-                          ? null
-                          : DateFormat(
+                      // Use outer context to read BLoC safely
+                      context.read<CostBloc>().add(
+                        UpdateManualCostRequested(
+                          costId: item.id,
+                          body: {
+                            'amount': amount,
+                            'costDate': DateFormat(
                               'yyyy-MM-dd',
-                            ).format(selectedDocumentDate!),
-                      'description': descriptionController.text.trim(),
-                      'costType': selectedCostType ?? item.type,
-                      'paymentMethod':
-                          selectedPaymentMethod ?? item.paymentMethod,
-                      'removeDocument': false,
+                            ).format(selectedDate),
+                            'documentDate': selectedDocumentDate == null
+                                ? null
+                                : DateFormat(
+                                    'yyyy-MM-dd',
+                                  ).format(selectedDocumentDate!),
+                            'description': descriptionController.text.trim(),
+                            'costType': selectedCostType ?? item.type,
+                            'paymentMethod':
+                                selectedPaymentMethod ?? item.paymentMethod,
+                            'removeDocument': false,
+                          },
+                        ),
+                      );
+                      Navigator.of(dialogCtx).pop();
                     },
-                  ),
-                );
-                Navigator.of(dialogCtx).pop();
-              },
-              child: Text(l10n.translate('common.save')),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.translate('common.save')),
             ),
           ],
         ),
@@ -1275,7 +1346,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final refCode = revenue.referenceCode;
     if (refId > 0) {
       if (_isImportReference(refType, refCode)) {
-        final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
+        final locationId =
+            context.read<BusinessContext>().currentBusinessId ?? '';
         AppRouter.navigateTo(
           AppRoutes.stockImport,
           arguments: {'locationId': locationId, 'importId': refId},
@@ -1310,7 +1382,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               const SizedBox(height: 6),
               Text('Kênh tiền: ${revenue.moneyChannel ?? '-'}'),
               const SizedBox(height: 6),
-                Text('Ngay chung tu: ${_formatIsoDate(revenue.documentDate)}'),
+              Text('Ngay chung tu: ${_formatIsoDate(revenue.documentDate)}'),
               const SizedBox(height: 6),
               Text('Loại hình KD: ${revenue.businessTypeName ?? '-'}'),
               const SizedBox(height: 6),
@@ -1381,7 +1453,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final refCode = cost.referenceCode;
     if (refId > 0) {
       if (_isImportReference(refType, refCode)) {
-        final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
+        final locationId =
+            context.read<BusinessContext>().currentBusinessId ?? '';
         AppRouter.navigateTo(
           AppRoutes.stockImport,
           arguments: {'locationId': locationId, 'importId': refId},
@@ -1503,6 +1576,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       selectedBusinessTypeId = null;
     }
 
+    bool isSubmitting = false;
+
     await showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
@@ -1598,58 +1673,84 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogCtx),
+              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
-              onPressed: () async {
-                final amount =
-                    (CurrencyFormatter.parse(amountController.text) ?? 0)
-                        .toDouble();
-                if (amount <= 0 || (selectedMoneyChannel ?? '').isEmpty) return;
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      final amount =
+                          (CurrencyFormatter.parse(amountController.text) ?? 0)
+                              .toDouble();
+                      if (amount <= 0 || (selectedMoneyChannel ?? '').isEmpty) {
+                        setDialogState(() => isSubmitting = false);
+                        return;
+                      }
 
-                final ok = await _confirmAction(
-                  title: l10n.translate('accounting.confirm_title'),
-                  message: l10n.translate('accounting.confirm_update_revenue'),
-                );
-                if (!ok) return;
+                      final ok = await _confirmAction(
+                        title: l10n.translate('accounting.confirm_title'),
+                        message: l10n.translate(
+                          'accounting.confirm_update_revenue',
+                        ),
+                      );
+                      if (!ok) {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                        return;
+                      }
 
-                final allowed = await _checkFeatureAccess(
-                  _featureManualRevenue,
-                );
-                if (!allowed) return;
+                      final allowed = await _checkFeatureAccess(
+                        _featureManualRevenue,
+                      );
+                      if (!allowed) {
+                        if (dialogCtx.mounted) {
+                          setDialogState(() => isSubmitting = false);
+                        }
+                        return;
+                      }
 
-                if (!mounted) return;
-                if (!dialogCtx.mounted) return;
+                      if (!mounted || !dialogCtx.mounted) {
+                        return;
+                      }
 
-                final locationId = context
-                    .read<BusinessContext>()
-                    .currentBusinessId;
-                context.read<RevenueBloc>().add(
-                  UpdateManualRevenueRequested(
-                    revenueId: item.id,
-                    body: {
-                      'businessLocationId':
-                          int.tryParse(locationId ?? '') ?? item.locationId,
-                      'amount': amount,
-                      'revenueDate': DateFormat(
-                        'yyyy-MM-dd',
-                      ).format(selectedDate),
-                      'documentDate': selectedDocumentDate == null
-                          ? null
-                          : DateFormat(
+                      final locationId = context
+                          .read<BusinessContext>()
+                          .currentBusinessId;
+                      context.read<RevenueBloc>().add(
+                        UpdateManualRevenueRequested(
+                          revenueId: item.id,
+                          body: {
+                            'businessLocationId':
+                                int.tryParse(locationId ?? '') ??
+                                item.locationId,
+                            'amount': amount,
+                            'revenueDate': DateFormat(
                               'yyyy-MM-dd',
-                            ).format(selectedDocumentDate!),
-                      'description': descriptionController.text.trim(),
-                      'moneyChannel': selectedMoneyChannel,
-                      if ((selectedBusinessTypeId ?? '').isNotEmpty)
-                        'businessTypeId': selectedBusinessTypeId,
+                            ).format(selectedDate),
+                            'documentDate': selectedDocumentDate == null
+                                ? null
+                                : DateFormat(
+                                    'yyyy-MM-dd',
+                                  ).format(selectedDocumentDate!),
+                            'description': descriptionController.text.trim(),
+                            'moneyChannel': selectedMoneyChannel,
+                            if ((selectedBusinessTypeId ?? '').isNotEmpty)
+                              'businessTypeId': selectedBusinessTypeId,
+                          },
+                        ),
+                      );
+                      Navigator.of(dialogCtx).pop();
                     },
-                  ),
-                );
-                Navigator.of(dialogCtx).pop();
-              },
-              child: Text(l10n.translate('common.save')),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n.translate('common.save')),
             ),
           ],
         ),

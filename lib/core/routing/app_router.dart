@@ -492,7 +492,8 @@ class AppRouter {
     }
 
     return uri.hasScheme &&
-        (uri.scheme.toLowerCase() == 'http' || uri.scheme.toLowerCase() == 'https');
+        (uri.scheme.toLowerCase() == 'http' ||
+            uri.scheme.toLowerCase() == 'https');
   }
 
   static Future<bool> openExternalUrl(String target) async {
@@ -540,7 +541,7 @@ class AppRouter {
   }
 }
 
-class AppRouteObserver extends NavigatorObserver {
+class AppRouteObserver extends RouteObserver<PageRoute<dynamic>> {
   String? currentRouteName;
 
   String? _routeName(Route<dynamic>? route) {
@@ -662,7 +663,8 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                         .toList();
 
                     // Resolve selectedLocation from businessContext
-                    final selectedBusinessId = businessContext.currentBusinessId;
+                    final selectedBusinessId =
+                        businessContext.currentBusinessId;
                     if (businessContext.currentBusinessId != null) {
                       try {
                         selectedLocation = locations.firstWhere(
@@ -693,7 +695,8 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                           ownerProfileId: fallbackLocation.ownerProfileId,
                         );
                       });
-                    } else if (locations.isEmpty && selectedBusinessId != null) {
+                    } else if (locations.isEmpty &&
+                        selectedBusinessId != null) {
                       WidgetsBinding.instance.addPostFrameCallback((_) async {
                         if (!context.mounted) return;
                         if (businessContext.currentBusinessId == null) {
@@ -749,13 +752,18 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           // Body
           body: widget.child,
           // FAB - positioned at bottom-right; only visible for owners
-          floatingActionButton: (widget.showAddLocationFab &&
+          floatingActionButton:
+              (widget.showAddLocationFab &&
                   context.watch<BusinessContext>().isOwner)
               ? FutureBuilder<bool>(
-                  future: context.read<SubscriptionRepository>().canUseFeatureCode(
-                    featureCode: SubscriptionFeatureCodes.locations,
-                    ownerProfileId: context.read<BusinessContext>().currentOwnerProfileId,
-                  ),
+                  future: context
+                      .read<SubscriptionRepository>()
+                      .canUseFeatureCode(
+                        featureCode: SubscriptionFeatureCodes.locations,
+                        ownerProfileId: context
+                            .read<BusinessContext>()
+                            .currentOwnerProfileId,
+                      ),
                   builder: (context, snapshot) {
                     final canCreateLocation = snapshot.data ?? false;
                     return Column(
@@ -772,10 +780,14 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFF3CD),
                               borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: const Color(0xFFFFE08A)),
+                              border: Border.all(
+                                color: const Color(0xFFFFE08A),
+                              ),
                             ),
                             child: Text(
-                              AppLocalizations.of(context).translate('subscription.limit_warning'),
+                              AppLocalizations.of(
+                                context,
+                              ).translate('subscription.limit_warning'),
                               style: const TextStyle(
                                 color: Color(0xFF8A6100),
                                 fontSize: 12,
@@ -792,7 +804,8 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => const AddEditLocationPage(),
+                                      builder: (context) =>
+                                          const AddEditLocationPage(),
                                     ),
                                   );
                                 }

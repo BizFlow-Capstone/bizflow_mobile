@@ -68,10 +68,7 @@ class ProductRepository {
     await AppDatabase().syncStateDao.upsertAll(rows);
   }
 
-  Future<void> clearProductsDirty(
-    String scopeKey,
-    List<String> productIds,
-  ) {
+  Future<void> clearProductsDirty(String scopeKey, List<String> productIds) {
     final resourceKeys = productIds
         .toSet()
         .map((id) => '$_productDirtyResourcePrefix$id')
@@ -106,7 +103,10 @@ class ProductRepository {
     if (dirtyRows.isEmpty) return incoming;
 
     final dirtyIds = dirtyRows
-        .map((row) => row.resourceKey.replaceFirst(_productDirtyResourcePrefix, ''))
+        .map(
+          (row) =>
+              row.resourceKey.replaceFirst(_productDirtyResourcePrefix, ''),
+        )
         .where((id) => id.isNotEmpty)
         .toSet();
     if (dirtyIds.isEmpty) return incoming;
@@ -215,18 +215,52 @@ class ProductRepository {
       }
       return await _localDataSource.getById(productId);
     } catch (e) {
+      final localCached = await _localApiCache.getMap(detailCacheKey);
+      if (localCached != null) {
+        final cachedEntity = _mapDtoToEntity(ProductDto.fromJson(localCached));
+        final localProduct = await _localDataSource.getById(productId);
+        if (localProduct != null) {
+          return _mergePreferDetailed(localProduct, cachedEntity);
+        }
+        return cachedEntity;
+      }
+
       final localProduct = await _localDataSource.getById(productId);
       if (localProduct != null) {
         return localProduct;
       }
 
-      final localCached = await _localApiCache.getMap(detailCacheKey);
-      if (localCached != null) {
-        return _mapDtoToEntity(ProductDto.fromJson(localCached));
-      }
       debugPrint('ProductRepository.getProductDetail error: $e');
       rethrow;
     }
+  }
+
+  ProductEntity _mergePreferDetailed(
+    ProductEntity local,
+    ProductEntity cachedDetail,
+  ) {
+    return local.copyWith(
+      name: cachedDetail.name.isNotEmpty ? cachedDetail.name : local.name,
+      description: cachedDetail.description ?? local.description,
+      imageUrl: cachedDetail.imageUrl ?? local.imageUrl,
+      barcode: cachedDetail.barcode ?? local.barcode,
+      category: cachedDetail.category ?? local.category,
+      costPrice: cachedDetail.costPrice ?? local.costPrice,
+      salePrice: cachedDetail.salePrice ?? local.salePrice,
+      unit: cachedDetail.unit ?? local.unit,
+      manufacturer: cachedDetail.manufacturer ?? local.manufacturer,
+      businessLocationName:
+          cachedDetail.businessLocationName ?? local.businessLocationName,
+      businessTypeId: cachedDetail.businessTypeId ?? local.businessTypeId,
+      createdAt: cachedDetail.createdAt ?? local.createdAt,
+      locationId: cachedDetail.locationId ?? local.locationId,
+      saleItems: cachedDetail.saleItems.isNotEmpty
+          ? cachedDetail.saleItems
+          : local.saleItems,
+      price: cachedDetail.price,
+      quantity: cachedDetail.quantity,
+      isActive: cachedDetail.isActive,
+    );
   }
 
   /// Get product sale items (price tiers/unit conversions)
@@ -457,7 +491,10 @@ class ProductRepository {
         if (data is List) {
           return data
               .whereType<Map>()
-              .map((item) => BusinessTypeDto.fromJson(Map<String, dynamic>.from(item)))
+              .map(
+                (item) =>
+                    BusinessTypeDto.fromJson(Map<String, dynamic>.from(item)),
+              )
               .toList();
         }
         return <BusinessTypeDto>[];

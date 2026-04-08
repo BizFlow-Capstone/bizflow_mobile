@@ -188,6 +188,8 @@ class _BulkAdjustSellingPricePageState
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
+
     final increase = (CurrencyFormatter.parse(_increaseController.text) ?? 0)
         .toDouble();
     final decrease = (CurrencyFormatter.parse(_decreaseController.text) ?? 0)
@@ -195,32 +197,42 @@ class _BulkAdjustSellingPricePageState
     final deltaAmount = increase - decrease;
 
     if (_selectedSaleItemIds.isEmpty) {
-      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n.translate('product.bulk_adjust.select_sale_items_required'),
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.translate('product.bulk_adjust.select_sale_items_required'),
+            ),
           ),
-        ),
-      );
+        );
       return;
     }
 
     if (deltaAmount == 0) {
-      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('product.bulk_adjust.delta_required')),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(l10n.translate('product.bulk_adjust.delta_required')),
+          ),
+        );
       return;
     }
+
+    setState(() => _isSubmitting = true);
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
       featureCode: SubscriptionFeatureCodes.productManagement,
     );
-    if (!allowed) return;
+    if (!allowed) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+      return;
+    }
 
-    setState(() => _isSubmitting = true);
     try {
       final affectedProductIds = _saleItemsByProduct.entries
           .where(
@@ -250,22 +262,26 @@ class _BulkAdjustSellingPricePageState
         RefreshProductsRequested(locationId: widget.locationId),
       );
 
-      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('product.bulk_adjust.success')),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(l10n.translate('product.bulk_adjust.success')),
+            backgroundColor: AppColors.success,
+          ),
+        );
 
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
-        SnackBar(
-          content: Text(e.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: AppColors.error,
+          ),
+        );
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);

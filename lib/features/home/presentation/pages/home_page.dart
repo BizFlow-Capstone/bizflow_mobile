@@ -40,9 +40,11 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with RouteAware {
   String? _lastEmployeeLoadedBusinessId;
   _SummaryPeriod _selectedPeriod = _SummaryPeriod.today;
+  int _summaryRefreshTick = 0;
+  PageRoute<dynamic>? _subscribedRoute;
 
   @override
   void initState() {
@@ -53,6 +55,36 @@ class _HomePageState extends State<HomePage> {
     if (locationBloc.state is LocationInitial) {
       locationBloc.add(const LoadLocationsRequested());
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute<dynamic> && route != _subscribedRoute) {
+      if (_subscribedRoute != null) {
+        AppRouter.routeObserver.unsubscribe(this);
+      }
+      _subscribedRoute = route;
+      AppRouter.routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_subscribedRoute != null) {
+      AppRouter.routeObserver.unsubscribe(this);
+      _subscribedRoute = null;
+    }
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    if (!mounted) return;
+    setState(() {
+      _summaryRefreshTick++;
+    });
   }
 
   @override
@@ -181,6 +213,7 @@ class _HomePageState extends State<HomePage> {
                 _buildPeriodSelector(),
                 SizedBox(height: AppSpacing.sm),
                 SwrBuilder<DashboardSummaryDto>(
+                  key: ValueKey('home_summary_refresh_$_summaryRefreshTick'),
                   cacheKey: _summaryCacheKey(
                     businessLocationId,
                     _selectedPeriod,
