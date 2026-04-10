@@ -187,12 +187,24 @@ class _NotificationListPageState extends State<NotificationListPage> {
 
     if (!mounted) return;
 
-    final targetRoute = _resolveRouteFromNotification(notification);
-    if (targetRoute != null) {
-      await AppRouter.navigateFromNotificationTarget(targetRoute);
-      return;
+    // Resolve navigation details (internal route + external URL)
+    final resolution = _resolveNavigationFromNotification(notification);
+    final forceDetailOnly = _isDetailOnlyNotificationType(
+      notification.notificationType,
+    );
+
+    // Any internal route should navigate directly first.
+    // If blocked by permission or invalid route, fallback to detail page.
+    if (!forceDetailOnly && resolution.hasInternalRoute) {
+      final didNavigate = await AppRouter.navigateFromNotificationTarget(
+        resolution.internalRoute!,
+      );
+      if (didNavigate) {
+        return;
+      }
     }
 
+    // External URL or failed internal navigation: show detail page
     AppRouter.navigateTo(
       AppRoutes.notificationDetail,
       arguments: {
@@ -201,10 +213,32 @@ class _NotificationListPageState extends State<NotificationListPage> {
         'time': _formatTime(context, notification.createdAt),
         'icon': _resolveIcon(notification.notificationType),
         'iconColor': _resolveIconColor(notification.notificationType),
+        'externalUrl': resolution.externalUrl,
+        'notificationType': notification.notificationType,
       },
     );
   }
 
+  bool _isDetailOnlyNotificationType(String? notificationType) {
+    final normalized = notificationType?.trim().toUpperCase() ?? '';
+    return normalized == 'INVITE_ACCEPTED' ||
+        normalized == 'INVITE_REJECTED' ||
+        normalized == 'EMPLOYEE_REMOVED';
+  }
+
+  // New method: Resolve navigation details with external URL support
+  NotificationNavigationResolution _resolveNavigationFromNotification(
+    UserNotificationDto notification,
+  ) {
+    return NotificationNavigationContract.resolveDetailed(
+      actionType: notification.actionType,
+      targetScreen: notification.targetScreen,
+      actionPayloadJson: notification.actionPayloadJson,
+      type: notification.notificationType,
+    );
+  }
+
+  // Legacy method: for backward compatibility if needed elsewhere
   String? _resolveRouteFromNotification(UserNotificationDto notification) {
     return NotificationNavigationContract.resolve(
       actionType: notification.actionType,

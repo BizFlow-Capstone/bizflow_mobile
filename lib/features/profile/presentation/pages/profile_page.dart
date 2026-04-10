@@ -609,6 +609,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final l10n = AppLocalizations.of(context);
     final passwordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
+    final phraseController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     var autoValidate = false;
 
@@ -695,9 +696,50 @@ class _ProfilePageState extends State<ProfilePage> {
                           return null;
                         },
                       ),
+                      const SizedBox(height: AppSpacing.md),
+                      AppTextField(
+                        controller: phraseController,
+                        label: _deleteAccountPhrase,
+                        hintText: _deleteAccountPhrase,
+                        helperText: l10n
+                            .translate('profile.delete_account_phrase_hint')
+                            .replaceAll('{phrase}', _deleteAccountPhrase),
+                        textInputAction: TextInputAction.done,
+                        onChanged: (_) {
+                          if (autoValidate) {
+                            formKey.currentState?.validate();
+                          }
+                        },
+                        validator: (value) {
+                          final phrase = (value ?? '').trim().toUpperCase();
+                          if (phrase.isEmpty) {
+                            return l10n.translate(
+                              'profile.delete_account_phrase_invalid',
+                            );
+                          }
+                          if (phrase != _deleteAccountPhrase) {
+                            return l10n.translate(
+                              'profile.delete_account_phrase_invalid',
+                            );
+                          }
+                          return null;
+                        },
+                        onSubmitted: (_) {
+                          setSheetState(() {
+                            autoValidate = true;
+                          });
+                          final valid =
+                              formKey.currentState?.validate() ?? false;
+                          if (!valid) return;
+
+                          Navigator.of(sheetContext).pop();
+                        },
+                      ),
                       const SizedBox(height: AppSpacing.lg),
                       AppButton(
-                        label: l10n.translate('common.confirm'),
+                        label: l10n.translate(
+                          'profile.delete_account_final_action',
+                        ),
                         isFullWidth: true,
                         type: AppButtonType.danger,
                         onPressed: () {
@@ -722,60 +764,13 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     final password = passwordController.text.trim();
+    final phrase = phraseController.text.trim().toUpperCase();
     passwordController.dispose();
     confirmPasswordController.dispose();
-    if (password.isEmpty || !context.mounted) return;
-
-    final confirmDelete = await AppDialog.delete(
-      context,
-      title: l10n.translate('profile.delete_account_confirm_title'),
-      message: l10n.translate('profile.delete_account_confirm_body'),
-      confirmText: l10n.translate('profile.delete_account_confirm_action'),
-      cancelText: l10n.translate('common.cancel'),
-    );
-    if (confirmDelete != true || !context.mounted) return;
-
-    final phraseController = TextEditingController();
-    final phraseAccepted = await AppDialog.show(
-      context,
-      title: l10n.translate('profile.delete_account_phrase_title'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n
-                .translate('profile.delete_account_phrase_hint')
-                .replaceAll('{phrase}', _deleteAccountPhrase),
-            style: AppTextStyles.bodyMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: phraseController,
-            inputFormatters: AppInputFormatters.withSqlInjectionGuard(),
-            decoration: InputDecoration(
-              hintText: _deleteAccountPhrase,
-              border: OutlineInputBorder(
-                borderRadius: AppSpacing.borderRadiusMd,
-              ),
-            ),
-          ),
-        ],
-      ),
-      type: AppDialogType.error,
-      confirmText: l10n.translate('profile.delete_account_final_action'),
-      cancelText: l10n.translate('common.cancel'),
-    );
-
-    final phrase = phraseController.text.trim();
     phraseController.dispose();
-
-    if (phraseAccepted != true || !context.mounted) return;
-    if (phrase.toUpperCase() != _deleteAccountPhrase) {
-      AppSnackBar.warning(
-        context,
-        l10n.translate('profile.delete_account_phrase_invalid'),
-      );
+    if (password.isEmpty ||
+        phrase != _deleteAccountPhrase ||
+        !context.mounted) {
       return;
     }
 

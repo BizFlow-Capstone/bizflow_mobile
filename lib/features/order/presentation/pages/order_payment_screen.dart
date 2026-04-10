@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,6 +8,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/storage/local_storage.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -27,6 +30,7 @@ class OrderPaymentScreen extends StatefulWidget {
   final List<OrderItemEntity> items;
   final String? locationId;
   final String? locationName;
+  final String? localDraftId;
   final String? pendingOrderId;
   final int? initialDebtorId;
   final String? initialDebtorName;
@@ -42,6 +46,7 @@ class OrderPaymentScreen extends StatefulWidget {
     required this.items,
     this.locationId,
     this.locationName,
+    this.localDraftId,
     this.pendingOrderId,
     this.initialDebtorId,
     this.initialDebtorName,
@@ -230,6 +235,29 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
     });
   }
 
+  Future<void> _removeLocalDraftById(String? draftId) async {
+    final normalizedId = draftId?.trim() ?? '';
+    if (normalizedId.isEmpty) return;
+
+    final storage = await LocalStorage.getInstance();
+    final raw = storage.getString(StorageKeys.orderLocalDrafts);
+    if (raw == null || raw.trim().isEmpty) return;
+
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return;
+
+    final drafts = decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    final before = drafts.length;
+    drafts.removeWhere((item) => item['id']?.toString() == normalizedId);
+    if (drafts.length == before) return;
+
+    await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
+  }
+
   // ──────────────────────── Submit logic ────────────────────────
 
   Future<void> _submitPayment({
@@ -331,6 +359,8 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
           requestBody: body,
         );
 
+        await _removeLocalDraftById(widget.localDraftId);
+
         if (_debtAmount > 0 && _selectedDebtor != null) {
           final debtorRepo = context.read<DebtorBloc>().repository;
           await debtorRepo.recordDebtAdjustment(
@@ -353,6 +383,8 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         }
       } else {
         final order = await repository.createOrder(body);
+
+        await _removeLocalDraftById(widget.localDraftId);
 
         if (_debtAmount > 0 && _selectedDebtor != null) {
           final debtorRepo = context.read<DebtorBloc>().repository;

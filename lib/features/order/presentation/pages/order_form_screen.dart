@@ -1482,6 +1482,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                               locationId: locationId,
                               locationName:
                                   BusinessContext().currentBusinessName,
+                              localDraftId: widget.draftId ?? _draftId,
                               pendingOrderId: widget.pendingOrderId,
                               initialDebtorId: _customerType == 'debtor'
                                   ? _selectedDebtor?.debtorId
@@ -1893,7 +1894,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
 
     final allowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
-      featureCode: SubscriptionFeatureCodes.debtorManagement,
+      featureCode: SubscriptionFeatureCodes.debtManagement,
     );
     if (!allowed) {
       if (mounted) {

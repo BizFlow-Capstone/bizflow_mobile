@@ -6,6 +6,9 @@
 class PermissionService {
   PermissionService._();
 
+  // ── Subscription ───────────────────────────────────────────────────
+  static bool canAccessSubscription(bool isOwner) => isOwner;
+
   // ── Business Location ──────────────────────────────────────────────
   static bool canCreateLocation(bool isOwner) => isOwner;
   static bool canEditLocation(bool isOwner) => isOwner;

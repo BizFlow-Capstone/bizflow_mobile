@@ -198,6 +198,12 @@ class ApiEndpoints {
   static const String aiDraftOrder = '/api/my-business/ai/draft-order';
   static const String aiOcrPurchaseInvoice =
       '/api/my-business/ai/ocr/purchase-invoice';
+  static const String aiForecast = '/api/my-business/ai/forecast';
+  static const String aiReorder = '/api/my-business/ai/reorder';
+  static const String aiInsights = '/api/my-business/ai/insights';
+  static const String aiAnomalies = '/api/my-business/ai/anomalies';
+  static String aiAcknowledgeAnomaly(String id) =>
+      '/api/my-business/ai/anomalies/$id/acknowledge';
 
   // GL Entries
   static const String glEntries = '/api/my-business/accounting/gl-entries';

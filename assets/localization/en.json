@@ -488,7 +488,13 @@
     "manage_employees": "Manage Employees",
     "employees_count": "{count} employees",
     "managing": "Current business location",
-    "please_select_location": "Please select or create a business location first"
+    "please_select_location": "Please select or create a business location first",
+    "ai_section_title": "AI Insights",
+    "ai_forecast_title": "Revenue Forecast",
+    "ai_best_seller_title": "Best Sellers",
+    "ai_reorder_title": "Reorder Suggestions",
+    "ai_anomalies_title": "Anomaly Alerts",
+    "ai_mark_read": "Mark as read"
   },
   "subscription": {
     "appbar_title": "Subscription",
@@ -859,6 +865,7 @@
     "stock_low": "Low stock alert",
     "import_completed": "Import completed",
     "detail_title": "Notification Detail",
+    "open_link": "Open Link",
     "just_now": "Just now",
     "minutes_ago": "{count} minutes ago",
     "hours_ago": "{count} hours ago",

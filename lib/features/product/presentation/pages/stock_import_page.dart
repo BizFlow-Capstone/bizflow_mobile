@@ -1532,6 +1532,7 @@ class _StockImportViewState extends State<_StockImportView> {
                       final item = _selectedItems[index];
                       final cost = item.costPrice;
                       final total = item.quantity * cost;
+                      final baseUnit = (item.baseUnit ?? '').trim();
 
                       return Padding(
                         padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -1551,6 +1552,15 @@ class _StockImportViewState extends State<_StockImportView> {
                                       color: AppColors.textPrimary,
                                     ),
                                   ),
+                                  if (baseUnit.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${l10n.translate('product.unit')}: $baseUnit',
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
                                   const SizedBox(height: 10),
                                   if (isEditable)
                                     SizedBox(
@@ -1708,7 +1718,7 @@ class _StockImportViewState extends State<_StockImportView> {
                               Expanded(
                                 flex: 2,
                                 child: Text(
-                                  'SL: ${item.quantity} \n${NumberFormat.currency(locale: 'vi_VN', symbol: 'đ').format(total)}',
+                                  'SL: ${item.quantity}${baseUnit.isNotEmpty ? ' $baseUnit' : ''} \n${NumberFormat.currency(locale: 'vi_VN', symbol: 'đ').format(total)}',
                                   textAlign: TextAlign.right,
                                   style: AppTextStyles.bodyMedium.copyWith(
                                     fontWeight: FontWeight.bold,
@@ -1905,6 +1915,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
   late List<ImportItemModel> _items;
   String _searchQuery = '';
   final Map<int, double> _costPriceCache = {};
+  final Map<int, String> _saleUnitsCache = {};
   final Set<int> _loadingCostPriceProductIds = {};
 
   AppLocalizations get l10n => AppLocalizations.of(context);
@@ -1963,11 +1974,37 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
           .repository
           .getProductDetail(product.id);
       final resolved = detail?.costPrice ?? 0;
+      final resolvedUnits = _extractSaleUnits(detail ?? product);
       _costPriceCache[productId] = resolved;
+      _saleUnitsCache[productId] = resolvedUnits;
       return resolved;
     } catch (_) {
       return 0;
     }
+  }
+
+  String _extractSaleUnits(ProductEntity product) {
+    final units = <String>{};
+
+    final baseUnit = (product.unit ?? '').trim();
+    if (baseUnit.isNotEmpty) {
+      units.add(baseUnit);
+    }
+
+    for (final item in product.saleItems) {
+      final unitName = (item['unitName'] ?? item['unit'] ?? item['Unit'])
+          ?.toString()
+          .trim();
+      if (unitName != null && unitName.isNotEmpty) {
+        units.add(unitName);
+      }
+    }
+
+    if (units.isEmpty) {
+      return '--';
+    }
+
+    return units.join(', ');
   }
 
   Future<void> _prefetchCostPrice(ProductEntity product) async {
@@ -1981,6 +2018,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     if (!mounted) return;
     setState(() {
       _costPriceCache[productId] = resolved;
+      _saleUnitsCache[productId] = _extractSaleUnits(product);
     });
     _loadingCostPriceProductIds.remove(productId);
   }
@@ -2201,6 +2239,10 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                               _costPriceCache[int.tryParse(product.id) ?? 0] ??
                               product.costPrice ??
                               0;
+                          final productId = int.tryParse(product.id) ?? 0;
+                          final saleUnitsText =
+                              _saleUnitsCache[productId] ??
+                              _extractSaleUnits(product);
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text(
@@ -2211,7 +2253,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                               ),
                             ),
                             subtitle: Text(
-                              '${l10n.translate('stock_import.cost_price_label')}${CurrencyFormatter.formatNumber(displayCostPrice)}${l10n.translate('stock_import.stock_label')}${product.quantity} ${product.unit ?? ''}',
+                              '${l10n.translate('order_create.sale_unit_label')}: $saleUnitsText\n${l10n.translate('stock_import.cost_price_label')}${CurrencyFormatter.formatNumber(displayCostPrice)}\n${l10n.translate('stock_import.stock_label')}${product.quantity} ${product.unit ?? ''}',
                               style: AppTextStyles.bodySmall.copyWith(
                                 color: AppColors.textSecondary,
                               ),

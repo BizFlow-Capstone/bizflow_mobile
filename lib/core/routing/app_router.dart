@@ -55,6 +55,7 @@ import '../../shared/widgets/sidebar_widget.dart';
 import '../../shared/dialogs/app_snackbar.dart';
 import '../../shared/context/business_context.dart';
 import '../../shared/context/notification_context.dart';
+import '../../shared/services/permission_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Route names - Tập trung khai báo tất cả route
@@ -302,6 +303,8 @@ class AppRouter {
             time: args?['time'] ?? '',
             icon: args?['icon'] ?? Icons.notifications,
             iconColor: args?['iconColor'] ?? Colors.blue,
+            externalUrl: args?['externalUrl'] as String?,
+            notificationType: args?['notificationType'] as String?,
           ),
         );
 
@@ -505,13 +508,71 @@ class AppRouter {
     return launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  static Future<void> navigateFromNotificationTarget(String target) async {
+  static Future<bool> navigateFromNotificationTarget(String target) async {
     if (isExternalUrl(target)) {
-      await openExternalUrl(target);
-      return;
+      return openExternalUrl(target);
+    }
+
+    final canAccess = await _canAccessInternalTarget(target);
+    if (!canAccess) {
+      final currentContext = context;
+      if (currentContext != null) {
+        AppSnackBar.show(
+          currentContext,
+          message: 'Bạn không có quyền truy cập màn hình này.',
+          type: AppSnackBarType.warning,
+        );
+      }
+      return false;
     }
 
     await navigateTo(target);
+    return true;
+  }
+
+  static Future<bool> _canAccessInternalTarget(String target) async {
+    final businessContext = BusinessContext();
+    await businessContext.init();
+
+    final hasBusinessMembership = (businessContext.currentBusinessId ?? '')
+        .trim()
+        .isNotEmpty;
+    final isOwner = businessContext.isOwner;
+
+    const ownerOnlyRoutes = <String>{
+      AppRoutes.subscriptionPlans,
+      AppRoutes.currentSubscription,
+      AppRoutes.premiumPayment,
+      AppRoutes.subscriptionTransactions,
+      AppRoutes.accounting,
+      AppRoutes.generalLedger,
+      AppRoutes.invoiceTemplate,
+      AppRoutes.advancedInvoiceTemplate,
+      AppRoutes.employeeList,
+      AppRoutes.addEmployee,
+      AppRoutes.editEmployee,
+    };
+
+    const memberOnlyRoutes = <String>{
+      AppRoutes.productManagement,
+      AppRoutes.orderList,
+      AppRoutes.orderStatus,
+      AppRoutes.orderCreateSelection,
+      AppRoutes.debtList,
+      AppRoutes.importHistory,
+      AppRoutes.stockImport,
+    };
+
+    if (ownerOnlyRoutes.contains(target)) {
+      return hasBusinessMembership &&
+          PermissionService.canAccessSubscription(isOwner);
+    }
+
+    if (memberOnlyRoutes.contains(target)) {
+      return hasBusinessMembership;
+    }
+
+    return true;
   }
 
   static Future<void> handleIncomingDeepLink(Uri uri) async {

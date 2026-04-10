@@ -36,6 +36,13 @@ class NoLocationPage extends StatelessWidget {
           foregroundColor: AppColors.textPrimary,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary),
+              tooltip: context.l10n.tr('notification.title'),
+              onPressed: () {
+                AppRouter.navigateTo(AppRoutes.notifications);
+              },
+            ),
             BlocBuilder<AuthBloc, AuthState>(
               builder: (context, authState) {
                 final isLoggingOut = authState is LogoutInProgress;

@@ -456,7 +456,7 @@
     "document_date_hint": "Chọn ngày chứng từ (nếu có)",
     "done_with_count": "Xong ({count})",
     "cost_price_label": "Giá vốn: ",
-    "stock_label": " • Tồn: ",
+    "stock_label": "Tồn: ",
     "loading_products": "Đang tải sản phẩm...",
     "no_products_found": "Không tìm thấy sản phẩm nào"
   },
@@ -488,7 +488,13 @@
     "manage_employees": "Quản lý Nhân viên",
     "employees_count": "{count} nhân viên",
     "managing": "Địa điểm kinh doanh hiện tại",
-    "please_select_location": "Vui lòng chọn hoặc tạo địa điểm kinh doanh trước"
+    "please_select_location": "Vui lòng chọn hoặc tạo địa điểm kinh doanh trước",
+    "ai_section_title": "Gợi ý AI",
+    "ai_forecast_title": "Dự báo doanh thu",
+    "ai_best_seller_title": "Sản phẩm bán chạy",
+    "ai_reorder_title": "Gợi ý nhập hàng",
+    "ai_anomalies_title": "Cảnh báo bất thường",
+    "ai_mark_read": "Đánh dấu đã đọc"
   },
   "subscription": {
     "appbar_title": "Gói Đăng Ký",
@@ -878,6 +884,7 @@
     "stock_low": "Sản phẩm sắp hết hàng",
     "import_completed": "Nhập kho hoàn tất",
     "detail_title": "Chi tiết thông báo",
+    "open_link": "Mở liên kết",
     "just_now": "Vừa xong",
     "minutes_ago": "{count} phút trước",
     "hours_ago": "{count} giờ trước",
