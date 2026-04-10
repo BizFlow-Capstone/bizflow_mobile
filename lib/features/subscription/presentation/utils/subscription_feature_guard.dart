@@ -9,6 +9,9 @@ import '../../data/subscription_repository.dart';
 class SubscriptionFeatureGuard {
   SubscriptionFeatureGuard._();
 
+  /// Guards against showing multiple dialogs simultaneously (e.g. spam tapping).
+  static bool _isDialogShowing = false;
+
   /// Synchronous local check using persistent feature-limit flags.
   /// Shows a dialog if feature has reached its limit.
   /// Returns false if blocked (dialog shown), true if allowed (no dialog).
@@ -22,10 +25,13 @@ class SubscriptionFeatureGuard {
 
     if (!isBlocked) return true; // allowed
 
+    if (_isDialogShowing) return false;
+
     final l10n = AppLocalizations.of(context);
     final featureName = customFeatureName ??
         _getFeatureDisplayName(featureCode, l10n);
 
+    _isDialogShowing = true;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -53,7 +59,7 @@ class SubscriptionFeatureGuard {
           ),
         ],
       ),
-    );
+    ).whenComplete(() => _isDialogShowing = false);
 
     return false; // blocked
   }
@@ -88,8 +94,11 @@ class SubscriptionFeatureGuard {
           );
 
       if (!allowed && context.mounted) {
+        if (_isDialogShowing) return false;
+
         final l10n = AppLocalizations.of(context);
         final featureName = _getFeatureDisplayName(featureCode, l10n);
+        _isDialogShowing = true;
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
@@ -117,7 +126,7 @@ class SubscriptionFeatureGuard {
               ),
             ],
           ),
-        );
+        ).whenComplete(() => _isDialogShowing = false);
       }
 
       return allowed;
