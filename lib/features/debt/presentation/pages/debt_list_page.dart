@@ -17,7 +17,7 @@ import '../../../../shared/services/permission_service.dart';
 import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
-import '../../../subscription/data/subscription_repository.dart';
+
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/debtor_entity.dart';
@@ -41,7 +41,6 @@ class _DebtListPageState extends State<DebtListPage> {
   final ActionGuard _debtorActionGuard = ActionGuard();
   int? _selectedLocationId;
   Completer<void>? _debtorActionCompleter;
-  late final Future<bool> _canManageDebtFuture;
   bool _isPermissionChecking = false;
 
   @override
@@ -51,12 +50,6 @@ class _DebtListPageState extends State<DebtListPage> {
     if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
       context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
     }
-    _canManageDebtFuture = context
-        .read<SubscriptionRepository>()
-        .canUseFeatureCode(
-          featureCode: SubscriptionFeatureCodes.debtManagement,
-          ownerProfileId: context.read<BusinessContext>().currentOwnerProfileId,
-        );
     _loadDebtors();
   }
 
@@ -284,14 +277,10 @@ class _DebtListPageState extends State<DebtListPage> {
     final canCreateDebtor = PermissionService.canCreateDebtor(isOwner);
     final canDeleteDebtor = PermissionService.canDeleteDebtor(isOwner);
 
-    return FutureBuilder<bool>(
-      future: _canManageDebtFuture,
-      builder: (context, featureSnapshot) {
-        final canManageDebt = featureSnapshot.data ?? false;
-        final disableActions = _isPermissionChecking;
-        final limitWarning = l10n.translate('subscription.limit_warning');
+    final canManageDebt = true;
+    final disableActions = _isPermissionChecking;
 
-        return Scaffold(
+    return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
             backgroundColor: AppColors.white,
@@ -489,38 +478,6 @@ class _DebtListPageState extends State<DebtListPage> {
                         );
                       },
                     ),
-                    if (!canManageDebt)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.md,
-                          0,
-                          AppSpacing.md,
-                          AppSpacing.sm,
-                        ),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.sm,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusMd,
-                            ),
-                            border: Border.all(
-                              color: AppColors.warning.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Text(
-                            limitWarning,
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.warning,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
                     Padding(
                       padding: const EdgeInsets.all(AppSpacing.md),
                       child: Row(
@@ -612,51 +569,14 @@ class _DebtListPageState extends State<DebtListPage> {
             ),
           ),
           floatingActionButton: canCreateDebtor
-              ? Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    if (!canManageDebt)
-                      Positioned(
-                        right: 0,
-                        bottom: 72,
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 220),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.xs,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusSm,
-                            ),
-                            border: Border.all(
-                              color: AppColors.warning.withValues(alpha: 0.35),
-                            ),
-                          ),
-                          child: Text(
-                            limitWarning,
-                            style: AppTextStyles.labelSmall.copyWith(
-                              color: AppColors.warning,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    FloatingActionButton(
-                      onPressed: (canManageDebt && !disableActions)
-                          ? () => _showDebtorForm()
-                          : null,
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      child: const Icon(Icons.add),
-                    ),
-                  ],
+              ? FloatingActionButton(
+                  onPressed: !disableActions ? () => _showDebtorForm() : null,
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  child: const Icon(Icons.add),
                 )
               : null,
         );
-      },
-    );
   }
 
   Widget _buildSummaryCard({
@@ -1142,6 +1062,15 @@ class _DebtListPageState extends State<DebtListPage> {
       );
       return;
     }
+
+    // Check subscription limit BEFORE showing the form.
+    if (existing == null) {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.debtManagement,
+      );
+      if (!allowed || !mounted) return;
+    }
     final nameController = TextEditingController(text: existing?.name ?? '');
     final phoneController = TextEditingController(text: existing?.phone ?? '');
     final addressController = TextEditingController(
@@ -1228,6 +1157,7 @@ class _DebtListPageState extends State<DebtListPage> {
 
     final name = nameController.text.trim();
     if (name.isEmpty) {
+      if (!mounted) return;
       AppSnackBar.show(
         context,
         message: l10n.translate('common.required_field'),
@@ -1241,18 +1171,11 @@ class _DebtListPageState extends State<DebtListPage> {
     );
 
     if (existing == null) {
-      _setPermissionChecking(true);
-      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-        context,
-        featureCode: SubscriptionFeatureCodes.debtManagement,
-      );
-      _setPermissionChecking(false);
-      if (!allowed) return;
-
       final locationId = int.tryParse(
         BusinessContext().currentBusinessId ?? '',
       );
       if (locationId == null || locationId <= 0) {
+        if (!mounted) return;
         AppSnackBar.show(
           context,
           message: l10n.translate('debt.location_required'),
@@ -1279,14 +1202,6 @@ class _DebtListPageState extends State<DebtListPage> {
         );
       });
     } else {
-      _setPermissionChecking(true);
-      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-        context,
-        featureCode: SubscriptionFeatureCodes.debtManagement,
-      );
-      _setPermissionChecking(false);
-      if (!allowed) return;
-
       await _runDebtorAction(() {
         context.read<DebtorBloc>().add(
           UpdateDebtorRequested(

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/localization/app_localizations.dart';
-import '../../../../shared/cache/swr_builder.dart';
+import '../../../../shared/cache/cache_manager.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../data/subscription_repository.dart';
 import '../../data/models/subscription_models.dart';
@@ -26,21 +26,80 @@ class CurrentSubscriptionPage extends StatefulWidget {
 }
 
 class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
-  // Cache last valid snapshot from Firestore stream
+  // Cached Firestore stream — must NOT be recreated on every build() call.
+  Stream<DocumentSnapshot<Map<String, dynamic>>>? _usageStream;
   DocumentSnapshot<Map<String, dynamic>>? _lastValidSnapshot;
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _ensureSubscriptionLoaded();
+  }
+
+  Future<void> _ensureSubscriptionLoaded() async {
+    final repo = context.read<SubscriptionRepository>();
+
+    // When coming from checkout, always fetch fresh from network to ensure
+    // the new plan is shown (checkout result already ran retry logic).
+    if (!widget.fromCheckoutResult) {
+      // If in-memory already has data (seeded by checkout/home prefetch) — done.
+      if (repo.currentSubscriptionSnapshot != null) return;
+
+      // Cold start: try synchronous cache first.
+      final cached = CacheManager().tryGetSync('current_subscription');
+      if (cached != null) {
+        try {
+          repo.updateCurrentSubscription(
+            CurrentSubscriptionDto.fromJson(Map<String, dynamic>.from(cached)),
+          );
+          return;
+        } catch (_) {}
+      }
+    }
+
+    // Truly cold: fetch from network.
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final fresh = await context.read<SubscriptionApiService>().getCurrentSubscription();
+      if (!mounted) return;
+      repo.updateCurrentSubscription(fresh);
+      if (fresh != null) {
+        final json = fresh.toJson();
+        await CacheManager().set('current_subscription', json);
+        await CacheManager().set('current_subscription_for_plans', json);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _retryLoad() {
+    setState(() { _errorMessage = null; });
+    _ensureSubscriptionLoaded();
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final apiService = context.read<SubscriptionApiService>();
-    final repo = context.read<SubscriptionRepository>();
-    final businessContext = Provider.of<BusinessContext>(context);
+    // watch — rebuilds when updateCurrentSubscription + notifyListeners fires.
+    final repo = context.watch<SubscriptionRepository>();
+    final currentSub = repo.currentSubscriptionSnapshot;
+    final businessContext = Provider.of<BusinessContext>(context, listen: false);
     final isOwner = businessContext.isOwner;
+
+    // Initialise Firestore stream once and cache it.
+    final ownerProfileId = isOwner ? null : businessContext.currentOwnerProfileId;
+    _usageStream ??= repo.streamUsageTracking(ownerProfileId: ownerProfileId);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-         elevation: 0,
+        elevation: 0,
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -57,59 +116,69 @@ class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
         ),
         title: Text(
           l10n.translate('subscription.my_current_plan'),
-          style: AppTextStyles.titleLarge.copyWith(
-            color: AppColors.textPrimary,
-          ),
+          style: AppTextStyles.titleLarge.copyWith(color: AppColors.textPrimary),
         ),
       ),
       body: SafeArea(
         top: false,
-        child: SwrBuilder<CurrentSubscriptionDto?>(
-        cacheKey: 'current_subscription',
-        fetcher: ({cancelToken}) => apiService.getCurrentSubscription(
-          cancelToken: cancelToken,
-        ),
-        fromJson: (json) => CurrentSubscriptionDto.fromJson(json),
-        toJson: (data) => data?.toJson() ?? {},
-        builder: (context, currentSub, isLoading, error) {
-          if (isLoading && currentSub == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (error != null && currentSub == null) {
-            return Center(child: Text(error.toString()));
-          }
-
-          final ownerProfileId = isOwner
-              ? null
-              : businessContext.currentOwnerProfileId;
-          final repoStream = repo.streamUsageTracking(
-            ownerProfileId: ownerProfileId,
-          );
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (!isOwner) ...[
-                  _buildEmployeeBanner(context),
-                  const SizedBox(height: 16),
-                ],
-                _buildCurrentPlanCard(context, currentSub),
-                if (currentSub?.isActive == true) ...[
-                  const SizedBox(height: 24),
-                  _buildUsageStats(context, repoStream, currentSub!),
-                ],
-                if (isOwner) ...[
-                  const SizedBox(height: 24),
-                  _buildActions(context),
-                ],
-              ],
-            ),
-          );
-        },
+        child: _buildBody(context, l10n, repo, currentSub, isOwner),
       ),
-    ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    AppLocalizations l10n,
+    SubscriptionRepository repo,
+    CurrentSubscriptionDto? currentSub,
+    bool isOwner,
+  ) {
+    if (_isLoading && currentSub == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_errorMessage != null && currentSub == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(_errorMessage!, textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: _retryLoad,
+              child: Text(l10n.translate('common.retry')),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final businessContext = Provider.of<BusinessContext>(context, listen: false);
+    final ownerProfileId = businessContext.isOwner ? null : businessContext.currentOwnerProfileId;
+    _usageStream ??= repo.streamUsageTracking(ownerProfileId: ownerProfileId);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!isOwner) ...[
+            _buildEmployeeBanner(context),
+            const SizedBox(height: 16),
+          ],
+          _buildCurrentPlanCard(context, currentSub),
+          if (currentSub?.isActive == true) ...[
+            const SizedBox(height: 24),
+            _buildUsageStats(context, _usageStream, currentSub!),
+          ],
+          if (isOwner) ...[
+            const SizedBox(height: 24),
+            _buildActions(context),
+          ],
+        ],
+      ),
     );
   }
 
@@ -233,62 +302,11 @@ class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
           _lastValidSnapshot = snapshot.data;
         }
 
-        if (snapshot.hasError) {
-          // FIX: Show cached data instead of empty map when offline
-          final cachedData = _lastValidSnapshot?.data();
-          final featuresUsage = cachedData?['features'] as Map<String, dynamic>? ?? {};
-          
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.amber.shade200),
-                ),
-                child: const Text(
-                  'Không thể cập nhật thông tin sử dụng từ Firestore. Hiển thị dữ liệu được lưu gần đây.',
-                  style: TextStyle(color: Colors.black87),
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildUsageSection(
-                context: context,
-                l10n: l10n,
-                planFeatures: planFeatures,
-                featuresUsage: featuresUsage,
-              ),
-            ],
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-          // While connecting, show last cached data if available
-          final cachedData = _lastValidSnapshot?.data();
-          final featuresUsage = cachedData?['features'] as Map<String, dynamic>? ?? {};
-          
-          return _buildUsageSection(
-            context: context,
-            l10n: l10n,
-            planFeatures: planFeatures,
-            featuresUsage: featuresUsage,
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data?.data() == null) {
-          return _buildUsageSection(
-            context: context,
-            l10n: l10n,
-            planFeatures: planFeatures,
-            featuresUsage: const {},
-          );
-        }
-
-        final data = snapshot.data!.data()!;
-        final featuresUsage = data['features'] as Map<String, dynamic>? ?? {};
+        // Render bars immediately using best-available data.
+        // Never show error banner — just use cache or empty data.
+        final fsDoc = snapshot.hasData ? snapshot.data : _lastValidSnapshot;
+        final featuresUsage =
+            (fsDoc?.data()?['features'] as Map<String, dynamic>?) ?? const {};
 
         return _buildUsageSection(
           context: context,
@@ -317,7 +335,8 @@ class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
         ...planFeatures.map((pf) {
           final fsData = featuresUsage[pf.featureCode] as Map<String, dynamic>? ?? {};
           final used = (fsData['used'] as num?)?.toInt() ?? 0;
-          final limit = (fsData['limit'] as num?)?.toInt() ?? pf.usageLimit;
+          // Always trust current subscription plan for limit to prevent old/new limit flicker.
+          final limit = pf.usageLimit;
           return _buildUsageBar(context, pf.featureName, used, limit);
         }),
       ],

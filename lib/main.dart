@@ -391,7 +391,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           create: (context) => CostBloc(repository: _costRepository),
         ),
         Provider<EmployeeRepository>.value(value: _employeeRepository),
-        Provider<SubscriptionRepository>.value(value: _subscriptionRepository),
+        ChangeNotifierProvider<SubscriptionRepository>.value(value: _subscriptionRepository),
         Provider<SubscriptionApiService>.value(value: _subscriptionApiService),
         Provider<ImportRepository>.value(value: _importRepository),
         Provider<AccountingRepository>.value(value: _accountingRepository),

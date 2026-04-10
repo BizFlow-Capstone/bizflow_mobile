@@ -19,7 +19,12 @@ import '../../../employee/presentation/bloc/employee_state.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_event.dart';
 import '../../../location/presentation/bloc/location_state.dart';
+import 'dart:async';
 import '../../data/home_dashboard_api_service.dart';
+import '../../../subscription/data/subscription_api_service.dart';
+import '../../../subscription/data/subscription_repository.dart';
+import '../../../subscription/data/models/subscription_models.dart';
+import '../../../../shared/cache/cache_manager.dart';
 import '../../data/models/dashboard_summary_dto.dart';
 import '../../data/models/home_ai_dto.dart';
 import '../widgets/quick_actions.dart';
@@ -66,6 +71,38 @@ class _HomePageState extends State<HomePage> with RouteAware {
     final locationBloc = context.read<LocationBloc>();
     if (locationBloc.state is LocationInitial) {
       locationBloc.add(const LoadLocationsRequested());
+    }
+
+    // Prefetch subscription data so CurrentSubscriptionPage renders instantly
+    // (fire-and-forget — does not block Home rendering).
+    unawaited(_prefetchSubscription());
+  }
+
+  Future<void> _prefetchSubscription() async {
+    if (!mounted) return;
+    try {
+      final apiService = context.read<SubscriptionApiService>();
+      final repo = context.read<SubscriptionRepository>();
+      final cache = CacheManager();
+      // Always update in-memory snapshot; skip network only if cache is warm.
+      final existing = await cache.get('current_subscription');
+      if (existing != null) {
+        // Seed in-memory value from cache so CurrentSubscriptionPage reads it sync.
+        try {
+          repo.updateCurrentSubscription(
+            CurrentSubscriptionDto.fromJson(Map<String, dynamic>.from(existing)),
+          );
+        } catch (_) {}
+        return;
+      }
+      final fresh = await apiService.getCurrentSubscription();
+      if (fresh == null) return;
+      repo.updateCurrentSubscription(fresh);
+      final json = fresh.toJson();
+      await cache.set('current_subscription', json);
+      await cache.set('current_subscription_for_plans', json);
+    } catch (_) {
+      // Best-effort: silently ignore if prefetch fails.
     }
   }
 

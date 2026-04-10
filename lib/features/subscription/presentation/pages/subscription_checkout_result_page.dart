@@ -10,7 +10,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/cache/cache_manager.dart';
 import '../../data/subscription_api_service.dart';
+import '../../data/subscription_repository.dart';
+import '../../data/models/subscription_models.dart';
 
 class SubscriptionCheckoutResultPage extends StatefulWidget {
   final bool isSuccess;
@@ -29,12 +32,32 @@ class SubscriptionCheckoutResultPage extends StatefulWidget {
 
 class _SubscriptionCheckoutResultPageState
     extends State<SubscriptionCheckoutResultPage> {
+  // Track the async refresh so the "View plan" button can await it.
+  Future<void>? _refreshFuture;
+  bool _isNavigatingToPlan = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_refreshCurrentSubscription());
+      _refreshFuture = _refreshCurrentSubscription();
     });
+  }
+
+  Future<void> _navigateToCurrentPlan() async {
+    if (_isNavigatingToPlan || !mounted) return;
+    setState(() => _isNavigatingToPlan = true);
+    try {
+      // Ensure fresh subscription data is in cache before opening the page.
+      await (_refreshFuture ?? Future.value());
+    } finally {
+      if (mounted) setState(() => _isNavigatingToPlan = false);
+    }
+    if (!mounted) return;
+    AppRouter.navigateAndClearStack(
+      AppRoutes.currentSubscription,
+      arguments: {'fromCheckoutResult': true},
+    );
   }
 
   Future<void> _refreshCurrentSubscription() async {
@@ -44,7 +67,43 @@ class _SubscriptionCheckoutResultPageState
 
     try {
       final apiService = context.read<SubscriptionApiService>();
-      await apiService.getCurrentSubscription();
+      final repo = context.read<SubscriptionRepository>();
+      final cache = CacheManager();
+
+      // Remember old plan ID to detect when backend has processed the upgrade.
+      final oldPlanId = repo.currentSubscriptionSnapshot?.plan?.subscriptionPlanId;
+
+      // Clear stale cache first.
+      await cache.remove('current_subscription');
+      await cache.remove('current_subscription_for_plans');
+
+      // Retry up to 5 times (2s apart) until the plan actually changes.
+      // This handles backend webhook processing delay after payment.
+      CurrentSubscriptionDto? latest;
+      const maxAttempts = 5;
+      const retryDelay = Duration(seconds: 2);
+
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        if (!mounted) return;
+        latest = await apiService.getCurrentSubscription();
+
+        // Plan changed (or no previous plan) → backend processed successfully.
+        if (latest?.plan?.subscriptionPlanId != oldPlanId) break;
+
+        // Still same plan → wait and retry, except on last attempt.
+        if (attempt < maxAttempts - 1) {
+          await Future.delayed(retryDelay);
+        }
+      }
+
+      // Update in-memory snapshot — CurrentSubscriptionPage reads this sync.
+      if (latest != null && mounted) {
+        repo.updateCurrentSubscription(latest);
+      }
+
+      final json = latest?.toJson() ?? <String, dynamic>{};
+      await cache.set('current_subscription', json);
+      await cache.set('current_subscription_for_plans', json);
     } catch (_) {
       // Best effort refresh: keep result page UX stable if refresh fails.
     }
@@ -126,10 +185,8 @@ class _SubscriptionCheckoutResultPageState
 
                   final currentPlanButton = AppButton(
                     label: l10n.translate('subscription.my_current_plan'),
-                    onPressed: () => AppRouter.navigateAndClearStack(
-                      AppRoutes.currentSubscription,
-                      arguments: {'fromCheckoutResult': true},
-                    ),
+                    onPressed: _isNavigatingToPlan ? null : _navigateToCurrentPlan,
+                    isLoading: _isNavigatingToPlan,
                     type: AppButtonType.outlined,
                     size: AppButtonSize.large,
                   );

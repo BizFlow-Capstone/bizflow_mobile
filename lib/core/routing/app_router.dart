@@ -31,8 +31,7 @@ import '../../features/subscription/presentation/pages/subscription_plans_page.d
 import '../../features/subscription/presentation/pages/premium_payment_page.dart';
 import '../../features/subscription/presentation/pages/subscription_checkout_result_page.dart';
 import '../../features/subscription/presentation/pages/subscription_transactions_page.dart';
-import '../../features/subscription/data/subscription_repository.dart';
-import '../../features/subscription/domain/subscription_feature_codes.dart';
+
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notification/presentation/pages/notification_list_page.dart';
 import '../../features/notification/presentation/pages/notification_detail_page.dart';
@@ -56,6 +55,8 @@ import '../../shared/dialogs/app_snackbar.dart';
 import '../../shared/context/business_context.dart';
 import '../../shared/context/notification_context.dart';
 import '../../shared/services/permission_service.dart';
+import '../../features/subscription/domain/subscription_feature_codes.dart';
+import '../../features/subscription/presentation/utils/subscription_feature_guard.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Route names - Tập trung khai báo tất cả route
@@ -816,66 +817,22 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           floatingActionButton:
               (widget.showAddLocationFab &&
                   context.watch<BusinessContext>().isOwner)
-              ? FutureBuilder<bool>(
-                  future: context
-                      .read<SubscriptionRepository>()
-                      .canUseFeatureCode(
-                        featureCode: SubscriptionFeatureCodes.locations,
-                        ownerProfileId: context
-                            .read<BusinessContext>()
-                            .currentOwnerProfileId,
+              ? FloatingActionButton(
+                  backgroundColor: const Color(0xFF23C4C1),
+                  onPressed: () async {
+                    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                      context,
+                      featureCode: SubscriptionFeatureCodes.locations,
+                    );
+                    if (!allowed || !context.mounted) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AddEditLocationPage(),
                       ),
-                  builder: (context, snapshot) {
-                    final canCreateLocation = snapshot.data ?? false;
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (!canCreateLocation)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3CD),
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: const Color(0xFFFFE08A),
-                              ),
-                            ),
-                            child: Text(
-                              AppLocalizations.of(
-                                context,
-                              ).translate('subscription.limit_warning'),
-                              style: const TextStyle(
-                                color: Color(0xFF8A6100),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        FloatingActionButton(
-                          backgroundColor: canCreateLocation
-                              ? const Color(0xFF23C4C1)
-                              : const Color(0xFFBDBDBD),
-                          onPressed: canCreateLocation
-                              ? () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const AddEditLocationPage(),
-                                    ),
-                                  );
-                                }
-                              : null,
-                          child: const Icon(Icons.add, color: Colors.white),
-                        ),
-                      ],
                     );
                   },
+                  child: const Icon(Icons.add, color: Colors.white),
                 )
               : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

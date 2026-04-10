@@ -18,7 +18,7 @@ import '../../domain/entities/employee_entity.dart';
 import '../widgets/employee_card_widget.dart';
 import '../widgets/employee_action_sheet.dart';
 import '../widgets/delete_employee_dialog.dart';
-import '../../../subscription/data/subscription_repository.dart';
+
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
@@ -351,59 +351,17 @@ class _EmployeeListPageState extends State<EmployeeListPage>
           },
         ),
       ),
-      floatingActionButton: FutureBuilder<bool>(
-        future: context.read<SubscriptionRepository>().canUseFeatureCode(
-          featureCode: SubscriptionFeatureCodes.employees,
-          ownerProfileId: context.read<BusinessContext>().currentOwnerProfileId,
-        ),
-        builder: (context, snapshot) {
-          final canAddEmployee = snapshot.data ?? false;
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (!canAddEmployee)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3CD),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: const Color(0xFFFFE08A)),
-                      ),
-                      child: Text(
-                        AppLocalizations.of(
-                          context,
-                        ).translate('subscription.limit_warning'),
-                        style: const TextStyle(
-                          color: Color(0xFF8A6100),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  FloatingActionButton(
-                    onPressed: canAddEmployee
-                        ? () {
-                            Navigator.pushNamed(context, AppRoutes.addEmployee);
-                          }
-                        : null,
-                    backgroundColor: canAddEmployee
-                        ? AppColors.primary
-                        : AppColors.divider,
-                    child: const Icon(Icons.add, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+            context,
+            featureCode: SubscriptionFeatureCodes.employees,
           );
+          if (!allowed || !context.mounted) return;
+          Navigator.pushNamed(context, AppRoutes.addEmployee);
         },
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

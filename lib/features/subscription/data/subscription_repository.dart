@@ -2,12 +2,13 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../../../shared/cache/cache_manager.dart';
 import '../../../core/storage/secure_storage.dart';
 import '../data/subscription_api_service.dart';
 import '../data/models/subscription_models.dart';
 
-class SubscriptionRepository {
+class SubscriptionRepository extends ChangeNotifier {
   final SubscriptionApiService _apiService;
   final CacheManager _cache;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
@@ -16,6 +17,28 @@ class SubscriptionRepository {
   Map<String, int> _latestUsageByFeatureCode = const {};
   // Preserve last valid snapshot when network error occurs
   Map<String, int> _lastValidUsageSnapshot = const {};
+
+  // In-memory current subscription — updated every time fresh API data arrives.
+  // This is the single source of truth for instant UI reads; no serialization needed.
+  CurrentSubscriptionDto? _currentSubscription;
+
+  /// Synchronous read — always returns the most recent known subscription.
+  /// Safe to call from initState / build without await.
+  CurrentSubscriptionDto? get currentSubscriptionSnapshot => _currentSubscription;
+
+  /// Called by any service that fetches fresh subscription data (Home prefetch,
+  /// checkout result, etc.) to keep the in-memory value up-to-date.
+  void updateCurrentSubscription(CurrentSubscriptionDto? dto) {
+    _currentSubscription = dto;
+    notifyListeners();
+  }
+
+  // Persistent feature-limit flags.
+  // Key: featureCode (lowercase). Value: true = at-or-over limit (blocked).
+  // Persisted to cache so the flag survives app restart.
+  // Rule: once blocked, stays blocked until realtime confirms used < limit.
+  static const _flagsCacheKey = 'feature_limit_flags';
+  Map<String, bool> _featureLimitFlags = {};
 
   SubscriptionRepository(this._apiService) : _cache = CacheManager();
 
@@ -145,6 +168,10 @@ class SubscriptionRepository {
 
     await _clearUsageTrackingListener();
 
+    // Load persisted flags before starting the stream so the flag state is
+    // correct even before the first Firestore event arrives.
+    await _loadFlagsFromCache();
+
     _activeUsageTrackingDocId = docId;
     _usageTrackingSubscription = FirebaseFirestore.instance
         .collection('usage_tracking')
@@ -156,6 +183,8 @@ class SubscriptionRepository {
           // Always preserve as last valid snapshot (even if empty doc)
           if (extracted.isNotEmpty) {
             _lastValidUsageSnapshot = extracted;
+            // Realtime update: recompute and persist limit flags.
+            _updateFeatureLimitFlags(extracted);
           }
         }, onError: (error) {
           //FIX: On network error, keep using last valid snapshot
@@ -209,6 +238,74 @@ class SubscriptionRepository {
 
     return result;
   }
+
+  // ---------------------------------------------------------------------------
+  // Feature-limit flag helpers
+  // ---------------------------------------------------------------------------
+
+  /// Synchronous check — safe to call from build() or anywhere without await.
+  /// Returns true if the feature has reached (or exceeded) its plan limit.
+  /// Stays true until Firestore confirms used < limit again.
+  bool isFeatureLimitReached(String featureCode) {
+    final key = featureCode.trim().toLowerCase();
+    return _featureLimitFlags[key] ?? false;
+  }
+
+  Future<void> _loadFlagsFromCache() async {
+    try {
+      // Try synchronous read first (SharedPreferences already in RAM).
+      final raw = _cache.tryGetSync(_flagsCacheKey)
+          ?? await _cache.get(_flagsCacheKey);
+      if (raw != null) {
+        _featureLimitFlags = raw.map((k, v) => MapEntry(k, v == true));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveFlagsToCache() async {
+    try {
+      final json = _featureLimitFlags.map((k, v) => MapEntry(k, v));
+      await _cache.set(_flagsCacheKey, json);
+    } catch (_) {}
+  }
+
+  void _updateFeatureLimitFlags(Map<String, int> usageMap) {
+    // Read plan limits synchronously from the subscription cache.
+    Map<String, int> planLimits = {};
+    try {
+      final raw = _cache.tryGetSync('current_subscription');
+      if (raw != null) {
+        final sub = CurrentSubscriptionDto.fromJson(
+          Map<String, dynamic>.from(raw),
+        );
+        for (final f in sub.plan?.features ?? []) {
+          planLimits[f.featureCode.toLowerCase()] = f.usageLimit;
+        }
+      }
+    } catch (_) {}
+
+    if (planLimits.isEmpty) return;
+
+    bool changed = false;
+    for (final entry in usageMap.entries) {
+      final code = entry.key; // already lowercased by _extractUsageMap
+      final used = entry.value;
+      final limit = planLimits[code];
+      if (limit == null) continue;
+      // limit == -1 means unlimited — never block.
+      final blocked = limit >= 0 && used >= limit;
+      if (_featureLimitFlags[code] != blocked) {
+        _featureLimitFlags[code] = blocked;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      unawaited(_saveFlagsToCache());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
 
   Future<void> _clearUsageTrackingListener() async {
     await _usageTrackingSubscription?.cancel();

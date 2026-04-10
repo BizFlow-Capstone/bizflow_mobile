@@ -51,7 +51,6 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   final ActionGuard _submitGuard = ActionGuard();
   final ActionGuard _employeeMutationGuard = ActionGuard();
   Completer<void>? _submitCompleter;
-  Future<bool>? _canCreateLocationFuture;
   final ScrollController _formScrollController = ScrollController();
   final GlobalKey _nameFieldKey = GlobalKey();
   final GlobalKey _addressFieldKey = GlobalKey();
@@ -86,14 +85,6 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     _selectedManagerId = widget.location?.id;
 
     if (widget.location == null) {
-      _canCreateLocationFuture = context
-          .read<SubscriptionRepository>()
-          .canUseFeatureCode(
-            featureCode: SubscriptionFeatureCodes.locations,
-            ownerProfileId: context
-                .read<BusinessContext>()
-                .currentOwnerProfileId,
-          );
       _prefillTaxCodeFromRegister();
     }
 
@@ -583,60 +574,16 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                   );
                 }
 
-                return FutureBuilder<bool>(
-                  future: _canCreateLocationFuture,
-                  builder: (context, snapshot) {
-                    final canCreateLocation = snapshot.data ?? false;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (!canCreateLocation)
-                          Container(
-                            margin: const EdgeInsets.only(
-                              bottom: AppSpacing.sm,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: AppSpacing.sm,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.warning.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(
-                                AppSpacing.radiusMd,
-                              ),
-                              border: Border.all(
-                                color: AppColors.warning.withValues(
-                                  alpha: 0.35,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              l10n.translate('subscription.limit_warning'),
-                              style: AppTextStyles.bodySmall.copyWith(
-                                color: AppColors.warning,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        AppButton(
-                          label: l10n.translate('location.create_button'),
-                          isFullWidth: true,
-                          isLoading: isLoading,
-                          isDisabled:
-                              !canCreateLocation || _submitGuard.isRunning,
-                          onPressed:
-                              (isLoading ||
-                                  !canCreateLocation ||
-                                  _submitGuard.isRunning)
-                              ? null
-                              : _handleSubmit,
-                          type: AppButtonType.secondary,
-                          size: AppButtonSize.large,
-                        ),
-                      ],
-                    );
-                  },
+                return AppButton(
+                  label: l10n.translate('location.create_button'),
+                  isFullWidth: true,
+                  isLoading: isLoading,
+                  isDisabled: _submitGuard.isRunning,
+                  onPressed: (isLoading || _submitGuard.isRunning)
+                      ? null
+                      : _handleSubmit,
+                  type: AppButtonType.secondary,
+                  size: AppButtonSize.large,
                 );
               },
             ),

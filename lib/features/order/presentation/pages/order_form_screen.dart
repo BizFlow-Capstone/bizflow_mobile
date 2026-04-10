@@ -1471,7 +1471,24 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                     : () async {
                         if (_isProceedingPayment) return;
                         setState(() => _isProceedingPayment = true);
+
+                        final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                          context,
+                          featureCode: SubscriptionFeatureCodes.orders,
+                        );
+                        if (!allowed) {
+                          if (mounted) {
+                            setState(() => _isProceedingPayment = false);
+                          }
+                          return;
+                        }
+
                         final locationId = BusinessContext().currentBusinessId;
+
+                        if (!mounted) {
+                          setState(() => _isProceedingPayment = false);
+                          return;
+                        }
 
                         await Navigator.push(
                           context,
@@ -1756,6 +1773,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   }
 
   Future<void> _showCreateDebtProfileDialog() async {
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.debtManagement,
+    );
+    if (!allowed || !mounted) return;
+
     final l10n = AppLocalizations.of(context);
     final nameController = TextEditingController();
     final phoneController = TextEditingController();

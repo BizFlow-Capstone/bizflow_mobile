@@ -71,6 +71,18 @@ class CacheManager {
     return data;
   }
 
+  /// Đọc cache đồng bộ (synchronous) — chỉ dùng sau khi init() đã được gọi ít nhất 1 lần.
+  /// SharedPreferences đã load vào RAM, nên read là instant, không cần await.
+  /// Trả về null nếu CacheManager chưa khởi tạo hoặc không có cache.
+  Map<String, dynamic>? tryGetSync(String key) {
+    if (_storage == null) return null;
+    final data = _storage!.getObject('cache_$key');
+    if (data != null && data.containsKey('data')) {
+      return data['data'] as Map<String, dynamic>;
+    }
+    return data;
+  }
+
   /// Lưu trữ dữ liệu vào cache theo key
   Future<void> set(String key, Map<String, dynamic> data) async {
     await init();
