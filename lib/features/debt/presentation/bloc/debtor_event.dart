@@ -42,6 +42,24 @@ class ResetDebtors extends DebtorEvent {
   const ResetDebtors();
 }
 
+class SearchDebtorsRequested extends DebtorEvent {
+  final String query;
+
+  const SearchDebtorsRequested(this.query);
+
+  @override
+  List<Object?> get props => [query];
+}
+
+class FilterDebtorsRequested extends DebtorEvent {
+  final bool? isActive;
+
+  const FilterDebtorsRequested(this.isActive);
+
+  @override
+  List<Object?> get props => [isActive];
+}
+
 class ToggleDebtorStatusRequested extends DebtorEvent {
   final int debtorId;
   final bool isActive;

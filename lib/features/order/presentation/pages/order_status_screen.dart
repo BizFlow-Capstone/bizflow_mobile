@@ -259,8 +259,6 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
       draftOrders = state.orders;
     } else if (state is OrdersLoaded) {
       draftOrders = state.orders.where((o) => o.isDraft).toList();
-    } else if (state is OrdersFiltered) {
-      draftOrders = state.orders.where((o) => o.isDraft).toList();
     }
 
     if (draftOrders.isEmpty) {
@@ -327,8 +325,6 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
     List<OrderEntity> pendingOrders = [];
 
     if (state is OrdersLoaded) {
-      pendingOrders = state.orders.where((o) => o.isPending).toList();
-    } else if (state is OrdersFiltered) {
       pendingOrders = state.orders.where((o) => o.isPending).toList();
     }
 

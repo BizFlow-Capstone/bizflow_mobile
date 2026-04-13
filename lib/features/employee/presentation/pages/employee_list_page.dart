@@ -352,6 +352,7 @@ class _EmployeeListPageState extends State<EmployeeListPage>
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        tooltip: t.translate('employee.add_employee'),
         onPressed: () async {
           final allowed = await SubscriptionFeatureGuard.ensureAllowed(
             context,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -53,6 +54,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   bool _showFabMenu = false;
   List<BusinessTypeDto> _businessTypes = [];
   String? _lastApiMessage;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -67,6 +69,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -92,9 +95,17 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   }
 
   void _searchProducts(String query) {
-    context.read<ProductBloc>().add(
-      SearchProductsRequested(locationId: widget.locationId, query: query),
-    );
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        context.read<ProductBloc>().add(
+              SearchProductsRequested(
+                locationId: widget.locationId,
+                query: query,
+              ),
+            );
+      }
+    });
   }
 
   Future<void> _openAddProductPage() async {
@@ -499,144 +510,120 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     ),
                   );
                 } else if (state is ProductsLoaded) {
-                  if (state.products.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.shopping_bag_outlined,
-                            size: 64,
-                            color: AppColors.textSecondary,
-                          ),
-                          SizedBox(height: AppSpacing.lg),
-                          Text(
-                            l10n.translate('location.manage_products'),
-                            style: AppTextStyles.titleSmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          SizedBox(height: AppSpacing.md),
-                          Text(
-                            l10n.translate('common.no_data'),
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      context.read<ProductBloc>().add(
-                        RefreshProductsRequested(locationId: widget.locationId),
-                      );
-                    },
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: AppSpacing.sm,
-                        bottom: 120, // Increased bottom padding for FAB
-                      ),
-                      itemCount: state.hasReachedMax
-                          ? state.products.length
-                          : state.products.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index >= state.products.length) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24.0),
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                        }
-                        final product = state.products[index];
-                        return ProductCardWidget(
-                          product: product,
-                          locationId: widget.locationId,
-                          canManageActions: canManageProducts,
-                          onQuickAdjustStock: canAdjustStock
-                              ? () => _showQuickAdjustStockDialog(product)
-                              : null,
-                        );
-                      },
-                    ),
-                  );
+                  return _buildProductList(state.products, state.hasReachedMax, canManageProducts, canAdjustStock);
                 }
 
-                final currentProducts = context
-                    .read<ProductBloc>()
-                    .currentProducts;
-
-                if (currentProducts.isNotEmpty &&
-                    state is! ProductLoading &&
-                    state is! ProductDeleteInProgress) {
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      context.read<ProductBloc>().add(
-                        RefreshProductsRequested(locationId: widget.locationId),
-                      );
-                    },
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: AppSpacing.sm,
-                        bottom: 120, // Increased bottom padding for FAB
-                      ),
-                      itemCount: currentProducts
-                          .length, // Don't show loading indicator at bottom for fallback
-                      itemBuilder: (context, index) {
-                        return ProductCardWidget(
-                          product: currentProducts[index],
-                          locationId: widget.locationId,
-                          canManageActions: canManageProducts,
-                          onQuickAdjustStock: canAdjustStock
-                              ? () => _showQuickAdjustStockDialog(
-                                  currentProducts[index],
-                                )
-                              : null,
-                        );
-                      },
-                    ),
-                  );
+                // If state is BusinessTypesLoaded or any other non-loading state,
+                // fallback to the current cached list in the Bloc
+                final currentProducts = context.read<ProductBloc>().currentProducts;
+                if (currentProducts.isNotEmpty) {
+                  return _buildProductList(currentProducts, true, canManageProducts, canAdjustStock);
                 }
 
-                return const SizedBox.shrink();
+                return _buildEmptyState(l10n);
               },
             ),
           ),
         ],
       ),
-      floatingActionButton: Consumer<BusinessContext>(
-        builder: (context, bCtx, _) {
-          if (!PermissionService.canCreateProduct(bCtx.isOwner)) {
-            return const SizedBox.shrink();
-          }
-          return ProductFabMenuWidget(
-            isOpen: _showFabMenu,
-            onToggle: _toggleFabMenu,
-            onAddProduct: _openAddProductPage,
-            onImportInventory: () {
-              _toggleFabMenu();
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ImportHistoryPage(),
-                ),
-              ).then((result) {
-                if (result == true && mounted) {
-                  _loadProducts();
+      floatingActionButton: canManageProducts
+          ? Consumer<BusinessContext>(
+              builder: (context, bCtx, _) {
+                if (!PermissionService.canCreateProduct(bCtx.isOwner)) {
+                  return const SizedBox.shrink();
                 }
-              });
-            },
+                return ProductFabMenuWidget(
+                  isOpen: _showFabMenu,
+                  onToggle: _toggleFabMenu,
+                  onAddProduct: _openAddProductPage,
+                  onImportInventory: () {
+                    _toggleFabMenu();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ImportHistoryPage(),
+                      ),
+                    ).then((result) {
+                      if (result == true && mounted) {
+                        _loadProducts();
+                      }
+                    });
+                  },
+                );
+              },
+            )
+          : null,
+    );
+  }
+
+  Widget _buildProductList(List<ProductEntity> products, bool hasReachedMax, bool canManageProducts, bool canAdjustStock) {
+    if (products.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context));
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<ProductBloc>().add(
+          RefreshProductsRequested(locationId: widget.locationId),
+        );
+      },
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: EdgeInsets.only(
+          left: AppSpacing.md,
+          right: AppSpacing.md,
+          top: AppSpacing.sm,
+          bottom: 120,
+        ),
+        itemCount: hasReachedMax ? products.length : products.length + 1,
+        itemBuilder: (context, index) {
+          if (index >= products.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          final product = products[index];
+          return ProductCardWidget(
+            product: product,
+            locationId: widget.locationId,
+            canManageActions: canManageProducts,
+            onQuickAdjustStock: canAdjustStock
+                ? () => _showQuickAdjustStockDialog(product)
+                : null,
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(AppLocalizations l10n) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shopping_bag_outlined,
+            size: 64,
+            color: AppColors.textSecondary,
+          ),
+          SizedBox(height: AppSpacing.lg),
+          Text(
+            l10n.translate('location.manage_products'),
+            style: AppTextStyles.titleSmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.translate('common.no_data'),
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -715,7 +702,7 @@ class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
                 labelText: l10n.translate('product.stock_adjust.stock'),
               ),
             ),
-            SizedBox(height: AppSpacing.md),
+            AppSpacing.gapVerticalMd,
             TextField(
               controller: _costPriceController,
               keyboardType: TextInputType.number,

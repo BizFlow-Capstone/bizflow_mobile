@@ -82,9 +82,10 @@ class _ManagementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return MergeSemantics(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -136,6 +137,6 @@ class _ManagementCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }

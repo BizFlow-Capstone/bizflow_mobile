@@ -158,6 +158,7 @@ class _CustomAppBarState extends State<CustomAppBar> {
           children: [
             IconButton(
               onPressed: widget.onNotificationTap,
+              tooltip: l10n.translate('notification.title'),
               icon: const Icon(Icons.notifications_none),
               color: AppColors.textPrimary,
             ),
@@ -200,6 +201,7 @@ class _CustomAppBarState extends State<CustomAppBar> {
         // Settings
         IconButton(
           onPressed: widget.onSettingsTap,
+          tooltip: l10n.translate('settings_page.title'),
           icon: const Icon(Icons.settings),
           color: AppColors.textPrimary,
         ),

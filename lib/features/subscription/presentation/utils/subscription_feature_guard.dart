@@ -39,8 +39,7 @@ class SubscriptionFeatureGuard {
           l10n.translate('subscription.feature_limit_reached_title'),
         ),
         content: Text(
-          l10n.translate('subscription.feature_limit_reached_message')
-              .replaceAll('{feature}', featureName),
+          l10n.translate('subscription.feature_limit_reached_message'),
         ),
         actions: [
           TextButton(

@@ -8,6 +8,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../core/routing/app_router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -52,7 +53,9 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
 
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is LoginSuccess) {
+        if (state is PhoneRegisterGoogleLinkRequired) {
+          AppRouter.navigateAndClearStack(AppRoutes.phoneGoogleLink);
+        } else if (state is LoginSuccess) {
           PostAuthNavigation.route(context);
         } else if (state is PhoneRegisterFailure) {
           AppSnackBar.error(context, state.message);

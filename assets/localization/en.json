@@ -28,7 +28,8 @@
     "detail": "Detail",
     "error_occurred": "An error occurred, please try again",
     "status": "Status",
-    "create": "Create"
+    "create": "Create",
+    "search_hint": "Search..."
   },
   "auth": {
     "login": "Login",
@@ -121,7 +122,10 @@
     "reset_password_button": "Reset Password",
     "reset_password_success": "Password reset successful",
     "link_phone_required_title": "Link Phone Number",
-    "link_phone_required_subtitle": "New Google accounts must link a phone number before setting password"
+    "link_phone_required_subtitle": "New Google accounts must link a phone number before setting password",
+    "link_google_required_title": "Link Google Account",
+    "link_google_required_subtitle": "Please link your Google account for better security and easier login",
+    "skip": "Skip"
   },
   "validation": {
     "required": "This field is required",
@@ -565,7 +569,7 @@
     "used_format": "{used} / {limit}",
     "feature_blocked": "This feature is unavailable in your current plan or usage limit has been reached.",
     "feature_limit_reached_title": "Usage limit reached",
-    "feature_limit_reached_message": "{feature} has reached the limit for your current plan. Please upgrade to continue.",
+    "feature_limit_reached_message": "This feature has reached the limit for your current plan. Please upgrade to continue.",
     "manage_plan": "Manage Plan",
     "registered_label": "Subscribed",
     "renew_more": "Renew",
@@ -954,7 +958,13 @@
     "credit_limit_warning_message": "The debt amount has exceeded the credit limit. Do you want to continue allowing debt?",
     "location_required": "Business location is required",
     "customer_required": "Customer name is required",
-    "create_failed": "Create debtor failed"
+    "create_failed": "Create debtor failed",
+    "filter_title": "Filters",
+    "filter_reset": "Reset",
+    "filter_status": "Status",
+    "filter_location": "Business Location",
+    "filter_apply": "Apply",
+    "create_customer": "Create Customer"
   },
   "employee": {
     "title": "Employee Management",

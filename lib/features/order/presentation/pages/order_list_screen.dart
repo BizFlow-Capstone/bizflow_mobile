@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,10 @@ import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart'
 import 'package:bizflow_mobile/features/order/domain/entities/order_entity.dart';
 import 'package:bizflow_mobile/shared/context/business_context.dart';
 import 'package:bizflow_mobile/shared/utils/action_guard.dart';
+import 'package:bizflow_mobile/core/theme/app_colors.dart';
+import 'package:bizflow_mobile/core/theme/app_spacing.dart';
+import 'package:bizflow_mobile/core/theme/app_text_styles.dart';
+import 'package:bizflow_mobile/shared/widgets/app_text_field.dart';
 import 'package:bizflow_mobile/shared/widgets/app_sync_status_text.dart';
 import 'package:bizflow_mobile/shared/dialogs/app_snackbar.dart';
 import '../widgets/order_card.dart';
@@ -34,6 +39,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
   final Set<String> _publishingOrderIds = {};
   final ActionGuard _cancelOrderGuard = ActionGuard();
   final ActionGuard _openOrderCreationGuard = ActionGuard();
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   String? _resolveLocationId({String? preferred}) {
     final raw = (preferred ?? context.read<BusinessContext>().currentBusinessId)
@@ -108,6 +115,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
     context.read<OrderBloc>().add(
       RefreshOrdersRequested(locationId: locationId),
     );
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        context.read<OrderBloc>().add(SearchOrdersRequested(keyword: query));
+      }
+    });
   }
 
   Future<void> _completeOrder(
@@ -309,6 +325,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
     _openOrderDetail(order);
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
   void _openOrderDetail(OrderEntity order) {
     Navigator.push(
       context,
@@ -371,6 +394,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(l10n.translate('order.list_title')),
         elevation: 0,
@@ -405,8 +429,32 @@ class _OrderListScreenState extends State<OrderListScreen> {
         ],
         bottom: const AppSyncStatusText(),
       ),
-      body: BlocConsumer<OrderBloc, OrderState>(
-        listener: (context, state) {
+      body: Column(
+        children: [
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: AppTextField(
+              controller: _searchController,
+              hintText: 'Tìm theo tên KH, SĐT hoặc mã đơn...',
+              prefixIcon: const Icon(Icons.search),
+              onChanged: _onSearchChanged,
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                        });
+                        _onSearchChanged('');
+                      },
+                    )
+                  : null,
+            ),
+          ),
+          Expanded(
+            child: BlocConsumer<OrderBloc, OrderState>(
+              listener: (context, state) {
           if (state is OrderError) {
             AppSnackBar.show(
               context,
@@ -433,8 +481,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
           if (state is DraftOrdersLoaded) {
             orders = state.orders;
           } else if (state is OrdersLoaded) {
-            orders = state.orders;
-          } else if (state is OrdersFiltered) {
             orders = state.orders;
           } else if (state is OrderError) {
             orders = [];
@@ -508,7 +554,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
           );
         },
       ),
+    ),
+  ],
+),
       floatingActionButton: FloatingActionButton(
+        tooltip: 'Tạo đơn hàng',
         onPressed: () async {
           await _openOrderCreationGuard.run(() async {
             await Navigator.push(

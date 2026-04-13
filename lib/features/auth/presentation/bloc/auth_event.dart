@@ -191,6 +191,10 @@ class LogoutRequested extends AuthEvent {
   const LogoutRequested();
 }
 
+class AuthOnboardingCompleted extends AuthEvent {
+  const AuthOnboardingCompleted();
+}
+
 class ClearAuthError extends AuthEvent {
   const ClearAuthError();
 }

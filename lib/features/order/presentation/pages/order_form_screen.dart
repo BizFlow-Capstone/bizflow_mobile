@@ -1786,77 +1786,120 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     final notesController = TextEditingController();
     final creditLimitController = TextEditingController();
 
+    final nameFocusNode = FocusNode();
+    final phoneFocusNode = FocusNode();
+
+    String? nameError;
+    String? phoneError;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(l10n.translate('debt.create_title')),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('order_create.customer_name'),
-                  ),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(l10n.translate('debt.create_title')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      focusNode: nameFocusNode,
+                      decoration: InputDecoration(
+                        labelText: '${l10n.translate('order_create.customer_name')} *',
+                        errorText: nameError,
+                      ),
+                      onChanged: (_) {
+                        if (nameError != null) setState(() => nameError = null);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: phoneController,
+                      focusNode: phoneFocusNode,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(_phoneLength),
+                        ],
+                      ),
+                      decoration: InputDecoration(
+                        labelText: '${l10n.translate('order_create.customer_phone')} *',
+                        errorText: phoneError,
+                      ),
+                      onChanged: (_) {
+                        if (phoneError != null) setState(() => phoneError = null);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: addressController,
+                      decoration: InputDecoration(
+                        labelText: l10n.translate('debt.address'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: notesController,
+                      decoration: InputDecoration(
+                        labelText: l10n.translate('debt.note'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: creditLimitController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                        inputFormatters: [CurrencyInputFormatter()],
+                      ),
+                      decoration: InputDecoration(
+                        labelText: l10n.translate('debt.credit_limit'),
+                        suffixText: 'đ',
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: phoneController,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(_phoneLength),
-                    ],
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('order_create.customer_phone'),
-                  ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: Text(l10n.translate('common.cancel')),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: addressController,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('debt.address'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: notesController,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('debt.note'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: creditLimitController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                    inputFormatters: [CurrencyInputFormatter()],
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('debt.credit_limit'),
-                    suffixText: 'đ',
-                  ),
+                ElevatedButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+                    final phone = phoneController.text.trim();
+
+                    setState(() {
+                      nameError = name.isEmpty ? l10n.translate('common.required_field') : null;
+                      phoneError = phone.isEmpty ? l10n.translate('common.required_field') : null;
+                    });
+
+                    if (name.isEmpty) {
+                      nameFocusNode.requestFocus();
+                      return;
+                    }
+
+                    if (phone.isEmpty) {
+                      phoneFocusNode.requestFocus();
+                      return;
+                    }
+
+                    Navigator.pop(dialogContext, true);
+                  },
+                  child: Text(l10n.translate('common.save')),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(l10n.translate('common.cancel')),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(l10n.translate('common.save')),
-            ),
-          ],
+            );
+          },
         );
       },
-    );
+    ).whenComplete(() {
+      nameFocusNode.dispose();
+      phoneFocusNode.dispose();
+    });
 
     if (confirmed != true || !mounted) return;
 
@@ -1890,24 +1933,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       AppSnackBar.show(
         context,
         message: l10n.translate('debt.location_required'),
-        type: AppSnackBarType.warning,
-      );
-      return;
-    }
-
-    if (customerName.isEmpty) {
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('order_create.customer_name_required'),
-        type: AppSnackBarType.warning,
-      );
-      return;
-    }
-
-    if (customerPhone.isNotEmpty && customerPhone.length != _phoneLength) {
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('order_create.phone_invalid'),
         type: AppSnackBarType.warning,
       );
       return;

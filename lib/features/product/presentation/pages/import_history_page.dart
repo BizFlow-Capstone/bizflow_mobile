@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,6 +12,7 @@ import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../data/import_repository.dart';
 import '../bloc/import_history/import_history_bloc.dart';
 import '../bloc/import_history/import_history_event.dart';
@@ -56,6 +58,8 @@ class _ImportHistoryView extends StatefulWidget {
 
 class _ImportHistoryViewState extends State<_ImportHistoryView> {
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   bool _needsRefresh = false;
 
   AppLocalizations get l10n => AppLocalizations.of(context);
@@ -69,6 +73,8 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -76,6 +82,15 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
     if (_isBottom) {
       context.read<ImportHistoryBloc>().add(const LoadMoreImportHistory());
     }
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        context.read<ImportHistoryBloc>().add(SearchImportHistory(query));
+      }
+    });
   }
 
   bool get _isBottom {
@@ -122,8 +137,32 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
           ],
           bottom: const AppSyncStatusText(),
         ),
-        body: BlocConsumer<ImportHistoryBloc, ImportHistoryState>(
-          listener: (context, state) {
+        body: Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: AppTextField(
+                controller: _searchController,
+                hintText: l10n.translate('common.search_hint'),
+                prefixIcon: const Icon(Icons.search),
+                onChanged: _onSearchChanged,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                          });
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+              ),
+            ),
+            Expanded(
+              child: BlocConsumer<ImportHistoryBloc, ImportHistoryState>(
+                listener: (context, state) {
             if (state.status == ImportHistoryStatus.failure) {
               AppSnackBar.show(
                 context,
@@ -215,7 +254,10 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
               ),
             );
           },
-        ),
+            ),
+          ),
+        ],
+      ),
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: AppColors.secondary,
           onPressed: () {

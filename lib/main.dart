@@ -275,7 +275,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 'Main: Auto-refreshed and cached ${locations.length} locations after network recovery.',
               );
             })
-            .catchError((Object _) => <LocationEntity>[]);
+            .catchError((Object _) {
+              // Ignore failure
+            });
       }
     });
 

@@ -192,3 +192,12 @@ class RefreshOrdersRequested extends OrderEvent {
   @override
   List<Object?> get props => [locationId];
 }
+
+/// Search orders by keyword (local filtering)
+class SearchOrdersRequested extends OrderEvent {
+  final String keyword;
+  const SearchOrdersRequested({required this.keyword});
+
+  @override
+  List<Object?> get props => [keyword];
+}

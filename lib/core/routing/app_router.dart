@@ -12,6 +12,7 @@ import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/set_password_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/google_phone_link_page.dart';
+import '../../features/auth/presentation/pages/phone_google_link_page.dart';
 import '../../core/services/firebase_messaging_service.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/bloc/auth_event.dart';
@@ -65,6 +66,7 @@ class AppRoutes {
 
   static const String setPassword = '/set-password';
   static const String googlePhoneLink = '/google-phone-link';
+  static const String phoneGoogleLink = '/phone-google-link';
 
   // Auth
   static const String splash = '/';
@@ -192,6 +194,9 @@ class AppRouter {
 
       case AppRoutes.googlePhoneLink:
         return _buildRoute(settings, const GooglePhoneLinkPage());
+
+      case AppRoutes.phoneGoogleLink:
+        return _buildRoute(settings, const PhoneGoogleLinkPage());
 
       case AppRoutes.forgotPassword:
         return _buildRoute(settings, const ForgotPasswordPage());
@@ -818,6 +823,7 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
               (widget.showAddLocationFab &&
                   context.watch<BusinessContext>().isOwner)
               ? FloatingActionButton(
+                  tooltip: 'Thêm địa điểm',
                   backgroundColor: const Color(0xFF23C4C1),
                   onPressed: () async {
                     final allowed = await SubscriptionFeatureGuard.ensureAllowed(

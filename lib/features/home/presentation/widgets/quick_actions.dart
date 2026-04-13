@@ -73,9 +73,10 @@ class _QuickActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
+    return MergeSemantics(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
@@ -98,6 +99,7 @@ class _QuickActionButton extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ],
+        ),
       ),
     );
   }

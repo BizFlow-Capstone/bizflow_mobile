@@ -22,19 +22,58 @@ class OrdersLoading extends OrderState {
 /// Orders loaded successfully
 class OrdersLoaded extends OrderState {
   final List<OrderEntity> orders;
+  final List<OrderEntity> allOrders; // Master set for local filtering
   final int total;
   final int pageNumber;
   final int pageSize;
+  final String? searchQuery;
+  final String? statusFilter;
+  final String? locationFilter;
 
   const OrdersLoaded({
     required this.orders,
+    required this.allOrders,
     required this.total,
     required this.pageNumber,
     required this.pageSize,
+    this.searchQuery,
+    this.statusFilter,
+    this.locationFilter,
   });
 
+  OrdersLoaded copyWith({
+    List<OrderEntity>? orders,
+    List<OrderEntity>? allOrders,
+    int? total,
+    int? pageNumber,
+    int? pageSize,
+    String? searchQuery,
+    String? statusFilter,
+    String? locationFilter,
+  }) {
+    return OrdersLoaded(
+      orders: orders ?? this.orders,
+      allOrders: allOrders ?? this.allOrders,
+      total: total ?? this.total,
+      pageNumber: pageNumber ?? this.pageNumber,
+      pageSize: pageSize ?? this.pageSize,
+      searchQuery: searchQuery ?? this.searchQuery,
+      statusFilter: statusFilter ?? this.statusFilter,
+      locationFilter: locationFilter ?? this.locationFilter,
+    );
+  }
+
   @override
-  List<Object?> get props => [orders, total, pageNumber, pageSize];
+  List<Object?> get props => [
+        orders,
+        allOrders,
+        total,
+        pageNumber,
+        pageSize,
+        searchQuery,
+        statusFilter,
+        locationFilter,
+      ];
 }
 
 /// Draft orders loaded successfully
@@ -97,21 +136,6 @@ class OrderCancelled extends OrderState {
   List<Object?> get props => [orderId];
 }
 
-/// Orders filtered
-class OrdersFiltered extends OrderState {
-  final List<OrderEntity> orders;
-  final String? statusFilter;
-  final String? locationFilter;
-
-  const OrdersFiltered({
-    required this.orders,
-    this.statusFilter,
-    this.locationFilter,
-  });
-
-  @override
-  List<Object?> get props => [orders, statusFilter, locationFilter];
-}
 
 /// Error state
 class OrderError extends OrderState {

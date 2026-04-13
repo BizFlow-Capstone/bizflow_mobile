@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +14,7 @@ import '../bloc/gl_bloc/gl_bloc.dart';
 import '../bloc/gl_bloc/gl_event.dart';
 import '../bloc/gl_bloc/gl_state.dart';
 import '../widgets/gl_filter_bottom_sheet.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../accounting/data/models/general_ledger_entry_model.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../../../order/presentation/bloc/order_bloc.dart';
@@ -29,6 +31,8 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   final ScrollController _scrollController = ScrollController();
   static const int _pageSize = 20;
   bool _isLocationUnavailable = false;
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -46,6 +50,8 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -122,19 +128,50 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     );
   }
 
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        context.read<GLBloc>().add(SearchGLEntriesRequested(query));
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          child: Column(
             children: [
-              TextButton.icon(
-                icon: const Icon(Icons.filter_list, color: AppColors.primary),
-                label: Text(context.tr('accounting.gl_filter_data')),
-                onPressed: _showFiltersBottomSheet,
+              AppTextField(
+                controller: _searchController,
+                hintText: context.tr('common.search_hint'),
+                prefixIcon: const Icon(Icons.search),
+                onChanged: _onSearchChanged,
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                          });
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.filter_list, color: AppColors.primary),
+                    label: Text(context.tr('accounting.gl_filter_data')),
+                    onPressed: _showFiltersBottomSheet,
+                  ),
+                ],
               ),
             ],
           ),

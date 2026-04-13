@@ -18,6 +18,8 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
     on<DebtorsNetworkDataReceived>(_onDebtorsNetworkDataReceived);
     on<DebtorsNetworkErrorOccurred>(_onDebtorsNetworkErrorOccurred);
     on<RefreshDebtorsRequested>(_onRefreshDebtorsRequested);
+    on<SearchDebtorsRequested>(_onSearchDebtorsRequested);
+    on<FilterDebtorsRequested>(_onFilterDebtorsRequested);
     on<ToggleDebtorStatusRequested>(_onToggleDebtorStatusRequested);
     on<DeleteDebtorRequested>(_onDeleteDebtorRequested);
     on<LoadActiveDebtorsByLocationRequested>(_onLoadActiveDebtorsByLocation);
@@ -36,31 +38,32 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
 
   String _buildDebtorCacheKey({
     required List<int>? locationIds,
-    required String? search,
     required bool? isActive,
-    required int pageNumber,
-    required int pageSize,
   }) {
     final businessId = BusinessContext().currentBusinessId ?? 'all';
     final locationKey = (locationIds == null || locationIds.isEmpty)
         ? 'all'
         : locationIds.join('-');
-    final searchKey = (search ?? '').trim();
     final activeKey = isActive == null ? 'all' : (isActive ? '1' : '0');
-    return 'cache_debtors_${businessId}_${locationKey}_${searchKey}_${activeKey}_${pageNumber}_$pageSize';
+    return 'cache_debtors_v2_${businessId}_${locationKey}_$activeKey';
   }
 
   Future<void> _onLoadDebtorsRequested(
     LoadDebtorsRequested event,
     Emitter<DebtorState> emit,
   ) async {
+    // If businessLocationIds change, we need to clear local master list to avoid mixing locations incorrectly
+    final bool locationChanged =
+        !listEquals(event.businessLocationIds, state.businessLocationIds);
+
     emit(
       state.copyWith(
         status: DebtorStatus.loading,
         errorMessage: null,
-        search: event.search,
+        // We keep the filters, but the data will be reloaded
         isActive: event.isActive,
         businessLocationIds: event.businessLocationIds,
+        debtors: locationChanged ? [] : state.debtors,
       ),
     );
 
@@ -70,10 +73,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
 
     final cacheKey = _buildDebtorCacheKey(
       locationIds: resolvedLocationIds,
-      search: event.search,
       isActive: event.isActive,
-      pageNumber: event.pageNumber,
-      pageSize: event.pageSize,
     );
 
     await CacheManager().fetchWithSWR<DebtorListResult>(
@@ -81,21 +81,19 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
       fetcher: ({cancelToken}) {
         return repository.getDebtors(
           businessLocationIds: resolvedLocationIds,
-          search: event.search,
+          search: null, // Always fetch full list
           isActive: event.isActive,
-          pageNumber: event.pageNumber,
-          pageSize: event.pageSize,
+          pageNumber: 1, // Start with page 1
+          pageSize: 200, // Load more for local search
         );
       },
       fromJson: DebtorListResult.fromCacheMap,
       toJson: (result) => result.toCacheMap(),
       onData: (result, _) {
         _debtors = result.items;
-        // Add event instead of direct emit to avoid BLoC timing issues
         add(DebtorsNetworkDataReceived(result: result));
       },
       onError: (error) {
-        // Add event instead of direct emit
         add(DebtorsNetworkErrorOccurred(error: error));
       },
     );
@@ -120,17 +118,78 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
     Emitter<DebtorState> emit,
   ) async {
     if (!isClosed) {
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
       emit(
         state.copyWith(
           status: DebtorStatus.success,
-          debtors: event.result.items,
-          hasReachedMax: !event.result.hasNextPage,
+          debtors: filtered,
+          hasReachedMax: true, // Local filtering usually covers current set
           currentPage: event.result.pageNumber,
           totalCount: event.result.totalCount,
           errorMessage: null,
         ),
       );
     }
+  }
+
+  Future<void> _onSearchDebtorsRequested(
+    SearchDebtorsRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    final filtered = _applyLocalFilters(_debtors, event.query, state.isActive);
+    emit(
+      state.copyWith(
+        search: event.query,
+        debtors: filtered,
+        status: DebtorStatus.success,
+      ),
+    );
+  }
+
+  Future<void> _onFilterDebtorsRequested(
+    FilterDebtorsRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    // Some filters (like isActive) might be handled by server and cached,
+    // but we can also handle them locally if master list is broad.
+    // Given current UX needs, if we have local data, we just filter it.
+    final filtered = _applyLocalFilters(_debtors, state.search, event.isActive);
+    emit(
+      state.copyWith(
+        isActive: event.isActive,
+        debtors: filtered,
+        status: DebtorStatus.success,
+      ),
+    );
+  }
+
+  List<DebtorEntity> _applyLocalFilters(
+    List<DebtorEntity> all,
+    String? search,
+    bool? isActive,
+  ) {
+    var result = List<DebtorEntity>.from(all);
+
+    // Filter by isActive
+    if (isActive != null) {
+      result = result.where((d) => d.isActive == isActive).toList();
+    }
+
+    // Filter by search
+    if (search != null && search.trim().isNotEmpty) {
+      final query = search.trim().toLowerCase();
+      result = result.where((d) {
+        final name = d.name.toLowerCase();
+        final phone = (d.phone ?? '').toLowerCase();
+        return name.contains(query) || phone.contains(query);
+      }).toList();
+    }
+
+    return result;
   }
 
   Future<void> _onDebtorsNetworkErrorOccurred(
@@ -164,10 +223,16 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
         return debtor;
       }).toList();
 
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
       emit(
         state.copyWith(
           status: DebtorStatus.success,
-          debtors: _debtors,
+          debtors: filtered,
           lastMessageCode: event.isActive
               ? 'DEBTOR_STATUS_ACTIVATED'
               : 'DEBTOR_STATUS_DEACTIVATED',
@@ -198,10 +263,16 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
           .where((debtor) => debtor.debtorId != event.debtorId)
           .toList();
 
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
       emit(
         state.copyWith(
           status: DebtorStatus.success,
-          debtors: _debtors,
+          debtors: filtered,
           totalCount: _debtors.length,
           lastMessageCode: 'DEBTOR_DELETED',
           errorMessage: null,
@@ -237,10 +308,16 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
         _debtors = [created, ..._debtors];
       }
 
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
       emit(
         state.copyWith(
           status: DebtorStatus.success,
-          debtors: _debtors,
+          debtors: filtered,
           debtorDetail: created ?? state.debtorDetail,
           totalCount: _debtors.length,
           isSubmitting: false,
@@ -283,10 +360,16 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
             .toList();
       }
 
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
       emit(
         state.copyWith(
           status: DebtorStatus.success,
-          debtors: _debtors,
+          debtors: filtered,
           debtorDetail: updated?.debtorId == state.debtorDetail?.debtorId
               ? updated
               : state.debtorDetail,

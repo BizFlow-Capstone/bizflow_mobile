@@ -81,10 +81,16 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     final localProducts = await repository.getCachedProducts(scopeKey);
     if (localProducts.isNotEmpty) {
       _products = localProducts;
+      final filtered = _applyLocalFilters(
+        _products,
+        _searchQuery,
+        _filterStatus,
+        _filterBusinessTypeId,
+      );
       emit(
         ProductsLoaded(
-          products: localProducts,
-          hasReachedMax: localProducts.length < 20,
+          products: filtered,
+          hasReachedMax: true,
           currentPage: 1,
           locationId: event.locationId,
           searchQuery: _searchQuery,
@@ -99,18 +105,23 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
     try {
       debugPrint(
-        'ProductBloc: Loading products for location ${event.locationId} with filters: $_searchQuery, $_filterStatus',
+        'ProductBloc: Loading master products for location ${event.locationId}',
       );
+      // Fetch WITHOUT search/filter to get the master list
       final response = await repository.getProducts(
         locationId: int.tryParse(event.locationId),
-        search: _searchQuery,
-        businessTypeId: _filterBusinessTypeId,
-        status: _filterStatus,
+        search: null,
+        businessTypeId: null,
+        status: null,
+        pageNumber: 1,
+        pageSize: 500, // Load enough for local search
       );
-      debugPrint('ProductBloc: Response received');
+      
       final parsedProducts = _parseProductsFromResponse(response);
       final products = await _enrichProductsWithSaleItems(parsedProducts);
       _products = products;
+      
+      // Save full list to cache
       unawaited(repository.saveCachedProducts(scopeKey, products));
       unawaited(
         repository.clearProductsDirty(
@@ -118,6 +129,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           products.map((item) => item.id).toList(),
         ),
       );
+      
       add(
         ProductsNetworkDataReceived(
           products: products,
@@ -137,10 +149,16 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     if (!isClosed) {
+      final filtered = _applyLocalFilters(
+        event.products,
+        _searchQuery,
+        _filterStatus,
+        _filterBusinessTypeId,
+      );
       emit(
         ProductsLoaded(
-          products: event.products,
-          hasReachedMax: event.products.length < 20,
+          products: filtered,
+          hasReachedMax: true,
           currentPage: 1,
           locationId: event.locationId,
           searchQuery: _searchQuery,
@@ -472,7 +490,20 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     _searchQuery = event.query.isEmpty ? null : event.query;
-    add(LoadProductsByLocationRequested(locationId: event.locationId));
+    final filtered = _applyLocalFilters(
+      _products,
+      _searchQuery,
+      _filterStatus,
+      _filterBusinessTypeId,
+    );
+    if (state is ProductsLoaded) {
+      emit(
+        (state as ProductsLoaded).copyWith(
+          products: filtered,
+          searchQuery: _searchQuery,
+        ),
+      );
+    }
   }
 
   Future<void> _onFilterProductsRequested(
@@ -481,7 +512,55 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     _filterStatus = event.status;
     _filterBusinessTypeId = event.businessTypeId;
-    add(LoadProductsByLocationRequested(locationId: event.locationId));
+    final filtered = _applyLocalFilters(
+      _products,
+      _searchQuery,
+      _filterStatus,
+      _filterBusinessTypeId,
+    );
+    if (state is ProductsLoaded) {
+      emit(
+        (state as ProductsLoaded).copyWith(
+          products: filtered,
+          filterStatus: _filterStatus,
+          filterBusinessTypeId: _filterBusinessTypeId,
+        ),
+      );
+    }
+  }
+
+  List<ProductEntity> _applyLocalFilters(
+    List<ProductEntity> all,
+    String? search,
+    String? status,
+    String? businessTypeId,
+  ) {
+    var result = List<ProductEntity>.from(all);
+
+    // Filter by status
+    if (status != null && status != 'ALL') {
+      final bool active = status == 'ACTIVE';
+      result = result.where((p) => p.isActive == active).toList();
+    }
+
+    // Filter by business type
+    if (businessTypeId != null && businessTypeId != 'ALL') {
+      result = result
+          .where((p) => p.businessTypeId == businessTypeId)
+          .toList();
+    }
+
+    // Filter by search
+    if (search != null && search.trim().isNotEmpty) {
+      final query = search.trim().toLowerCase();
+      result = result.where((p) {
+        final name = p.name.toLowerCase();
+        final barcode = (p.barcode ?? '').toLowerCase();
+        return name.contains(query) || barcode.contains(query);
+      }).toList();
+    }
+
+    return result;
   }
 
   Future<void> _onSortProductsRequested(

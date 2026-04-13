@@ -11,6 +11,7 @@ class GLBloc extends Bloc<GLEvent, GLState> {
   GLBloc({required this.repository}) : super(GLInitial()) {
     on<LoadGLEntriesRequested>(_onLoadGLEntriesRequested);
     on<ChangeGLFiltersRequested>(_onChangeGLFiltersRequested);
+    on<SearchGLEntriesRequested>(_onSearchGLEntriesRequested);
   }
 
   Future<void> _onLoadGLEntriesRequested(
@@ -36,34 +37,38 @@ class GLBloc extends Bloc<GLEvent, GLState> {
         toDate: event.toDate,
         viewMode: event.viewMode,
         onData: (data, totalCount, isFromCache) {
-          if (!isClosed) {
-            // Append if load more
-            List<GeneralLedgerEntryModel> allEntries = data;
-            if (event.isLoadMore && currentState is GLLoaded) {
-              allEntries = List.of(currentState.entries)..addAll(data);
-              // Deduplicate based on ID if needed, but pagination usually handles this
-              final ids = <int>{};
-              allEntries.retainWhere((x) => ids.add(x.entryId));
-            }
-            
-            final hasReachedMax = allEntries.length >= totalCount || data.length < event.pageSize;
-
-            emit(GLLoaded(
-              entries: allEntries,
-              totalCount: totalCount,
-              isFromCache: isFromCache,
-              isLoadMore: event.isLoadMore,
-              pageNumber: event.pageNumber,
-              pageSize: event.pageSize,
-              hasReachedMax: hasReachedMax,
-              transactionTypes: event.transactionTypes ?? [],
-              referenceTypes: event.referenceTypes ?? [],
-              moneyChannels: event.moneyChannels ?? [],
-              fromDate: event.fromDate,
-              toDate: event.toDate,
-              viewMode: event.viewMode,
-            ));
+          // Append if load more
+          List<GeneralLedgerEntryModel> masterEntries = data;
+          if (event.isLoadMore && currentState is GLLoaded) {
+            masterEntries = List.of(currentState.allEntries)..addAll(data);
+            // Deduplicate based on ID if needed
+            final ids = <int>{};
+            masterEntries.retainWhere((x) => ids.add(x.entryId));
           }
+          
+          final hasReachedMax = masterEntries.length >= totalCount || data.length < event.pageSize;
+
+          final searchKeyword = (currentState is GLLoaded) ? currentState.searchQuery : null;
+          final filtered = _applyLocalFilters(masterEntries, searchKeyword);
+
+          emit(GLLoaded(
+            entries: filtered,
+            allEntries: masterEntries,
+            totalCount: totalCount,
+            isFromCache: isFromCache,
+            isLoadMore: event.isLoadMore,
+            pageNumber: event.pageNumber,
+            pageSize: event.pageSize,
+            hasReachedMax: hasReachedMax,
+            businessLocationId: event.businessLocationId,
+            searchQuery: searchKeyword,
+            transactionTypes: event.transactionTypes ?? [],
+            referenceTypes: event.referenceTypes ?? [],
+            moneyChannels: event.moneyChannels ?? [],
+            fromDate: event.fromDate,
+            toDate: event.toDate,
+            viewMode: event.viewMode,
+          ));
         },
         onError: (e) {
           if (!isClosed) {
@@ -73,8 +78,8 @@ class GLBloc extends Bloc<GLEvent, GLState> {
         },
       );
     } catch (error) {
-       final prevEntries = currentState is GLLoaded ? currentState.entries : null;
-       emit(GLError(ApiErrorMessageParser.parse(error), previousEntries: prevEntries));
+      final prevEntries = currentState is GLLoaded ? currentState.entries : null;
+      emit(GLError(ApiErrorMessageParser.parse(error), previousEntries: prevEntries));
     }
   }
 
@@ -84,20 +89,57 @@ class GLBloc extends Bloc<GLEvent, GLState> {
   ) async {
     final currentState = state;
     if (currentState is GLLoaded) {
-      // Just emit a new state with updated filters!
-      // The UI will dispatch LoadGLEntriesRequested immediately after.
-      emit(currentState.copyWith(
+      // If we only changed viewMode, we can potentially filter locally too? 
+      // But typically viewMode (audit/standard) might require different data fields from API.
+      // So we keep standard full reload for viewMode change.
+      
+      // Reset pagination and reload
+      add(LoadGLEntriesRequested(
+        businessLocationId: currentState.businessLocationId,
+        pageNumber: 1,
+        pageSize: currentState.pageSize,
         transactionTypes: event.transactionTypes,
         referenceTypes: event.referenceTypes,
         moneyChannels: event.moneyChannels,
         fromDate: event.fromDate,
         toDate: event.toDate,
-        viewMode: event.viewMode,
-        // Reset pagination when filters change
-        pageNumber: 1,
-        entries: [],
-        hasReachedMax: false,
+        viewMode: event.viewMode ?? currentState.viewMode,
       ));
     }
+  }
+
+  void _onSearchGLEntriesRequested(
+    SearchGLEntriesRequested event,
+    Emitter<GLState> emit,
+  ) {
+    final s = state;
+    if (s is GLLoaded) {
+      final filtered = _applyLocalFilters(s.allEntries, event.keyword);
+      emit(s.copyWith(entries: filtered, searchQuery: event.keyword));
+    }
+  }
+
+  List<GeneralLedgerEntryModel> _applyLocalFilters(
+    List<GeneralLedgerEntryModel> entries,
+    String? search,
+  ) {
+    if (search == null || search.trim().isEmpty) {
+      return List.from(entries);
+    }
+
+    final query = search.trim().toLowerCase();
+    return entries.where((e) {
+      final note = e.note.toLowerCase();
+      final docNum = e.documentNumber.toLowerCase();
+      final amount = e.amount.toString();
+      final channel = (e.moneyChannel ?? '').toLowerCase();
+      final type = e.transactionType.toLowerCase();
+      
+      return note.contains(query) ||
+             docNum.contains(query) ||
+             amount.contains(query) ||
+             channel.contains(query) ||
+             type.contains(query);
+    }).toList();
   }
 }

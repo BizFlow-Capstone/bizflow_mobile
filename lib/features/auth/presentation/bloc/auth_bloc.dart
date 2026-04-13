@@ -98,6 +98,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<ChangePasswordRequested>(_onChangePasswordRequested);
     on<DeleteAccountRequested>(_onDeleteAccountRequested);
     on<LogoutRequested>(_onLogoutRequested);
+    on<AuthOnboardingCompleted>(_onAuthOnboardingCompleted);
     on<ClearAuthError>(_onClearAuthError);
   }
 
@@ -998,15 +999,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     await firebaseMessagingService.registerCurrentToken();
     await _firebaseAuth.signOut();
-    emit(
-      LoginSuccess(
-        accessToken: result.accessToken!,
-        user: {
-          if (result.fullName != null) 'fullName': result.fullName,
-          if (result.avatarUrl != null) 'avatarUrl': result.avatarUrl,
-        },
-      ),
-    );
+    emit(const PhoneRegisterGoogleLinkRequired());
   }
 
   Future<void> _completeLinkPhoneWithCredential({
@@ -1303,5 +1296,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         .where((e) => e.isNotEmpty)
         .toSet()
         .toList();
+  }
+
+  Future<void> _onAuthOnboardingCompleted(
+    AuthOnboardingCompleted event,
+    Emitter<AuthState> emit,
+  ) async {
+    final token = await secureStorage.getAccessToken();
+    emit(AuthAuthenticated(accessToken: token ?? ''));
   }
 }

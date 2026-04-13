@@ -232,28 +232,6 @@ class _LocationPageContent extends StatelessWidget {
 
             return Column(
               children: [
-                // Search Bar
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: l10n.translate('location.search_placeholder'),
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusSm,
-                        ),
-                        borderSide: BorderSide(color: AppColors.divider),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusSm,
-                        ),
-                        borderSide: BorderSide(color: AppColors.divider),
-                      ),
-                    ),
-                  ),
-                ),
                 // Location List
                 Expanded(
                   child: ListView.builder(

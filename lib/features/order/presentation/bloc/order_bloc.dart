@@ -37,6 +37,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     on<PublishOrderRequested>(_onPublishOrderRequested);
     on<CancelOrderRequested>(_onCancelOrderRequested);
     on<FilterOrdersRequested>(_onFilterOrdersRequested);
+    on<SearchOrdersRequested>(_onSearchOrdersRequested);
     on<RefreshOrdersRequested>(_onRefreshOrdersRequested);
     on<ResetOrders>(_onResetOrders);
   }
@@ -60,15 +61,25 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
         locationId: event.locationId,
         onData: (orders, totalCount, isFromCache) {
           final mergedOrders = _mergeOrdersWithDrafts(orders, event.status);
-          _orders = mergedOrders;
+          _orders = mergedOrders; // This is the master set for the current view
           _currentStatusFilter = event.status;
           _currentLocationFilter = event.locationId;
+          
+          final filtered = _applyLocalFilters(
+            mergedOrders,
+            null, // search
+            event.status,
+          );
+          
           emit(
             OrdersLoaded(
-              orders: mergedOrders,
+              orders: filtered,
+              allOrders: mergedOrders,
               total: totalCount,
               pageNumber: event.pageNumber,
               pageSize: event.pageSize,
+              statusFilter: event.status,
+              locationFilter: event.locationId,
             ),
           );
         },
@@ -220,6 +231,90 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
   }
 
   /// Publish order (now Complete order)
+  void _onSearchOrdersRequested(
+    SearchOrdersRequested event,
+    Emitter<OrderState> emit,
+  ) {
+    final s = state;
+    if (s is OrdersLoaded) {
+      final filtered = _applyLocalFilters(
+        s.allOrders,
+        event.keyword,
+        s.statusFilter,
+      );
+
+      emit(s.copyWith(orders: filtered, searchQuery: event.keyword));
+    }
+  }
+
+  Future<void> _onFilterOrdersRequested(
+    FilterOrdersRequested event,
+    Emitter<OrderState> emit,
+  ) async {
+    final s = state;
+
+    // If only status changed and we already have orders, do it locally
+    if (s is OrdersLoaded &&
+        event.locationId == s.locationFilter &&
+        s.allOrders.isNotEmpty) {
+      final filtered = _applyLocalFilters(
+        s.allOrders,
+        s.searchQuery,
+        event.status,
+      );
+
+      emit(
+        s.copyWith(
+          orders: filtered,
+          statusFilter: event.status,
+          pageNumber: event.pageNumber,
+        ),
+      );
+      return;
+    }
+
+    // Otherwise, perform a full reload
+    add(
+      LoadOrdersRequested(
+        locationId: event.locationId,
+        status: event.status,
+        pageNumber: event.pageNumber,
+        pageSize: event.pageSize,
+      ),
+    );
+  }
+
+  List<OrderEntity> _applyLocalFilters(
+    List<OrderEntity> orders,
+    String? search,
+    String? status,
+  ) {
+    var result = List<OrderEntity>.from(orders);
+
+    // 1. Status Filter
+    if (status != null && status.isNotEmpty && status != 'ALL') {
+      result = result.where((o) => o.status.toUpperCase() == status.toUpperCase()).toList();
+    }
+
+    // 2. Search Keyword
+    if (search != null && search.trim().isNotEmpty) {
+      final query = search.trim().toLowerCase();
+      result = result.where((o) {
+        final customerName = o.customerName?.toLowerCase() ?? '';
+        final customerPhone = o.customerPhone?.toLowerCase() ?? '';
+        final orderId = o.id.toString().toLowerCase();
+        final orderCode = o.orderCode.toLowerCase();
+        
+        return customerName.contains(query) ||
+               customerPhone.contains(query) ||
+               orderId.contains(query) ||
+               orderCode.contains(query);
+      }).toList();
+    }
+
+    return result;
+  }
+
   Future<void> _onPublishOrderRequested(
     PublishOrderRequested event,
     Emitter<OrderState> emit,
@@ -258,51 +353,13 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     }
   }
 
-  /// Filter orders
-  Future<void> _onFilterOrdersRequested(
-    FilterOrdersRequested event,
-    Emitter<OrderState> emit,
-  ) async {
-    if (state is! OrdersLoaded && state is! OrdersFiltered) {
-      emit(const OrdersLoading());
-    }
-    try {
-      // Load local drafts first, respecting locationId filter
-      _localDrafts = await _loadLocalDraftOrders(locationId: event.locationId);
-
-      await repository.getOrdersSWR(
-        pageNumber: event.pageNumber,
-        pageSize: event.pageSize,
-        status: event.status,
-        locationId: event.locationId,
-        onData: (orders, totalCount, isFromCache) {
-          final mergedOrders = _mergeOrdersWithDrafts(orders, event.status);
-          _orders = mergedOrders;
-          _currentStatusFilter = event.status;
-          _currentLocationFilter = event.locationId;
-          emit(
-            OrdersFiltered(
-              orders: mergedOrders,
-              statusFilter: event.status,
-              locationFilter: event.locationId,
-            ),
-          );
-        },
-        onError: (e) {
-          emit(OrderError(message: ApiErrorMessageParser.parse(e)));
-        },
-      );
-    } catch (e) {
-      emit(OrderError(message: ApiErrorMessageParser.parse(e)));
-    }
-  }
 
   /// Refresh orders
   Future<void> _onRefreshOrdersRequested(
     RefreshOrdersRequested event,
     Emitter<OrderState> emit,
   ) async {
-    if (state is! OrdersLoaded && state is! OrdersFiltered) {
+    if (state is! OrdersLoaded) {
       emit(const OrdersLoading());
     }
     try {
@@ -324,6 +381,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
           _orders = mergedOrders;
           emit(
             OrdersLoaded(
+              allOrders: mergedOrders,
               orders: mergedOrders,
               total: totalCount,
               pageNumber: 1,

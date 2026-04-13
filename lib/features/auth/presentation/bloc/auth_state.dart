@@ -89,6 +89,10 @@ class GoogleLoginPhoneLinkRequired extends AuthState {
   const GoogleLoginPhoneLinkRequired();
 }
 
+class PhoneRegisterGoogleLinkRequired extends AuthState {
+  const PhoneRegisterGoogleLinkRequired();
+}
+
 // Set Password States
 class SetPasswordInProgress extends AuthState {
   const SetPasswordInProgress();

@@ -74,3 +74,12 @@ class ChangeGLFiltersRequested extends GLEvent {
         viewMode,
       ];
 }
+
+class SearchGLEntriesRequested extends GLEvent {
+  final String keyword;
+
+  const SearchGLEntriesRequested(this.keyword);
+
+  @override
+  List<Object?> get props => [keyword];
+}
