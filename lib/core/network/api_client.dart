@@ -810,7 +810,7 @@ class ApiClient {
     if (inFlightAt != null) {
       throw ApiException(
         statusCode: -4,
-        message: 'Yeu cau dang duoc xu ly, vui long doi trong giay lat.',
+        message: 'Yêu cầu đang được xử lý, vui lòng đợi trong giây lát.',
       );
     }
 
@@ -818,7 +818,7 @@ class ApiClient {
     if (recentAt != null && now.difference(recentAt) < _mutationCooldown) {
       throw ApiException(
         statusCode: -4,
-        message: 'Ban thao tac qua nhanh, vui long thu lai sau it giay.',
+        message: 'Bạn thao tác quá nhanh, vui lòng thử lại sau ít giây nữa.',
       );
     }
 

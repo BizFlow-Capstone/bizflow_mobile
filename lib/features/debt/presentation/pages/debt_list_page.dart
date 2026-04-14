@@ -1214,8 +1214,17 @@ class _DebtListPageState extends State<DebtListPage> {
         );
       },
     ).whenComplete(() {
-      nameFocusNode.dispose();
-      phoneFocusNode.dispose();
+      // Delay disposal to ensure context menu and listeners are detached
+      // after the dialog slide-out animation finishes.
+      Future.delayed(const Duration(milliseconds: 500), () {
+        nameFocusNode.dispose();
+        phoneFocusNode.dispose();
+        nameController.dispose();
+        phoneController.dispose();
+        addressController.dispose();
+        notesController.dispose();
+        creditLimitController.dispose();
+      });
     });
 
     if (confirmed != true || !mounted) return;
