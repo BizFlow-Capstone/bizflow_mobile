@@ -114,21 +114,56 @@ class PaginatedNotificationsDto {
   });
 
   factory PaginatedNotificationsDto.fromJson(Map<String, dynamic> json) {
-    final rawItems = json['items'];
-    final items = rawItems is List
-        ? rawItems
-              .whereType<Map<String, dynamic>>()
-              .map(UserNotificationDto.fromJson)
-              .toList()
-        : <UserNotificationDto>[];
+    Map<String, dynamic>? asStringKeyMap(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return Map<String, dynamic>.from(value);
+      }
+      return null;
+    }
+
+    final rawItems =
+        json['items'] ?? json['notifications'] ?? json['rows'] ?? json['data'];
+    final items = <UserNotificationDto>[];
+    if (rawItems is List) {
+      for (final item in rawItems) {
+        final map = asStringKeyMap(item);
+        if (map != null) {
+          items.add(UserNotificationDto.fromJson(map));
+        }
+      }
+    }
+
+    final pageNumber =
+        (json['pageNumber'] as num?)?.toInt() ??
+        (json['page'] as num?)?.toInt() ??
+        1;
+    final pageSize =
+        (json['pageSize'] as num?)?.toInt() ??
+        (json['size'] as num?)?.toInt() ??
+        items.length;
+    final totalPages =
+        (json['totalPages'] as num?)?.toInt() ??
+        (json['pages'] as num?)?.toInt() ??
+        1;
+    final totalCount =
+        (json['totalCount'] as num?)?.toInt() ??
+        (json['total'] as num?)?.toInt() ??
+        items.length;
+    final hasNextPage =
+        json['hasNextPage'] == true ||
+        (json['hasMore'] == true) ||
+        (pageNumber < totalPages);
 
     return PaginatedNotificationsDto(
       items: items,
-      pageNumber: (json['pageNumber'] as num?)?.toInt() ?? 1,
-      pageSize: (json['pageSize'] as num?)?.toInt() ?? items.length,
-      totalPages: (json['totalPages'] as num?)?.toInt() ?? 1,
-      totalCount: (json['totalCount'] as num?)?.toInt() ?? items.length,
-      hasNextPage: json['hasNextPage'] == true,
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+      totalPages: totalPages,
+      totalCount: totalCount,
+      hasNextPage: hasNextPage,
     );
   }
 }

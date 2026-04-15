@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/cache/sync_status_controller.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/sidebar_widget.dart';
@@ -35,7 +37,31 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
   @override
   void initState() {
     super.initState();
+    SyncStatusController().setManualRefreshCallback(_triggerManualRefresh);
     context.read<LocationBloc>().add(const LoadLocationsRequested());
+  }
+
+  @override
+  void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
+    super.dispose();
+  }
+
+  void _triggerManualRefresh() {
+    unawaited(_refreshLocationsManually());
+  }
+
+  Future<void> _refreshLocationsManually() async {
+    if (!mounted) return;
+    SyncStatusController().startSync();
+    try {
+      context.read<LocationBloc>().add(
+        const LoadLocationsRequested(useCache: false),
+      );
+      SyncStatusController().endSync(updatedAt: DateTime.now());
+    } catch (_) {
+      SyncStatusController().endSync(hasError: true);
+    }
   }
 
   void _handleLocationToggleStatus(String locationId, bool isActive) {
@@ -62,7 +88,9 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
   void _handleLocationDelete(LocationEntity location) async {
     final confirmed = await AppDialog.delete(
       context,
-      title: l10n.translate('product.confirm_delete_title'), // Reusing product confirm delete for now
+      title: l10n.translate(
+        'product.confirm_delete_title',
+      ), // Reusing product confirm delete for now
       message: l10n.translate('product.confirm_delete_message'),
       confirmText: l10n.translate('common.delete'),
     );
@@ -155,8 +183,10 @@ class _LocationPageContent extends StatelessWidget {
             message: l10n.translate('location.location_deleted'),
             type: AppSnackBarType.success,
           );
-          final businessContext =
-              Provider.of<BusinessContext>(context, listen: false);
+          final businessContext = Provider.of<BusinessContext>(
+            context,
+            listen: false,
+          );
           if (businessContext.currentBusinessId == state.locationId) {
             await businessContext.clear();
             // In the next frame, LocationsLoaded will trigger and auto-select a new location.
@@ -179,13 +209,28 @@ class _LocationPageContent extends StatelessWidget {
             // Ignore employee tab states (LocationEmployeesLoaded, AddEmployeeToLocationSuccess, etc.)
             return current is LocationsLoaded ||
                 current is LocationLoading ||
+                current is LocationToggleInProgress ||
                 current is LocationFailure ||
                 current is LocationError ||
                 current is LocationInitial;
           },
           builder: (context, state) {
-            // Loading state
-            if (state is LocationLoading) {
+            final cachedLocations = context
+                .read<LocationBloc>()
+                .currentLocations;
+            final togglingLocationId = state is LocationToggleInProgress
+                ? state.locationId
+                : null;
+
+            List<LocationEntity> locations = [];
+            if (state is LocationsLoaded) {
+              locations = state.locations;
+            } else {
+              locations = cachedLocations;
+            }
+
+            // Loading state (only when absolutely no local data)
+            if (state is LocationLoading && locations.isEmpty) {
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -203,9 +248,44 @@ class _LocationPageContent extends StatelessWidget {
               );
             }
 
-            List<LocationEntity> locations = [];
-            if (state is LocationsLoaded) {
-              locations = state.locations;
+            if ((state is LocationFailure || state is LocationError) &&
+                locations.isEmpty) {
+              final message = state is LocationFailure
+                  ? state.message
+                  : (state as LocationError).message;
+
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off_outlined,
+                        size: 56,
+                        color: AppColors.textSecondary,
+                      ),
+                      SizedBox(height: AppSpacing.md),
+                      Text(
+                        message,
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.md),
+                      ElevatedButton(
+                        onPressed: () {
+                          context.read<LocationBloc>().add(
+                            const LoadLocationsRequested(),
+                          );
+                        },
+                        child: Text(l10n.translate('common.retry')),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }
 
             if (locations.isEmpty) {
@@ -244,8 +324,10 @@ class _LocationPageContent extends StatelessWidget {
                     itemCount: locations.length,
                     itemBuilder: (context, index) {
                       final location = locations[index];
-                      final isOwner =
-                          Provider.of<BusinessContext>(context, listen: false).isOwner;
+                      final isOwner = Provider.of<BusinessContext>(
+                        context,
+                        listen: false,
+                      ).isOwner;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.md),
                         child: LocationCard(
@@ -264,10 +346,16 @@ class _LocationPageContent extends StatelessWidget {
                           },
                           // Owner-only actions
                           onToggleStatus: isOwner
-                              ? (isActive) => onToggleStatus(location.id, isActive)
+                            ? (isActive) =>
+                              onToggleStatus(location.id, isActive)
                               : null,
+                          isToggleLoading: togglingLocationId == location.id,
                           onEdit: isOwner ? () => onEdit(location) : null,
                           onDelete: isOwner ? () => onDelete(location) : null,
+                          activeText: l10n.translate('location.active_status'),
+                          inactiveText: l10n.translate(
+                            'location.inactive_status',
+                          ),
                           onAddManager: () {
                             AppSnackBar.show(
                               context,

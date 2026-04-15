@@ -184,6 +184,56 @@ class OrderRepository {
     }
   }
 
+  Future<OrderEntity?> getCachedOrder(String orderId) async {
+    final key = 'order_detail_$orderId';
+
+    final localOrder = await _localDataSource.getById(orderId);
+    if (localOrder != null) {
+      return localOrder;
+    }
+
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      return _mapToEntity(
+        OrderDto.fromJson(Map<String, dynamic>.from(localCached)),
+      );
+    }
+
+    return null;
+  }
+
+  Future<void> fetchOrderSWR({
+    required String orderId,
+    required Function(OrderEntity data, bool isFromCache) onData,
+    Function(dynamic error)? onError,
+  }) async {
+    final key = 'order_detail_$orderId';
+    final cached = await getCachedOrder(orderId);
+
+    if (cached != null) {
+      onData(cached, true);
+    }
+
+    try {
+      final dto = await _apiService.getOrder(orderId);
+      final order = _mapToEntity(dto);
+
+      await _localApiCache.setMap(
+        key,
+        dto.toJson(),
+        groupKey: 'orders',
+        cacheType: 'detail',
+      );
+      await _localDataSource.upsertDetail(order);
+
+      onData(order, false);
+    } catch (error) {
+      if (cached == null && onError != null) {
+        onError(error);
+      }
+    }
+  }
+
   /// Create a new order (pending)
   Future<OrderEntity> createOrder(Map<String, dynamic> requestBody) async {
     final dto = await _apiService.createOrder(requestBody);

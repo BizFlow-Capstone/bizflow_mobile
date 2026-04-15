@@ -73,7 +73,8 @@ class SettingsPage extends StatelessWidget {
                 title: l10n.translate('settings_page.premium_plan'),
                 subtitle: l10n.translate('settings_page.premium_plan_sub'),
                 badge: 'Premium',
-                onTap: () => AppRouter.navigateTo(AppRoutes.currentSubscription),
+                onTap: () =>
+                    AppRouter.navigateTo(AppRoutes.currentSubscription),
               ),
               const SizedBox(height: AppSpacing.lg),
 
@@ -170,9 +171,9 @@ class SettingsPage extends StatelessWidget {
                     return OutlinedButton.icon(
                       onPressed: state is LogoutInProgress
                           ? null
-                          : () => context
-                              .read<AuthBloc>()
-                              .add(const LogoutRequested()),
+                          : () => context.read<AuthBloc>().add(
+                              const LogoutRequested(),
+                            ),
                       icon: state is LogoutInProgress
                           ? const SizedBox(
                               width: 18,
@@ -192,11 +193,11 @@ class SettingsPage extends StatelessWidget {
                       ),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: AppColors.danger),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSpacing.radiusMd),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
                         ),
                       ),
                     );
@@ -211,7 +212,7 @@ class SettingsPage extends StatelessWidget {
                   future: PackageInfo.fromPlatform(),
                   builder: (context, snapshot) {
                     final version = snapshot.hasData
-                        ? '${snapshot.data!.version}+${snapshot.data!.buildNumber}'
+                        ? snapshot.data!.version
                         : '1.0.0';
                     return Column(
                       children: [
@@ -307,8 +308,8 @@ class SettingsPage extends StatelessWidget {
                         UserProfileContext().email?.isNotEmpty == true
                             ? UserProfileContext().email!
                             : (UserProfileContext().phone?.isNotEmpty == true
-                                ? UserProfileContext().phone!
-                                : 'No contact info'),
+                                  ? UserProfileContext().phone!
+                                  : 'No contact info'),
                         style: AppTextStyles.labelSmall.copyWith(
                           color: Colors.white.withAlpha(204), // 80% opacity
                         ),
@@ -335,10 +336,9 @@ class SettingsPage extends StatelessWidget {
                     const SizedBox(height: 2),
                     SwrBuilder<CurrentSubscriptionDto?>(
                       cacheKey: 'current_subscription',
-                      fetcher: ({cancelToken}) =>
-                          context.read<SubscriptionApiService>().getCurrentSubscription(
-                            cancelToken: cancelToken,
-                          ),
+                      fetcher: ({cancelToken}) => context
+                          .read<SubscriptionApiService>()
+                          .getCurrentSubscription(cancelToken: cancelToken),
                       fromJson: (json) => json.isEmpty
                           ? null
                           : CurrentSubscriptionDto.fromJson(json),
@@ -346,7 +346,9 @@ class SettingsPage extends StatelessWidget {
                       builder: (context, currentSub, isLoading, error) {
                         final planName = currentSub?.plan?.name;
                         return Text(
-                          planName?.isNotEmpty == true ? planName! : 'Free Plan',
+                          planName?.isNotEmpty == true
+                              ? planName!
+                              : 'Free Plan',
                           style: AppTextStyles.titleMedium.copyWith(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

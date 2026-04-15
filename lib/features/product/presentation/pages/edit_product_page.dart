@@ -91,6 +91,8 @@ class _EditProductPageState extends State<EditProductPage> {
   final ActionGuard _deleteGuard = ActionGuard();
   bool _isSubmitting = false;
   bool _isDeleting = false;
+  bool _isStatusUpdating = false;
+  bool? _statusBeforeToggle;
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -565,6 +567,25 @@ class _EditProductPageState extends State<EditProductPage> {
       body: BlocListener<ProductBloc, ProductState>(
         listener: (context, state) {
           if (state is ProductUpdateSuccess) {
+            if (_isStatusUpdating) {
+              setState(() {
+                _isStatusUpdating = false;
+                _statusBeforeToggle = null;
+                _isActive = state.product.isActive;
+              });
+
+              AppSnackBar.show(
+                context,
+                message: 'Đã cập nhật trạng thái sản phẩm',
+                type: AppSnackBarType.success,
+              );
+              return;
+            }
+
+            if (!_isSubmitting && !_isDeleting) {
+              return;
+            }
+
             if (_isSubmitting || _isDeleting) {
               setState(() {
                 _isSubmitting = false;
@@ -582,6 +603,10 @@ class _EditProductPageState extends State<EditProductPage> {
               if (mounted) Navigator.pop(context, true);
             });
           } else if (state is ProductDeleteSuccess) {
+            if (!_isDeleting) {
+              return;
+            }
+
             if (_isSubmitting || _isDeleting) {
               setState(() {
                 _isSubmitting = false;
@@ -604,33 +629,75 @@ class _EditProductPageState extends State<EditProductPage> {
               if (items.isNotEmpty) {
                 // First element is the base unit
                 final baseItem = items.first;
-                _unitController.text =
+                final baseUnit =
                     baseItem['unit']?.toString() ??
                     baseItem['Unit']?.toString() ??
                     '';
+                if (baseUnit.trim().isNotEmpty ||
+                    _unitController.text.trim().isEmpty) {
+                  _unitController.text = baseUnit;
+                }
                 // The rest are price tiers
                 _priceTiers = items.skip(1).toList();
-              } else {
-                _priceTiers = [];
               }
             });
           } else if (state is ProductDetailLoaded &&
               state.product.id == widget.productId) {
             final detail = state.product;
             setState(() {
-              _productNameController.text = detail.name;
-              _barcodeController.text = detail.barcode ?? '';
-              _costPriceController.text = detail.costPrice != null
-                  ? CurrencyFormatter.formatNumber(detail.costPrice!)
-                  : '';
-              _salePriceController.text = detail.salePrice != null
-                  ? CurrencyFormatter.formatNumber(detail.salePrice!)
-                  : '';
-              _quantityController.text = detail.quantity.toString();
-              _unitController.text = detail.unit ?? '';
-              _descriptionController.text = detail.description ?? '';
-              _manufacturerController.text = detail.manufacturer ?? '';
-              _selectedBusinessTypeId = detail.businessTypeId;
+              if (detail.name.trim().isNotEmpty) {
+                _productNameController.text = detail.name;
+              }
+
+              final detailBarcode = (detail.barcode ?? '').trim();
+              if (detailBarcode.isNotEmpty ||
+                  _barcodeController.text.trim().isEmpty) {
+                _barcodeController.text = detailBarcode;
+              }
+
+              if ((detail.costPrice ?? 0) > 0 ||
+                  _costPriceController.text.trim().isEmpty) {
+                _costPriceController.text = detail.costPrice != null
+                    ? CurrencyFormatter.formatNumber(detail.costPrice!)
+                    : '';
+              }
+
+              if ((detail.salePrice ?? 0) > 0 ||
+                  _salePriceController.text.trim().isEmpty) {
+                _salePriceController.text = detail.salePrice != null
+                    ? CurrencyFormatter.formatNumber(detail.salePrice!)
+                    : '';
+              }
+
+              if (detail.quantity > 0 ||
+                  _quantityController.text.trim().isEmpty ||
+                  _quantityController.text.trim() == '0') {
+                _quantityController.text = detail.quantity.toString();
+              }
+
+              final detailUnit = (detail.unit ?? '').trim();
+              if (detailUnit.isNotEmpty ||
+                  _unitController.text.trim().isEmpty) {
+                _unitController.text = detailUnit;
+              }
+
+              final detailDescription = (detail.description ?? '').trim();
+              if (detailDescription.isNotEmpty ||
+                  _descriptionController.text.trim().isEmpty) {
+                _descriptionController.text = detailDescription;
+              }
+
+              final detailManufacturer = (detail.manufacturer ?? '').trim();
+              if (detailManufacturer.isNotEmpty ||
+                  _manufacturerController.text.trim().isEmpty) {
+                _manufacturerController.text = detailManufacturer;
+              }
+
+              if ((detail.businessTypeId ?? '').trim().isNotEmpty ||
+                  _selectedBusinessTypeId == null) {
+                _selectedBusinessTypeId = detail.businessTypeId;
+              }
+
               _isActive = detail.isActive;
             });
           } else if (state is BusinessTypesLoaded) {
@@ -644,6 +711,17 @@ class _EditProductPageState extends State<EditProductPage> {
                 _isDeleting = false;
               });
             }
+
+            if (_isStatusUpdating) {
+              setState(() {
+                _isStatusUpdating = false;
+                if (_statusBeforeToggle != null) {
+                  _isActive = _statusBeforeToggle!;
+                }
+                _statusBeforeToggle = null;
+              });
+            }
+
             AppSnackBar.show(
               context,
               message: state.message,
@@ -727,47 +805,65 @@ class _EditProductPageState extends State<EditProductPage> {
                 SizedBox(height: AppSpacing.lg),
 
                 // Status Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                BlocBuilder<ProductBloc, ProductState>(
+                  builder: (context, state) {
+                    final isStatusBusy =
+                        _isStatusUpdating || state is ProductUpdateInProgress;
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          l10n.translate('product.status'),
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.translate('product.status'),
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: AppSpacing.sm),
+                            Text(
+                              _isActive
+                                  ? l10n.translate('product.status_active')
+                                  : l10n.translate('product.status_inactive'),
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: AppSpacing.sm),
-                        Text(
-                          _isActive
-                              ? l10n.translate('product.status_active')
-                              : l10n.translate('product.status_inactive'),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
+                        isStatusBusy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.secondary,
+                                ),
+                              )
+                            : Switch(
+                                value: _isActive,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _statusBeforeToggle = _isActive;
+                                    _isActive = value;
+                                    _isStatusUpdating = true;
+                                  });
+
+                                  context.read<ProductBloc>().add(
+                                    UpdateProductStatusRequested(
+                                      locationId: widget.locationId,
+                                      productId: widget.productId,
+                                      isActive: value,
+                                    ),
+                                  );
+                                },
+                                activeThumbColor: AppColors.secondary,
+                              ),
                       ],
-                    ),
-                    Switch(
-                      value: _isActive,
-                      onChanged: (value) {
-                        setState(() {
-                          _isActive = value;
-                        });
-                        // Immediate update as requested by the user
-                        context.read<ProductBloc>().add(
-                          UpdateProductStatusRequested(
-                            locationId: widget.locationId,
-                            productId: widget.productId,
-                            isActive: value,
-                          ),
-                        );
-                      },
-                      activeThumbColor: AppColors.secondary,
-                    ),
-                  ],
+                    );
+                  },
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -1234,6 +1330,22 @@ class _EditProductPageState extends State<EditProductPage> {
             child: Text(type.name),
           );
         }).toList();
+
+        final hasSelectedInList =
+            _selectedBusinessTypeId != null &&
+            _businessTypes.any(
+              (type) => type.businessTypeId == _selectedBusinessTypeId,
+            );
+
+        if (!hasSelectedInList && _selectedBusinessTypeId != null) {
+          typeItems.insert(
+            0,
+            DropdownMenuItem<String>(
+              value: _selectedBusinessTypeId,
+              child: Text(l10n.translate('common.loading')),
+            ),
+          );
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

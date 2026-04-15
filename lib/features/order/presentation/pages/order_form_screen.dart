@@ -514,6 +514,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     if (_isPurchaseInvoiceOcrProcessing) return;
 
     final l10n = AppLocalizations.of(context);
+    final aiAllowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.ai,
+    );
+    if (!aiAllowed || !mounted) return;
+
     final imagePath = _purchaseInvoiceOcrImagePath;
     if (imagePath == null || imagePath.trim().isEmpty) {
       setState(() {

@@ -13,7 +13,8 @@ class SyncStatusState {
 }
 
 class SyncStatusController extends ChangeNotifier {
-  static final SyncStatusController _instance = SyncStatusController._internal();
+  static final SyncStatusController _instance =
+      SyncStatusController._internal();
   factory SyncStatusController() => _instance;
   SyncStatusController._internal();
 
@@ -28,7 +29,11 @@ class SyncStatusController extends ChangeNotifier {
 
   /// Register a callback that will be called when the user taps the refresh button.
   void setManualRefreshCallback(VoidCallback? callback) {
+    final hasChanged = _manualRefreshCallback != callback;
     _manualRefreshCallback = callback;
+    if (hasChanged) {
+      notifyListeners();
+    }
   }
 
   /// Called by the refresh button in [AppSyncStatusText] to trigger a reload.

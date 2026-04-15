@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -38,7 +39,9 @@ class OrderDetailScreen extends StatefulWidget {
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
-  late Future<OrderEntity?> _detailFuture;
+  OrderEntity? _detail;
+  bool _isInitialLoading = true;
+  String? _detailError;
   bool _isCancelling = false;
   bool _isPublishing = false;
   bool _isInvoiceActionInProgress = false;
@@ -50,16 +53,71 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _detailFuture = _loadDetail(context);
+    _loadDetailSWR();
   }
 
-  Future<OrderEntity?> _loadDetail(BuildContext context) async {
+  Future<void> _loadDetailSWR({bool refreshOnly = false}) async {
     final normalizedId = widget.orderId.trim();
-    if (normalizedId.isEmpty) return null;
+    if (normalizedId.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _detail = null;
+        _detailError = 'Không có dữ liệu';
+        _isInitialLoading = false;
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      if (!refreshOnly || _detail == null) {
+        _isInitialLoading = true;
+      }
+      _detailError = null;
+    });
+
     try {
-      return await context.read<OrderBloc>().repository.getOrder(normalizedId);
-    } catch (_) {
-      return null;
+      await context
+          .read<OrderBloc>()
+          .repository
+          .fetchOrderSWR(
+            orderId: normalizedId,
+            onData: (order, _) {
+              if (!mounted) return;
+              setState(() {
+                _detail = order;
+                _detailError = null;
+                _isInitialLoading = false;
+              });
+            },
+            onError: (error) {
+              if (!mounted) return;
+              setState(() {
+                _detailError = ApiErrorMessageParser.parse(error);
+                _isInitialLoading = false;
+              });
+            },
+          )
+          .timeout(const Duration(seconds: 35));
+    } on TimeoutException {
+      if (!mounted) return;
+      setState(() {
+        _detailError = 'Không tải được chi tiết đơn hàng. Vui lòng thử lại.';
+        _isInitialLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _detailError = ApiErrorMessageParser.parse(error);
+        _isInitialLoading = false;
+      });
+    }
+
+    if (!mounted) return;
+    if (_detail == null && _detailError == null) {
+      setState(() {
+        _isInitialLoading = false;
+      });
     }
   }
 
@@ -140,9 +198,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..removeCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text(ApiErrorMessageParser.parse(e))),
-        );
+        ..showSnackBar(SnackBar(content: Text(ApiErrorMessageParser.parse(e))));
     } finally {
       if (mounted) {
         setState(() => _isCancelling = false);
@@ -180,9 +236,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       );
 
       // Refresh detail
-      setState(() {
-        _detailFuture = repository.getOrder(widget.orderId);
-      });
+      unawaited(_loadDetailSWR(refreshOnly: true));
 
       // Optionally notify Bloc about the update to refresh list
       context.read<OrderBloc>().add(
@@ -552,11 +606,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 ? state.order.id
                 : (state as OrderUpdated).order.id;
             if (orderId == widget.orderId) {
-              setState(() {
-                _detailFuture = context.read<OrderBloc>().repository.getOrder(
-                  widget.orderId,
-                );
-              });
+              unawaited(_loadDetailSWR(refreshOnly: true));
             }
           } else if (state is OrderError) {
             ScaffoldMessenger.of(context)
@@ -569,16 +619,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               );
           }
         },
-        child: FutureBuilder<OrderEntity?>(
-          future: _detailFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+        child: Builder(
+          builder: (context) {
+            if (_isInitialLoading && _detail == null) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            final detail = snapshot.data;
+            final detail = _detail;
             if (detail == null) {
-              return Center(child: Text(l10n.translate('common.no_data')));
+              return Center(
+                child: Text(_detailError ?? l10n.translate('common.no_data')),
+              );
             }
 
             return Column(

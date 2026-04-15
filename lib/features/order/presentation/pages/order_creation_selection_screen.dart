@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +9,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_audio_upload_screen.dart';
 import 'order_form_screen.dart';
@@ -25,6 +28,8 @@ class OrderCreationSelectionScreen extends StatefulWidget {
 
 class _OrderCreationSelectionScreenState
     extends State<OrderCreationSelectionScreen> {
+  final ActionGuard _openCreateMethodGuard = ActionGuard();
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -57,17 +62,28 @@ class _OrderCreationSelectionScreenState
                 subtitle: l10n.translate('order_create.method_voice_subtitle'),
                 color: Colors.blue.shade50,
                 iconColor: Colors.blue,
-                onTap: () async {
-                  final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-                    context,
-                    featureCode: SubscriptionFeatureCodes.orders,
-                  );
-                  if (!allowed || !context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrderVoiceRecordScreen(),
-                    ),
+                onTap: () {
+                  unawaited(
+                    _openCreateMethodGuard.run(() async {
+                      final allowedOrders =
+                          await SubscriptionFeatureGuard.ensureAllowed(
+                        context,
+                        featureCode: SubscriptionFeatureCodes.orders,
+                      );
+                      if (!allowedOrders || !context.mounted) return;
+                      final allowedAi =
+                          await SubscriptionFeatureGuard.ensureAllowed(
+                        context,
+                        featureCode: SubscriptionFeatureCodes.ai,
+                      );
+                      if (!allowedAi || !context.mounted) return;
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OrderVoiceRecordScreen(),
+                        ),
+                      );
+                    }),
                   );
                 },
               ),
@@ -79,17 +95,28 @@ class _OrderCreationSelectionScreenState
                 subtitle: null,
                 color: Colors.green.shade50,
                 iconColor: Colors.green,
-                onTap: () async {
-                  final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-                    context,
-                    featureCode: SubscriptionFeatureCodes.orders,
-                  );
-                  if (!allowed || !context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrderAudioUploadScreen(),
-                    ),
+                onTap: () {
+                  unawaited(
+                    _openCreateMethodGuard.run(() async {
+                      final allowedOrders =
+                          await SubscriptionFeatureGuard.ensureAllowed(
+                        context,
+                        featureCode: SubscriptionFeatureCodes.orders,
+                      );
+                      if (!allowedOrders || !context.mounted) return;
+                      final allowedAi =
+                          await SubscriptionFeatureGuard.ensureAllowed(
+                        context,
+                        featureCode: SubscriptionFeatureCodes.ai,
+                      );
+                      if (!allowedAi || !context.mounted) return;
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OrderAudioUploadScreen(),
+                        ),
+                      );
+                    }),
                   );
                 },
               ),
@@ -101,17 +128,23 @@ class _OrderCreationSelectionScreenState
                 subtitle: null,
                 color: Colors.orange.shade50,
                 iconColor: Colors.orange,
-                onTap: () async {
-                  final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-                    context,
-                    featureCode: SubscriptionFeatureCodes.orders,
-                  );
-                  if (!allowed || !context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrderFormScreen(inputType: 'manual'),
-                    ),
+                onTap: () {
+                  unawaited(
+                    _openCreateMethodGuard.run(() async {
+                      final allowed =
+                          await SubscriptionFeatureGuard.ensureAllowed(
+                        context,
+                        featureCode: SubscriptionFeatureCodes.orders,
+                      );
+                      if (!allowed || !context.mounted) return;
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const OrderFormScreen(inputType: 'manual'),
+                        ),
+                      );
+                    }),
                   );
                 },
               ),

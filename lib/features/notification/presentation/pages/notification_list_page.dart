@@ -12,6 +12,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../shared/context/notification_context.dart';
+import '../../../../shared/cache/sync_status_controller.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../data/models/user_notification_dto.dart';
 import '../../data/notification_repository.dart';
@@ -42,6 +43,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
   @override
   void initState() {
     super.initState();
+    SyncStatusController().setManualRefreshCallback(_loadInitial);
     _scrollController.addListener(_onScroll);
     NotificationRealtimeService().connect();
     _realtimeSubscription = NotificationRealtimeService.notificationStream
@@ -53,6 +55,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
 
   @override
   void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
     _realtimeSubscription?.cancel();
     _scrollController.dispose();
     super.dispose();

@@ -27,6 +27,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
     Emitter<RevenueState> emit,
   ) async {
     emit(const RevenuesLoading());
+    var hasDeliveredData = false;
     try {
       final locationIdInt = event.businessLocationId != null
           ? int.tryParse(event.businessLocationId!)
@@ -39,6 +40,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
         fromDate: event.fromDate,
         toDate: event.toDate,
         onData: (revenues, totalCount, isFromCache) {
+          hasDeliveredData = true;
           if (!emit.isDone) {
             emit(
               RevenuesLoaded(
@@ -52,7 +54,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
           }
         },
         onError: (error) {
-          if (!emit.isDone) {
+          if (!emit.isDone && !hasDeliveredData) {
             emit(RevenueError(message: ApiErrorMessageParser.parse(error)));
           }
         },
@@ -89,7 +91,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
     try {
       await repository.deleteManualRevenue(event.revenueId);
       emit(RevenueDeleted(revenueId: event.revenueId));
-      add(const LoadRevenuesRequested());
+      add(LoadRevenuesRequested(businessLocationId: event.businessLocationId));
     } catch (e) {
       emit(RevenueError(message: ApiErrorMessageParser.parse(e)));
     }

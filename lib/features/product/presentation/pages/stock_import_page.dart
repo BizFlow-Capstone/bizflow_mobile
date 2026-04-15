@@ -270,6 +270,12 @@ class _StockImportViewState extends State<_StockImportView> {
   Future<void> _scanPurchaseInvoice() async {
     if (_isOcrProcessing) return;
 
+    final aiAllowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.ai,
+    );
+    if (!aiAllowed || !mounted) return;
+
     final imagePath = _selectedImagePath;
     if (imagePath == null || imagePath.trim().isEmpty) {
       setState(() {

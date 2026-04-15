@@ -9,6 +9,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/context/user_profile_context.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/cache/sync_status_controller.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -26,6 +27,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   static const String _deleteAccountPhrase = 'DELETE ACCOUNT';
   Set<String> _credentialTypes = <String>{};
+  bool _hasLoadedCredentialSnapshot = false;
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _taxCodeController = TextEditingController();
   String? _avatarUrl;
@@ -35,6 +37,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    SyncStatusController().setManualRefreshCallback(_refreshProfileManually);
     context.read<AuthBloc>().add(const LoadCredentialsRequested());
     context.read<AuthBloc>().add(const LoadProfileRequested());
     final profile = UserProfileContext();
@@ -42,8 +45,14 @@ class _ProfilePageState extends State<ProfilePage> {
     _avatarUrl = profile.avatarUrl;
   }
 
+  void _refreshProfileManually() {
+    context.read<AuthBloc>().add(const LoadCredentialsRequested());
+    context.read<AuthBloc>().add(const LoadProfileRequested());
+  }
+
   @override
   void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
     _fullNameController.dispose();
     _taxCodeController.dispose();
     super.dispose();
@@ -59,6 +68,7 @@ class _ProfilePageState extends State<ProfilePage> {
         if (state is CredentialsLoaded) {
           setState(() {
             _credentialTypes = state.credentialTypes.toSet();
+            _hasLoadedCredentialSnapshot = true;
           });
         } else if (state is ProfileLoaded) {
           setState(() {
@@ -82,6 +92,7 @@ class _ProfilePageState extends State<ProfilePage> {
         } else if (state is LinkCredentialSuccess) {
           setState(() {
             _credentialTypes = {..._credentialTypes, state.linkedType};
+            _hasLoadedCredentialSnapshot = true;
           });
           AppSnackBar.success(context, l10n.translate('profile.link_success'));
           context.read<AuthBloc>().add(const LoadCredentialsRequested());
@@ -170,7 +181,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     children: [
                       Expanded(
                         child: AppButton(
-                          label: 'Cập nhật ảnh đại diện',
+                          label: l10n.translate('profile.update_avatar'),
                           type: AppButtonType.outlined,
                           isFullWidth: true,
                           isLoading: _isUploadingAvatar,
@@ -285,25 +296,35 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: AppTextStyles.titleMedium,
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  _CredentialTile(
-                    title: l10n.translate('profile.credential_google'),
-                    isLinked: hasGoogle,
-                    onLink: hasGoogle
-                        ? null
-                        : () {
-                            context.read<AuthBloc>().add(
-                              const LinkGoogleRequested(),
-                            );
-                          },
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _CredentialTile(
-                    title: l10n.translate('profile.credential_phone'),
-                    isLinked: hasPhone,
-                    onLink: hasPhone
-                        ? null
-                        : () => _showLinkPhoneSheet(context),
-                  ),
+                  if (!_hasLoadedCredentialSnapshot &&
+                      state is CredentialsLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  else ...[
+                    _CredentialTile(
+                      title: l10n.translate('profile.credential_google'),
+                      isLinked: hasGoogle,
+                      onLink: hasGoogle
+                          ? null
+                          : () {
+                              context.read<AuthBloc>().add(
+                                const LinkGoogleRequested(),
+                              );
+                            },
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _CredentialTile(
+                      title: l10n.translate('profile.credential_phone'),
+                      isLinked: hasPhone,
+                      onLink: hasPhone
+                          ? null
+                          : () => _showLinkPhoneSheet(context),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   Text(
                     l10n.translate('profile.security'),
@@ -323,7 +344,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     type: AppButtonType.danger,
                     onPressed: () => _showDeleteAccountFlow(context),
                   ),
-                  if (state is CredentialsLoading ||
+                  if ((state is CredentialsLoading &&
+                          !_hasLoadedCredentialSnapshot) ||
                       state is ProfileLoading ||
                       state is LinkCredentialInProgress ||
                       state is ChangePasswordInProgress ||

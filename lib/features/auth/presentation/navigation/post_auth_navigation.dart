@@ -18,11 +18,13 @@ class PostAuthNavigation {
     // This avoids using stale in-memory/cache location lists from a previous account.
     locationBloc.add(const LoadLocationsRequested(useCache: false));
     try {
-      state = await locationBloc.stream.firstWhere(
-        (s) => s is LocationsLoaded || s is LocationFailure,
-      ).timeout(const Duration(seconds: 5));
+      state = await locationBloc.stream
+          .firstWhere((s) => s is LocationsLoaded || s is LocationFailure)
+          .timeout(const Duration(seconds: 5));
     } catch (e) {
-      debugPrint('PostAuthNavigation: Timeout waiting for locations, proceeding to home.');
+      debugPrint(
+        'PostAuthNavigation: Timeout waiting for locations, proceeding to home.',
+      );
       // Fallback to currently loaded state or empty
       state = locationBloc.state;
     }
@@ -37,9 +39,7 @@ class PostAuthNavigation {
     }
 
     final loadedState = state as LocationsLoaded;
-    final locations = loadedState.locations
-      .where((location) => location.isActive)
-      .toList();
+    final locations = loadedState.locations;
     final businessContext = BusinessContext();
 
     if (locations.isEmpty) {
@@ -57,7 +57,10 @@ class PostAuthNavigation {
         locations.any((location) => location.id == selectedId);
 
     if (!isSelectedValid) {
-      final firstLocation = locations.first;
+      final firstLocation = locations.firstWhere(
+        (location) => location.isActive,
+        orElse: () => locations.first,
+      );
       await businessContext.switchBusinessLocation(
         firstLocation.id,
         firstLocation.name,

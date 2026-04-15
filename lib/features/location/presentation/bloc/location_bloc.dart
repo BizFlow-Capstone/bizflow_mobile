@@ -38,12 +38,14 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
   // Cache locations in memory
   List<LocationEntity> _locations = [];
 
+  List<LocationEntity> get currentLocations => List.unmodifiable(_locations);
+
   // Track employee IDs for current location (updated locally after add)
   List<String> _currentLocationEmployeeIds = [];
 
   Future<List<LocationEntity>> _refreshLocations() async {
     // Fetch both owned and hired locations
-    // Use catchError to ensure that if one fails (e.g. 403 on owned for an employee), 
+    // Use catchError to ensure that if one fails (e.g. 403 on owned for an employee),
     // we still get the data from the other.
     debugPrint('LocationBloc: refreshing locations...');
     final results = await Future.wait([
@@ -59,10 +61,14 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
 
     final owned = results[0];
     final hired = results[1];
-    debugPrint('LocationBloc: Owned count: ${owned.length}, Hired count: ${hired.length}');
+    debugPrint(
+      'LocationBloc: Owned count: ${owned.length}, Hired count: ${hired.length}',
+    );
 
     // Tag owned locations with isOwner: true
-    final ownedTagged = owned.map((loc) => loc.copyWith(isOwner: true)).toList();
+    final ownedTagged = owned
+        .map((loc) => loc.copyWith(isOwner: true))
+        .toList();
     // Work-at locations: isOwner defaults to false; only override if not already owned
     final ownedIds = ownedTagged.map((l) => l.id).toSet();
 
@@ -78,7 +84,6 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     return combined;
   }
 
-
   Future<List<EmployeeEntity>> fetchAvailableEmployees() {
     return employeeRepository.getAvailableEmployees();
   }
@@ -87,9 +92,11 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     LoadLocationsRequested event,
     Emitter<LocationState> emit,
   ) async {
-    // Only emit loading initially so UI can show some loading indicator
-    // if there is absolutely no cache.
-    emit(const LocationLoading());
+    if (_locations.isEmpty) {
+      emit(const LocationLoading());
+    } else {
+      emit(LocationsLoaded(locations: List.from(_locations)));
+    }
 
     if (event.useCache) {
       try {
@@ -134,6 +141,41 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     ToggleLocationStatusRequested event,
     Emitter<LocationState> emit,
   ) async {
+    final targetIndex = _locations.indexWhere(
+      (loc) => loc.id == event.locationId,
+    );
+    if (targetIndex == -1) {
+      emit(
+        const LocationFailure(
+          message: 'Không tìm thấy địa điểm để cập nhật trạng thái.',
+        ),
+      );
+      if (_locations.isNotEmpty) {
+        emit(LocationsLoaded(locations: List.from(_locations)));
+      }
+      return;
+    }
+
+    final target = _locations[targetIndex];
+    final previousIsActive = target.isActive;
+    final activeCount = _locations.where((loc) => loc.isActive).length;
+    final isDeactivatingLastActive =
+        target.isActive && !event.isActive && activeCount <= 1;
+    if (isDeactivatingLastActive) {
+      emit(
+        const LocationFailure(
+          message:
+              'Cần tối thiểu 1 địa điểm đang hoạt động, không thể tắt hết.',
+        ),
+      );
+      emit(LocationsLoaded(locations: List.from(_locations)));
+      return;
+    }
+
+    // Optimistic update: reflect the target state immediately for snappy UX.
+    _locations[targetIndex] = target.copyWith(isActive: event.isActive);
+    emit(LocationToggleInProgress(locationId: event.locationId));
+
     try {
       // Call API to update status (only returns success/fail)
       final success = await repository.updateLocationStatus(
@@ -142,26 +184,55 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
       );
 
       if (success) {
-        // Update local cache manually (backend doesn't return updated entity)
-        final index = _locations.indexWhere(
+        // Confirm with fresh server state to avoid stale UI/toast mismatch.
+        final refreshed = await _refreshLocations();
+        await repository.saveCachedLocations(refreshed);
+
+        final refreshedIndex = refreshed.indexWhere(
           (loc) => loc.id == event.locationId,
         );
-        if (index != -1) {
-          _locations[index] = _locations[index].copyWith(
-            isActive: event.isActive,
+        if (refreshedIndex == -1) {
+          emit(
+            const LocationFailure(
+              message: 'Không tìm thấy địa điểm sau khi cập nhật trạng thái.',
+            ),
           );
-
-          await repository.saveCachedLocations(_locations);
-
-          // Emit success event
-          emit(LocationToggleSuccess(updatedLocation: _locations[index]));
-
-          // Update UI
           emit(LocationsLoaded(locations: List.from(_locations)));
+          return;
         }
+
+        final refreshedLocation = refreshed[refreshedIndex];
+        if (refreshedLocation.isActive != event.isActive) {
+          emit(
+            const LocationFailure(
+              message:
+                  'Trạng thái địa điểm chưa được cập nhật trên hệ thống. Vui lòng thử lại.',
+            ),
+          );
+          emit(LocationsLoaded(locations: List.from(_locations)));
+          return;
+        }
+
+        emit(LocationToggleSuccess(updatedLocation: refreshedLocation));
+        emit(LocationsLoaded(locations: List.from(_locations)));
+        return;
+      }
+
+      _locations[targetIndex] = target.copyWith(isActive: previousIsActive);
+      emit(
+        const LocationFailure(
+          message: 'Không thể cập nhật trạng thái địa điểm. Vui lòng thử lại.',
+        ),
+      );
+      if (_locations.isNotEmpty) {
+        emit(LocationsLoaded(locations: List.from(_locations)));
       }
     } catch (e) {
+      _locations[targetIndex] = target.copyWith(isActive: previousIsActive);
       emit(LocationFailure(message: ApiErrorMessageParser.parse(e)));
+      if (_locations.isNotEmpty) {
+        emit(LocationsLoaded(locations: List.from(_locations)));
+      }
     }
   }
 
@@ -282,6 +353,46 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
     DeleteLocationRequested event,
     Emitter<LocationState> emit,
   ) async {
+    LocationEntity? target;
+    for (final location in _locations) {
+      if (location.id == event.locationId) {
+        target = location;
+        break;
+      }
+    }
+
+    if (target == null) {
+      emit(const LocationFailure(message: 'Không tìm thấy địa điểm để xóa.'));
+      if (_locations.isNotEmpty) {
+        emit(LocationsLoaded(locations: List.from(_locations)));
+      }
+      return;
+    }
+
+    if (_locations.length <= 1) {
+      emit(
+        const LocationFailure(
+          message:
+              'Phải có tối thiểu 1 địa điểm, không thể xóa địa điểm cuối cùng.',
+        ),
+      );
+      emit(LocationsLoaded(locations: List.from(_locations)));
+      return;
+    }
+
+    final activeCount = _locations.where((loc) => loc.isActive).length;
+    final isDeletingLastActive = target.isActive && activeCount <= 1;
+    if (isDeletingLastActive) {
+      emit(
+        const LocationFailure(
+          message:
+              'Cần tối thiểu 1 địa điểm đang hoạt động, không thể xóa địa điểm hoạt động cuối cùng.',
+        ),
+      );
+      emit(LocationsLoaded(locations: List.from(_locations)));
+      return;
+    }
+
     emit(LocationDeleteInProgress(locationId: event.locationId));
     try {
       await repository.deleteLocation(event.locationId);

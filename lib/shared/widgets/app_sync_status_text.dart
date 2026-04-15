@@ -41,7 +41,7 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
         }
 
         final hasRefreshCallback =
-          SyncStatusController().hasManualRefreshCallback;
+            SyncStatusController().hasManualRefreshCallback;
 
         return Container(
           alignment: Alignment.centerRight,
@@ -74,22 +74,10 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
                         : const Icon(Icons.refresh_rounded),
                     color: AppColors.textSecondary,
                     tooltip: l10n.translate('sync.refresh'),
-                    onPressed: state.isSyncing
+                    onPressed: state.isSyncing || !hasRefreshCallback
                         ? null
-                        : () async {
-                            final controller = SyncStatusController();
-                            if (hasRefreshCallback) {
-                              controller.triggerManualRefresh();
-                              return;
-                            }
-
-                            // Fallback behavior: update global sync state even
-                            // when current page has not registered a callback.
-                            controller.startSync();
-                            await Future<void>.delayed(
-                              const Duration(milliseconds: 300),
-                            );
-                            controller.endSync(updatedAt: DateTime.now());
+                        : () {
+                            SyncStatusController().triggerManualRefresh();
                           },
                   ),
                 ),
@@ -102,7 +90,9 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
                   shape: BoxShape.circle,
                   color: state.hasError && !state.isSyncing
                       ? AppColors.error
-                      : (state.isSyncing ? AppColors.warning : AppColors.success),
+                      : (state.isSyncing
+                            ? AppColors.warning
+                            : AppColors.success),
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),

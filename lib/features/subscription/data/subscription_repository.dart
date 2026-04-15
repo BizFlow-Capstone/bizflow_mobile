@@ -24,7 +24,8 @@ class SubscriptionRepository extends ChangeNotifier {
 
   /// Synchronous read — always returns the most recent known subscription.
   /// Safe to call from initState / build without await.
-  CurrentSubscriptionDto? get currentSubscriptionSnapshot => _currentSubscription;
+  CurrentSubscriptionDto? get currentSubscriptionSnapshot =>
+      _currentSubscription;
 
   /// Called by any service that fetches fresh subscription data (Home prefetch,
   /// checkout result, etc.) to keep the in-memory value up-to-date.
@@ -83,6 +84,8 @@ class SubscriptionRepository extends ChangeNotifier {
         );
       },
       onData: (data, isFromCache) {
+        // Keep in-memory snapshot synchronized for instant UI reads.
+        updateCurrentSubscription(data);
         onData(data, isFromCache);
       },
       onError: onError,
@@ -177,22 +180,25 @@ class SubscriptionRepository extends ChangeNotifier {
         .collection('usage_tracking')
         .doc(docId)
         .snapshots()
-        .listen((snapshot) {
-          final extracted = _extractUsageMap(snapshot.data());
-          _latestUsageByFeatureCode = extracted;
-          // Always preserve as last valid snapshot (even if empty doc)
-          if (extracted.isNotEmpty) {
-            _lastValidUsageSnapshot = extracted;
-            // Realtime update: recompute and persist limit flags.
-            _updateFeatureLimitFlags(extracted);
-          }
-        }, onError: (error) {
-          //FIX: On network error, keep using last valid snapshot
-          // Don't reset to empty - this prevents UI from showing wrong state
-          if (_lastValidUsageSnapshot.isNotEmpty) {
-            _latestUsageByFeatureCode = _lastValidUsageSnapshot;
-          }
-        });
+        .listen(
+          (snapshot) {
+            final extracted = _extractUsageMap(snapshot.data());
+            _latestUsageByFeatureCode = extracted;
+            // Always preserve as last valid snapshot (even if empty doc)
+            if (extracted.isNotEmpty) {
+              _lastValidUsageSnapshot = extracted;
+              // Realtime update: recompute and persist limit flags.
+              _updateFeatureLimitFlags(extracted);
+            }
+          },
+          onError: (error) {
+            //FIX: On network error, keep using last valid snapshot
+            // Don't reset to empty - this prevents UI from showing wrong state
+            if (_lastValidUsageSnapshot.isNotEmpty) {
+              _latestUsageByFeatureCode = _lastValidUsageSnapshot;
+            }
+          },
+        );
   }
 
   int? _readUsedCountFromRealtimeCache(String featureCode) {
@@ -254,8 +260,8 @@ class SubscriptionRepository extends ChangeNotifier {
   Future<void> _loadFlagsFromCache() async {
     try {
       // Try synchronous read first (SharedPreferences already in RAM).
-      final raw = _cache.tryGetSync(_flagsCacheKey)
-          ?? await _cache.get(_flagsCacheKey);
+      final raw =
+          _cache.tryGetSync(_flagsCacheKey) ?? await _cache.get(_flagsCacheKey);
       if (raw != null) {
         _featureLimitFlags = raw.map((k, v) => MapEntry(k, v == true));
       }

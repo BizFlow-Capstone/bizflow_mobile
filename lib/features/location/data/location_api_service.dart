@@ -149,24 +149,24 @@ class LocationApiService {
     required bool isActive,
   }) async {
     try {
-      debugPrint('=== UPDATE STATUS REQUEST ===');
-      debugPrint('LocationId: $locationId (Type: ${locationId.runtimeType})');
-      debugPrint('isActive: $isActive');
-      debugPrint('URL: ${ApiEndpoints.updateLocationStatus(locationId)}');
+      if (kDebugMode) {
+        debugPrint(
+          '[Location] update status request: locationId=$locationId, isActive=$isActive',
+        );
+      }
 
       final body = UpdateStatusRequestDto(isActive: isActive).toJson();
-      debugPrint('Request Body: $body');
 
       final response = await _apiClient.patch(
         ApiEndpoints.updateLocationStatus(locationId),
         body: body,
       );
 
-      debugPrint('=== UPDATE STATUS RESPONSE ===');
-      debugPrint('Status Code: ${response.statusCode}');
-      debugPrint('Response Success: ${response.isSuccess}');
-      debugPrint('Response Message: ${response.message}');
-      debugPrint('Response Data: ${response.data}');
+      if (kDebugMode) {
+        debugPrint(
+          '[Location] update status response: code=${response.statusCode}, success=${response.isSuccess}',
+        );
+      }
 
       if (response.isSuccess) {
         return true;

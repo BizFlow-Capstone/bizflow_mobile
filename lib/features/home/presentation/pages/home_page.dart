@@ -9,6 +9,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/cache/swr_builder.dart';
+import '../../../../shared/cache/sync_status_controller.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/services/permission_service.dart';
 import '../../../../shared/utils/formatters.dart';
@@ -19,6 +20,7 @@ import '../../../employee/presentation/bloc/employee_state.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_event.dart';
 import '../../../location/presentation/bloc/location_state.dart';
+import '../../../location/domain/entities/location_entity.dart';
 import 'dart:async';
 import '../../data/home_dashboard_api_service.dart';
 import '../../../subscription/data/subscription_api_service.dart';
@@ -54,6 +56,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
   String? _lastEmployeeLoadedBusinessId;
   _SummaryPeriod _selectedPeriod = _SummaryPeriod.today;
   int _summaryRefreshTick = 0;
+  DashboardSummaryDto? _lastVisibleSummary;
+  int? _lastSummaryBusinessLocationId;
   bool _isForecastExpanded = false;
   bool _isReorderExpanded = false;
   bool _isInsightsExpanded = false;
@@ -66,6 +70,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
   @override
   void initState() {
     super.initState();
+    SyncStatusController().setManualRefreshCallback(_triggerManualRefresh);
 
     // Đảm bảo danh sách địa điểm được tải khi ở HomePage để hiển thị trên Sidebar
     final locationBloc = context.read<LocationBloc>();
@@ -84,26 +89,46 @@ class _HomePageState extends State<HomePage> with RouteAware {
       final apiService = context.read<SubscriptionApiService>();
       final repo = context.read<SubscriptionRepository>();
       final cache = CacheManager();
-      // Always update in-memory snapshot; skip network only if cache is warm.
+      // Seed fast from local cache first (if any), then always revalidate from server.
       final existing = await cache.get('current_subscription');
       if (existing != null) {
         // Seed in-memory value from cache so CurrentSubscriptionPage reads it sync.
         try {
           repo.updateCurrentSubscription(
-            CurrentSubscriptionDto.fromJson(Map<String, dynamic>.from(existing)),
+            CurrentSubscriptionDto.fromJson(
+              Map<String, dynamic>.from(existing),
+            ),
           );
         } catch (_) {}
+      }
+
+      final fresh = await apiService.getCurrentSubscription();
+      repo.updateCurrentSubscription(fresh);
+      if (fresh == null) {
+        await cache.remove('current_subscription');
+        await cache.remove('current_subscription_for_plans');
         return;
       }
-      final fresh = await apiService.getCurrentSubscription();
-      if (fresh == null) return;
-      repo.updateCurrentSubscription(fresh);
+
       final json = fresh.toJson();
       await cache.set('current_subscription', json);
       await cache.set('current_subscription_for_plans', json);
     } catch (_) {
       // Best-effort: silently ignore if prefetch fails.
     }
+  }
+
+  bool _isCurrentBusinessLocationActive({
+    required List<LocationEntity> locations,
+    required String? currentBusinessId,
+  }) {
+    if (currentBusinessId == null) return false;
+    for (final location in locations) {
+      if (location.id == currentBusinessId) {
+        return location.isActive;
+      }
+    }
+    return false;
   }
 
   @override
@@ -121,11 +146,56 @@ class _HomePageState extends State<HomePage> with RouteAware {
 
   @override
   void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
     if (_subscribedRoute != null) {
       AppRouter.routeObserver.unsubscribe(this);
       _subscribedRoute = null;
     }
     super.dispose();
+  }
+
+  void _triggerManualRefresh() {
+    unawaited(_refreshHomeManually());
+  }
+
+  Future<void> _refreshHomeManually() async {
+    if (!mounted) return;
+
+    SyncStatusController().startSync();
+    try {
+      final businessContext = context.read<BusinessContext>();
+      final businessLocationId = _asIntId(businessContext.currentBusinessId);
+
+      // Force SWR to perform a true network revalidate instead of serving/throttling cache.
+      await CacheManager().removeByPrefix('home_dashboard_summary_');
+      if (businessLocationId != null) {
+        await CacheManager().remove(_aiCacheKey(businessLocationId));
+      } else {
+        await CacheManager().removeByPrefix('home_ai_bundle_');
+      }
+
+      context.read<LocationBloc>().add(
+        const LoadLocationsRequested(useCache: false),
+      );
+
+      if (businessContext.isOwner &&
+          businessContext.currentBusinessId != null) {
+        context.read<EmployeeBloc>().add(
+          LoadEmployeesRequested(businessId: businessContext.currentBusinessId!),
+        );
+      }
+
+      await _prefetchSubscription();
+
+      if (!mounted) return;
+      setState(() {
+        _summaryRefreshTick++;
+      });
+
+      SyncStatusController().endSync(updatedAt: DateTime.now());
+    } catch (_) {
+      SyncStatusController().endSync(hasError: true);
+    }
   }
 
   @override
@@ -143,6 +213,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
     final businessLocationId = _asIntId(businessContext.currentBusinessId);
     final isOwner = businessContext.isOwner;
 
+    if (_lastSummaryBusinessLocationId != businessLocationId) {
+      _lastSummaryBusinessLocationId = businessLocationId;
+      _lastVisibleSummary = null;
+    }
+
     if (isOwner && businessContext.currentBusinessId != null) {
       final businessId = businessContext.currentBusinessId!;
       if (_lastEmployeeLoadedBusinessId != businessId) {
@@ -156,12 +231,10 @@ class _HomePageState extends State<HomePage> with RouteAware {
     return BlocListener<LocationBloc, LocationState>(
       listener: (context, state) {
         if (state is LocationsLoaded) {
-          final activeLocations = state.locations
-              .where((location) => location.isActive)
-              .toList();
+          final allLocations = state.locations;
 
-          if (activeLocations.isEmpty) {
-            // If the user has 0 locations, send them to the no locations screen
+          if (allLocations.isEmpty) {
+            // Only route to no-location when user truly has zero locations.
             WidgetsBinding.instance.addPostFrameCallback((_) {
               AppRouter.navigateAndClearStack(AppRoutes.noLocation);
             });
@@ -174,11 +247,26 @@ class _HomePageState extends State<HomePage> with RouteAware {
               listen: false,
             );
             final selectedId = businessContext.currentBusinessId;
+            final hasAnyActive = allLocations.any(
+              (location) => location.isActive,
+            );
+            LocationEntity? selectedLocation;
+            if (selectedId != null) {
+              for (final location in allLocations) {
+                if (location.id == selectedId) {
+                  selectedLocation = location;
+                  break;
+                }
+              }
+            }
             final isSelectedValid =
-                selectedId != null &&
-                activeLocations.any((location) => location.id == selectedId);
+                selectedLocation != null &&
+                (!hasAnyActive || selectedLocation.isActive);
             if (!isSelectedValid) {
-              final firstLocation = activeLocations.first;
+              final firstLocation = allLocations.firstWhere(
+                (location) => location.isActive,
+                orElse: () => allLocations.first,
+              );
               businessContext.switchBusinessLocation(
                 firstLocation.id,
                 firstLocation.name,
@@ -298,7 +386,10 @@ class _HomePageState extends State<HomePage> with RouteAware {
                       );
                     }
 
-                    final summary = data;
+                    if (data != null) {
+                      _lastVisibleSummary = data;
+                    }
+                    final summary = data ?? _lastVisibleSummary;
                     return StatsCards(
                       ordersTitle: _ordersTitle(l10n),
                       revenueTitle: _revenueTitle(l10n),
@@ -883,13 +974,57 @@ class _HomePageState extends State<HomePage> with RouteAware {
                   ),
 
                 // Quick Actions
-                QuickActions(
-                  onCreateOrder: () =>
-                      AppRouter.navigateTo(AppRoutes.orderCreateSelection),
-                  onOrders: () => AppRouter.navigateTo(AppRoutes.orderList),
-                  onDebt: () => AppRouter.navigateTo(AppRoutes.debtList),
-                  onReport: () => AppRouter.navigateTo(AppRoutes.accounting),
-                  showReport: PermissionService.canViewReports(isOwner),
+                BlocBuilder<LocationBloc, LocationState>(
+                  builder: (context, locationState) {
+                    final allLocations = locationState is LocationsLoaded
+                        ? locationState.locations
+                        : context.read<LocationBloc>().currentLocations;
+                    final isCurrentLocationActive =
+                        _isCurrentBusinessLocationActive(
+                          locations: allLocations,
+                          currentBusinessId: businessContext.currentBusinessId,
+                        );
+
+                    void showInactiveWarning() {
+                      AppSnackBar.show(
+                        context,
+                        message: l10n.translate('home.location_inactive_block'),
+                        type: AppSnackBarType.warning,
+                      );
+                    }
+
+                    return QuickActions(
+                      onCreateOrder: () {
+                        if (!isCurrentLocationActive) {
+                          showInactiveWarning();
+                          return;
+                        }
+                        AppRouter.navigateTo(AppRoutes.orderCreateSelection);
+                      },
+                      onOrders: () {
+                        if (!isCurrentLocationActive) {
+                          showInactiveWarning();
+                          return;
+                        }
+                        AppRouter.navigateTo(AppRoutes.orderList);
+                      },
+                      onDebt: () {
+                        if (!isCurrentLocationActive) {
+                          showInactiveWarning();
+                          return;
+                        }
+                        AppRouter.navigateTo(AppRoutes.debtList);
+                      },
+                      onReport: () {
+                        if (!isCurrentLocationActive) {
+                          showInactiveWarning();
+                          return;
+                        }
+                        AppRouter.navigateTo(AppRoutes.accounting);
+                      },
+                      showReport: PermissionService.canViewReports(isOwner),
+                    );
+                  },
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -923,6 +1058,27 @@ class _HomePageState extends State<HomePage> with RouteAware {
                               context,
                               listen: false,
                             );
+                            final isCurrentLocationActive =
+                                _isCurrentBusinessLocationActive(
+                                  locations: locationState is LocationsLoaded
+                                      ? locationState.locations
+                                      : context
+                                            .read<LocationBloc>()
+                                            .currentLocations,
+                                  currentBusinessId:
+                                      contextData.currentBusinessId,
+                                );
+                            if (!isCurrentLocationActive) {
+                              AppSnackBar.show(
+                                context,
+                                message: l10n.translate(
+                                  'home.location_inactive_block',
+                                ),
+                                type: AppSnackBarType.warning,
+                              );
+                              return;
+                            }
+
                             if (contextData.currentBusinessId != null) {
                               String address = '';
                               if (locationState is LocationsLoaded) {
@@ -964,6 +1120,27 @@ class _HomePageState extends State<HomePage> with RouteAware {
                               context,
                               listen: false,
                             );
+                            final isCurrentLocationActive =
+                                _isCurrentBusinessLocationActive(
+                                  locations: locationState is LocationsLoaded
+                                      ? locationState.locations
+                                      : context
+                                            .read<LocationBloc>()
+                                            .currentLocations,
+                                  currentBusinessId:
+                                      contextData.currentBusinessId,
+                                );
+                            if (!isCurrentLocationActive) {
+                              AppSnackBar.show(
+                                context,
+                                message: l10n.translate(
+                                  'home.location_inactive_block',
+                                ),
+                                type: AppSnackBarType.warning,
+                              );
+                              return;
+                            }
+
                             if (contextData.currentBusinessId != null) {
                               AppRouter.navigateTo(AppRoutes.employeeList);
                             } else {

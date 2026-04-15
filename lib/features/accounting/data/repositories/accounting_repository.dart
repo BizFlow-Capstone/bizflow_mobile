@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../shared/cache/local_api_cache_store.dart';
@@ -28,6 +30,8 @@ class AccountingRepository {
   ) => 'book_rows_${locationId}_${bookId}_${cursor ?? 'first'}_$batchSize';
   String _bookSectionsKey(String locationId, String bookId) =>
       'book_sections_${locationId}_$bookId';
+  String _auditLogsKey(String locationId, String periodId) =>
+      'audit_logs_${locationId}_$periodId';
 
   static const String _periodsSyncResourceKey = 'accounting_periods_list';
   static const String _booksSyncResourceKey = 'accounting_books_list';
@@ -251,6 +255,60 @@ class AccountingRepository {
     return _apiService.getAuditLogs(locationId, periodId);
   }
 
+  /// SWR for audit logs: return cached logs immediately if available,
+  /// then refresh from server in background.
+  Future<void> fetchAuditLogsSWR({
+    required String locationId,
+    required String periodId,
+    required void Function(List<AccountingPeriodAuditLog> logs, bool fromCache)
+    onData,
+    void Function(dynamic error)? onError,
+  }) async {
+    final key = _auditLogsKey(locationId, periodId);
+    var hasLocalData = false;
+
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      final list = localCached['items'] as List<dynamic>? ?? [];
+      final logs = list
+          .map(
+            (e) => AccountingPeriodAuditLog.fromJson(e as Map<String, dynamic>),
+          )
+          .toList();
+      onData(logs, true);
+      hasLocalData = true;
+    }
+
+    try {
+      final logs = await _apiService.getAuditLogs(locationId, periodId);
+      await _localApiCache.setMap(
+        key,
+        {
+          'items': logs
+              .map(
+                (log) => {
+                  'logId': log.logId,
+                  'periodId': log.periodId,
+                  'action': log.action,
+                  'oldValue': log.oldValue,
+                  'newValue': log.newValue,
+                  'reason': log.reason,
+                  'createdAt': log.createdAt.toIso8601String(),
+                },
+              )
+              .toList(),
+        },
+        groupKey: 'accounting_period_audit_logs',
+        cacheType: 'list',
+      );
+      onData(logs, false);
+    } catch (error) {
+      if (!hasLocalData && onError != null) {
+        onError(error);
+      }
+    }
+  }
+
   // ──────────────────────────────────────────────────────
   // Create Accounting Books (TT152 templates)
   // ──────────────────────────────────────────────────────
@@ -374,6 +432,20 @@ class AccountingRepository {
     int batchSize = 200,
   }) async {
     final key = _bookRowsKey(locationId, bookId, cursor, batchSize);
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      unawaited(
+        _refreshBookRowsCache(
+          key: key,
+          locationId: locationId,
+          bookId: bookId,
+          cursor: cursor,
+          batchSize: batchSize,
+        ),
+      );
+      return BookRowsResponse.fromJson(localCached);
+    }
+
     try {
       final rows = await _apiService.getBookRows(
         locationId,
@@ -389,11 +461,32 @@ class AccountingRepository {
       );
       return rows;
     } catch (e) {
-      final localCached = await _localApiCache.getMap(key);
-      if (localCached != null) {
-        return BookRowsResponse.fromJson(localCached);
-      }
       rethrow;
+    }
+  }
+
+  Future<void> _refreshBookRowsCache({
+    required String key,
+    required String locationId,
+    required String bookId,
+    required String? cursor,
+    required int batchSize,
+  }) async {
+    try {
+      final rows = await _apiService.getBookRows(
+        locationId,
+        bookId,
+        cursor: cursor,
+        batchSize: batchSize,
+      );
+      await _localApiCache.setMap(
+        key,
+        _bookRowsResponseToJson(rows),
+        groupKey: 'accounting_book_rows',
+        cacheType: 'list',
+      );
+    } catch (_) {
+      // Best effort background refresh.
     }
   }
 
@@ -406,6 +499,18 @@ class AccountingRepository {
     required String bookId,
   }) async {
     final key = _bookSectionsKey(locationId, bookId);
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      unawaited(
+        _refreshBookSectionsCache(
+          key: key,
+          locationId: locationId,
+          bookId: bookId,
+        ),
+      );
+      return BookSectionsResponse.fromJson(localCached);
+    }
+
     try {
       final sections = await _apiService.getBookSections(locationId, bookId);
       await _localApiCache.setMap(
@@ -416,11 +521,25 @@ class AccountingRepository {
       );
       return sections;
     } catch (e) {
-      final localCached = await _localApiCache.getMap(key);
-      if (localCached != null) {
-        return BookSectionsResponse.fromJson(localCached);
-      }
       rethrow;
+    }
+  }
+
+  Future<void> _refreshBookSectionsCache({
+    required String key,
+    required String locationId,
+    required String bookId,
+  }) async {
+    try {
+      final sections = await _apiService.getBookSections(locationId, bookId);
+      await _localApiCache.setMap(
+        key,
+        _bookSectionsResponseToJson(sections),
+        groupKey: 'accounting_book_sections',
+        cacheType: 'detail',
+      );
+    } catch (_) {
+      // Best effort background refresh.
     }
   }
 
@@ -435,6 +554,7 @@ class AccountingRepository {
       await _localApiCache.removeByGroup('accounting_books');
       await _localApiCache.removeByGroup('accounting_book_rows');
       await _localApiCache.removeByGroup('accounting_book_sections');
+      await _localApiCache.removeByGroup('accounting_period_audit_logs');
     } catch (e) {
       debugPrint('AccountingRepository._invalidateCache error: $e');
     }

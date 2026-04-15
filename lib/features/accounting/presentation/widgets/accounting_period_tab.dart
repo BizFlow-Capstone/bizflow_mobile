@@ -525,7 +525,11 @@ class _PeriodCard extends StatelessWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: bloc,
-        child: _AuditLogSheet(periodLabel: period.displayLabel, l10n: l10n),
+        child: _AuditLogSheet(
+          periodId: period.periodId.toString(),
+          periodLabel: period.displayLabel,
+          l10n: l10n,
+        ),
       ),
     );
   }
@@ -666,10 +670,15 @@ class _PeriodCard extends StatelessWidget {
 // ─────────────────────── AUDIT LOG SHEET ───────────────────────
 
 class _AuditLogSheet extends StatelessWidget {
+  final String periodId;
   final String periodLabel;
   final AppLocalizations l10n;
 
-  const _AuditLogSheet({required this.periodLabel, required this.l10n});
+  const _AuditLogSheet({
+    required this.periodId,
+    required this.periodLabel,
+    required this.l10n,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -709,10 +718,16 @@ class _AuditLogSheet extends StatelessWidget {
             Expanded(
               child: BlocBuilder<AccountingPeriodBloc, AccountingPeriodState>(
                 builder: (context, state) {
-                  if (state.isLogsLoading) {
+                  final hasCurrentPeriodLogs =
+                      state.auditLogsPeriodId == periodId;
+                  final logs = hasCurrentPeriodLogs
+                      ? state.auditLogs
+                      : const <AccountingPeriodAuditLog>[];
+
+                  if (state.isLogsLoading && logs.isEmpty) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final logs = state.auditLogs;
+
                   if (logs.isEmpty) {
                     return Center(
                       child: Text(
@@ -721,12 +736,24 @@ class _AuditLogSheet extends StatelessWidget {
                       ),
                     );
                   }
-                  return ListView.builder(
-                    controller: controller,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    itemCount: logs.length,
-                    itemBuilder: (_, i) =>
-                        _AuditLogItem(log: logs[i], l10n: l10n),
+
+                  return Stack(
+                    children: [
+                      ListView.builder(
+                        controller: controller,
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        itemCount: logs.length,
+                        itemBuilder: (_, i) =>
+                            _AuditLogItem(log: logs[i], l10n: l10n),
+                      ),
+                      if (state.isLogsLoading)
+                        const Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: LinearProgressIndicator(minHeight: 2),
+                        ),
+                    ],
                   );
                 },
               ),

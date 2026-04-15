@@ -18,8 +18,7 @@ class NoLocationPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocListener<LocationBloc, LocationState>(
       listener: (context, state) {
-        if (state is LocationsLoaded &&
-            state.locations.any((location) => location.isActive)) {
+        if (state is LocationsLoaded && state.locations.isNotEmpty) {
           // If locations are found (e.g. from background refresh after invitation)
           // automatically navigate back to Home.
           AppRouter.navigateAndClearStack(AppRoutes.home);
@@ -37,7 +36,10 @@ class NoLocationPage extends StatelessWidget {
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary),
+              icon: const Icon(
+                Icons.notifications_outlined,
+                color: AppColors.textPrimary,
+              ),
               tooltip: context.l10n.tr('notification.title'),
               onPressed: () {
                 AppRouter.navigateTo(AppRoutes.notifications);

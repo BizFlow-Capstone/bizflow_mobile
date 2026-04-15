@@ -36,6 +36,7 @@ class _EmployeeListPageState extends State<EmployeeListPage>
   StreamSubscription<Map<String, dynamic>>? _messageSubscription;
   late BusinessContext _businessContext;
   final ActionGuard _deleteEmployeeGuard = ActionGuard();
+  final ActionGuard _openAddEmployeeGuard = ActionGuard();
 
   @override
   void initState() {
@@ -354,12 +355,14 @@ class _EmployeeListPageState extends State<EmployeeListPage>
       floatingActionButton: FloatingActionButton(
         tooltip: t.translate('employee.add_employee'),
         onPressed: () async {
-          final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-            context,
-            featureCode: SubscriptionFeatureCodes.employees,
-          );
-          if (!allowed || !context.mounted) return;
-          Navigator.pushNamed(context, AppRoutes.addEmployee);
+          await _openAddEmployeeGuard.run(() async {
+            final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+              context,
+              featureCode: SubscriptionFeatureCodes.employees,
+            );
+            if (!allowed || !context.mounted) return;
+            await Navigator.pushNamed(context, AppRoutes.addEmployee);
+          });
         },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add, color: Colors.white),

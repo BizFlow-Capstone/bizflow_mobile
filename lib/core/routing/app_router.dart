@@ -56,6 +56,7 @@ import '../../shared/dialogs/app_snackbar.dart';
 import '../../shared/context/business_context.dart';
 import '../../shared/context/notification_context.dart';
 import '../../shared/services/permission_service.dart';
+import '../../shared/utils/action_guard.dart';
 import '../../features/subscription/domain/subscription_feature_codes.dart';
 import '../../features/subscription/presentation/utils/subscription_feature_guard.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -657,6 +658,7 @@ class _GlobalAppBarShell extends StatefulWidget {
 
 class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ActionGuard _openLocationFormGuard = ActionGuard();
   StreamSubscription<String>? _navigationSubscription;
 
   @override
@@ -712,66 +714,72 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                   List<LocationItem> locations = [];
                   LocationItem? selectedLocation;
 
-                  if (state is LocationsLoaded) {
-                    final activeLocations = state.locations
-                        .where((loc) => loc.isActive)
-                        .toList();
+                  final allLocations = state is LocationsLoaded
+                      ? state.locations
+                      : context.read<LocationBloc>().currentLocations;
 
-                    locations = activeLocations
-                        .map(
-                          (loc) => LocationItem(
-                            id: loc.id,
-                            name: loc.name,
-                            ownerProfileId: loc.ownerProfileId,
-                            isActive: loc.isActive,
-                            isOwner: loc.isOwner,
-                          ),
-                        )
-                        .toList();
+                  locations = allLocations
+                      .map(
+                        (loc) => LocationItem(
+                          id: loc.id,
+                          name: loc.name,
+                          ownerProfileId: loc.ownerProfileId,
+                          isActive: loc.isActive,
+                          isOwner: loc.isOwner,
+                        ),
+                      )
+                      .toList();
 
-                    // Resolve selectedLocation from businessContext
-                    final selectedBusinessId =
-                        businessContext.currentBusinessId;
-                    if (businessContext.currentBusinessId != null) {
-                      try {
-                        selectedLocation = locations.firstWhere(
-                          (loc) => loc.id == businessContext.currentBusinessId,
-                        );
-                      } catch (_) {
-                        // Safe fallback
+                  // Resolve selectedLocation from businessContext
+                  final selectedBusinessId = businessContext.currentBusinessId;
+                  if (selectedBusinessId != null) {
+                    try {
+                      selectedLocation = locations.firstWhere(
+                        (loc) => loc.id == selectedBusinessId,
+                      );
+                    } catch (_) {
+                      // Safe fallback
+                    }
+                  }
+
+                  final hasAnyActive = locations.any(
+                    (location) => location.isActive,
+                  );
+                  final isSelectionValid =
+                      selectedBusinessId != null &&
+                      selectedLocation != null &&
+                      (!hasAnyActive || selectedLocation!.isActive);
+
+                  if (locations.isNotEmpty && !isSelectionValid) {
+                    // Keep sidebar selection and business context in sync,
+                    // including after account switch when old business id is stale
+                    // or when selected location has been inactivated.
+                    final fallbackLocation = locations.firstWhere(
+                      (location) => location.isActive,
+                      orElse: () => locations.first,
+                    );
+                    selectedLocation = fallbackLocation;
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      if (!context.mounted) return;
+                      if (businessContext.currentBusinessId ==
+                          fallbackLocation.id) {
+                        return;
                       }
-                    }
-
-                    final isSelectionValid =
-                        selectedBusinessId != null && selectedLocation != null;
-                    if (locations.isNotEmpty && !isSelectionValid) {
-                      // Keep sidebar selection and business context in sync,
-                      // including after account switch when old business id is stale.
-                      final fallbackLocation = locations.first;
-                      selectedLocation = fallbackLocation;
-                      WidgetsBinding.instance.addPostFrameCallback((_) async {
-                        if (!context.mounted) return;
-                        if (businessContext.currentBusinessId ==
-                            fallbackLocation.id) {
-                          return;
-                        }
-                        await businessContext.switchBusinessLocation(
-                          fallbackLocation.id,
-                          fallbackLocation.name,
-                          isOwner: fallbackLocation.isOwner,
-                          ownerProfileId: fallbackLocation.ownerProfileId,
-                        );
-                      });
-                    } else if (locations.isEmpty &&
-                        selectedBusinessId != null) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) async {
-                        if (!context.mounted) return;
-                        if (businessContext.currentBusinessId == null) {
-                          return;
-                        }
-                        await businessContext.clear();
-                      });
-                    }
+                      await businessContext.switchBusinessLocation(
+                        fallbackLocation.id,
+                        fallbackLocation.name,
+                        isOwner: fallbackLocation.isOwner,
+                        ownerProfileId: fallbackLocation.ownerProfileId,
+                      );
+                    });
+                  } else if (locations.isEmpty && selectedBusinessId != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      if (!context.mounted) return;
+                      if (businessContext.currentBusinessId == null) {
+                        return;
+                      }
+                      await businessContext.clear();
+                    });
                   }
 
                   return SidebarWidget(
@@ -779,12 +787,23 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                     selectedLocation: selectedLocation,
                     isOwner: businessContext.isOwner,
                     onAddLocation: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AddEditLocationPage(),
-                        ),
+                      unawaited(
+                        _openLocationFormGuard.run(() async {
+                          final allowed =
+                              await SubscriptionFeatureGuard.ensureAllowed(
+                                context,
+                                featureCode: SubscriptionFeatureCodes.locations,
+                              );
+                          if (!allowed || !context.mounted) return;
+
+                          Navigator.pop(context);
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AddEditLocationPage(),
+                            ),
+                          );
+                        }),
                       );
                     },
                     onLogout: () {
@@ -802,6 +821,16 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                       AppRouter.navigateTo(AppRoutes.profile);
                     },
                     onLocationSelected: (location) async {
+                      if (!location.isActive) {
+                        AppSnackBar.show(
+                          context,
+                          message: l10n.translate(
+                            'home.location_inactive_block',
+                          ),
+                          type: AppSnackBarType.warning,
+                        );
+                        return;
+                      }
                       await businessContext.switchBusinessLocation(
                         location.id,
                         location.name,
@@ -826,17 +855,20 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
                   tooltip: 'Thêm địa điểm',
                   backgroundColor: const Color(0xFF23C4C1),
                   onPressed: () async {
-                    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-                      context,
-                      featureCode: SubscriptionFeatureCodes.locations,
-                    );
-                    if (!allowed || !context.mounted) return;
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AddEditLocationPage(),
-                      ),
-                    );
+                    await _openLocationFormGuard.run(() async {
+                      final allowed =
+                          await SubscriptionFeatureGuard.ensureAllowed(
+                            context,
+                            featureCode: SubscriptionFeatureCodes.locations,
+                          );
+                      if (!allowed || !context.mounted) return;
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddEditLocationPage(),
+                        ),
+                      );
+                    });
                   },
                   child: const Icon(Icons.add, color: Colors.white),
                 )

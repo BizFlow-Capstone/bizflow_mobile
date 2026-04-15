@@ -17,8 +17,15 @@ import '../../data/subscription_repository.dart';
 
 import '../../../../shared/context/business_context.dart';
 
-class SubscriptionPlansPage extends StatelessWidget {
+class SubscriptionPlansPage extends StatefulWidget {
   const SubscriptionPlansPage({super.key});
+
+  @override
+  State<SubscriptionPlansPage> createState() => _SubscriptionPlansPageState();
+}
+
+class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
+  int? _processingPlanId;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +57,7 @@ class SubscriptionPlansPage extends StatelessWidget {
               Icons.notifications_none,
               color: AppColors.textPrimary,
             ),
-            onPressed: () {},
+            onPressed: () => AppRouter.navigateTo(AppRoutes.notifications),
           ),
           SizedBox(width: AppSpacing.xs),
         ],
@@ -165,6 +172,8 @@ class SubscriptionPlansPage extends StatelessWidget {
                               onUpgrade: () => _handleUpgrade(context, plan),
                               isOwner: isOwner,
                               isCurrentPlan: isCurrentPlan,
+                              isProcessing:
+                                  _processingPlanId == plan.subscriptionPlanId,
                             ),
                             SizedBox(height: AppSpacing.lg),
                           ],
@@ -224,7 +233,12 @@ class SubscriptionPlansPage extends StatelessWidget {
     BuildContext context,
     SubscriptionPlanDto plan,
   ) async {
+    if (_processingPlanId != null) return;
     final repo = context.read<SubscriptionRepository>();
+
+    setState(() {
+      _processingPlanId = plan.subscriptionPlanId;
+    });
 
     try {
       final checkout = await repo.checkoutSubscription(plan.subscriptionPlanId);
@@ -258,6 +272,12 @@ class SubscriptionPlansPage extends StatelessWidget {
             ),
           );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _processingPlanId = null;
+        });
+      }
     }
   }
 }
@@ -272,6 +292,7 @@ class _DynamicPlanCard extends StatelessWidget {
 
   final bool isOwner;
   final bool isCurrentPlan;
+  final bool isProcessing;
 
   const _DynamicPlanCard({
     required this.plan,
@@ -280,6 +301,7 @@ class _DynamicPlanCard extends StatelessWidget {
     required this.onUpgrade,
     required this.isOwner,
     required this.isCurrentPlan,
+    this.isProcessing = false,
   });
 
   @override
@@ -391,7 +413,7 @@ class _DynamicPlanCard extends StatelessWidget {
         width: double.infinity,
         height: 52,
         child: ElevatedButton(
-          onPressed: onUpgrade,
+            onPressed: isProcessing ? null : onUpgrade,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.success,
             foregroundColor: AppColors.white,
@@ -399,10 +421,22 @@ class _DynamicPlanCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-          child: Text(
-            l10n.translate('subscription.renew_more'),
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
+            child: isProcessing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    l10n.translate('subscription.renew_more'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
         ),
       );
     }
@@ -420,7 +454,7 @@ class _DynamicPlanCard extends StatelessWidget {
       width: double.infinity,
       height: 52,
       child: ElevatedButton(
-        onPressed: onUpgrade,
+        onPressed: isProcessing ? null : onUpgrade,
         style: ElevatedButton.styleFrom(
           backgroundColor: type == _PlanType.premium
               ? AppColors.warning
@@ -428,15 +462,24 @@ class _DynamicPlanCard extends StatelessWidget {
           foregroundColor: AppColors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        child: Text(
-          type == _PlanType.business
-              ? l10n.translate('subscription.business.cta')
-              : l10n.translate('subscription.premium.cta'),
-          style: AppTextStyles.titleSmall.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        child: isProcessing
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Text(
+                type == _PlanType.business
+                    ? l10n.translate('subscription.business.cta')
+                    : l10n.translate('subscription.premium.cta'),
+                style: AppTextStyles.titleSmall.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
       ),
     );
   }

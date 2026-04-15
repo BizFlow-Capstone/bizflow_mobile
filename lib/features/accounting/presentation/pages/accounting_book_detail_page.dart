@@ -17,6 +17,7 @@ import '../../presentation/widgets/s2e_book_widget.dart';
 import '../../presentation/widgets/s3a_book_widget.dart';
 import '../../data/repositories/accounting_repository.dart';
 import '../../data/services/excel_export_service.dart';
+import '../../domain/utils/accounting_reference_display.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
@@ -164,6 +165,11 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
           final results = snapshot.data;
           final sectionsData = results?[0] as BookSectionsResponse?;
           final dataRows = (results?[1] as List<Map<String, dynamic>>?) ?? [];
+          final languageCode = Localizations.localeOf(context).languageCode;
+          final normalizedDataRows = AccountingReferenceDisplay.normalizeRows(
+            dataRows,
+            languageCode: languageCode,
+          );
           if (sectionsData == null) {
             return Center(
               child: Text(
@@ -179,7 +185,9 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
                 _buildBookHeader(context),
                 const Divider(height: 1),
                 // Template-aware table
-                Expanded(child: _buildTemplateWidget(sectionsData, dataRows)),
+                Expanded(
+                  child: _buildTemplateWidget(sectionsData, normalizedDataRows),
+                ),
                 // Export button
                 _buildExportButton(context, sectionsData),
               ],
@@ -414,7 +422,12 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
     );
 
     try {
-      final rows = await _rowsFuture;
+      final rawRows = await _rowsFuture;
+      final languageCode = Localizations.localeOf(context).languageCode;
+      final rows = AccountingReferenceDisplay.normalizeRows(
+        rawRows,
+        languageCode: languageCode,
+      );
       final headerInfo = _buildExportHeaderInfo(sectionsData);
       final files = await ExcelExportService.exportToExcelFiles(
         widget.book,

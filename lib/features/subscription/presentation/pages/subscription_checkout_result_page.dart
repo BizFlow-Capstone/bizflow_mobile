@@ -71,7 +71,8 @@ class _SubscriptionCheckoutResultPageState
       final cache = CacheManager();
 
       // Remember old plan ID to detect when backend has processed the upgrade.
-      final oldPlanId = repo.currentSubscriptionSnapshot?.plan?.subscriptionPlanId;
+      final oldPlanId =
+          repo.currentSubscriptionSnapshot?.plan?.subscriptionPlanId;
 
       // Clear stale cache first.
       await cache.remove('current_subscription');
@@ -97,11 +98,17 @@ class _SubscriptionCheckoutResultPageState
       }
 
       // Update in-memory snapshot — CurrentSubscriptionPage reads this sync.
-      if (latest != null && mounted) {
+      if (mounted) {
         repo.updateCurrentSubscription(latest);
       }
 
-      final json = latest?.toJson() ?? <String, dynamic>{};
+      if (latest == null) {
+        await cache.remove('current_subscription');
+        await cache.remove('current_subscription_for_plans');
+        return;
+      }
+
+      final json = latest.toJson();
       await cache.set('current_subscription', json);
       await cache.set('current_subscription_for_plans', json);
     } catch (_) {
@@ -123,7 +130,7 @@ class _SubscriptionCheckoutResultPageState
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-         elevation: 0,
+        elevation: 0,
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -185,7 +192,9 @@ class _SubscriptionCheckoutResultPageState
 
                   final currentPlanButton = AppButton(
                     label: l10n.translate('subscription.my_current_plan'),
-                    onPressed: _isNavigatingToPlan ? null : _navigateToCurrentPlan,
+                    onPressed: _isNavigatingToPlan
+                        ? null
+                        : _navigateToCurrentPlan,
                     isLoading: _isNavigatingToPlan,
                     type: AppButtonType.outlined,
                     size: AppButtonSize.large,
@@ -193,9 +202,8 @@ class _SubscriptionCheckoutResultPageState
 
                   final backButton = AppButton(
                     label: l10n.translate('common.back'),
-                    onPressed: () => AppRouter.navigateAndClearStack(
-                      AppRoutes.home,
-                    ),
+                    onPressed: () =>
+                        AppRouter.navigateAndClearStack(AppRoutes.home),
                     type: AppButtonType.primary,
                     size: AppButtonSize.large,
                   );
@@ -203,7 +211,10 @@ class _SubscriptionCheckoutResultPageState
                   if (isNarrow) {
                     return Column(
                       children: [
-                        SizedBox(width: double.infinity, child: currentPlanButton),
+                        SizedBox(
+                          width: double.infinity,
+                          child: currentPlanButton,
+                        ),
                         const SizedBox(height: AppSpacing.md),
                         SizedBox(width: double.infinity, child: backButton),
                       ],

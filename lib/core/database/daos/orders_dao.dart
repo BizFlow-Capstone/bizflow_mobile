@@ -19,7 +19,8 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   Future<OrdersTableData?> getLatestById(String id) {
     return (select(ordersTable)
           ..where((tbl) => tbl.id.equals(id))
-          ..orderBy([(tbl) => OrderingTerm.desc(tbl.cachedAtEpoch)]))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.cachedAtEpoch)])
+          ..limit(1))
         .getSingleOrNull();
   }
 

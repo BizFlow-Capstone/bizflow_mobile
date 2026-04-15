@@ -21,6 +21,8 @@ import '../../../../core/network/api_error_message_parser.dart';
 import '../../../product/data/models/business_type_model.dart';
 import '../../../product/presentation/bloc/product_bloc.dart';
 import '../../../revenue/presentation/bloc/revenue_bloc.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../revenue/data/models/ai_draft_revenue_dto.dart';
 
@@ -65,7 +67,9 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
       case 'low':
         return l10n.translate('accounting.ai_confidence_low');
       default:
-        return normalized.isEmpty ? '(khong co)' : normalized;
+        return normalized.isEmpty
+            ? l10n.translate('accounting.ai_confidence_none')
+            : normalized;
     }
   }
 
@@ -146,20 +150,32 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
     required String audioPath,
     required AppLocalizations l10n,
   }) async {
+    final aiAllowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.ai,
+    );
+    if (!aiAllowed || !mounted) return;
+
     final locationId = int.tryParse(
       context.read<BusinessContext>().currentBusinessId ?? '',
     );
     if (locationId == null || locationId <= 0) {
-      AppSnackBar.warning(context, l10n.translate('home.please_select_location'));
+      AppSnackBar.warning(
+        context,
+        l10n.translate('home.please_select_location'),
+      );
       return;
     }
 
     setState(() => _isVoiceProcessing = true);
     try {
-      final result = await context.read<RevenueBloc>().repository.parseDraftRevenueFromAudio(
-        locationId: locationId,
-        audioFile: File(audioPath),
-      );
+      final result = await context
+          .read<RevenueBloc>()
+          .repository
+          .parseDraftRevenueFromAudio(
+            locationId: locationId,
+            audioFile: File(audioPath),
+          );
       debugPrint(
         'AIDraftRevenueDialog.parse result rawTranscript="${result.rawTranscript}" confidence="${result.confidence}"',
       );
@@ -186,7 +202,10 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                 amountText: item.amount == null
                     ? ''
                     : CurrencyFormatter.formatNumber(item.amount!),
-                moneyChannel: _mapMoneyChannelFromAi(item.moneyChannel, channels),
+                moneyChannel: _mapMoneyChannelFromAi(
+                  item.moneyChannel,
+                  channels,
+                ),
                 revenueDate: firstDate ?? DateTime.now(),
               );
             }),
@@ -210,7 +229,10 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
       final recordedPath = await _voiceRecorder.stop();
       setState(() => _isVoiceRecording = false);
       if (recordedPath == null || recordedPath.isEmpty) {
-        AppSnackBar.warning(context, l10n.translate('accounting.voice_no_record_found'));
+        AppSnackBar.warning(
+          context,
+          l10n.translate('accounting.voice_no_record_found'),
+        );
         return;
       }
       final fileName = recordedPath.split(Platform.pathSeparator).last;
@@ -219,7 +241,13 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
         displayName: fileName,
       );
       if (mounted && (publicPath ?? '').isNotEmpty) {
-        AppSnackBar.info(context, 'Da luu ban ghi vao $publicPath');
+        AppSnackBar.info(
+          context,
+          l10n.translate(
+            'accounting.audio_saved_to',
+            params: {'path': publicPath!},
+          ),
+        );
       }
       await _parseDraftFromAudioFile(audioPath: recordedPath, l10n: l10n);
       return;
@@ -227,7 +255,10 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
 
     final permission = await Permission.microphone.request();
     if (permission != PermissionStatus.granted) {
-      AppSnackBar.warning(context, l10n.translate('common.microphone_permission_required'));
+      AppSnackBar.warning(
+        context,
+        l10n.translate('common.microphone_permission_required'),
+      );
       return;
     }
     if (!await _voiceRecorder.hasPermission()) {
@@ -262,13 +293,19 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
   Future<void> _replayLastVoice(AppLocalizations l10n) async {
     final path = _lastVoicePath;
     if (path == null || path.isEmpty) {
-      AppSnackBar.info(context, l10n.translate('accounting.voice_no_record_found'));
+      AppSnackBar.info(
+        context,
+        l10n.translate('accounting.voice_no_record_found'),
+      );
       return;
     }
 
     final file = File(path);
     if (!await file.exists()) {
-      AppSnackBar.warning(context, l10n.translate('accounting.voice_no_record_found'));
+      AppSnackBar.warning(
+        context,
+        l10n.translate('accounting.voice_no_record_found'),
+      );
       return;
     }
 
@@ -283,7 +320,10 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
 
   Future<void> _loadBusinessTypes() async {
     try {
-      final result = await context.read<ProductBloc>().repository.getBusinessTypes();
+      final result = await context
+          .read<ProductBloc>()
+          .repository
+          .getBusinessTypes();
       setState(() {
         businessTypes = List<BusinessTypeDto>.from(result);
       });
@@ -295,10 +335,7 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
   void _populateFromAi(AppLocalizations l10n) {
     final items = widget.voiceItems;
     if (items.isEmpty) {
-      AppSnackBar.info(
-        context,
-        l10n.translate('accounting.ai_draft_empty'),
-      );
+      AppSnackBar.info(context, l10n.translate('accounting.ai_draft_empty'));
       return;
     }
     final channels = widget.getMoneyChannels();
@@ -310,7 +347,9 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
             final firstDate = _tryParseYmdDate(item.revenueDate);
             return _RevenueAIDraft(
               description: (item.description ?? '').trim(),
-              amountText: item.amount == null ? '' : CurrencyFormatter.formatNumber(item.amount!),
+              amountText: item.amount == null
+                  ? ''
+                  : CurrencyFormatter.formatNumber(item.amount!),
               moneyChannel: _mapMoneyChannelFromAi(item.moneyChannel, channels),
               revenueDate: firstDate ?? DateTime.now(),
             );
@@ -369,8 +408,12 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
 
     if (locationId == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(l10n.translate('accounting.ai_draft_revenue_title'))),
-        body: Center(child: Text(l10n.translate('home.please_select_location'))),
+        appBar: AppBar(
+          title: Text(l10n.translate('accounting.ai_draft_revenue_title')),
+        ),
+        body: Center(
+          child: Text(l10n.translate('home.please_select_location')),
+        ),
       );
     }
 
@@ -405,7 +448,9 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                         onPressed: _isVoiceProcessing
                             ? null
                             : () => _toggleVoiceCapture(l10n),
-                        icon: Icon(_isVoiceRecording ? Icons.stop_circle : Icons.mic),
+                        icon: Icon(
+                          _isVoiceRecording ? Icons.stop_circle : Icons.mic,
+                        ),
                         label: Text(
                           _isVoiceRecording
                               ? l10n.translate('accounting.voice_stop_record')
@@ -420,7 +465,9 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                             ? null
                             : () => _pickAndParseAudioFile(l10n),
                         icon: const Icon(Icons.library_music_outlined),
-                        label: Text(l10n.translate('accounting.voice_upload_file')),
+                        label: Text(
+                          l10n.translate('accounting.voice_upload_file'),
+                        ),
                       ),
                     ),
                   ],
@@ -434,7 +481,9 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                         : () => _replayLastVoice(l10n),
                     icon: Icon(_isVoicePlaying ? Icons.stop : Icons.play_arrow),
                     label: Text(
-                      _isVoicePlaying ? 'Dung phat' : 'Phat lai ban ghi gan nhat',
+                      _isVoicePlaying
+                          ? l10n.translate('accounting.voice_stop_playback')
+                          : l10n.translate('accounting.voice_replay_latest'),
                     ),
                   ),
                 ),
@@ -445,8 +494,17 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                 if ((_lastVoicePath ?? '').isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Audio: ${_lastVoicePath!.split(Platform.pathSeparator).last}',
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                    l10n.translate(
+                      'accounting.audio_file_label',
+                      params: {
+                        'file': _lastVoicePath!
+                            .split(Platform.pathSeparator)
+                            .last,
+                      },
+                    ),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
                 if (_hasVoiceParseResult) ...[
@@ -462,12 +520,22 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.subtitles_outlined, size: 16, color: AppColors.textSecondary),
+                        const Icon(
+                          Icons.subtitles_outlined,
+                          size: 16,
+                          color: AppColors.textSecondary,
+                        ),
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: SelectableText(
-                            (_lastRawTranscript ?? '').isEmpty ? '(trong)' : _lastRawTranscript!,
-                            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),
+                            (_lastRawTranscript ?? '').isEmpty
+                                ? l10n.translate(
+                                    'accounting.voice_transcript_empty',
+                                  )
+                                : _lastRawTranscript!,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: AppColors.textPrimary,
+                            ),
                           ),
                         ),
                       ],
@@ -497,7 +565,9 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                   Center(
                     child: Text(
                       l10n.translate('accounting.ai_draft_empty'),
-                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   )
                 else
@@ -516,7 +586,8 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                           drafts.removeAt(index);
                         });
                       },
-                      onSave: () => _saveDraft(context, l10n, locationId, index),
+                      onSave: () =>
+                          _saveDraft(context, l10n, locationId, index),
                       onDateChanged: (date) {
                         setState(() {
                           draft.revenueDate = date;
@@ -532,15 +603,27 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
     );
   }
 
-  Future<void> _saveDraft(BuildContext context, AppLocalizations l10n, String locationId, int index) async {
+  Future<void> _saveDraft(
+    BuildContext context,
+    AppLocalizations l10n,
+    String locationId,
+    int index,
+  ) async {
     final draft = drafts[index];
-    final amount = (CurrencyFormatter.parse(draft.amountText) ?? double.tryParse(draft.amountText) ?? 0).toDouble();
+    final amount =
+        (CurrencyFormatter.parse(draft.amountText) ??
+                double.tryParse(draft.amountText) ??
+                0)
+            .toDouble();
 
     if (amount <= 0 ||
         draft.description.trim().isEmpty ||
         (draft.moneyChannel ?? '').trim().isEmpty ||
         (draft.businessTypeId ?? '').trim().isEmpty) {
-      AppSnackBar.info(context, l10n.translate('accounting.ai_draft_validation_failed'));
+      AppSnackBar.info(
+        context,
+        l10n.translate('accounting.ai_draft_validation_failed'),
+      );
       return;
     }
 
@@ -555,12 +638,18 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
         'revenueDate': DateFormat('yyyy-MM-dd').format(draft.revenueDate),
         'description': draft.description.trim(),
         'moneyChannel': draft.moneyChannel,
-        if ((draft.businessTypeId ?? '').isNotEmpty) 'businessTypeId': draft.businessTypeId,
+        if ((draft.businessTypeId ?? '').isNotEmpty)
+          'businessTypeId': draft.businessTypeId,
       });
 
       if (!mounted) return;
-      AppSnackBar.success(context, l10n.translate('accounting.ai_draft_submit_success'));
-      context.read<RevenueBloc>().add(LoadRevenuesRequested(businessLocationId: locationId));
+      AppSnackBar.success(
+        context,
+        l10n.translate('accounting.ai_draft_submit_success'),
+      );
+      context.read<RevenueBloc>().add(
+        LoadRevenuesRequested(businessLocationId: locationId),
+      );
 
       setState(() {
         drafts.removeAt(index);
@@ -610,7 +699,9 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
   @override
   void initState() {
     super.initState();
-    _descriptionController = TextEditingController(text: widget.draft.description);
+    _descriptionController = TextEditingController(
+      text: widget.draft.description,
+    );
     _amountController = TextEditingController(text: widget.draft.amountText);
   }
 
@@ -678,7 +769,8 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
           TextFormField(
             controller: _descriptionController,
             decoration: InputDecoration(
-              labelText: '${l10n.translate('accounting.revenue_description')} *',
+              labelText:
+                  '${l10n.translate('accounting.revenue_description')} *',
               labelStyle: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.error,
                 fontWeight: FontWeight.w600,
@@ -724,7 +816,8 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
             isExpanded: true,
             initialValue: widget.draft.businessTypeId,
             decoration: InputDecoration(
-              labelText: '${l10n.translate('accounting.revenue_business_type')} *',
+              labelText:
+                  '${l10n.translate('accounting.revenue_business_type')} *',
               labelStyle: AppTextStyles.bodySmall.copyWith(
                 color: AppColors.error,
                 fontWeight: FontWeight.w600,

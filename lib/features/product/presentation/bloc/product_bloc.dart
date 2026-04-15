@@ -32,7 +32,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<DeleteProductRequested>(_onDeleteProductRequested);
     on<UpdateProductStatusRequested>(_onUpdateProductStatusRequested);
     on<LoadProductSaleItemsRequested>(_onLoadProductSaleItemsRequested);
-    on<ProductSaleItemsNetworkDataReceived>(_onProductSaleItemsNetworkDataReceived);
+    on<ProductSaleItemsNetworkDataReceived>(
+      _onProductSaleItemsNetworkDataReceived,
+    );
     on<ImportInventoryRequested>(_onImportInventoryRequested);
     on<LoadProductDetailRequested>(_onLoadProductDetailRequested);
     on<ProductDetailNetworkDataReceived>(_onProductDetailNetworkDataReceived);
@@ -116,11 +118,11 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         pageNumber: 1,
         pageSize: 500, // Load enough for local search
       );
-      
+
       final parsedProducts = _parseProductsFromResponse(response);
       final products = await _enrichProductsWithSaleItems(parsedProducts);
       _products = products;
-      
+
       // Save full list to cache
       unawaited(repository.saveCachedProducts(scopeKey, products));
       unawaited(
@@ -129,7 +131,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           products.map((item) => item.id).toList(),
         ),
       );
-      
+
       add(
         ProductsNetworkDataReceived(
           products: products,
@@ -175,9 +177,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     if (!isClosed) {
-      emit(
-        ProductFailure(message: ApiErrorMessageParser.parse(event.error)),
-      );
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(event.error)));
     }
   }
 
@@ -218,9 +218,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       );
     } catch (e) {
       debugPrint('ProductBloc._onRefreshProductsRequested error: $e');
-      emit(
-        ProductFailure(message: ApiErrorMessageParser.parse(e)),
-      );
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -306,10 +304,14 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             if (value is num) return value != 0;
             if (value is String) {
               final normalized = value.trim().toLowerCase();
-              if (normalized == 'true' || normalized == 'active' || normalized == '1') {
+              if (normalized == 'true' ||
+                  normalized == 'active' ||
+                  normalized == '1') {
                 return true;
               }
-              if (normalized == 'false' || normalized == 'inactive' || normalized == '0') {
+              if (normalized == 'false' ||
+                  normalized == 'inactive' ||
+                  normalized == '0') {
                 return false;
               }
             }
@@ -345,6 +347,17 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             return 0.0;
           }
 
+          double? parseNullableDouble(dynamic value) {
+            if (value == null) return null;
+            if (value is num) return value.toDouble();
+            if (value is String) {
+              final normalized = value.trim();
+              if (normalized.isEmpty) return null;
+              return double.tryParse(normalized);
+            }
+            return null;
+          }
+
           final double resolvedSalePrice = parseDouble(rawSalePrice);
 
           final dynamic rawCostPrice =
@@ -359,9 +372,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['importPrice'] ??
               item['ImportPrice'] ??
               item['import_price'];
-          final double? resolvedCostPrice = rawCostPrice == null
-              ? null
-              : parseDouble(rawCostPrice);
+          final double? resolvedCostPrice = parseNullableDouble(rawCostPrice);
 
           // 'stock' is the inventory field from the list API
           final dynamic rawQty =
@@ -377,7 +388,9 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             item['barcode'] ?? item['Barcode'] ?? item['sku'] ?? item['Sku'],
           );
 
-          final String? resolvedStatus = parseString(item['status'] ?? item['Status']);
+          final String? resolvedStatus = parseString(
+            item['status'] ?? item['Status'],
+          );
           final bool resolvedIsActive = resolvedStatus != null
               ? parseBool(resolvedStatus, fallback: true)
               : parseBool(
@@ -390,13 +403,15 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
                 );
 
           final int? resolvedLocationId = (() {
-            final dynamic rawLocationId = item['locationId'] ?? item['LocationId'];
+            final dynamic rawLocationId =
+                item['locationId'] ?? item['LocationId'];
             if (rawLocationId == null) return null;
             return parseInt(rawLocationId, fallback: 0);
           })();
 
-          final String? resolvedBusinessTypeId =
-              parseString(item['businessTypeId'] ?? item['BusinessTypeId']);
+          final String? resolvedBusinessTypeId = parseString(
+            item['businessTypeId'] ?? item['BusinessTypeId'],
+          );
 
           return ProductEntity(
             id: idValue?.toString() ?? '',
@@ -545,9 +560,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
 
     // Filter by business type
     if (businessTypeId != null && businessTypeId != 'ALL') {
-      result = result
-          .where((p) => p.businessTypeId == businessTypeId)
-          .toList();
+      result = result.where((p) => p.businessTypeId == businessTypeId).toList();
     }
 
     // Filter by search
@@ -812,9 +825,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       emit(ProductFailure(message: message));
     } catch (e) {
       debugPrint('ProductBloc._onUpdateProductRequested error: $e');
-      emit(
-        ProductFailure(message: ApiErrorMessageParser.parse(e)),
-      );
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -852,9 +863,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       emit(ProductFailure(message: message));
     } catch (e) {
       debugPrint('ProductBloc._onDeleteProductRequested error: $e');
-      emit(
-        ProductFailure(message: ApiErrorMessageParser.parse(e)),
-      );
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -917,11 +926,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       }
     } catch (e) {
       debugPrint('ProductBloc._onUpdateProductStatusRequested error: $e');
-      emit(
-        ProductFailure(
-          message: ApiErrorMessageParser.parse(e),
-        ),
-      );
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -971,9 +976,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       );
     } catch (e) {
       debugPrint('ProductBloc._onImportInventoryRequested error: $e');
-      emit(
-        ProductFailure(message: ApiErrorMessageParser.parse(e)),
-      );
+      emit(ProductFailure(message: ApiErrorMessageParser.parse(e)));
     }
   }
 
@@ -1010,11 +1013,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       if (event.product != null) {
         emit(ProductDetailLoaded(product: event.product!));
       } else if (state is! ProductDetailLoaded) {
-        emit(
-          ProductFailure(
-            message: 'Không tìm thấy chi tiết sản phẩm',
-          ),
-        );
+        emit(ProductFailure(message: 'Không tìm thấy chi tiết sản phẩm'));
       }
     }
   }
@@ -1040,7 +1039,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       return product.copyWith(salePrice: nextSalePrice, price: nextSalePrice);
     }).toList();
 
-    await repository.markProductsDirty(event.locationId, event.affectedProductIds);
+    await repository.markProductsDirty(
+      event.locationId,
+      event.affectedProductIds,
+    );
     await _updateProductCache(event.locationId);
 
     emit(

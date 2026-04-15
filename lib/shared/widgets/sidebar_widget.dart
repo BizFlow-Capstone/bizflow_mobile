@@ -100,13 +100,17 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                               bottom: AppSpacing.sm,
                             ),
                             child: GestureDetector(
-                              onTap: () {
-                                Navigator.pop(context);
-                                widget.onLocationSelected?.call(location);
-                              },
+                              onTap: location.isActive
+                                  ? () {
+                                      Navigator.pop(context);
+                                      widget.onLocationSelected?.call(location);
+                                    }
+                                  : null,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: isSelected
+                                  color: !location.isActive
+                                      ? AppColors.background
+                                      : isSelected
                                       ? AppColors.secondary.withValues(
                                           alpha: 0.1,
                                         )
@@ -149,7 +153,9 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                                     Text(
                                       location.name,
                                       style: AppTextStyles.labelSmall.copyWith(
-                                        color: isSelected
+                                        color: !location.isActive
+                                            ? AppColors.textDisabled
+                                            : isSelected
                                             ? AppColors.secondary
                                             : AppColors.textPrimary,
                                         fontWeight: isSelected
@@ -159,6 +165,21 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    if (!location.isActive)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.xs,
+                                        ),
+                                        child: Text(
+                                          l10n.translate(
+                                            'location.inactive_status',
+                                          ),
+                                          style: AppTextStyles.labelSmall
+                                              .copyWith(
+                                                color: AppColors.textDisabled,
+                                              ),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -259,13 +280,15 @@ class _SidebarWidgetState extends State<SidebarWidget> {
 
                   // App Version
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
                     child: Center(
                       child: FutureBuilder<PackageInfo>(
                         future: PackageInfo.fromPlatform(),
                         builder: (context, snapshot) {
                           final version = snapshot.hasData
-                              ? '${snapshot.data!.version}+${snapshot.data!.buildNumber}'
+                              ? snapshot.data!.version
                               : '1.0.0';
                           return Text(
                             'BizFlow v$version',

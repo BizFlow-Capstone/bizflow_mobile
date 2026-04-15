@@ -77,6 +77,17 @@ class ProductDto {
       return 0.0;
     }
 
+    double? parseNullableDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      if (value is String) {
+        final normalized = value.trim();
+        if (normalized.isEmpty) return null;
+        return double.tryParse(normalized);
+      }
+      return null;
+    }
+
     final dynamic idValue =
         json['id'] ??
         json['Id'] ??
@@ -111,9 +122,7 @@ class ProductDto {
         json['importPrice'] ??
         json['ImportPrice'] ??
         json['import_price'];
-    final double? resolvedCostPrice = rawCostPrice == null
-        ? null
-        : parseDouble(rawCostPrice);
+    final double? resolvedCostPrice = parseNullableDouble(rawCostPrice);
 
     // 'stock' is the inventory field from the list API
     final dynamic rawQty =

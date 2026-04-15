@@ -21,13 +21,36 @@ class NotificationApiService {
       throw Exception(response.message ?? 'Failed to load notifications');
     }
 
-    final payload = response.data as Map<String, dynamic>;
-    final data = payload['data'] as Map<String, dynamic>?;
-    if (data == null) {
+    final raw = response.data;
+    if (raw is! Map) {
       throw Exception('Invalid notification response payload');
     }
 
-    return PaginatedNotificationsDto.fromJson(data);
+    final payload = Map<String, dynamic>.from(raw);
+    final data = payload['data'];
+
+    if (data is Map) {
+      return PaginatedNotificationsDto.fromJson(
+        Map<String, dynamic>.from(data),
+      );
+    }
+
+    if (data is List) {
+      return PaginatedNotificationsDto.fromJson({
+        'items': data,
+        'pageNumber': pageNumber,
+        'pageSize': pageSize,
+        'totalPages': 1,
+        'totalCount': data.length,
+        'hasNextPage': false,
+      });
+    }
+
+    if (payload['items'] is List || payload['notifications'] is List) {
+      return PaginatedNotificationsDto.fromJson(payload);
+    }
+
+    throw Exception('Invalid notification response payload');
   }
 
   Future<int> getUnreadCount() async {

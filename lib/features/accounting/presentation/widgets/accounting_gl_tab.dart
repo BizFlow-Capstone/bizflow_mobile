@@ -16,6 +16,7 @@ import '../bloc/gl_bloc/gl_state.dart';
 import '../widgets/gl_filter_bottom_sheet.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../accounting/data/models/general_ledger_entry_model.dart';
+import '../../../accounting/domain/utils/accounting_reference_display.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../../../order/presentation/bloc/order_bloc.dart';
 import '../../../order/presentation/pages/order_detail_screen.dart';
@@ -167,7 +168,10 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton.icon(
-                    icon: const Icon(Icons.filter_list, color: AppColors.primary),
+                    icon: const Icon(
+                      Icons.filter_list,
+                      color: AppColors.primary,
+                    ),
                     label: Text(context.tr('accounting.gl_filter_data')),
                     onPressed: _showFiltersBottomSheet,
                   ),
@@ -322,6 +326,28 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       dateObj = DateTime.parse(entry.date);
     } catch (_) {}
 
+    final languageCode = Localizations.localeOf(context).languageCode;
+    final displayDocument = AccountingReferenceDisplay.displayDocument(
+      documentNumber: entry.documentNumber,
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      referenceCode: entry.documentNumber,
+      languageCode: languageCode,
+    );
+    final displayNote = AccountingReferenceDisplay.displayDescriptionValue(
+      description: entry.note,
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      referenceCode: entry.documentNumber,
+      languageCode: languageCode,
+    );
+    final displayReference = AccountingReferenceDisplay.displayReference(
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      referenceCode: entry.documentNumber,
+      languageCode: languageCode,
+    );
+
     final dateStr = dateObj != null
         ? DateFormat('dd/MM/yyyy HH:mm').format(dateObj.toLocal())
         : entry.date;
@@ -347,7 +373,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 children: [
                   Expanded(
                     child: Text(
-                      entry.documentNumber,
+                      displayDocument,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -371,7 +397,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
               ),
               const SizedBox(height: 8),
               Text(
-                entry.note,
+                displayNote,
                 style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 14,
@@ -448,7 +474,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            '${entry.referenceType.toUpperCase()}-${entry.referenceId}',
+                            displayReference,
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.primary,
@@ -482,6 +508,29 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   }
 
   void _showEntryDetail(GeneralLedgerEntryModel entry) {
+    final languageCode = Localizations.localeOf(context).languageCode;
+    final displayDocument = AccountingReferenceDisplay.displayDocument(
+      documentNumber: entry.documentNumber,
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      referenceCode: entry.documentNumber,
+      languageCode: languageCode,
+    );
+    final displayNote = AccountingReferenceDisplay.displayDescriptionValue(
+      description: entry.note,
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      referenceCode: entry.documentNumber,
+      languageCode: languageCode,
+    );
+    final displayReference = AccountingReferenceDisplay.displayReference(
+      referenceType: entry.referenceType,
+      referenceId: entry.referenceId,
+      referenceCode: entry.documentNumber,
+      languageCode: languageCode,
+      fallback: '-',
+    );
+
     final entityType = (entry.entityType ?? '').toLowerCase();
     final entityId = entry.entityId ?? 0;
 
@@ -524,7 +573,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 Text(
                   context.tr(
                     'accounting.gl_detail_document',
-                    params: {'value': entry.documentNumber},
+                    params: {'value': displayDocument},
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -545,7 +594,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 Text(
                   context.tr(
                     'accounting.gl_detail_note',
-                    params: {'value': entry.note},
+                    params: {'value': displayNote},
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -566,12 +615,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 Text(
                   context.tr(
                     'accounting.gl_detail_reference',
-                    params: {
-                      'type': entry.referenceType.isNotEmpty
-                          ? entry.referenceType
-                          : '-',
-                      'id': (entry.referenceId ?? '').toString(),
-                    },
+                    params: {'type': displayReference, 'id': ''},
                   ),
                 ),
                 const SizedBox(height: 6),

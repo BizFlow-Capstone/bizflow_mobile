@@ -7,6 +7,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../revenue/domain/entities/revenue_entity.dart';
 import '../../../cost/domain/entities/cost_entity.dart';
+import '../../../accounting/domain/utils/accounting_reference_display.dart';
 
 enum AccountingCostRevenueMode { revenue, cost, both }
 
@@ -14,6 +15,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
   final List<RevenueEntity> revenues;
   final List<CostEntity> costs;
   final AccountingCostRevenueMode mode;
+  final String languageCode;
   final VoidCallback onAddRevenue;
   final VoidCallback onAddCost;
   final ValueChanged<RevenueEntity> onEditRevenue;
@@ -28,6 +30,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     required this.revenues,
     required this.costs,
     this.mode = AccountingCostRevenueMode.both,
+    this.languageCode = 'vi',
     required this.onAddRevenue,
     required this.onAddCost,
     required this.onEditRevenue,
@@ -125,15 +128,41 @@ class AccountingCostRevenueTab extends StatelessWidget {
     String title = '';
     String subtitle = '';
     double amount = 0;
+    bool canModify = false;
+    final effectiveLanguageCode = languageCode;
 
     if (item is RevenueEntity) {
-      title = 'REV-${item.id}';
-      subtitle = item.description;
+      title = AccountingReferenceDisplay.displayReference(
+        referenceType: 'revenue',
+        referenceId: item.id,
+        languageCode: effectiveLanguageCode,
+        fallback: 'REV-${item.id}',
+      );
+      subtitle = AccountingReferenceDisplay.displayDescriptionValue(
+        description: item.description,
+        referenceType: item.referenceType ?? 'revenue',
+        referenceId: item.referenceId ?? item.id,
+        referenceCode: item.referenceCode,
+        languageCode: effectiveLanguageCode,
+      );
       amount = item.amount;
+      canModify = _isManualRevenue(item);
     } else if (item is CostEntity) {
-      title = 'COST-${item.id}';
-      subtitle = item.description;
+      title = AccountingReferenceDisplay.displayReference(
+        referenceType: 'cost',
+        referenceId: item.id,
+        languageCode: effectiveLanguageCode,
+        fallback: 'COST-${item.id}',
+      );
+      subtitle = AccountingReferenceDisplay.displayDescriptionValue(
+        description: item.description,
+        referenceType: item.referenceType ?? 'cost',
+        referenceId: item.referenceId ?? item.id,
+        referenceCode: item.referenceCode,
+        languageCode: effectiveLanguageCode,
+      );
       amount = item.amount;
+      canModify = _isManualCost(item);
     }
 
     return ListTile(
@@ -155,20 +184,56 @@ class AccountingCostRevenueTab extends StatelessWidget {
               color: isRevenue ? AppColors.success : AppColors.error,
             ),
           ),
-          const SizedBox(width: AppSpacing.xs),
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: onEdit,
-            visualDensity: VisualDensity.compact,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: AppColors.error),
-            onPressed: onDelete,
-            visualDensity: VisualDensity.compact,
-          ),
+          if (canModify) ...[
+            const SizedBox(width: AppSpacing.xs),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: onEdit,
+              visualDensity: VisualDensity.compact,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+            ),
+          ] else ...[
+            const SizedBox(width: AppSpacing.sm),
+            const Icon(
+              Icons.lock_outline,
+              size: 18,
+              color: AppColors.textSecondary,
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  bool _isManualRevenue(RevenueEntity item) {
+    final type = item.type.trim().toLowerCase();
+    final referenceType = (item.referenceType ?? '').trim().toLowerCase();
+    return type == 'manual' || referenceType == 'manual';
+  }
+
+  bool _isManualCost(CostEntity item) {
+    final type = item.type.trim().toLowerCase();
+    final referenceType = (item.referenceType ?? '').trim().toLowerCase();
+    if (referenceType == 'manual') {
+      return true;
+    }
+    if (type == 'import') {
+      return false;
+    }
+
+    // Import and other system-generated costs usually carry an external reference.
+    if (item.referenceId != null &&
+        item.referenceId! > 0 &&
+        referenceType.isNotEmpty &&
+        referenceType != 'cost') {
+      return false;
+    }
+
+    return true;
   }
 
   Widget _card({

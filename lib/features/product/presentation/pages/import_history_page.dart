@@ -10,6 +10,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/date_formatter.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -61,6 +62,7 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
   bool _needsRefresh = false;
+  final ActionGuard _openStockImportGuard = ActionGuard();
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -98,6 +100,26 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
     return currentScroll >= (maxScroll - 200);
+  }
+
+  Future<void> _openStockImportPage({
+    required String locationId,
+    int? importId,
+  }) async {
+    await _openStockImportGuard.run(() async {
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              StockImportPage(locationId: locationId, importId: importId),
+        ),
+      );
+
+      if (result == true && mounted) {
+        context.read<ImportHistoryBloc>().add(const RefreshImportHistory());
+        setState(() => _needsRefresh = true);
+      }
+    });
   }
 
   @override
@@ -163,101 +185,87 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
             Expanded(
               child: BlocConsumer<ImportHistoryBloc, ImportHistoryState>(
                 listener: (context, state) {
-            if (state.status == ImportHistoryStatus.failure) {
-              AppSnackBar.show(
-                context,
-                message:
-                    state.errorMessage ??
-                    l10n.translate('common.error_occurred'),
-                type: AppSnackBarType.error,
-              );
-            }
-          },
-          builder: (context, state) {
-            if (state.status == ImportHistoryStatus.initial ||
-                state.status == ImportHistoryStatus.loading &&
-                    state.items.isEmpty) {
-              return const Center(child: AppLoadingIndicator());
-            }
-
-            if (state.items.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.history,
-                      size: 64,
-                      color: AppColors.textDisabled,
-                    ),
-                    SizedBox(height: AppSpacing.md),
-                    Text(
-                      l10n.translate('stock_import.no_history'),
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<ImportHistoryBloc>().add(
-                  const RefreshImportHistory(),
-                );
-              },
-              child: ListView.separated(
-                controller: _scrollController,
-                padding: EdgeInsets.only(
-                  left: AppSpacing.md,
-                  right: AppSpacing.md,
-                  top: AppSpacing.md,
-                  bottom: 120, // Increased bottom padding for FAB
-                ),
-                itemCount: state.hasReachedMax
-                    ? state.items.length
-                    : state.items.length + 1,
-                separatorBuilder: (_, __) => SizedBox(height: AppSpacing.sm),
-                itemBuilder: (context, index) {
-                  if (index >= state.items.length) {
+                  if (state.status == ImportHistoryStatus.failure) {
+                    AppSnackBar.show(
+                      context,
+                      message:
+                          state.errorMessage ??
+                          l10n.translate('common.error_occurred'),
+                      type: AppSnackBarType.error,
+                    );
+                  }
+                },
+                builder: (context, state) {
+                  if (state.status == ImportHistoryStatus.initial ||
+                      state.status == ImportHistoryStatus.loading &&
+                          state.items.isEmpty) {
                     return const Center(child: AppLoadingIndicator());
                   }
 
-                  final item = state.items[index];
-                  return _ImportHistoryCard(
-                    item: item,
-                    onTap: () {
-                      // Navigate to StockImportPage to view or edit
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => StockImportPage(
-                            locationId: item.businessLocationId.toString(),
-                            importId: item
-                                .importId, // We will update StockImportPage to accept this
+                  if (state.items.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 64,
+                            color: AppColors.textDisabled,
                           ),
-                        ),
-                      ).then((result) {
-                        if (result == true && context.mounted) {
-                          context.read<ImportHistoryBloc>().add(
-                            const RefreshImportHistory(),
-                          );
-                          // Store the fact that something changed to return it to ProductManagementPage
-                          setState(() => _needsRefresh = true);
-                        }
-                      });
+                          SizedBox(height: AppSpacing.md),
+                          Text(
+                            l10n.translate('stock_import.no_history'),
+                            style: AppTextStyles.bodyLarge.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<ImportHistoryBloc>().add(
+                        const RefreshImportHistory(),
+                      );
                     },
+                    child: ListView.separated(
+                      controller: _scrollController,
+                      padding: EdgeInsets.only(
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        top: AppSpacing.md,
+                        bottom: 120, // Increased bottom padding for FAB
+                      ),
+                      itemCount: state.hasReachedMax
+                          ? state.items.length
+                          : state.items.length + 1,
+                      separatorBuilder: (_, __) =>
+                          SizedBox(height: AppSpacing.sm),
+                      itemBuilder: (context, index) {
+                        if (index >= state.items.length) {
+                          return const Center(child: AppLoadingIndicator());
+                        }
+
+                        final item = state.items[index];
+                        return _ImportHistoryCard(
+                          item: item,
+                          onTap: () {
+                            _openStockImportPage(
+                              locationId: item.businessLocationId.toString(),
+                              importId: item.importId,
+                            );
+                          },
+                        );
+                      },
+                    ),
                   );
                 },
               ),
-            );
-          },
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
         floatingActionButton: FloatingActionButton.extended(
           backgroundColor: AppColors.secondary,
           onPressed: () {
@@ -272,20 +280,7 @@ class _ImportHistoryViewState extends State<_ImportHistoryView> {
                 currentLocId = activeLocations.first.id;
               }
             }
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => StockImportPage(locationId: currentLocId),
-              ),
-            ).then((result) {
-              if (result == true && context.mounted) {
-                context.read<ImportHistoryBloc>().add(
-                  const RefreshImportHistory(),
-                );
-                // Store the fact that something changed
-                setState(() => _needsRefresh = true);
-              }
-            });
+            _openStockImportPage(locationId: currentLocId);
           },
           icon: const Icon(Icons.add, color: Colors.white),
           label: Text(

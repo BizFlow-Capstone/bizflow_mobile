@@ -23,7 +23,13 @@ class LoadRevenuesRequested extends RevenueEvent {
   });
 
   @override
-  List<Object?> get props => [pageNumber, pageSize, businessLocationId, fromDate, toDate];
+  List<Object?> get props => [
+    pageNumber,
+    pageSize,
+    businessLocationId,
+    fromDate,
+    toDate,
+  ];
 }
 
 class CreateManualRevenueRequested extends RevenueEvent {
@@ -50,11 +56,15 @@ class UpdateManualRevenueRequested extends RevenueEvent {
 
 class DeleteManualRevenueRequested extends RevenueEvent {
   final int revenueId;
+  final String? businessLocationId;
 
-  const DeleteManualRevenueRequested({required this.revenueId});
+  const DeleteManualRevenueRequested({
+    required this.revenueId,
+    this.businessLocationId,
+  });
 
   @override
-  List<Object?> get props => [revenueId];
+  List<Object?> get props => [revenueId, businessLocationId];
 }
 
 class ResetRevenues extends RevenueEvent {

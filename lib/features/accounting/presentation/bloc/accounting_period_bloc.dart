@@ -131,6 +131,7 @@ class AccountingPeriodState {
   final AccountingPeriod? periodDetail;
   final List<AccountingBook> books;
   final List<AccountingPeriodAuditLog> auditLogs;
+  final String? auditLogsPeriodId;
   final OpeningBalanceSuggestion? suggestion;
 
   final AccountingPeriodStatus status;
@@ -149,6 +150,7 @@ class AccountingPeriodState {
     this.periodDetail,
     this.books = const [],
     this.auditLogs = const [],
+    this.auditLogsPeriodId,
     this.suggestion,
     this.status = AccountingPeriodStatus.initial,
     this.errorMessage,
@@ -166,6 +168,7 @@ class AccountingPeriodState {
     AccountingPeriod? periodDetail,
     List<AccountingBook>? books,
     List<AccountingPeriodAuditLog>? auditLogs,
+    String? auditLogsPeriodId,
     OpeningBalanceSuggestion? suggestion,
     AccountingPeriodStatus? status,
     String? errorMessage,
@@ -185,6 +188,7 @@ class AccountingPeriodState {
       periodDetail: clearDetail ? null : (periodDetail ?? this.periodDetail),
       books: clearBooks ? const [] : (books ?? this.books),
       auditLogs: auditLogs ?? this.auditLogs,
+      auditLogsPeriodId: auditLogsPeriodId ?? this.auditLogsPeriodId,
       suggestion: suggestion ?? this.suggestion,
       status: status ?? this.status,
       errorMessage: errorMessage, // Reset error if not provided
@@ -475,22 +479,57 @@ class AccountingPeriodBloc
     LoadAuditLogsRequested event,
     Emitter<AccountingPeriodState> emit,
   ) async {
-    emit(state.copyWith(isLogsLoading: true));
-    try {
-      final logs = await _repository.getAuditLogs(
-        locationId: event.locationId,
-        periodId: event.periodId,
-      );
-      emit(state.copyWith(auditLogs: logs, isLogsLoading: false));
-    } catch (e) {
-      emit(
-        state.copyWith(
-          status: AccountingPeriodStatus.error,
-          errorMessage: ApiErrorMessageParser.parse(e),
-          isLogsLoading: false,
-        ),
-      );
-    }
+    final shouldClearLogs = state.auditLogsPeriodId != event.periodId;
+    emit(
+      state.copyWith(
+        isLogsLoading: true,
+        auditLogsPeriodId: event.periodId,
+        auditLogs: shouldClearLogs ? const <AccountingPeriodAuditLog>[] : null,
+        errorMessage: null,
+      ),
+    );
+
+    var hasDeliveredData = false;
+    await _repository.fetchAuditLogsSWR(
+      locationId: event.locationId,
+      periodId: event.periodId,
+      onData: (logs, fromCache) {
+        hasDeliveredData = true;
+        if (!isClosed) {
+          emit(
+            state.copyWith(
+              status: AccountingPeriodStatus.loaded,
+              auditLogs: logs,
+              auditLogsPeriodId: event.periodId,
+              isLogsLoading: false,
+              isRefreshing: fromCache,
+              errorMessage: null,
+            ),
+          );
+        }
+      },
+      onError: (error) {
+        if (isClosed) return;
+        if (!hasDeliveredData) {
+          emit(
+            state.copyWith(
+              status: AccountingPeriodStatus.error,
+              errorMessage: ApiErrorMessageParser.parse(error),
+              isLogsLoading: false,
+              isRefreshing: false,
+            ),
+          );
+          return;
+        }
+
+        emit(
+          state.copyWith(
+            isLogsLoading: false,
+            isRefreshing: false,
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _onLoadPeriodDetail(

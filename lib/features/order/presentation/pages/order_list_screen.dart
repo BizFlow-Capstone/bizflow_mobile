@@ -17,6 +17,7 @@ import 'package:bizflow_mobile/core/theme/app_text_styles.dart';
 import 'package:bizflow_mobile/shared/widgets/app_text_field.dart';
 import 'package:bizflow_mobile/shared/widgets/app_sync_status_text.dart';
 import 'package:bizflow_mobile/shared/dialogs/app_snackbar.dart';
+import 'package:bizflow_mobile/shared/cache/sync_status_controller.dart';
 import '../widgets/order_card.dart';
 import '../widgets/order_filter.dart';
 import 'order_creation_selection_screen.dart';
@@ -55,6 +56,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   @override
   void initState() {
     super.initState();
+    SyncStatusController().setManualRefreshCallback(_refreshOrders);
     _loadInitialOrders();
   }
 
@@ -328,6 +330,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   @override
   void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
     _searchController.dispose();
     _searchDebounce?.cancel();
     super.dispose();

@@ -12,6 +12,8 @@ import '../../../../core/services/connectivity_service.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/order_entity.dart';
 import '../../domain/entities/order_item_entity.dart';
 import '../bloc/order_bloc.dart';
@@ -112,6 +114,12 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
 
   Future<void> _parseAndNavigate({required File audioFile}) async {
     final l10n = AppLocalizations.of(context);
+    final aiAllowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.ai,
+    );
+    if (!aiAllowed || !mounted) return;
+
     final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
     if (locationId == null || locationId <= 0) {
       AppSnackBar.show(

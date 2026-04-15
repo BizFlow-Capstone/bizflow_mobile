@@ -16,9 +16,11 @@ import '../../data/models/business_type_model.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
 import '../../../../shared/widgets/app_barcode_scanner.dart';
+import '../../../../shared/cache/sync_status_controller.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
 
 import '../../domain/entities/product_entity.dart';
@@ -55,18 +57,27 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   List<BusinessTypeDto> _businessTypes = [];
   String? _lastApiMessage;
   Timer? _searchDebounce;
+  final ActionGuard _openFabActionGuard = ActionGuard();
 
   @override
   void initState() {
     super.initState();
+    SyncStatusController().setManualRefreshCallback(_refreshFromSyncBar);
     _searchController = TextEditingController();
     _scrollController = ScrollController()..addListener(_onScroll);
     context.read<ProductBloc>().add(const LoadBusinessTypesRequested());
     _loadProducts();
   }
 
+  void _refreshFromSyncBar() {
+    context.read<ProductBloc>().add(
+      RefreshProductsRequested(locationId: widget.locationId),
+    );
+  }
+
   @override
   void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
     _searchController.dispose();
     _scrollController.dispose();
     _searchDebounce?.cancel();
@@ -99,28 +110,39 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     _searchDebounce = Timer(const Duration(milliseconds: 300), () {
       if (mounted) {
         context.read<ProductBloc>().add(
-              SearchProductsRequested(
-                locationId: widget.locationId,
-                query: query,
-              ),
-            );
+          SearchProductsRequested(locationId: widget.locationId, query: query),
+        );
       }
     });
   }
 
   Future<void> _openAddProductPage() async {
-    _toggleFabMenu();
-    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-      context,
-      featureCode: SubscriptionFeatureCodes.products,
-    );
-    if (!allowed || !mounted) return;
-    Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddProductPage(locationId: widget.locationId),
-      ),
-    ).then((result) {
+    await _openFabActionGuard.run(() async {
+      _toggleFabMenu();
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.products,
+      );
+      if (!allowed || !mounted) return;
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddProductPage(locationId: widget.locationId),
+        ),
+      );
+      if (result == true && mounted) {
+        _loadProducts();
+      }
+    });
+  }
+
+  Future<void> _openImportHistoryPage() async {
+    await _openFabActionGuard.run(() async {
+      _toggleFabMenu();
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
+      );
       if (result == true && mounted) {
         _loadProducts();
       }
@@ -510,14 +532,26 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     ),
                   );
                 } else if (state is ProductsLoaded) {
-                  return _buildProductList(state.products, state.hasReachedMax, canManageProducts, canAdjustStock);
+                  return _buildProductList(
+                    state.products,
+                    state.hasReachedMax,
+                    canManageProducts,
+                    canAdjustStock,
+                  );
                 }
 
                 // If state is BusinessTypesLoaded or any other non-loading state,
                 // fallback to the current cached list in the Bloc
-                final currentProducts = context.read<ProductBloc>().currentProducts;
+                final currentProducts = context
+                    .read<ProductBloc>()
+                    .currentProducts;
                 if (currentProducts.isNotEmpty) {
-                  return _buildProductList(currentProducts, true, canManageProducts, canAdjustStock);
+                  return _buildProductList(
+                    currentProducts,
+                    true,
+                    canManageProducts,
+                    canAdjustStock,
+                  );
                 }
 
                 return _buildEmptyState(l10n);
@@ -536,19 +570,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   isOpen: _showFabMenu,
                   onToggle: _toggleFabMenu,
                   onAddProduct: _openAddProductPage,
-                  onImportInventory: () {
-                    _toggleFabMenu();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ImportHistoryPage(),
-                      ),
-                    ).then((result) {
-                      if (result == true && mounted) {
-                        _loadProducts();
-                      }
-                    });
-                  },
+                  onImportInventory: _openImportHistoryPage,
                 );
               },
             )
@@ -556,7 +578,12 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     );
   }
 
-  Widget _buildProductList(List<ProductEntity> products, bool hasReachedMax, bool canManageProducts, bool canAdjustStock) {
+  Widget _buildProductList(
+    List<ProductEntity> products,
+    bool hasReachedMax,
+    bool canManageProducts,
+    bool canAdjustStock,
+  ) {
     if (products.isEmpty) {
       return _buildEmptyState(AppLocalizations.of(context));
     }

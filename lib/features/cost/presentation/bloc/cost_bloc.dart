@@ -26,6 +26,7 @@ class CostBloc extends Bloc<CostEvent, CostState> {
     Emitter<CostState> emit,
   ) async {
     emit(const CostsLoading());
+    var hasDeliveredData = false;
     try {
       final locationIdInt = event.businessLocationId != null
           ? int.tryParse(event.businessLocationId!)
@@ -38,6 +39,7 @@ class CostBloc extends Bloc<CostEvent, CostState> {
         fromDate: event.fromDate,
         toDate: event.toDate,
         onData: (costs, totalCount, isFromCache) {
+          hasDeliveredData = true;
           emit(
             CostsLoaded(
               costs: costs,
@@ -49,13 +51,13 @@ class CostBloc extends Bloc<CostEvent, CostState> {
           );
         },
         onError: (error) {
-          if (state is! CostsLoaded) {
+          if (!hasDeliveredData) {
             emit(CostError(error.toString()));
           }
         },
       );
     } catch (e) {
-      if (state is! CostsLoaded) {
+      if (!hasDeliveredData) {
         emit(CostError(e.toString()));
       }
     }
@@ -78,7 +80,11 @@ class CostBloc extends Bloc<CostEvent, CostState> {
     Emitter<CostState> emit,
   ) async {
     try {
-      await repository.updateManualCost(event.costId, event.body, image: event.image);
+      await repository.updateManualCost(
+        event.costId,
+        event.body,
+        image: event.image,
+      );
       emit(const CostOperationSuccess('cost_updated_successfully'));
     } catch (e) {
       emit(CostOperationFailure(e.toString()));

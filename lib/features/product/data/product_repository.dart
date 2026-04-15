@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import '../../../core/database/app_database.dart';
@@ -269,24 +271,48 @@ class ProductRepository {
     final cacheKey = 'cache_sale_items_${businessId}_$productId';
 
     final cached = await _localApiCache.getMap(cacheKey);
+    if (cached != null) {
+      unawaited(
+        _refreshSaleItemsCache(cacheKey: cacheKey, productId: productId),
+      );
+      return {'data': cached['data'] ?? <dynamic>[]};
+    }
 
     try {
-      final response = await _service.getProductSaleItems(productId);
-      final normalized = _normalizeSaleItems(response);
-      await _localApiCache.setMap(
-        cacheKey,
-        {'data': normalized},
-        groupKey: 'product_sale_items',
-        cacheType: 'list',
+      return await _fetchSaleItemsAndCache(
+        cacheKey: cacheKey,
+        productId: productId,
       );
-      return {'data': normalized};
     } catch (e) {
       debugPrint('ProductRepository.getProductSaleItems error: $e');
-      if (cached != null) {
-        return {'data': cached['data'] ?? <dynamic>[]};
-      }
       rethrow;
     }
+  }
+
+  Future<void> _refreshSaleItemsCache({
+    required String cacheKey,
+    required String productId,
+  }) async {
+    try {
+      await _fetchSaleItemsAndCache(cacheKey: cacheKey, productId: productId);
+    } catch (_) {
+      // Best effort background refresh.
+    }
+  }
+
+  Future<Map<String, dynamic>> _fetchSaleItemsAndCache({
+    required String cacheKey,
+    required String productId,
+  }) async {
+    final response = await _service.getProductSaleItems(productId);
+    final normalized = _normalizeSaleItems(response);
+    await _localApiCache.setMap(
+      cacheKey,
+      {'data': normalized},
+      groupKey: 'product_sale_items',
+      cacheType: 'list',
+    );
+    return {'data': normalized};
   }
 
   List<Map<String, dynamic>> _normalizeSaleItems(dynamic response) {
@@ -472,6 +498,12 @@ class ProductRepository {
   Future<List<BusinessTypeDto>> getBusinessTypes() async {
     const cacheKey = 'product_business_types';
 
+    final cachedBusinessTypes = await _readBusinessTypesFromCache(cacheKey);
+    if (cachedBusinessTypes.isNotEmpty) {
+      unawaited(_refreshBusinessTypesCache(cacheKey));
+      return cachedBusinessTypes;
+    }
+
     try {
       final result = await _service.getBusinessTypes();
       final normalized = result.map((item) => item.toJson()).toList();
@@ -485,23 +517,49 @@ class ProductRepository {
 
       return result;
     } catch (e) {
-      final cached = await _localApiCache.getMap(cacheKey);
-      if (cached != null) {
-        final data = cached['data'];
-        if (data is List) {
-          return data
-              .whereType<Map>()
-              .map(
-                (item) =>
-                    BusinessTypeDto.fromJson(Map<String, dynamic>.from(item)),
-              )
-              .toList();
-        }
-        return <BusinessTypeDto>[];
+      final fallback = await _readBusinessTypesFromCache(cacheKey);
+      if (fallback.isNotEmpty) {
+        return fallback;
       }
       debugPrint('ProductRepository.getBusinessTypes error: $e');
       rethrow;
     }
+  }
+
+  Future<void> _refreshBusinessTypesCache(String cacheKey) async {
+    try {
+      final result = await _service.getBusinessTypes();
+      final normalized = result.map((item) => item.toJson()).toList();
+      await _localApiCache.setMap(
+        cacheKey,
+        {'data': normalized},
+        groupKey: 'product_business_types',
+        cacheType: 'list',
+      );
+    } catch (_) {
+      // Best effort background refresh.
+    }
+  }
+
+  Future<List<BusinessTypeDto>> _readBusinessTypesFromCache(
+    String cacheKey,
+  ) async {
+    final cached = await _localApiCache.getMap(cacheKey);
+    if (cached == null) {
+      return <BusinessTypeDto>[];
+    }
+
+    final data = cached['data'];
+    if (data is! List) {
+      return <BusinessTypeDto>[];
+    }
+
+    return data
+        .whereType<Map>()
+        .map(
+          (item) => BusinessTypeDto.fromJson(Map<String, dynamic>.from(item)),
+        )
+        .toList();
   }
 
   ProductEntity _mapDtoToEntity(ProductDto dto) {

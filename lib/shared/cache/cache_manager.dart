@@ -16,6 +16,7 @@ class CacheManager {
 
   final Map<String, CancelToken> _cancelTokens = {};
   final Map<String, int> _sequences = {};
+  final Map<String, DateTime> _lastNetworkFetchAt = {};
 
   Future<void> init() async {
     if (_storage == null) {
@@ -33,7 +34,9 @@ class CacheManager {
     });
   }
 
-  Future<void> _cleanupExpiredCache({Duration ttl = const Duration(days: 7)}) async {
+  Future<void> _cleanupExpiredCache({
+    Duration ttl = const Duration(days: 7),
+  }) async {
     await init();
     int deleted = 0;
     try {
@@ -125,7 +128,8 @@ class CacheManager {
 
     if (locale != null) await _storage?.setString(StorageKeys.locale, locale);
     if (theme != null) await _storage?.setString(StorageKeys.themeMode, theme);
-    if (isFirstLaunch != null) await _storage?.setBool(StorageKeys.isFirstLaunch, isFirstLaunch);
+    if (isFirstLaunch != null)
+      await _storage?.setBool(StorageKeys.isFirstLaunch, isFirstLaunch);
 
     debugPrint('CacheManager: Aggressive clear all finished');
   }
@@ -139,6 +143,7 @@ class CacheManager {
     T Function(Map<String, dynamic> json)? fromJson,
     Map<String, dynamic> Function(T data)? toJson,
     Duration networkTimeout = const Duration(seconds: 5),
+    Duration minRevalidateInterval = const Duration(seconds: 15),
   }) async {
     await init();
     final completer = Completer<void>();
@@ -171,10 +176,22 @@ class CacheManager {
     if (!hasLocalData) {
       Timer(networkTimeout, () {
         if (!completer.isCompleted) {
-          debugPrint('SWR: Initial fetch for $key timed out after ${networkTimeout.inSeconds}s, resolving.');
+          debugPrint(
+            'SWR: Initial fetch for $key timed out after ${networkTimeout.inSeconds}s, resolving.',
+          );
           completer.complete();
         }
       });
+    }
+
+    // With local cache available, skip very frequent revalidate requests to
+    // avoid re-sync flicker and redundant API calls when users switch tabs fast.
+    if (hasLocalData) {
+      final lastFetch = _lastNetworkFetchAt[key];
+      if (lastFetch != null &&
+          DateTime.now().difference(lastFetch) < minRevalidateInterval) {
+        return completer.future;
+      }
     }
 
     _cancelTokens[key]?.cancel('New request triggered for $key');
@@ -184,20 +201,26 @@ class CacheManager {
     final sequence = (_sequences[key] ?? 0) + 1;
     _sequences[key] = sequence;
 
-    SyncStatusController().startSync();
+    final trackSyncStatus = !hasLocalData;
+    if (trackSyncStatus) {
+      SyncStatusController().startSync();
+    }
 
-    unawaited(_performNetworkSync<T>(
-      key: key,
-      fetcher: fetcher,
-      onData: onData,
-      onError: onError,
-      toJson: toJson,
-      hasLocalData: hasLocalData,
-      localDataHash: localDataHash,
-      sequence: sequence,
-      cancelToken: cancelToken,
-      completerToResolveIfNoCache: hasLocalData ? null : completer,
-    ));
+    unawaited(
+      _performNetworkSync<T>(
+        key: key,
+        fetcher: fetcher,
+        onData: onData,
+        onError: onError,
+        toJson: toJson,
+        hasLocalData: hasLocalData,
+        localDataHash: localDataHash,
+        sequence: sequence,
+        cancelToken: cancelToken,
+        trackSyncStatus: trackSyncStatus,
+        completerToResolveIfNoCache: hasLocalData ? null : completer,
+      ),
+    );
 
     return completer.future;
   }
@@ -212,14 +235,18 @@ class CacheManager {
     String? localDataHash,
     required int sequence,
     required CancelToken cancelToken,
+    required bool trackSyncStatus,
     Completer<void>? completerToResolveIfNoCache,
   }) async {
     try {
       final serverData = await fetcher(cancelToken: cancelToken);
+      _lastNetworkFetchAt[key] = DateTime.now();
 
       if (_sequences[key] != sequence) {
         debugPrint('SWR Sequence mismatch for $key, discarding result');
-        SyncStatusController().endSync();
+        if (trackSyncStatus) {
+          SyncStatusController().endSync();
+        }
         if (completerToResolveIfNoCache?.isCompleted == false) {
           completerToResolveIfNoCache?.complete();
         }
@@ -241,15 +268,22 @@ class CacheManager {
       if (toJson != null) {
         await set(key, toJson(serverData));
       }
-      SyncStatusController().endSync(updatedAt: DateTime.now(), hasError: false);
-      
+      if (trackSyncStatus) {
+        SyncStatusController().endSync(
+          updatedAt: DateTime.now(),
+          hasError: false,
+        );
+      }
+
       if (completerToResolveIfNoCache?.isCompleted == false) {
         completerToResolveIfNoCache?.complete();
       }
     } catch (e) {
       if (e is DioException && CancelToken.isCancel(e)) {
         debugPrint('SWR request cancelled: $key');
-        SyncStatusController().endSync();
+        if (trackSyncStatus) {
+          SyncStatusController().endSync();
+        }
         if (completerToResolveIfNoCache?.isCompleted == false) {
           completerToResolveIfNoCache?.complete();
         }
@@ -257,12 +291,14 @@ class CacheManager {
       }
 
       debugPrint('SWR Fetcher Error: $e');
-      SyncStatusController().endSync(hasError: true);
-      
+      if (trackSyncStatus) {
+        SyncStatusController().endSync(hasError: true);
+      }
+
       if (!hasLocalData && onError != null) {
         onError(e);
       }
-      
+
       if (completerToResolveIfNoCache?.isCompleted == false) {
         completerToResolveIfNoCache?.completeError(e);
       }
