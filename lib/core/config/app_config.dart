@@ -52,7 +52,7 @@ class AppConfig {
 
     switch (environment) {
       case 'production':
-        return 'https://api.bizflow.com';
+        return 'https://api.bizflow.asia';
       case 'staging':
         return 'https://staging-api.bizflow.com';
       default:
