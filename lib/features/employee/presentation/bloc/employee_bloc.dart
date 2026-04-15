@@ -108,6 +108,13 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
       return;
     }
 
+    // Avoid noisy broad matches when users are still typing.
+    if (query.length < 3) {
+      emit(const EmployeeSearchLoaded([]));
+      if (currentState is EmployeeLoaded) emit(currentState);
+      return;
+    }
+
     try {
       final results = await _repository.searchEmployees(query);
       emit(EmployeeSearchLoaded(results));

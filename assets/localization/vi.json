@@ -122,7 +122,7 @@
     "reset_password_button": "Đặt lại mật khẩu",
     "reset_password_success": "Đặt lại mật khẩu thành công",
     "link_phone_required_title": "Liên kết số điện thoại",
-    "link_phone_required_subtitle": "Tài khoản Google mới cần liên kết số điện thoại trước khi đặt mật khẩu",
+    "link_phone_required_subtitle": "Tài khoản Google mới cần liên kết số điện thoại",
     "link_google_required_title": "Liên kết Google",
     "link_google_required_subtitle": "Tài khoản của bạn cần liên kết với Google để bảo mật tốt hơn",
     "skip": "Bỏ qua"

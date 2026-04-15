@@ -10,6 +10,7 @@ class ApiEndpoints {
   static const String setPassword = '/api/auth/set-password';
   static const String refreshTokenEndpoint = '/api/auth/refresh';
   static const String logoutEndpoint = '/api/auth/logout';
+    static const String logoutAllEndpoint = '/api/auth/logout-all';
   static const String credentials = '/api/auth/credentials';
   static const String linkPhone = '/api/auth/link/phone';
   static const String linkEmail = '/api/auth/link/email';

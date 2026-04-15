@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -278,7 +279,7 @@ class _BulkAdjustSellingPricePageState
         ..removeCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            content: Text(ApiErrorMessageParser.parse(e)),
             backgroundColor: AppColors.error,
           ),
         );

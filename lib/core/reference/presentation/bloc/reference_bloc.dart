@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../network/api_error_message_parser.dart';
 import '../../data/reference_repository.dart';
 import 'reference_event.dart';
 import 'reference_state.dart';
@@ -20,7 +21,7 @@ class ReferenceBloc extends Bloc<ReferenceEvent, ReferenceState> {
         emit(ReferenceLoaded(data, isFromCache: isFromCache));
       },
       onError: (e) {
-        emit(ReferenceError('Failed to load references: ${e.toString()}'));
+        emit(ReferenceError(ApiErrorMessageParser.parse(e)));
       },
     );
   }

@@ -16,6 +16,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../domain/entities/order_entity.dart';
 import '../bloc/order_bloc.dart';
 import 'order_form_screen.dart';
@@ -139,7 +140,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..removeCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(e.toString())));
+        ..showSnackBar(
+          SnackBar(content: Text(ApiErrorMessageParser.parse(e))),
+        );
     } finally {
       if (mounted) {
         setState(() => _isCancelling = false);
@@ -194,7 +197,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
             content: Text(
-              '${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}',
+              '${ApiErrorMessageParser.parse(e)}\n\n${l10n.translate('order_create.confirm_continue_message')}',
             ),
             actions: [
               TextButton(
@@ -219,7 +222,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
       AppSnackBar.show(
         context,
-        message: e.toString(),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     } finally {

@@ -6,6 +6,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -52,7 +53,7 @@ class _OrderCompletionConfirmationScreenState
       if (mounted) {
         AppSnackBar.show(
           context,
-          message: e.toString(),
+          message: ApiErrorMessageParser.parse(e),
           type: AppSnackBarType.error,
         );
       }

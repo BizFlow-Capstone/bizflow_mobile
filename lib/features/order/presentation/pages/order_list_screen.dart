@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/storage/local_storage.dart';
 import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
 import 'package:bizflow_mobile/features/order/domain/entities/order_entity.dart';
@@ -165,7 +166,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
             content: Text(
-              '${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}',
+              '${ApiErrorMessageParser.parse(e)}\n\n${l10n.translate('order_create.confirm_continue_message')}',
             ),
             actions: [
               TextButton(
@@ -189,7 +190,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
       AppSnackBar.show(
         context,
-        message: e.toString(),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     } finally {

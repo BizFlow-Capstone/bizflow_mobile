@@ -493,6 +493,11 @@ class AuthApiService {
     );
   }
 
+  /// Logout all sessions for the current account
+  Future<void> logoutAll() async {
+    await _apiClient.post<void>(ApiEndpoints.logoutAllEndpoint);
+  }
+
   String _getDeviceInfo() {
     try {
       return 'BizFlow Mobile / ${Platform.operatingSystem}';

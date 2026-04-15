@@ -122,7 +122,7 @@
     "reset_password_button": "Reset Password",
     "reset_password_success": "Password reset successful",
     "link_phone_required_title": "Link Phone Number",
-    "link_phone_required_subtitle": "New Google accounts must link a phone number before setting password",
+    "link_phone_required_subtitle": "New Google accounts must link a phone number",
     "link_google_required_title": "Link Google Account",
     "link_google_required_subtitle": "Please link your Google account for better security and easier login",
     "skip": "Skip"

@@ -920,6 +920,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     emit(ChangePasswordSuccess(message: result.message));
+    await authRepository.logoutAll();
+    add(const LogoutRequested());
   }
 
   Future<void> _onDeleteAccountRequested(

@@ -75,6 +75,8 @@ abstract class AuthRepository {
 
   Future<void> logout();
 
+  Future<void> logoutAll();
+
   Future<bool> isLoggedIn();
 
   Future<String?> getStoredAccessToken();
@@ -391,6 +393,15 @@ class AuthRepositoryImpl implements AuthRepository {
       // Always clear local tokens, even if API call fails
     } finally {
       await _secureStorage.clearAuthTokens();
+    }
+  }
+
+  @override
+  Future<void> logoutAll() async {
+    try {
+      await _apiService.logoutAll();
+    } catch (_) {
+      // Ignore server-side logout-all failures; local logout still follows.
     }
   }
 

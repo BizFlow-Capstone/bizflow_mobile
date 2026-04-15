@@ -1,5 +1,6 @@
 import 'package:bizflow_mobile/core/theme/app_colors.dart';
 import 'package:bizflow_mobile/core/theme/app_text_styles.dart';
+import 'package:bizflow_mobile/core/network/api_error_message_parser.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -72,7 +73,9 @@ class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
         await CacheManager().set('current_subscription_for_plans', json);
       }
     } catch (e) {
-      if (mounted) setState(() => _errorMessage = e.toString());
+      if (mounted) {
+        setState(() => _errorMessage = ApiErrorMessageParser.parse(e));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
