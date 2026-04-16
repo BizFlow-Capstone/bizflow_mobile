@@ -190,12 +190,15 @@ class ProductCardWidget extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          '${product.quantity} ${product.unit ?? 'cái'}',
+                          product.trackInventory
+                              ? '${product.quantity} ${product.unit ?? 'cái'}'
+                              : 'Khong quan ly ton kho',
                           style: AppTextStyles.titleSmall.copyWith(
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        if (onQuickAdjustStock != null) ...[
+                        if (onQuickAdjustStock != null &&
+                            product.trackInventory) ...[
                           SizedBox(width: AppSpacing.xs),
                           InkWell(
                             borderRadius: BorderRadius.circular(6),
@@ -275,6 +278,7 @@ class ProductCardWidget extends StatelessWidget {
                                     unit: product.unit,
                                     description: product.description,
                                     isActive: product.isActive,
+                                    trackInventory: product.trackInventory,
                                     businessTypeId: product.businessTypeId,
                                     manufacturer: product.manufacturer,
                                     imageUrl: product.imageUrl,

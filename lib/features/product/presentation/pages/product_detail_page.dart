@@ -298,7 +298,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         style: AppTextStyles.titleMedium.copyWith(color: AppColors.textPrimary),
       ),
       actions: [
-        if (canAdjustStock)
+        if (canAdjustStock && _currentProduct.trackInventory)
           IconButton(
             icon: const Icon(Icons.inventory_2_outlined),
             tooltip:
@@ -327,6 +327,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         unit: _currentProduct.unit,
                         description: _currentProduct.description,
                         isActive: _currentProduct.isActive,
+                        trackInventory: _currentProduct.trackInventory,
                         businessTypeId: _currentProduct.businessTypeId,
                         manufacturer: _currentProduct.manufacturer,
                         imageUrl: _currentProduct.imageUrl,

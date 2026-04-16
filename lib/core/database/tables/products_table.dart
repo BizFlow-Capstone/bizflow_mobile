@@ -25,6 +25,9 @@ class ProductsTable extends Table {
 
   TextColumn get unit => text().nullable()();
 
+  BoolColumn get trackInventory =>
+      boolean().withDefault(const Constant(true))();
+
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
   IntColumn get createdAtEpoch => integer().nullable()();

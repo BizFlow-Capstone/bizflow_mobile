@@ -37,6 +37,7 @@ class EditProductPage extends StatefulWidget {
   final String? businessTypeId;
   final String? manufacturer;
   final String? imageUrl;
+  final bool trackInventory;
 
   const EditProductPage({
     super.key,
@@ -54,6 +55,7 @@ class EditProductPage extends StatefulWidget {
     this.businessTypeId,
     this.manufacturer,
     this.imageUrl,
+    this.trackInventory = true,
   });
 
   @override
@@ -93,6 +95,7 @@ class _EditProductPageState extends State<EditProductPage> {
   bool _isDeleting = false;
   bool _isStatusUpdating = false;
   bool? _statusBeforeToggle;
+  late bool _trackInventory;
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -122,6 +125,7 @@ class _EditProductPageState extends State<EditProductPage> {
       text: widget.manufacturer ?? '',
     );
     _isActive = widget.isActive;
+    _trackInventory = widget.trackInventory;
     _selectedBusinessTypeId = widget.businessTypeId;
 
     // Load business types
@@ -468,7 +472,9 @@ class _EditProductPageState extends State<EditProductPage> {
           (salePriceText.isNotEmpty && (salePrice == null || salePrice < 0))
           ? invalidSalePriceMessage
           : null;
-      _quantityError =
+        _quantityError = !_trackInventory
+          ? null
+          :
           (quantityText.isNotEmpty && (quantity == null || quantity < 0))
           ? invalidStockMessage
           : null;
@@ -519,8 +525,12 @@ class _EditProductPageState extends State<EditProductPage> {
               : null,
           costPrice: _costPriceController.text.isNotEmpty ? costPrice : null,
           salePrice: _salePriceController.text.isNotEmpty ? salePrice : null,
-          quantity: _quantityController.text.isNotEmpty ? quantity : null,
+            quantity:
+              _trackInventory && _quantityController.text.isNotEmpty
+              ? quantity
+              : null,
           unit: _unitController.text.isNotEmpty ? _unitController.text : null,
+            trackInventory: _trackInventory,
           isActive: _isActive,
           manufacturer: _manufacturerController.text.isNotEmpty
               ? _manufacturerController.text
@@ -674,6 +684,8 @@ class _EditProductPageState extends State<EditProductPage> {
                   _quantityController.text.trim() == '0') {
                 _quantityController.text = detail.quantity.toString();
               }
+
+              _trackInventory = detail.trackInventory;
 
               final detailUnit = (detail.unit ?? '').trim();
               if (detailUnit.isNotEmpty ||
@@ -960,6 +972,55 @@ class _EditProductPageState extends State<EditProductPage> {
                 ),
                 SizedBox(height: AppSpacing.lg),
 
+                Container(
+                  padding: EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _trackInventory,
+                        onChanged: (value) {
+                          setState(() {
+                            _trackInventory = value ?? true;
+                            if (!_trackInventory) {
+                              _quantityController.clear();
+                              _quantityError = null;
+                            }
+                          });
+                        },
+                        activeColor: AppColors.secondary,
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quản lý tồn kho',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: AppSpacing.xs),
+                            Text(
+                              _trackInventory
+                                  ? 'Bật để cho phép nhập và chỉnh tồn kho.'
+                                  : 'Tắt quản lý tồn kho: không thể chỉnh tồn kho ở danh sách sản phẩm.',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: AppSpacing.lg),
+
                 Row(
                   children: [
                     Expanded(
@@ -968,6 +1029,7 @@ class _EditProductPageState extends State<EditProductPage> {
                         controller: _quantityController,
                         hint: '0',
                         errorText: _quantityError,
+                        enabled: _trackInventory,
                         onChanged: (_) {
                           if (_quantityError == null) return;
                           setState(() => _quantityError = null);
@@ -1200,6 +1262,7 @@ class _EditProductPageState extends State<EditProductPage> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1224,6 +1287,7 @@ class _EditProductPageState extends State<EditProductPage> {
         SizedBox(height: AppSpacing.sm),
         TextField(
           controller: controller,
+          enabled: enabled,
           onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,

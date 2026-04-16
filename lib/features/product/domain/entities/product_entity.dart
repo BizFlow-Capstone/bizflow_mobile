@@ -19,6 +19,7 @@ class ProductEntity {
   final String? businessTypeId;
   final String? manufacturer;
   final String? businessLocationName;
+  final bool trackInventory;
   final List<Map<String, dynamic>> saleItems;
 
   ProductEntity({
@@ -39,6 +40,7 @@ class ProductEntity {
     this.businessTypeId,
     this.manufacturer,
     this.businessLocationName,
+    this.trackInventory = true,
     this.saleItems = const [],
   });
 
@@ -60,6 +62,7 @@ class ProductEntity {
     String? businessTypeId,
     String? manufacturer,
     String? businessLocationName,
+    bool? trackInventory,
     List<Map<String, dynamic>>? saleItems,
   }) {
     return ProductEntity(
@@ -80,6 +83,7 @@ class ProductEntity {
       businessTypeId: businessTypeId ?? this.businessTypeId,
       manufacturer: manufacturer ?? this.manufacturer,
       businessLocationName: businessLocationName ?? this.businessLocationName,
+      trackInventory: trackInventory ?? this.trackInventory,
       saleItems: saleItems ?? this.saleItems,
     );
   }
@@ -106,6 +110,7 @@ class ProductEntity {
       'businessTypeId': businessTypeId,
       'manufacturer': manufacturer,
       'businessLocationName': businessLocationName,
+      'trackInventory': trackInventory,
       'saleItems': saleItems,
     };
   }
@@ -124,6 +129,22 @@ class ProductEntity {
       if (value is num) return value.toDouble();
       if (value is String) return double.tryParse(value);
       return null;
+    }
+
+    bool parseBool(dynamic value, {bool fallback = true}) {
+      if (value == null) return fallback;
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+          return true;
+        }
+        if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+          return false;
+        }
+      }
+      return fallback;
     }
 
     final double priceValue = parseDouble(
@@ -173,6 +194,7 @@ class ProductEntity {
       businessTypeId: map['businessTypeId'] as String?,
       manufacturer: map['manufacturer'] as String?,
       businessLocationName: map['businessLocationName'] as String?,
+        trackInventory: parseBool(map['trackInventory'], fallback: true),
       saleItems:
           (map['saleItems'] as List<dynamic>?)
               ?.map((e) => e as Map<String, dynamic>)

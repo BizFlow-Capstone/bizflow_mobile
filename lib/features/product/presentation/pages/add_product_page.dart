@@ -46,6 +46,7 @@ class _AddProductPageState extends State<AddProductPage> {
   final List<Map<String, dynamic>> _priceTiers = [];
 
   bool _isActive = true;
+  bool _trackInventory = true;
   String? _selectedBusinessTypeId;
   List<BusinessTypeDto> _businessTypes = [];
   String? _productNameError;
@@ -340,7 +341,9 @@ class _AddProductPageState extends State<AddProductPage> {
           (salePriceText.isNotEmpty && (salePrice == null || salePrice < 0))
           ? invalidSalePriceMessage
           : null;
-      _quantityError =
+        _quantityError = !_trackInventory
+          ? null
+          :
           (quantityText.isNotEmpty && (quantity == null || quantity < 0))
           ? invalidStockMessage
           : null;
@@ -378,8 +381,12 @@ class _AddProductPageState extends State<AddProductPage> {
               : null,
           costPrice: _costPriceController.text.isNotEmpty ? costPrice : null,
           salePrice: _salePriceController.text.isNotEmpty ? salePrice : null,
-          quantity: _quantityController.text.isNotEmpty ? quantity : null,
+            quantity:
+              _trackInventory && _quantityController.text.isNotEmpty
+              ? quantity
+              : null,
           unit: _unitController.text.isNotEmpty ? _unitController.text : null,
+            trackInventory: _trackInventory,
           isActive: _isActive,
           manufacturer: _manufacturerController.text.isNotEmpty
               ? _manufacturerController.text
@@ -638,6 +645,55 @@ class _AddProductPageState extends State<AddProductPage> {
                 ),
                 SizedBox(height: AppSpacing.lg),
 
+                Container(
+                  padding: EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _trackInventory,
+                        onChanged: (value) {
+                          setState(() {
+                            _trackInventory = value ?? true;
+                            if (!_trackInventory) {
+                              _quantityController.clear();
+                              _quantityError = null;
+                            }
+                          });
+                        },
+                        activeColor: AppColors.secondary,
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quản lý tồn kho',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: AppSpacing.xs),
+                            Text(
+                              _trackInventory
+                                  ? 'Có thể nhập và chỉnh tồn kho cho sản phẩm này.'
+                                  : 'Tắt quản lý tồn kho: sản phẩm sẽ không cho chỉnh tồn kho.',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: AppSpacing.lg),
+
                 Row(
                   children: [
                     Expanded(
@@ -646,6 +702,7 @@ class _AddProductPageState extends State<AddProductPage> {
                         controller: _quantityController,
                         hint: '0',
                         errorText: _quantityError,
+                        enabled: _trackInventory,
                         onChanged: (_) {
                           if (_quantityError == null) return;
                           setState(() => _quantityError = null);
@@ -886,6 +943,7 @@ class _AddProductPageState extends State<AddProductPage> {
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -910,6 +968,7 @@ class _AddProductPageState extends State<AddProductPage> {
         SizedBox(height: AppSpacing.sm),
         TextField(
           controller: controller,
+          enabled: enabled,
           onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,

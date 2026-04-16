@@ -46,6 +46,7 @@ class ProductDto {
   final String? unit;
   final String? barcode;
   final bool isActive;
+  final bool trackInventory;
   final List<Map<String, dynamic>> saleItems;
 
   ProductDto({
@@ -64,6 +65,7 @@ class ProductDto {
     this.unit,
     this.barcode,
     this.isActive = true,
+    this.trackInventory = true,
     this.saleItems = const [],
   });
 
@@ -86,6 +88,22 @@ class ProductDto {
         return double.tryParse(normalized);
       }
       return null;
+    }
+
+    bool parseBool(dynamic value, {bool fallback = true}) {
+      if (value == null) return fallback;
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+          return true;
+        }
+        if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+          return false;
+        }
+      }
+      return fallback;
     }
 
     final dynamic idValue =
@@ -158,6 +176,11 @@ class ProductDto {
       }
     }
 
+    final bool resolvedTrackInventory = parseBool(
+      json['trackInventory'] ?? json['TrackInventory'],
+      fallback: true,
+    );
+
     return ProductDto(
       id: idValue?.toString() ?? '',
       name:
@@ -193,6 +216,7 @@ class ProductDto {
       isActive:
           (json['status'] ?? json['Status']) == 'active' ||
           (json['isActive'] ?? json['IsActive']) == true,
+      trackInventory: resolvedTrackInventory,
       saleItems: saleItems,
     );
   }
@@ -215,6 +239,7 @@ class ProductDto {
       if (unit != null) 'unit': unit,
       if (barcode != null) 'barcode': barcode,
       'isActive': isActive,
+      'trackInventory': trackInventory,
       'saleItems': saleItems,
     };
   }

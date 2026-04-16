@@ -391,6 +391,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           final String? resolvedStatus = parseString(
             item['status'] ?? item['Status'],
           );
+          final bool resolvedTrackInventory = parseBool(
+            item['trackInventory'] ?? item['TrackInventory'] ?? true,
+            fallback: true,
+          );
           final bool resolvedIsActive = resolvedStatus != null
               ? parseBool(resolvedStatus, fallback: true)
               : parseBool(
@@ -432,6 +436,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             salePrice: resolvedSalePrice,
             unit: (item['unit'] ?? item['Unit']) as String?,
             isActive: resolvedIsActive,
+            trackInventory: resolvedTrackInventory,
             createdAt: (item['createdAt'] ?? item['CreatedAt']) != null
                 ? DateFormatter.parseApiDateTime(
                     (item['createdAt'] ?? item['CreatedAt']) as String?,
@@ -657,9 +662,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         businessTypeId: businessTypeId,
         locationId: int.tryParse(event.locationId) ?? 1,
         sku: event.barcode,
+        trackInventory: event.trackInventory,
         costPrice: event.costPrice ?? 0,
         price: event.salePrice,
-        stock: event.quantity,
+        stock: event.trackInventory ? event.quantity : null,
         priceTiers: event.priceTiers,
         imagePath: event.imagePath,
         manufacturer: event.manufacturer,
@@ -679,12 +685,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         name: event.productName,
         description: event.description ?? '',
         price: event.salePrice ?? 0,
-        quantity: event.quantity ?? 0,
+        quantity: event.trackInventory ? (event.quantity ?? 0) : 0,
         barcode: event.barcode,
         category: event.category,
         costPrice: event.costPrice,
         salePrice: event.salePrice,
         unit: event.unit,
+        trackInventory: event.trackInventory,
         isActive: event.isActive,
         createdAt: DateTime.now(),
         businessTypeId: event.businessTypeId,
@@ -747,9 +754,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         locationId: locationId,
         businessTypeId: businessTypeId,
         sku: event.barcode,
+        trackInventory: event.trackInventory,
         costPrice: event.costPrice,
         price: event.salePrice,
-        stock: event.quantity,
+        stock: event.trackInventory ? event.quantity : null,
         priceTiers: event.priceTiers,
         imagePath: event.imagePath,
         removeImage: event.removeImage,
@@ -760,11 +768,14 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       if (index != -1) {
         _products[index] = _products[index].copyWith(
           name: event.productName,
-          quantity: event.quantity,
+          quantity: event.trackInventory
+              ? (event.quantity ?? _products[index].quantity)
+              : 0,
           barcode: event.barcode,
           costPrice: event.costPrice,
           salePrice: event.salePrice,
           unit: event.unit,
+          trackInventory: event.trackInventory,
           isActive: event.isActive,
           description: event.description,
         );
@@ -799,6 +810,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               costPrice: event.costPrice,
               salePrice: event.salePrice,
               unit: event.unit,
+                trackInventory: event.trackInventory,
               isActive: event.isActive,
               businessTypeId:
                   event.businessTypeId ?? existingProduct.businessTypeId,

@@ -62,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
   static String get activeDbFileName => _activeDbFileName;
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,6 +87,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 7) {
         await m.createTable(importsTable);
+      }
+      if (from < 8) {
+        await m.addColumn(productsTable, productsTable.trackInventory);
       }
     },
   );

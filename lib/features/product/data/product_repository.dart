@@ -149,6 +149,7 @@ class ProductRepository {
               unit: dto.unit,
               barcode: dto.barcode,
               isActive: dto.isActive,
+              trackInventory: dto.trackInventory,
               saleItems: dto.saleItems,
             ),
           )
@@ -256,6 +257,7 @@ class ProductRepository {
       businessTypeId: cachedDetail.businessTypeId ?? local.businessTypeId,
       createdAt: cachedDetail.createdAt ?? local.createdAt,
       locationId: cachedDetail.locationId ?? local.locationId,
+        trackInventory: cachedDetail.trackInventory,
       saleItems: cachedDetail.saleItems.isNotEmpty
           ? cachedDetail.saleItems
           : local.saleItems,
@@ -578,6 +580,7 @@ class ProductRepository {
       unit: dto.unit,
       barcode: dto.barcode,
       isActive: dto.isActive,
+      trackInventory: dto.trackInventory,
       saleItems: dto.saleItems,
     );
   }

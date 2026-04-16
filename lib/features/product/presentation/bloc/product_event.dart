@@ -102,6 +102,7 @@ class AddProductRequested extends ProductEvent {
   final double? salePrice;
   final int? quantity;
   final String? unit;
+  final bool trackInventory;
   final bool isActive;
   final String? description;
   final String? imagePath;
@@ -118,6 +119,7 @@ class AddProductRequested extends ProductEvent {
     this.salePrice,
     this.quantity,
     this.unit,
+    this.trackInventory = true,
     this.isActive = true,
     this.description,
     this.imagePath,
@@ -136,6 +138,7 @@ class AddProductRequested extends ProductEvent {
     salePrice,
     quantity,
     unit,
+    trackInventory,
     isActive,
     description,
     imagePath,
@@ -156,6 +159,7 @@ class UpdateProductRequested extends ProductEvent {
   final double? salePrice;
   final int? quantity;
   final String? unit;
+  final bool trackInventory;
   final bool isActive;
   final String? description;
   final String? imagePath;
@@ -174,6 +178,7 @@ class UpdateProductRequested extends ProductEvent {
     this.salePrice,
     this.quantity,
     this.unit,
+    this.trackInventory = true,
     this.isActive = true,
     this.description,
     this.imagePath,
@@ -194,6 +199,7 @@ class UpdateProductRequested extends ProductEvent {
     salePrice,
     quantity,
     unit,
+    trackInventory,
     isActive,
     description,
     imagePath,

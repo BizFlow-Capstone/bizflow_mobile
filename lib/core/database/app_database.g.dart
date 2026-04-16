@@ -999,6 +999,21 @@ class $ProductsTableTable extends ProductsTable
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _trackInventoryMeta = const VerificationMeta(
+    'trackInventory',
+  );
+  @override
+  late final GeneratedColumn<bool> trackInventory = GeneratedColumn<bool>(
+    'track_inventory',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("track_inventory" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -1106,6 +1121,7 @@ class $ProductsTableTable extends ProductsTable
     costPrice,
     salePrice,
     unit,
+    trackInventory,
     isActive,
     createdAtEpoch,
     locationId,
@@ -1203,6 +1219,15 @@ class $ProductsTableTable extends ProductsTable
       context.handle(
         _unitMeta,
         unit.isAcceptableOrUnknown(data['unit']!, _unitMeta),
+      );
+    }
+    if (data.containsKey('track_inventory')) {
+      context.handle(
+        _trackInventoryMeta,
+        trackInventory.isAcceptableOrUnknown(
+          data['track_inventory']!,
+          _trackInventoryMeta,
+        ),
       );
     }
     if (data.containsKey('is_active')) {
@@ -1330,6 +1355,10 @@ class $ProductsTableTable extends ProductsTable
         DriftSqlType.string,
         data['${effectivePrefix}unit'],
       ),
+      trackInventory: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}track_inventory'],
+      )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -1385,6 +1414,7 @@ class ProductsTableData extends DataClass
   final double? costPrice;
   final double? salePrice;
   final String? unit;
+  final bool trackInventory;
   final bool isActive;
   final int? createdAtEpoch;
   final int? locationId;
@@ -1406,6 +1436,7 @@ class ProductsTableData extends DataClass
     this.costPrice,
     this.salePrice,
     this.unit,
+    required this.trackInventory,
     required this.isActive,
     this.createdAtEpoch,
     this.locationId,
@@ -1442,6 +1473,7 @@ class ProductsTableData extends DataClass
     if (!nullToAbsent || unit != null) {
       map['unit'] = Variable<String>(unit);
     }
+    map['track_inventory'] = Variable<bool>(trackInventory);
     map['is_active'] = Variable<bool>(isActive);
     if (!nullToAbsent || createdAtEpoch != null) {
       map['created_at_epoch'] = Variable<int>(createdAtEpoch);
@@ -1487,6 +1519,7 @@ class ProductsTableData extends DataClass
           ? const Value.absent()
           : Value(salePrice),
       unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      trackInventory: Value(trackInventory),
       isActive: Value(isActive),
       createdAtEpoch: createdAtEpoch == null && nullToAbsent
           ? const Value.absent()
@@ -1526,6 +1559,7 @@ class ProductsTableData extends DataClass
       costPrice: serializer.fromJson<double?>(json['costPrice']),
       salePrice: serializer.fromJson<double?>(json['salePrice']),
       unit: serializer.fromJson<String?>(json['unit']),
+      trackInventory: serializer.fromJson<bool>(json['trackInventory']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAtEpoch: serializer.fromJson<int?>(json['createdAtEpoch']),
       locationId: serializer.fromJson<int?>(json['locationId']),
@@ -1554,6 +1588,7 @@ class ProductsTableData extends DataClass
       'costPrice': serializer.toJson<double?>(costPrice),
       'salePrice': serializer.toJson<double?>(salePrice),
       'unit': serializer.toJson<String?>(unit),
+      'trackInventory': serializer.toJson<bool>(trackInventory),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAtEpoch': serializer.toJson<int?>(createdAtEpoch),
       'locationId': serializer.toJson<int?>(locationId),
@@ -1578,6 +1613,7 @@ class ProductsTableData extends DataClass
     Value<double?> costPrice = const Value.absent(),
     Value<double?> salePrice = const Value.absent(),
     Value<String?> unit = const Value.absent(),
+    bool? trackInventory,
     bool? isActive,
     Value<int?> createdAtEpoch = const Value.absent(),
     Value<int?> locationId = const Value.absent(),
@@ -1599,6 +1635,7 @@ class ProductsTableData extends DataClass
     costPrice: costPrice.present ? costPrice.value : this.costPrice,
     salePrice: salePrice.present ? salePrice.value : this.salePrice,
     unit: unit.present ? unit.value : this.unit,
+    trackInventory: trackInventory ?? this.trackInventory,
     isActive: isActive ?? this.isActive,
     createdAtEpoch: createdAtEpoch.present
         ? createdAtEpoch.value
@@ -1630,6 +1667,9 @@ class ProductsTableData extends DataClass
       costPrice: data.costPrice.present ? data.costPrice.value : this.costPrice,
       salePrice: data.salePrice.present ? data.salePrice.value : this.salePrice,
       unit: data.unit.present ? data.unit.value : this.unit,
+      trackInventory: data.trackInventory.present
+          ? data.trackInventory.value
+          : this.trackInventory,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAtEpoch: data.createdAtEpoch.present
           ? data.createdAtEpoch.value
@@ -1670,6 +1710,7 @@ class ProductsTableData extends DataClass
           ..write('costPrice: $costPrice, ')
           ..write('salePrice: $salePrice, ')
           ..write('unit: $unit, ')
+          ..write('trackInventory: $trackInventory, ')
           ..write('isActive: $isActive, ')
           ..write('createdAtEpoch: $createdAtEpoch, ')
           ..write('locationId: $locationId, ')
@@ -1683,7 +1724,7 @@ class ProductsTableData extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     scopeKey,
     name,
@@ -1696,6 +1737,7 @@ class ProductsTableData extends DataClass
     costPrice,
     salePrice,
     unit,
+    trackInventory,
     isActive,
     createdAtEpoch,
     locationId,
@@ -1704,7 +1746,7 @@ class ProductsTableData extends DataClass
     businessLocationName,
     saleItemsJson,
     cachedAtEpoch,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1721,6 +1763,7 @@ class ProductsTableData extends DataClass
           other.costPrice == this.costPrice &&
           other.salePrice == this.salePrice &&
           other.unit == this.unit &&
+          other.trackInventory == this.trackInventory &&
           other.isActive == this.isActive &&
           other.createdAtEpoch == this.createdAtEpoch &&
           other.locationId == this.locationId &&
@@ -1744,6 +1787,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
   final Value<double?> costPrice;
   final Value<double?> salePrice;
   final Value<String?> unit;
+  final Value<bool> trackInventory;
   final Value<bool> isActive;
   final Value<int?> createdAtEpoch;
   final Value<int?> locationId;
@@ -1766,6 +1810,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     this.costPrice = const Value.absent(),
     this.salePrice = const Value.absent(),
     this.unit = const Value.absent(),
+    this.trackInventory = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAtEpoch = const Value.absent(),
     this.locationId = const Value.absent(),
@@ -1789,6 +1834,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     this.costPrice = const Value.absent(),
     this.salePrice = const Value.absent(),
     this.unit = const Value.absent(),
+    this.trackInventory = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAtEpoch = const Value.absent(),
     this.locationId = const Value.absent(),
@@ -1815,6 +1861,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     Expression<double>? costPrice,
     Expression<double>? salePrice,
     Expression<String>? unit,
+    Expression<bool>? trackInventory,
     Expression<bool>? isActive,
     Expression<int>? createdAtEpoch,
     Expression<int>? locationId,
@@ -1838,6 +1885,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
       if (costPrice != null) 'cost_price': costPrice,
       if (salePrice != null) 'sale_price': salePrice,
       if (unit != null) 'unit': unit,
+      if (trackInventory != null) 'track_inventory': trackInventory,
       if (isActive != null) 'is_active': isActive,
       if (createdAtEpoch != null) 'created_at_epoch': createdAtEpoch,
       if (locationId != null) 'location_id': locationId,
@@ -1864,6 +1912,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     Value<double?>? costPrice,
     Value<double?>? salePrice,
     Value<String?>? unit,
+    Value<bool>? trackInventory,
     Value<bool>? isActive,
     Value<int?>? createdAtEpoch,
     Value<int?>? locationId,
@@ -1887,6 +1936,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
       costPrice: costPrice ?? this.costPrice,
       salePrice: salePrice ?? this.salePrice,
       unit: unit ?? this.unit,
+      trackInventory: trackInventory ?? this.trackInventory,
       isActive: isActive ?? this.isActive,
       createdAtEpoch: createdAtEpoch ?? this.createdAtEpoch,
       locationId: locationId ?? this.locationId,
@@ -1938,6 +1988,9 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     if (unit.present) {
       map['unit'] = Variable<String>(unit.value);
     }
+    if (trackInventory.present) {
+      map['track_inventory'] = Variable<bool>(trackInventory.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -1985,6 +2038,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
           ..write('costPrice: $costPrice, ')
           ..write('salePrice: $salePrice, ')
           ..write('unit: $unit, ')
+          ..write('trackInventory: $trackInventory, ')
           ..write('isActive: $isActive, ')
           ..write('createdAtEpoch: $createdAtEpoch, ')
           ..write('locationId: $locationId, ')
@@ -6635,6 +6689,7 @@ typedef $$ProductsTableTableCreateCompanionBuilder =
       Value<double?> costPrice,
       Value<double?> salePrice,
       Value<String?> unit,
+      Value<bool> trackInventory,
       Value<bool> isActive,
       Value<int?> createdAtEpoch,
       Value<int?> locationId,
@@ -6659,6 +6714,7 @@ typedef $$ProductsTableTableUpdateCompanionBuilder =
       Value<double?> costPrice,
       Value<double?> salePrice,
       Value<String?> unit,
+      Value<bool> trackInventory,
       Value<bool> isActive,
       Value<int?> createdAtEpoch,
       Value<int?> locationId,
@@ -6736,6 +6792,11 @@ class $$ProductsTableTableFilterComposer
 
   ColumnFilters<String> get unit => $composableBuilder(
     column: $table.unit,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get trackInventory => $composableBuilder(
+    column: $table.trackInventory,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6849,6 +6910,11 @@ class $$ProductsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get trackInventory => $composableBuilder(
+    column: $table.trackInventory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -6937,6 +7003,11 @@ class $$ProductsTableTableAnnotationComposer
   GeneratedColumn<String> get unit =>
       $composableBuilder(column: $table.unit, builder: (column) => column);
 
+  GeneratedColumn<bool> get trackInventory => $composableBuilder(
+    column: $table.trackInventory,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
 
@@ -7023,6 +7094,7 @@ class $$ProductsTableTableTableManager
                 Value<double?> costPrice = const Value.absent(),
                 Value<double?> salePrice = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
+                Value<bool> trackInventory = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<int?> createdAtEpoch = const Value.absent(),
                 Value<int?> locationId = const Value.absent(),
@@ -7045,6 +7117,7 @@ class $$ProductsTableTableTableManager
                 costPrice: costPrice,
                 salePrice: salePrice,
                 unit: unit,
+                trackInventory: trackInventory,
                 isActive: isActive,
                 createdAtEpoch: createdAtEpoch,
                 locationId: locationId,
@@ -7069,6 +7142,7 @@ class $$ProductsTableTableTableManager
                 Value<double?> costPrice = const Value.absent(),
                 Value<double?> salePrice = const Value.absent(),
                 Value<String?> unit = const Value.absent(),
+                Value<bool> trackInventory = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<int?> createdAtEpoch = const Value.absent(),
                 Value<int?> locationId = const Value.absent(),
@@ -7091,6 +7165,7 @@ class $$ProductsTableTableTableManager
                 costPrice: costPrice,
                 salePrice: salePrice,
                 unit: unit,
+                trackInventory: trackInventory,
                 isActive: isActive,
                 createdAtEpoch: createdAtEpoch,
                 locationId: locationId,

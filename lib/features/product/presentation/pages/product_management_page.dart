@@ -617,7 +617,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             product: product,
             locationId: widget.locationId,
             canManageActions: canManageProducts,
-            onQuickAdjustStock: canAdjustStock
+            onQuickAdjustStock: canAdjustStock && product.trackInventory
                 ? () => _showQuickAdjustStockDialog(product)
                 : null,
           );

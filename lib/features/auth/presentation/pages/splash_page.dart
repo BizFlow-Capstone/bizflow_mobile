@@ -48,15 +48,6 @@ class _SplashPageState extends State<SplashPage> {
                 width: 120,
                 fit: BoxFit.contain,
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'BizFlow',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF23C4C1),
-                ),
-              ),
               const SizedBox(height: 48),
               const CircularProgressIndicator(color: Color(0xFF23C4C1)),
             ],

@@ -19,6 +19,7 @@ class ProductLocalMapper {
       costPrice: row.costPrice,
       salePrice: row.salePrice,
       unit: row.unit,
+      trackInventory: row.trackInventory,
       isActive: row.isActive,
       createdAt: row.createdAtEpoch == null
           ? null
@@ -49,6 +50,7 @@ class ProductLocalMapper {
       costPrice: Value(entity.costPrice),
       salePrice: Value(entity.salePrice),
       unit: Value(entity.unit),
+      trackInventory: Value(entity.trackInventory),
       isActive: Value(entity.isActive),
       createdAtEpoch: Value(entity.createdAt?.millisecondsSinceEpoch),
       locationId: Value(entity.locationId),
