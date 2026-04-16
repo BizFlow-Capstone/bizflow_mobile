@@ -12,6 +12,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
+import '../navigation/post_auth_navigation.dart';
 
 class GooglePhoneLinkPage extends StatefulWidget {
   const GooglePhoneLinkPage({super.key});
@@ -57,7 +58,11 @@ class _GooglePhoneLinkPageState extends State<GooglePhoneLinkPage> {
         } else if (state is GoogleLoginSetPasswordRequired) {
           AppRouter.navigateAndClearStack(AppRoutes.setPassword);
         } else if (state is LinkCredentialSuccess) {
-          AppRouter.navigateAndClearStack(AppRoutes.setPassword);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            PostAuthNavigation.route(context);
+            context.read<AuthBloc>().add(const AuthOnboardingCompleted());
+          });
         } else if (state is LinkCredentialFailure) {
           AppSnackBar.error(context, state.message);
         }
@@ -84,6 +89,14 @@ class _GooglePhoneLinkPageState extends State<GooglePhoneLinkPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    l10n.translate('auth.onboarding_link_phone_step'),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     l10n.translate('auth.link_phone_required_subtitle'),
                     style: AppTextStyles.bodyMedium.copyWith(

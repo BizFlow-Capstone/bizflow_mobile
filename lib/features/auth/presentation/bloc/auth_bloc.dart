@@ -297,30 +297,29 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final requiresSetPassword =
           (result.hasPassword == false) || (result.isNewAccount == true);
 
-      if (requiresPhoneLink) {
-        await secureStorage.setNeedsSetPassword(requiresSetPassword);
+      if (requiresSetPassword) {
+        // Priority: set password first, then link phone if still missing.
+        await secureStorage.setNeedsSetPassword(true);
+        await secureStorage.setGoogleOnboardingStep(
+          _googleOnboardingStepSetPassword,
+        );
+        emit(
+          GoogleLoginSetPasswordRequired(
+            accessToken: result.accessToken!,
+            refreshToken: result.refreshToken ?? '',
+          ),
+        );
+      } else if (requiresPhoneLink) {
+        await secureStorage.setNeedsSetPassword(false);
         await secureStorage.setGoogleOnboardingStep(
           _googleOnboardingStepLinkPhone,
         );
         emit(const GoogleLoginPhoneLinkRequired());
       } else {
-        if (requiresSetPassword) {
-          await secureStorage.setNeedsSetPassword(true);
-          await secureStorage.setGoogleOnboardingStep(
-            _googleOnboardingStepSetPassword,
-          );
-          emit(
-            GoogleLoginSetPasswordRequired(
-              accessToken: result.accessToken!,
-              refreshToken: result.refreshToken ?? '',
-            ),
-          );
-        } else {
-          await secureStorage.setNeedsSetPassword(false);
-          await secureStorage.clearGoogleOnboardingStep();
-          await firebaseMessagingService.registerCurrentToken();
-          emit(LoginSuccess(accessToken: result.accessToken!, user: const {}));
-        }
+        await secureStorage.setNeedsSetPassword(false);
+        await secureStorage.clearGoogleOnboardingStep();
+        await firebaseMessagingService.registerCurrentToken();
+        emit(LoginSuccess(accessToken: result.accessToken!, user: const {}));
       }
     } catch (e) {
       emit(
@@ -340,8 +339,27 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(SetPasswordInProgress());
     try {
       final result = await authRepository.setPassword(password: event.password);
-      if (result.success) {
+      final normalizedMessageCode = result.messageCode?.trim();
+      final normalizedMessage = result.message.trim().toLowerCase();
+      final isAlreadySet =
+          normalizedMessageCode == 'AUTH_PASSWORD_ALREADY_SET' ||
+          normalizedMessage.contains('mật khẩu đã được đặt') ||
+          normalizedMessage.contains('mat khau da duoc dat');
+
+      if (result.success || isAlreadySet) {
         await secureStorage.setNeedsSetPassword(false);
+
+        final credentialTypes = await _getCredentialTypesForOnboarding();
+        final needsPhoneLink = !credentialTypes.contains('phone');
+
+        if (needsPhoneLink) {
+          await secureStorage.setGoogleOnboardingStep(
+            _googleOnboardingStepLinkPhone,
+          );
+          emit(const GoogleLoginPhoneLinkRequired());
+          return;
+        }
+
         await secureStorage.clearGoogleOnboardingStep();
         await firebaseMessagingService.registerCurrentToken();
         emit(const SetPasswordSuccess());
@@ -1043,13 +1061,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     final onboardingStep = await secureStorage.getGoogleOnboardingStep();
     if (onboardingStep == _googleOnboardingStepLinkPhone) {
-      await secureStorage.setGoogleOnboardingStep(
-        _googleOnboardingStepSetPassword,
-      );
-      await secureStorage.setNeedsSetPassword(true);
-      emit(
-        const GoogleLoginSetPasswordRequired(accessToken: '', refreshToken: ''),
-      );
+      final needsSetPassword = await secureStorage.getNeedsSetPassword();
+      if (needsSetPassword) {
+        await secureStorage.setGoogleOnboardingStep(
+          _googleOnboardingStepSetPassword,
+        );
+        emit(
+          const GoogleLoginSetPasswordRequired(
+            accessToken: '',
+            refreshToken: '',
+          ),
+        );
+        return;
+      }
+
+      await secureStorage.setNeedsSetPassword(false);
+      await secureStorage.clearGoogleOnboardingStep();
+      emit(const LinkCredentialSuccess(linkedType: 'phone'));
       return;
     }
 
@@ -1298,6 +1326,34 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         .where((e) => e.isNotEmpty)
         .toSet()
         .toList();
+  }
+
+  Future<List<String>> _getCredentialTypesForOnboarding() async {
+    final fromCache = await secureStorage.getCredentialTypes();
+    if (fromCache.isNotEmpty) {
+      return fromCache
+          .map((e) => e.trim().toLowerCase())
+          .where((e) => e.isNotEmpty)
+          .toSet()
+          .toList();
+    }
+
+    final fetched = await authRepository.getCredentials();
+    if (!fetched.success) {
+      return const <String>[];
+    }
+
+    final normalized = fetched.credentialTypes
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (normalized.isNotEmpty) {
+      await secureStorage.setCredentialTypes(normalized);
+    }
+
+    return normalized;
   }
 
   Future<void> _onAuthOnboardingCompleted(

@@ -1,9 +1,10 @@
-﻿import 'auth_api_service.dart';
+import 'auth_api_service.dart';
 import 'models/auth_response.dart';
 import 'models/credentials_response.dart';
 import 'models/user_profile_response.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/secure_storage.dart';
+import 'dart:convert';
 
 abstract class AuthRepository {
   Future<AuthResponse> loginWithPhone({
@@ -445,7 +446,43 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   AuthResponse _errorResponse(Object e) {
-    if (e is ApiException) return AuthResponse(success: false, message: e.message);
+    if (e is ApiException) {
+      String? code;
+      final rawData = e.data;
+
+      if (rawData is Map) {
+        code = rawData['messageCode']?.toString();
+
+        // Some endpoints may wrap payload under data/error objects.
+        if ((code == null || code.isEmpty) && rawData['data'] is Map) {
+          code = rawData['data']['messageCode']?.toString();
+        }
+        if ((code == null || code.isEmpty) && rawData['error'] is Map) {
+          code = rawData['error']['messageCode']?.toString();
+        }
+      } else if (rawData is String) {
+        try {
+          final decoded = jsonDecode(rawData);
+          if (decoded is Map) {
+            code = decoded['messageCode']?.toString();
+            if ((code == null || code.isEmpty) && decoded['data'] is Map) {
+              code = decoded['data']['messageCode']?.toString();
+            }
+            if ((code == null || code.isEmpty) && decoded['error'] is Map) {
+              code = decoded['error']['messageCode']?.toString();
+            }
+          }
+        } catch (_) {
+          // Keep null code, message fallback is handled by caller.
+        }
+      }
+
+      return AuthResponse(
+        success: false,
+        message: e.message,
+        messageCode: code,
+      );
+    }
     return AuthResponse(success: false, message: e.toString().replaceAll('Exception: ', ''));
   }
 }

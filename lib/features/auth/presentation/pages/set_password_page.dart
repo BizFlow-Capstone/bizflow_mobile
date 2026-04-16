@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -75,6 +76,12 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
             if (!mounted) return;
             PostAuthNavigation.route(context);
           });
+        } else if (state is GoogleLoginPhoneLinkRequired) {
+          FocusScope.of(context).unfocus();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            AppRouter.navigateAndClearStack(AppRoutes.googlePhoneLink);
+          });
         } else if (state is SetPasswordFailure) {
           _showError(state.message);
         }
@@ -118,6 +125,14 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.lg),
+                  Text(
+                    l10n.translate('auth.onboarding_set_password_step'),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     l10n.translate('auth.set_password_subtitle'),
                     style: AppTextStyles.bodyMedium.copyWith(
