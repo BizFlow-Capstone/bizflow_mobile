@@ -76,11 +76,29 @@ class CostDto extends Equatable {
         json['documentDate'] as String?,
       ),
       description: json['description'] as String? ?? '',
-      paymentMethod: asNullableString(json['paymentMethod']),
-      documentUrl: asNullableString(json['documentUrl']),
-      referenceType: asNullableString(json['referenceType']),
-      referenceId: asNullableInt(json['referenceId']),
-      referenceCode: asNullableString(json['referenceCode']),
+      paymentMethod: asNullableString(
+        json['paymentMethod'] ?? json['PaymentMethod'],
+      ),
+      documentUrl: asNullableString(json['documentUrl'] ?? json['DocumentUrl']),
+      referenceType: asNullableString(
+        json['referenceType'] ??
+            json['ReferenceType'] ??
+            json['entityType'] ??
+            json['EntityType'],
+      ),
+      referenceId: asNullableInt(
+        json['referenceId'] ??
+            json['ReferenceId'] ??
+            json['entityId'] ??
+            json['EntityId'] ??
+            json['orderId'] ??
+            json['OrderId'] ??
+            json['importId'] ??
+            json['ImportId'],
+      ),
+      referenceCode: asNullableString(
+        json['referenceCode'] ?? json['ReferenceCode'] ?? json['code'],
+      ),
       createdBy: json['createdBy'] as String? ?? '',
       createdAt:
           DateFormatter.parseApiDateTime(json['createdAt'] as String?) ??

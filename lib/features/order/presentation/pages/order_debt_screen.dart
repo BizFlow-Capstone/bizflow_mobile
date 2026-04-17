@@ -4,6 +4,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -100,8 +101,8 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
               ..removeCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: const Text(
-                    'Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)',
+                  content: Text(
+                    l10n.translate('order_payment.success_update_pending'),
                   ),
                   backgroundColor: AppColors.success,
                 ),
@@ -538,7 +539,7 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
       if (!mounted) return;
       AppSnackBar.show(
         context,
-        message: e.toString().replaceFirst('Exception: ', ''),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     } finally {

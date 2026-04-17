@@ -69,7 +69,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _validateCommonForm(AppLocalizations l10n) {
     final fullName = _fullNameController.text.trim();
     final phone = _phoneController.text.trim();
-    final taxCode = _taxCodeController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
@@ -77,7 +76,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
     String? fullNameError;
     String? phoneError;
-    String? taxCodeError;
     String? passwordError;
     String? confirmPasswordError;
 
@@ -88,10 +86,6 @@ class _RegisterPageState extends State<RegisterPage> {
     if (phone.isEmpty) {
       phoneError = l10n.translate('auth.phone_required');
       firstInvalidFocus ??= _phoneFocusNode;
-    }
-    if (taxCode.isEmpty) {
-      taxCodeError = l10n.translate('common.required_field');
-      firstInvalidFocus ??= _taxCodeFocusNode;
     }
     if (password.isEmpty) {
       passwordError = l10n.translate('auth.password_required');
@@ -111,7 +105,7 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() {
       _fullNameError = fullNameError;
       _phoneError = phoneError;
-      _taxCodeError = taxCodeError;
+      _taxCodeError = null;
       _passwordError = passwordError;
       _confirmPasswordError = confirmPasswordError;
     });

@@ -78,10 +78,28 @@ class RevenueDto extends Equatable {
         json['documentDate'] as String?,
       ),
       description: json['description'] as String? ?? '',
-      moneyChannel: asNullableString(json['moneyChannel']),
-      referenceType: asNullableString(json['referenceType']),
-      referenceId: asNullableInt(json['referenceId']),
-      referenceCode: asNullableString(json['referenceCode']),
+      moneyChannel: asNullableString(
+        json['moneyChannel'] ?? json['MoneyChannel'],
+      ),
+      referenceType: asNullableString(
+        json['referenceType'] ??
+            json['ReferenceType'] ??
+            json['entityType'] ??
+            json['EntityType'],
+      ),
+      referenceId: asNullableInt(
+        json['referenceId'] ??
+            json['ReferenceId'] ??
+            json['entityId'] ??
+            json['EntityId'] ??
+            json['orderId'] ??
+            json['OrderId'] ??
+            json['importId'] ??
+            json['ImportId'],
+      ),
+      referenceCode: asNullableString(
+        json['referenceCode'] ?? json['ReferenceCode'] ?? json['code'],
+      ),
       businessTypeId: asNullableString(
         json['businessTypeId'] ?? json['BusinessTypeId'],
       ),

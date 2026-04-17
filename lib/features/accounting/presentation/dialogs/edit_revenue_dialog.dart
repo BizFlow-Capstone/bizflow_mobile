@@ -162,7 +162,7 @@ Future<void> showEditRevenueDialog({
               const SizedBox(height: AppSpacing.sm),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Ngày chứng từ'),
+                title: Text(l10n.translate('accounting.document_date')),
                 subtitle: Text(
                   selectedDocumentDate == null
                       ? l10n.translate('common.no_data')

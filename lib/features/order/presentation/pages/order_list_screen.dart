@@ -154,7 +154,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
       if (!mounted) return;
       AppSnackBar.show(
         context,
-        message: 'Đơn hàng đã được hoàn thành thành công!',
+        message: l10n.translate('order.complete_success'),
         type: AppSnackBarType.success,
       );
 
@@ -349,7 +349,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.translate('common.delete')),
-        content: Text('Xóa bản nháp này khỏi thiết bị?'),
+        content: Text(l10n.translate('order.delete_draft_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -388,7 +388,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
     if (!mounted) return;
     AppSnackBar.show(
       context,
-      message: 'Đã xóa bản nháp',
+      message: l10n.translate('order.delete_draft_success'),
       type: AppSnackBarType.success,
     );
     _loadDraftOrders();
@@ -440,7 +440,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             padding: const EdgeInsets.all(16.0),
             child: AppTextField(
               controller: _searchController,
-              hintText: 'Tìm theo tên KH, SĐT hoặc mã đơn...',
+              hintText: l10n.translate('order.search_hint'),
               prefixIcon: const Icon(Icons.search),
               onChanged: _onSearchChanged,
               suffixIcon: _searchController.text.isNotEmpty
@@ -562,7 +562,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   ],
 ),
       floatingActionButton: FloatingActionButton(
-        tooltip: 'Tạo đơn hàng',
+        tooltip: l10n.translate('order.action_add'),
         onPressed: () async {
           await _openOrderCreationGuard.run(() async {
             await Navigator.push(
@@ -581,25 +581,36 @@ class _OrderListScreenState extends State<OrderListScreen> {
   void _showCancelConfirmDialog(BuildContext context, String orderId) {
     final l10n = AppLocalizations.of(context);
     final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.translate('order.cancel_confirm_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l10n.translate('order.cancel_confirm_message')),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: l10n.translate('order.detail_cancel_reason'),
-                hintText: l10n.translate('order.detail_cancel_reason'),
-                border: const OutlineInputBorder(),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.translate('order.cancel_confirm_message')),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonController,
+                maxLines: 3,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                validator: (value) {
+                  if ((value ?? '').trim().isEmpty) {
+                    return l10n.translate('order.cancel_reason_required');
+                  }
+                  return null;
+                },
+                decoration: InputDecoration(
+                  labelText: l10n.translate('order.detail_cancel_reason'),
+                  hintText: l10n.translate('order.detail_cancel_reason'),
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -608,15 +619,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
           ),
           TextButton(
             onPressed: () async {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) {
-                AppSnackBar.show(
-                  context,
-                  message: l10n.translate('order.cancel_reason_required'),
-                  type: AppSnackBarType.warning,
-                );
+              if (!(formKey.currentState?.validate() ?? false)) {
                 return;
               }
+              final reason = reasonController.text.trim();
               await _cancelOrderGuard.run(() async {
                 final allowed = await SubscriptionFeatureGuard.ensureAllowed(
                   context,

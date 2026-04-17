@@ -10,6 +10,7 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/context/user_profile_context.dart';
 import '../../../../shared/cache/swr_builder.dart';
 import '../../../subscription/data/subscription_api_service.dart';
@@ -159,7 +160,15 @@ class SettingsPage extends StatelessWidget {
                 iconBgColor: const Color(0xFFE3F2FD),
                 title: l10n.translate('settings_page.help'),
                 subtitle: l10n.translate('settings_page.help_sub'),
-                onTap: () {},
+                onTap: () {
+                  AppDialog.show(
+                    context,
+                    title: l10n.translate('settings_page.help_dialog_title'),
+                    message: l10n.translate('settings_page.help_dialog_message'),
+                    type: AppDialogType.info,
+                    confirmText: l10n.translate('common.ok'),
+                  );
+                },
               ),
               const SizedBox(height: AppSpacing.lg),
 

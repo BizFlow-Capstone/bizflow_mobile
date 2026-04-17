@@ -256,7 +256,7 @@ class _EditProductPageState extends State<EditProductPage> {
                 controller: unitController,
                 decoration: InputDecoration(
                   labelText: l10n.translate('product.unit'),
-                  hintText: 'Lốc, Thùng, ...',
+                  hintText: l10n.translate('product.conversion_example'),
                 ),
               ),
               SizedBox(height: AppSpacing.md),
@@ -586,7 +586,7 @@ class _EditProductPageState extends State<EditProductPage> {
 
               AppSnackBar.show(
                 context,
-                message: 'Đã cập nhật trạng thái sản phẩm',
+                message: l10n.translate('product.status_updated'),
                 type: AppSnackBarType.success,
               );
               return;

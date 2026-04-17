@@ -158,13 +158,41 @@ class ProductDto {
             .toList() ??
         const [];
 
-    // Prioritize salePrice and unit from saleItems where unit matches top-level unit
+    // Prioritize salePrice and unit from saleItems where unit matches top-level unit.
     String? finalUnit = (json['unit'] ?? json['Unit']) as String?;
+
+    String? resolveUnit(Map<String, dynamic> item) {
+      final unit = (item['baseUnit'] ??
+              item['BaseUnit'] ??
+              item['unitName'] ??
+              item['UnitName'] ??
+              item['unit'] ??
+              item['Unit'])
+          ?.toString()
+          .trim();
+      if (unit == null || unit.isEmpty) return null;
+      return unit;
+    }
+
+    if ((finalUnit == null || finalUnit.trim().isEmpty) &&
+        saleItems.isNotEmpty) {
+      num? parseNum(dynamic value) {
+        if (value == null) return null;
+        if (value is num) return value;
+        return num.tryParse(value.toString().trim());
+      }
+
+      final baseItem = saleItems.firstWhere(
+        (item) => parseNum(item['quantity'] ?? item['Quantity']) == 1,
+        orElse: () => saleItems.first,
+      );
+      finalUnit = resolveUnit(baseItem);
+    }
 
     if (saleItems.isNotEmpty && finalUnit != null) {
       // Find the sale item that matches the base unit
       final baseItem = saleItems.firstWhere(
-        (item) => (item['unit'] ?? item['Unit']) == finalUnit,
+        (item) => resolveUnit(item) == finalUnit,
         orElse: () => const {},
       );
 

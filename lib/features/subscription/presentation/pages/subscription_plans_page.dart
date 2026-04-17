@@ -336,7 +336,7 @@ class _DynamicPlanCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          if (isCurrentPlan) ...[
+          if (isCurrentPlan && type != _PlanType.free) ...[
             _PopularBadge(
               text: l10n.translate('subscription.registered_label'),
             ),
@@ -408,12 +408,16 @@ class _DynamicPlanCard extends StatelessWidget {
   Widget _buildActionButton(BuildContext context) {
     if (!isOwner) return const SizedBox.shrink();
 
+    if (type == _PlanType.free && isCurrentPlan) {
+      return const SizedBox.shrink();
+    }
+
     if (isCurrentPlan) {
       return SizedBox(
         width: double.infinity,
         height: 52,
         child: ElevatedButton(
-            onPressed: isProcessing ? null : onUpgrade,
+          onPressed: isProcessing ? null : onUpgrade,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.success,
             foregroundColor: AppColors.white,
@@ -421,22 +425,22 @@ class _DynamicPlanCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-            child: isProcessing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
+          child: isProcessing
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   )
-                : Text(
-                    l10n.translate('subscription.renew_more'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                )
+              : Text(
+                  l10n.translate('subscription.renew_more'),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
         ),
       );
     }

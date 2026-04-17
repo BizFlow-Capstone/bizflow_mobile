@@ -174,7 +174,9 @@ class _AddProductPageState extends State<AddProductPage> {
                 controller: unitController,
                 decoration: InputDecoration(
                   labelText: l10n?.translate('product.unit') ?? 'Đơn vị',
-                  hintText: 'Lốc, Thùng, ...',
+                  hintText:
+                      l10n?.translate('product.conversion_example') ??
+                      'VD: 1 lốc = 10 lon',
                 ),
               ),
               SizedBox(height: AppSpacing.md),

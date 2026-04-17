@@ -384,6 +384,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['stock_quantity'];
           final int resolvedQty = parseInt(rawQty);
 
+            final List<Map<String, dynamic>> resolvedSaleItems =
+              (item['saleItems'] as List<dynamic>?)
+                ?.whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList() ??
+              const <Map<String, dynamic>>[];
+
           final String? resolvedBarcode = parseString(
             item['barcode'] ?? item['Barcode'] ?? item['sku'] ?? item['Sku'],
           );
@@ -417,6 +424,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             item['businessTypeId'] ?? item['BusinessTypeId'],
           );
 
+          final String? directUnit = parseString(item['unit'] ?? item['Unit']);
+          final String? resolvedBaseUnit =
+              directUnit ?? _resolveBaseUnitFromSaleItems(resolvedSaleItems);
+
           return ProductEntity(
             id: idValue?.toString() ?? '',
             name: (item['name'] ?? item['Name']) as String? ?? 'Unknown',
@@ -434,9 +445,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             category: (item['category'] ?? item['Category']) as String?,
             costPrice: resolvedCostPrice,
             salePrice: resolvedSalePrice,
-            unit: (item['unit'] ?? item['Unit']) as String?,
+            unit: resolvedBaseUnit,
             isActive: resolvedIsActive,
             trackInventory: resolvedTrackInventory,
+            saleItems: resolvedSaleItems,
             createdAt: (item['createdAt'] ?? item['CreatedAt']) != null
                 ? DateFormatter.parseApiDateTime(
                     (item['createdAt'] ?? item['CreatedAt']) as String?,
@@ -465,7 +477,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           final raw = await repository.getProductSaleItems(product.id);
           final saleItems = _extractSaleItems(raw);
           if (saleItems.isEmpty) return product;
-          return product.copyWith(saleItems: saleItems);
+          final resolvedBaseUnit = _resolveBaseUnitFromSaleItems(saleItems);
+          return product.copyWith(
+            saleItems: saleItems,
+            unit: (product.unit?.trim().isNotEmpty ?? false)
+                ? product.unit
+                : resolvedBaseUnit,
+          );
         } catch (e) {
           debugPrint(
             'ProductBloc: Failed to load sale items for product ${product.id}: $e',
@@ -503,6 +521,36 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     }
 
     return <Map<String, dynamic>>[];
+  }
+
+  String? _resolveBaseUnitFromSaleItems(List<Map<String, dynamic>> saleItems) {
+    if (saleItems.isEmpty) return null;
+
+    num? parseNum(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value;
+      return num.tryParse(value.toString().trim());
+    }
+
+    String? parseUnit(Map<String, dynamic> item) {
+      final unit = (item['baseUnit'] ??
+              item['BaseUnit'] ??
+              item['unitName'] ??
+              item['UnitName'] ??
+              item['unit'] ??
+              item['Unit'])
+          ?.toString()
+          .trim();
+      if (unit == null || unit.isEmpty) return null;
+      return unit;
+    }
+
+    final baseItem = saleItems.firstWhere(
+      (item) => parseNum(item['quantity'] ?? item['Quantity']) == 1,
+      orElse: () => saleItems.first,
+    );
+
+    return parseUnit(baseItem);
   }
 
   Future<void> _onSearchProductsRequested(

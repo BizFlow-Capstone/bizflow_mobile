@@ -240,7 +240,7 @@ class ApiClient {
     'AUTH_CURRENT_PASSWORD_INCORRECT',
   };
 
-  static const Duration _mutationCooldown = Duration(milliseconds: 900);
+  static const Duration _mutationCooldown = Duration(seconds: 3);
   final Map<String, DateTime> _inFlightMutationRequests = <String, DateTime>{};
   final Map<String, DateTime> _recentMutationRequests = <String, DateTime>{};
 
@@ -534,6 +534,8 @@ class ApiClient {
     const boundary = '----BizFlowBoundary';
     final uri = Uri.parse('$baseUrl$path');
 
+    var shouldMarkRecentCooldown = false;
+
     try {
       final request = await _client.postUrl(uri);
 
@@ -595,6 +597,7 @@ class ApiClient {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = parser != null ? parser(jsonResponse) : jsonResponse as T?;
+        shouldMarkRecentCooldown = true;
         return ApiResponse.success(data as T, statusCode: response.statusCode);
       } else {
         throw ApiException(
@@ -607,7 +610,10 @@ class ApiClient {
       if (e is ApiException) rethrow;
       throw ApiException(statusCode: -3, message: e.toString());
     } finally {
-      _releaseMutationRequest(mutationKey);
+      _clearInFlightMutationRequest(mutationKey);
+      if (shouldMarkRecentCooldown) {
+        _markRecentMutationRequest(mutationKey);
+      }
     }
   }
 
@@ -631,6 +637,8 @@ class ApiClient {
 
     const boundary = '----BizFlowBoundary';
     final uri = Uri.parse('$baseUrl$path');
+
+    var shouldMarkRecentCooldown = false;
 
     try {
       final request = await _client.putUrl(uri);
@@ -693,6 +701,7 @@ class ApiClient {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = parser != null ? parser(jsonResponse) : jsonResponse as T?;
+        shouldMarkRecentCooldown = true;
         return ApiResponse.success(data as T, statusCode: response.statusCode);
       } else {
         throw ApiException(
@@ -705,7 +714,10 @@ class ApiClient {
       if (e is ApiException) rethrow;
       throw ApiException(statusCode: -3, message: e.toString());
     } finally {
-      _releaseMutationRequest(mutationKey);
+      _clearInFlightMutationRequest(mutationKey);
+      if (shouldMarkRecentCooldown) {
+        _markRecentMutationRequest(mutationKey);
+      }
     }
   }
 
@@ -731,6 +743,7 @@ class ApiClient {
     }
 
     ApiResponse<T>? result;
+    var shouldMarkRecentCooldown = false;
     try {
       result = await _doRequest<T>(
         method,
@@ -740,6 +753,7 @@ class ApiClient {
         headers: headers,
         parser: parser,
       );
+      shouldMarkRecentCooldown = true;
     } on ApiException catch (e) {
       // Check for 401 — attempt token refresh
       final refreshInterceptor = responseInterceptors
@@ -752,7 +766,7 @@ class ApiClient {
         final newToken = await refreshInterceptor.attemptRefresh();
         if (newToken != null) {
           // Retry original request with new token
-          return _doRequest<T>(
+          result = await _doRequest<T>(
             method,
             path,
             body: body,
@@ -760,16 +774,24 @@ class ApiClient {
             headers: headers,
             parser: parser,
           );
+          shouldMarkRecentCooldown = true;
+        } else {
+          // No refresh possible — propagate.
+          rethrow;
         }
+      } else {
+        // No refresh possible — propagate.
+        rethrow;
       }
-      // No refresh possible — propagate
-      rethrow;
     } finally {
       if (isMutation) {
-        _releaseMutationRequest(mutationKey);
+        _clearInFlightMutationRequest(mutationKey);
+        if (shouldMarkRecentCooldown) {
+          _markRecentMutationRequest(mutationKey);
+        }
       }
     }
-    return result;
+    return result as ApiResponse<T>;
   }
 
   bool _isMutationMethod(HttpMethod method) {
@@ -825,8 +847,11 @@ class ApiClient {
     _inFlightMutationRequests[key] = now;
   }
 
-  void _releaseMutationRequest(String key) {
+  void _clearInFlightMutationRequest(String key) {
     _inFlightMutationRequests.remove(key);
+  }
+
+  void _markRecentMutationRequest(String key) {
     _recentMutationRequests[key] = DateTime.now();
     _cleanupExpiredRecentMutations();
   }

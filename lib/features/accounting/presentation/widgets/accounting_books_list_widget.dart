@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -21,6 +22,8 @@ class AccountingBooksListWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     if (isLoading && books.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -39,7 +42,7 @@ class AccountingBooksListWidget extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'No books created yet',
+                l10n.translate('accounting.books_empty'),
                 style: TextStyle(color: AppColors.textSecondary),
               ),
               if (onRefresh != null) ...[
@@ -47,7 +50,7 @@ class AccountingBooksListWidget extends StatelessWidget {
                 ElevatedButton.icon(
                   onPressed: onRefresh,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Refresh'),
+                  label: Text(l10n.translate('sync.refresh')),
                 ),
               ],
             ],

@@ -19,7 +19,8 @@ class ImportsDao extends DatabaseAccessor<AppDatabase> with _$ImportsDaoMixin {
   Future<ImportsTableData?> getLatestById(int id) {
     return (select(importsTable)
           ..where((tbl) => tbl.id.equals(id))
-          ..orderBy([(tbl) => OrderingTerm.desc(tbl.cachedAtEpoch)]))
+          ..orderBy([(tbl) => OrderingTerm.desc(tbl.cachedAtEpoch)])
+          ..limit(1))
         .getSingleOrNull();
   }
 

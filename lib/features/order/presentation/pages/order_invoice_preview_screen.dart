@@ -9,6 +9,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/routing/app_router.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -32,6 +34,22 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
   final OrderEntity order;
 
   OrderInvoicePreviewScreen({super.key, required this.order});
+
+  bool get _shouldReturnToOrderListOnBack =>
+      order.status.toLowerCase() == 'completed';
+
+  void _handleBack(BuildContext context) {
+    if (_shouldReturnToOrderListOnBack) {
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.orderList,
+        (route) => false,
+      );
+      return;
+    }
+
+    Navigator.pop(context);
+  }
 
   String _pdfFormat(String text) => StringUtils.removeDiacritics(text);
   String _pdfCurrency(num? amount) =>
@@ -300,7 +318,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
       if (!context.mounted) return;
       AppSnackBar.show(
         context,
-        message: e.toString(),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     }
@@ -316,111 +334,123 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        foregroundColor: AppColors.textPrimary,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        title: Text(l10n.translate('order_payment.invoice_preview')),
-        elevation: 0,
-        iconTheme: const IconThemeData(color: AppColors.textPrimary),
-      ),
-      body: SafeArea(
-        child: BlocBuilder<InvoiceTemplateBloc, InvoiceTemplateState>(
-          builder: (context, state) {
-            final template = state is InvoiceTemplateLoaded
-                ? state.template
-                : InvoiceTemplateEntity.empty();
+    return PopScope(
+      canPop: !_shouldReturnToOrderListOnBack,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack(context);
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          backgroundColor: AppColors.white,
+          foregroundColor: AppColors.textPrimary,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          title: Text(l10n.translate('order_payment.invoice_preview')),
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => _handleBack(context),
+          ),
+          iconTheme: const IconThemeData(color: AppColors.textPrimary),
+        ),
+        body: SafeArea(
+          child: BlocBuilder<InvoiceTemplateBloc, InvoiceTemplateState>(
+            builder: (context, state) {
+              final template = state is InvoiceTemplateLoaded
+                  ? state.template
+                  : InvoiceTemplateEntity.empty();
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildSummaryCard(l10n),
-                  const SizedBox(height: AppSpacing.md),
-                  InvoicePreviewWidget(
-                    businessName: template.businessName,
-                    businessAddress: template.businessAddress,
-                    businessPhone: template.businessPhone,
-                    order: order,
-                    showStt: template.showStt,
-                    showItemName: template.showItemName,
-                    showQuantity: template.showQuantity,
-                    showUnit: template.showUnit,
-                    showUnitPrice: template.showUnitPrice,
-                    showItemDiscount: template.showItemDiscount,
-                    showItemVat: template.showItemVat,
-                    showItemTotalAmount: template.showItemTotalAmount,
-                    showCustomerName: template.showCustomerName,
-                    showCustomerPhone: template.showCustomerPhone,
-                    showCustomerAddress: template.showCustomerAddress,
-                    showCustomerEmail: template.showCustomerEmail,
-                    showCustomerTaxCode: template.showCustomerTaxCode,
-                    showTotalVat: template.showTotalVat,
-                    showTotalDiscount: template.showTotalDiscount,
-                    showSubTotal: template.showSubTotal,
-                    showFooterNote: template.showFooterNote,
-                    footerNoteText: template.footerNoteText,
-                    showSignature: template.showSignature,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            await _exportGuard.run(() async {
-                              final allowed = await _checkExportFeature(
-                                context,
-                              );
-                              if (!allowed) return;
-                              await _sharePdf(context, template);
-                            });
-                          },
-                          icon: const Icon(Icons.share_outlined),
-                          label: Text(
-                            l10n.translate('order_payment.share_invoice'),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            await _exportGuard.run(() async {
-                              final allowed = await _checkExportFeature(
-                                context,
-                              );
-                              if (!allowed) return;
-                              await _downloadInvoice(context, template);
-                            });
-                          },
-                          icon: const Icon(Icons.download_outlined),
-                          label: Text(
-                            l10n.translate('order_payment.download_invoice'),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton(
-                      onPressed: () => Navigator.pushNamedAndRemoveUntil(
-                        context,
-                        '/home',
-                        (route) => false,
-                      ),
-                      child: Text(l10n.translate('order_payment.back_to_list')),
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildSummaryCard(l10n),
+                    const SizedBox(height: AppSpacing.md),
+                    InvoicePreviewWidget(
+                      businessName: template.businessName,
+                      businessAddress: template.businessAddress,
+                      businessPhone: template.businessPhone,
+                      order: order,
+                      showStt: template.showStt,
+                      showItemName: template.showItemName,
+                      showQuantity: template.showQuantity,
+                      showUnit: template.showUnit,
+                      showUnitPrice: template.showUnitPrice,
+                      showItemDiscount: template.showItemDiscount,
+                      showItemVat: template.showItemVat,
+                      showItemTotalAmount: template.showItemTotalAmount,
+                      showCustomerName: template.showCustomerName,
+                      showCustomerPhone: template.showCustomerPhone,
+                      showCustomerAddress: template.showCustomerAddress,
+                      showCustomerEmail: template.showCustomerEmail,
+                      showCustomerTaxCode: template.showCustomerTaxCode,
+                      showTotalVat: template.showTotalVat,
+                      showTotalDiscount: template.showTotalDiscount,
+                      showSubTotal: template.showSubTotal,
+                      showFooterNote: template.showFooterNote,
+                      footerNoteText: template.footerNoteText,
+                      showSignature: template.showSignature,
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await _exportGuard.run(() async {
+                                final allowed = await _checkExportFeature(
+                                  context,
+                                );
+                                if (!allowed) return;
+                                await _sharePdf(context, template);
+                              });
+                            },
+                            icon: const Icon(Icons.share_outlined),
+                            label: Text(
+                              l10n.translate('order_payment.share_invoice'),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              await _exportGuard.run(() async {
+                                final allowed = await _checkExportFeature(
+                                  context,
+                                );
+                                if (!allowed) return;
+                                await _downloadInvoice(context, template);
+                              });
+                            },
+                            icon: const Icon(Icons.download_outlined),
+                            label: Text(
+                              l10n.translate('order_payment.download_invoice'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton(
+                        onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          AppRoutes.orderList,
+                          (route) => false,
+                        ),
+                        child: Text(l10n.translate('order_payment.back_to_list')),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

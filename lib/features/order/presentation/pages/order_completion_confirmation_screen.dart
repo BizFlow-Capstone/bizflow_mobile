@@ -11,8 +11,10 @@ import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../domain/entities/order_entity.dart';
+import '../../data/order_api_service.dart';
 import '../bloc/order_bloc.dart';
 import 'order_invoice_preview_screen.dart';
+import '../../../../core/routing/app_router.dart';
 
 class OrderCompletionConfirmationScreen extends StatefulWidget {
   final OrderEntity order;
@@ -28,13 +30,16 @@ class _OrderCompletionConfirmationScreenState
     extends State<OrderCompletionConfirmationScreen> {
   bool _isSubmitting = false;
 
-  Future<void> _completeOrder() async {
+  Future<void> _completeOrder({bool confirmLowStock = false}) async {
     setState(() => _isSubmitting = true);
     final l10n = AppLocalizations.of(context);
     final repository = context.read<OrderBloc>().repository;
 
     try {
-      final completedOrder = await repository.completeOrder(widget.order.id);
+      final completedOrder = await repository.completeOrder(
+        widget.order.id,
+        confirmLowStock: confirmLowStock,
+      );
       if (mounted) {
         AppSnackBar.show(
           context,
@@ -50,6 +55,33 @@ class _OrderCompletionConfirmationScreenState
         );
       }
     } catch (e) {
+      if (e is OrderConfirmationRequiredException && mounted) {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(l10n.translate('order_create.confirm_continue_title')),
+            content: Text(
+              l10n.translate('order_create.confirm_continue_message'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.translate('common.cancel')),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(l10n.translate('common.confirm')),
+              ),
+            ],
+          ),
+        );
+
+        if (confirm == true && mounted) {
+          await _completeOrder(confirmLowStock: true);
+        }
+        return;
+      }
+
       if (mounted) {
         AppSnackBar.show(
           context,
@@ -201,7 +233,7 @@ class _OrderCompletionConfirmationScreenState
                   onPressed: () {
                     Navigator.pushNamedAndRemoveUntil(
                       context,
-                      '/home',
+                      AppRoutes.orderList,
                       (route) => false,
                     );
                   },

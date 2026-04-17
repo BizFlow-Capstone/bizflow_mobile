@@ -1027,7 +1027,7 @@ class _StockImportViewState extends State<_StockImportView> {
           final detail = state.importDetail!;
           setState(() {
             _status = detail.status;
-            _hasInvoice = detail.importType == 'INVOICE';
+            _hasInvoice = detail.importType.toUpperCase() == 'INVOICE';
             _supplierController.text = detail.supplier ?? '';
             _noteController.text = detail.note ?? '';
             _selectedItems = List.from(detail.items);
@@ -1565,6 +1565,8 @@ class _StockImportViewState extends State<_StockImportView> {
                                       style: AppTextStyles.bodySmall.copyWith(
                                         color: AppColors.textSecondary,
                                       ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                   const SizedBox(height: 10),
@@ -1922,6 +1924,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
   String _searchQuery = '';
   final Map<int, double> _costPriceCache = {};
   final Map<int, String> _saleUnitsCache = {};
+  final Map<int, String?> _baseUnitCache = {};
   final Set<int> _loadingCostPriceProductIds = {};
 
   AppLocalizations get l10n => AppLocalizations.of(context);
@@ -1937,6 +1940,9 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
       (e) => e.productId == int.tryParse(product.id),
     );
     final resolvedCostPrice = await _resolveCostPrice(product);
+    final productId = int.tryParse(product.id) ?? 0;
+    final resolvedBaseUnit =
+        _baseUnitCache[productId] ?? _resolveBaseUnit(product);
     if (!mounted) return;
     setState(() {
       if (idx >= 0) {
@@ -1951,11 +1957,11 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
       } else {
         _items.add(
           ImportItemModel(
-            productId: int.tryParse(product.id) ?? 0,
+            productId: productId,
             productName: product.name,
             quantity: 1,
             costPrice: resolvedCostPrice,
-            baseUnit: product.unit ?? 'cái',
+            baseUnit: resolvedBaseUnit,
           ),
         );
       }
@@ -1980,7 +1986,9 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
           .repository
           .getProductDetail(product.id);
       final resolved = detail?.costPrice ?? 0;
-      final resolvedUnits = _extractSaleUnits(detail ?? product);
+      final resolvedProduct = detail ?? product;
+      final resolvedUnits = _extractSaleUnits(resolvedProduct);
+      _baseUnitCache[productId] = _resolveBaseUnit(resolvedProduct);
       _costPriceCache[productId] = resolved;
       _saleUnitsCache[productId] = resolvedUnits;
       return resolved;
@@ -2013,6 +2021,43 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     return units.join(', ');
   }
 
+  String? _resolveBaseUnit(ProductEntity product) {
+    final directUnit = (product.unit ?? '').trim();
+    if (directUnit.isNotEmpty) {
+      return directUnit;
+    }
+
+    if (product.saleItems.isEmpty) {
+      return null;
+    }
+
+    num? parseNum(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value;
+      return num.tryParse(value.toString().trim());
+    }
+
+    String? parseUnit(Map<String, dynamic> item) {
+      final unit = (item['baseUnit'] ??
+              item['BaseUnit'] ??
+              item['unitName'] ??
+              item['UnitName'] ??
+              item['unit'] ??
+              item['Unit'])
+          ?.toString()
+          .trim();
+      if (unit == null || unit.isEmpty) return null;
+      return unit;
+    }
+
+    final baseItem = product.saleItems.firstWhere(
+      (item) => parseNum(item['quantity'] ?? item['Quantity']) == 1,
+      orElse: () => product.saleItems.first,
+    );
+
+    return parseUnit(baseItem);
+  }
+
   Future<void> _prefetchCostPrice(ProductEntity product) async {
     final productId = int.tryParse(product.id) ?? 0;
     if (productId <= 0) return;
@@ -2024,6 +2069,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     if (!mounted) return;
     setState(() {
       _costPriceCache[productId] = resolved;
+      _baseUnitCache[productId] = _resolveBaseUnit(product);
       _saleUnitsCache[productId] = _extractSaleUnits(product);
     });
     _loadingCostPriceProductIds.remove(productId);
@@ -2034,6 +2080,9 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
       (e) => e.productId == int.tryParse(product.id),
     );
     final resolvedCostPrice = await _resolveCostPrice(product);
+    final productId = int.tryParse(product.id) ?? 0;
+    final resolvedBaseUnit =
+        _baseUnitCache[productId] ?? _resolveBaseUnit(product);
     if (!mounted) return;
 
     setState(() {
@@ -2056,11 +2105,11 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
       } else {
         _items.add(
           ImportItemModel(
-            productId: int.tryParse(product.id) ?? 0,
+            productId: productId,
             productName: product.name,
             quantity: quantity,
             costPrice: resolvedCostPrice,
-            baseUnit: product.unit ?? 'cái',
+            baseUnit: resolvedBaseUnit,
           ),
         );
       }

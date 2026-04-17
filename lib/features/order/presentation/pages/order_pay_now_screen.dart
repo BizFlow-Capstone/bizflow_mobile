@@ -83,8 +83,8 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
               ..removeCurrentSnackBar()
               ..showSnackBar(
                 SnackBar(
-                  content: const Text(
-                    'Đã cập nhật đơn hàng thành công (Trạng thái: Chờ)',
+                  content: Text(
+                    l10n.translate('order_payment.success_update_pending'),
                   ),
                   backgroundColor: AppColors.success,
                 ),
@@ -239,7 +239,10 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
                           ),
                         ),
                         child: Text(
-                          'Đơn pending: ${widget.pendingOrderId}\nẤn Thanh toán để complete đơn hàng.',
+                          l10n.translate(
+                            'order_payment.pending_order_hint',
+                            params: {'id': widget.pendingOrderId},
+                          ),
                           style: AppTextStyles.bodyMedium,
                         ),
                       ),

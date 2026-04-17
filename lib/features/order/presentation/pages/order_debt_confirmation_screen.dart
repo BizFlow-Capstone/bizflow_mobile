@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -26,9 +27,11 @@ class OrderDebtConfirmationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Xác nhận ghi nợ'),
+        title: Text(l10n.translate('order_create.debt_confirm')),
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
@@ -46,10 +49,10 @@ class OrderDebtConfirmationScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
-            const Center(
+            Center(
               child: Text(
-                'Ghi nhận nợ thành công',
-                style: TextStyle(
+                l10n.translate('order_create.debt_confirm_success'),
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.success,
@@ -57,16 +60,25 @@ class OrderDebtConfirmationScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            _buildInfoRow('Khách hàng', customerName),
-            _buildInfoRow('Tổng đơn', CurrencyFormatter.formatVND(totalAmount)),
-            _buildInfoRow('Đã thanh toán', CurrencyFormatter.formatVND(paidAmount)),
-            _buildInfoRow('Còn nợ', CurrencyFormatter.formatVND(debtAmount)),
+            _buildInfoRow(l10n.translate('order.detail_customer_name'), customerName),
+            _buildInfoRow(
+              l10n.translate('order_payment.order_total'),
+              CurrencyFormatter.formatVND(totalAmount),
+            ),
+            _buildInfoRow(
+              l10n.translate('order_payment.paid_amount'),
+              CurrencyFormatter.formatVND(paidAmount),
+            ),
+            _buildInfoRow(
+              l10n.translate('order_create.amount_debt'),
+              CurrencyFormatter.formatVND(debtAmount),
+            ),
             const Spacer(),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
-                child: const Text('Về trang chủ'),
+                child: Text(l10n.translate('common.back_home')),
               ),
             ),
           ],

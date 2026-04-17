@@ -42,10 +42,34 @@ class AppButton extends StatefulWidget {
 }
 
 class _AppButtonState extends State<AppButton> {
-  static const Duration _tapCooldown = Duration(milliseconds: 900);
+  static const Duration _tapCooldown = Duration(milliseconds: 250);
 
   bool _tapLocked = false;
   DateTime? _lastTapAt;
+  int _lockVersion = 0;
+
+  @override
+  void didUpdateWidget(covariant AppButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+  }
+
+  void _lockFor(Duration duration) {
+    _lockVersion += 1;
+    final version = _lockVersion;
+
+    if (!_tapLocked) {
+      _tapLocked = true;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+
+    Future<void>.delayed(duration, () {
+      if (!mounted || version != _lockVersion) return;
+      _tapLocked = false;
+      setState(() {});
+    });
+  }
 
   void _handleTap() {
     if (!_isEnabled) return;
@@ -57,15 +81,8 @@ class _AppButtonState extends State<AppButton> {
     }
 
     _lastTapAt = now;
-    _tapLocked = true;
-    setState(() {});
+    _lockFor(_tapCooldown);
     widget.onPressed?.call();
-
-    Future<void>.delayed(_tapCooldown, () {
-      if (!mounted) return;
-      _tapLocked = false;
-      setState(() {});
-    });
   }
 
   @override

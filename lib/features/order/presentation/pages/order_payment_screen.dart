@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -21,6 +22,7 @@ import '../../data/order_api_service.dart';
 import '../../domain/entities/order_item_entity.dart';
 import '../bloc/order_bloc.dart';
 import 'order_completion_confirmation_screen.dart';
+import 'order_invoice_preview_screen.dart';
 
 /// Payment method enum for selectable toggles
 enum PaymentMethod { cash, bank, debt }
@@ -32,6 +34,8 @@ class OrderPaymentScreen extends StatefulWidget {
   final String? locationName;
   final String? localDraftId;
   final String? pendingOrderId;
+  final String? completedOrderId;
+  final String? updateIdempotencyKey;
   final int? initialDebtorId;
   final String? initialDebtorName;
   final String? customerName;
@@ -48,6 +52,8 @@ class OrderPaymentScreen extends StatefulWidget {
     this.locationName,
     this.localDraftId,
     this.pendingOrderId,
+    this.completedOrderId,
+    this.updateIdempotencyKey,
     this.initialDebtorId,
     this.initialDebtorName,
     this.customerName,
@@ -353,9 +359,12 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
     };
 
     try {
-      if (widget.pendingOrderId != null) {
+      final pendingOrderId = widget.pendingOrderId?.trim();
+      final completedOrderId = widget.completedOrderId?.trim();
+
+      if (pendingOrderId != null && pendingOrderId.isNotEmpty) {
         final order = await repository.updateOrder(
-          orderId: widget.pendingOrderId!,
+          orderId: pendingOrderId,
           requestBody: body,
         );
 
@@ -378,6 +387,23 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => OrderCompletionConfirmationScreen(order: order),
+            ),
+          );
+        }
+      } else if (completedOrderId != null && completedOrderId.isNotEmpty) {
+        final order = await repository.updateOrder(
+          orderId: completedOrderId,
+          requestBody: body,
+          idempotencyKey: widget.updateIdempotencyKey,
+        );
+
+        await _removeLocalDraftById(widget.localDraftId);
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrderInvoicePreviewScreen(order: order),
             ),
           );
         }
@@ -415,7 +441,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
             content: Text(
-              '${e.toString()}\n\n${l10n.translate('order_create.confirm_continue_message')}',
+              l10n.translate('order_create.confirm_continue_message'),
             ),
             actions: [
               TextButton(
@@ -446,7 +472,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
 
       AppSnackBar.show(
         context,
-        message: e.toString(),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     } finally {

@@ -990,8 +990,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     controller: referenceOrderIdController,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    label: 'Order ID (optional)',
-                    hintText: 'Vi du: 123',
+                    label: l10n.translate('accounting.reference_order_id'),
+                    hintText: l10n.translate('accounting.reference_order_id_hint'),
                     focusNode: referenceOrderFocusNode,
                     textInputAction: TextInputAction.done,
                     validator: (value) {
@@ -1175,9 +1175,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   }
 
   Future<OrderEntity?> _loadLinkedOrder(RevenueEntity revenue) async {
-    final refType = revenue.referenceType?.trim().toLowerCase();
     final refId = revenue.referenceId;
-    if (refType != 'order' || refId == null || refId <= 0) return null;
+    if (refId == null || refId <= 0) return null;
+
+    if (!_shouldOpenOrderFromRevenue(revenue)) {
+      return null;
+    }
 
     try {
       return await context.read<OrderBloc>().repository.getOrder(
@@ -1286,7 +1289,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _buildStringDropdownField(
-                    label: 'Loai chi phi',
+                    label: l10n.translate('accounting.ai_cost_type'),
                     value: selectedCostType,
                     focusNode: costTypeFocusNode,
                     validator: (value) {
@@ -1309,7 +1312,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _buildStringDropdownField(
-                    label: 'Phuong thuc thanh toan',
+                    label: l10n.translate('accounting.payment_method'),
                     value: selectedPaymentMethod,
                     focusNode: paymentMethodFocusNode,
                     validator: (value) {
@@ -1530,7 +1533,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _buildStringDropdownField(
-                  label: 'Loai chi phi',
+                  label: l10n.translate('accounting.ai_cost_type'),
                   value: selectedCostType,
                   options: costTypeOptions.toList(),
                   onChanged: (value) =>
@@ -1538,7 +1541,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _buildStringDropdownField(
-                  label: 'Phuong thuc thanh toan',
+                  label: l10n.translate('accounting.payment_method'),
                   value: selectedPaymentMethod,
                   options: paymentOptions.toList(),
                   onChanged: (value) =>
@@ -1546,7 +1549,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 _buildDateSelectorTile(
-                  title: 'Ngay chi',
+                  title: l10n.translate('accounting.cost_date'),
                   dialogCtx: dialogCtx,
                   value: selectedDate,
                   initialDate: selectedDate,
@@ -1712,7 +1715,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final refType = revenue.referenceType;
     final refCode = revenue.referenceCode;
     if (refId > 0) {
-      if (_isImportReference(refType, refCode)) {
+      if (_shouldOpenImportFromRevenue(revenue)) {
         final locationId =
             context.read<BusinessContext>().currentBusinessId ?? '';
         AppRouter.navigateTo(
@@ -1721,7 +1724,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         );
         return;
       }
-      if (_isOrderReference(refType, refCode)) {
+      if (_shouldOpenOrderFromRevenue(revenue)) {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1748,28 +1751,35 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Số tiền: ${CurrencyFormatter.formatVND(revenue.amount)}'),
+              Text(
+                '${l10n.translate('accounting.amount')}: ${CurrencyFormatter.formatVND(revenue.amount)}',
+              ),
               const SizedBox(height: 6),
-              Text('Mô tả: $displayDescription'),
+              Text('${l10n.translate('accounting.description')}: $displayDescription'),
               const SizedBox(height: 6),
-              Text('Kênh tiền: ${revenue.moneyChannel ?? '-'}'),
-              const SizedBox(height: 6),
-              Text('Ngay chung tu: ${_formatIsoDate(revenue.documentDate)}'),
-              const SizedBox(height: 6),
-              Text('Loại hình KD: ${revenue.businessTypeName ?? '-'}'),
+              Text('${l10n.translate('accounting.channel')}: ${revenue.moneyChannel ?? '-'}'),
               const SizedBox(height: 6),
               Text(
-                languageCode.startsWith('en')
-                    ? 'Reference: $referenceLabel'
-                    : 'Tham chiếu: $referenceLabel',
+                '${l10n.translate('accounting.document_date')}: ${_formatIsoDate(revenue.documentDate)}',
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${l10n.translate('accounting.revenue_business_type')}: ${revenue.businessTypeName ?? '-'}',
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.translate(
+                  'accounting.reference_label',
+                  params: {'value': referenceLabel},
+                ),
               ),
               const SizedBox(height: 12),
               if ((revenue.referenceType ?? '').toLowerCase() == 'order' &&
                   (revenue.referenceId ?? 0) > 0) ...[
                 const Divider(),
                 const SizedBox(height: 8),
-                const Text(
-                  'Order detail',
+                Text(
+                  l10n.translate('accounting.linked_order_detail'),
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -1785,18 +1795,24 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
                     final order = snapshot.data;
                     if (order == null) {
-                      return const Text('Không tải được chi tiết đơn hàng');
+                      return Text(
+                        l10n.translate('accounting.order_detail_unavailable'),
+                      );
                     }
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Order ID: ${order.id}'),
-                        const SizedBox(height: 4),
-                        Text('Trạng thái: ${order.status}'),
+                        Text(
+                          '${l10n.translate('order.detail_order_id')}: ${order.id}',
+                        ),
                         const SizedBox(height: 4),
                         Text(
-                          'Tổng: ${CurrencyFormatter.formatVND(order.totalAmount)}',
+                          '${l10n.translate('order.detail_status')}: ${order.status}',
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${l10n.translate('order.detail_total')}: ${CurrencyFormatter.formatVND(order.totalAmount)}',
                         ),
                         const SizedBox(height: 8),
                         ...order.items.map(
@@ -1841,7 +1857,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final refType = cost.referenceType;
     final refCode = cost.referenceCode;
     if (refId > 0) {
-      if (_isImportReference(refType, refCode)) {
+      if (_shouldOpenImportFromCost(cost)) {
         final locationId =
             context.read<BusinessContext>().currentBusinessId ?? '';
         AppRouter.navigateTo(
@@ -1850,7 +1866,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         );
         return;
       }
-      if (_isOrderReference(refType, refCode)) {
+      if (_shouldOpenOrderFromCost(cost)) {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1877,20 +1893,23 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Số tiền: ${CurrencyFormatter.formatVND(cost.amount)}'),
+              Text(
+                '${l10n.translate('accounting.amount')}: ${CurrencyFormatter.formatVND(cost.amount)}',
+              ),
               const SizedBox(height: 6),
-              Text('Mô tả: $displayDescription'),
+              Text('${l10n.translate('accounting.description')}: $displayDescription'),
               const SizedBox(height: 6),
-              Text('Kênh tiền: ${cost.paymentMethod ?? '-'}'),
+              Text('${l10n.translate('accounting.channel')}: ${cost.paymentMethod ?? '-'}'),
               const SizedBox(height: 6),
-              Text('Ngay chi: ${_formatIsoDate(cost.date)}'),
+              Text('${l10n.translate('accounting.cost_date')}: ${_formatIsoDate(cost.date)}'),
               const SizedBox(height: 6),
-              Text('Loại chi phí: ${cost.type}'),
+              Text('${l10n.translate('accounting.ai_cost_type')}: ${cost.type}'),
               const SizedBox(height: 6),
               Text(
-                languageCode.startsWith('en')
-                    ? 'Reference: $referenceLabel'
-                    : 'Tham chiếu: $referenceLabel',
+                l10n.translate(
+                  'accounting.reference_label',
+                  params: {'value': referenceLabel},
+                ),
               ),
             ],
           ),
@@ -1919,6 +1938,33 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         normalizedType.contains('inventory') ||
         normalizedCode.startsWith('imp') ||
         normalizedCode.startsWith('import');
+  }
+
+  bool _shouldOpenOrderFromRevenue(RevenueEntity revenue) {
+    final normalizedType = _normalizeReferenceType(revenue.type);
+    return _isOrderReference(revenue.referenceType, revenue.referenceCode) ||
+        normalizedType.contains('sale') ||
+        normalizedType.contains('order');
+  }
+
+  bool _shouldOpenImportFromRevenue(RevenueEntity revenue) {
+    final normalizedType = _normalizeReferenceType(revenue.type);
+    return _isImportReference(revenue.referenceType, revenue.referenceCode) ||
+        normalizedType.contains('import') ||
+        normalizedType.contains('inventory');
+  }
+
+  bool _shouldOpenOrderFromCost(CostEntity cost) {
+    final normalizedType = _normalizeReferenceType(cost.type);
+    return _isOrderReference(cost.referenceType, cost.referenceCode) ||
+        normalizedType.contains('order');
+  }
+
+  bool _shouldOpenImportFromCost(CostEntity cost) {
+    final normalizedType = _normalizeReferenceType(cost.type);
+    return _isImportReference(cost.referenceType, cost.referenceCode) ||
+        normalizedType.contains('import') ||
+        normalizedType.contains('inventory');
   }
 
   Future<void> _showEditRevenueDialog(RevenueEntity item) async {

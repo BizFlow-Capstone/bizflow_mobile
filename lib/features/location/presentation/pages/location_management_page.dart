@@ -359,7 +359,7 @@ class _LocationPageContent extends StatelessWidget {
                           onAddManager: () {
                             AppSnackBar.show(
                               context,
-                              message: 'Thêm nhân viên quản lý',
+                              message: l10n.translate('location.add_manager'),
                               type: AppSnackBarType.info,
                             );
                           },

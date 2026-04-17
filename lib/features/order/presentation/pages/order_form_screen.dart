@@ -738,9 +738,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) async {
-        if (!didPop) {
-          await _saveLocalDraft(showFeedback: false);
-        }
+        return;
       },
       child: BlocListener<DebtorBloc, DebtorState>(
         listener: (context, state) {
@@ -753,11 +751,8 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
             systemOverlayStyle: SystemUiOverlayStyle.dark,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () async {
-                await _saveLocalDraft(showFeedback: false);
-                if (mounted) {
-                  Navigator.pop(context);
-                }
+              onPressed: () {
+                Navigator.pop(context);
               },
               color: Colors.black,
             ),
@@ -1496,6 +1491,14 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                           return;
                         }
 
+                        final completedOrderId =
+                            widget.pendingOrderId == null &&
+                                widget.initialOrder?.status.toLowerCase() ==
+                                    'completed'
+                            ? widget.initialOrder!.id
+                            : null;
+                        final editDraftId = widget.draftId ?? _draftId;
+
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -1505,8 +1508,12 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                               locationId: locationId,
                               locationName:
                                   BusinessContext().currentBusinessName,
-                              localDraftId: widget.draftId ?? _draftId,
+                                localDraftId: editDraftId,
                               pendingOrderId: widget.pendingOrderId,
+                                completedOrderId: completedOrderId,
+                                updateIdempotencyKey: completedOrderId == null
+                                  ? null
+                                  : 'completed-edit-${completedOrderId}_$editDraftId',
                               initialDebtorId: _customerType == 'debtor'
                                   ? _selectedDebtor?.debtorId
                                   : null,
@@ -2009,7 +2016,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       if (!mounted) return;
       AppSnackBar.show(
         context,
-        message: e.toString().replaceFirst('Exception: ', ''),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     } finally {

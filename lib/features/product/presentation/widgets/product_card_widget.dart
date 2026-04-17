@@ -49,6 +49,51 @@ class ProductCardWidget extends StatelessWidget {
     return AppColors.error;
   }
 
+  String _buildInventoryText(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (!product.trackInventory) {
+      return l10n.translate('product.no_inventory_management');
+    }
+
+    final resolvedUnit = _resolveBaseUnit();
+    if (resolvedUnit.isEmpty) {
+      return '${product.quantity}';
+    }
+    return '${product.quantity} $resolvedUnit';
+  }
+
+  String _resolveBaseUnit() {
+    final directUnit = (product.unit ?? '').trim();
+    if (directUnit.isNotEmpty) {
+      return directUnit;
+    }
+
+    if (product.saleItems.isEmpty) {
+      return '';
+    }
+
+    final candidate = product.saleItems.firstWhere(
+      (item) => _tryParseNum(item['quantity'] ?? item['Quantity']) == 1,
+      orElse: () => product.saleItems.first,
+    );
+
+    return ((candidate['baseUnit'] ??
+                candidate['BaseUnit'] ??
+                candidate['unitName'] ??
+                candidate['UnitName'] ??
+                candidate['unit'] ??
+                candidate['Unit'])
+            ?.toString() ??
+        '')
+        .trim();
+  }
+
+  num? _tryParseNum(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    return num.tryParse(value.toString().trim());
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -190,9 +235,7 @@ class ProductCardWidget extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          product.trackInventory
-                              ? '${product.quantity} ${product.unit ?? 'cái'}'
-                              : 'Khong quan ly ton kho',
+                          _buildInventoryText(context),
                           style: AppTextStyles.titleSmall.copyWith(
                             color: AppColors.textPrimary,
                           ),

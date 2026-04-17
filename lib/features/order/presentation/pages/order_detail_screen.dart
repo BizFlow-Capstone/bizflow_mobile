@@ -11,23 +11,23 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../shared/utils/formatters.dart';
-import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
-import '../../../../core/network/api_error_message_parser.dart';
-import '../../domain/entities/order_entity.dart';
-import '../bloc/order_bloc.dart';
-import 'order_form_screen.dart';
-import '../../data/order_api_service.dart';
-import '../../../subscription/domain/subscription_feature_codes.dart';
-import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
+import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/utils/string_utils.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
-import '../../../../shared/utils/string_utils.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
+import '../../data/order_api_service.dart';
+import '../../domain/entities/order_entity.dart';
+import '../bloc/order_bloc.dart';
+import 'order_form_screen.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   final String orderId;
@@ -59,10 +59,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Future<void> _loadDetailSWR({bool refreshOnly = false}) async {
     final normalizedId = widget.orderId.trim();
     if (normalizedId.isEmpty) {
+      final l10n = AppLocalizations.of(context);
       if (!mounted) return;
       setState(() {
         _detail = null;
-        _detailError = 'Không có dữ liệu';
+        _detailError = l10n.translate('common.no_data');
         _isInitialLoading = false;
       });
       return;
@@ -100,9 +101,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           )
           .timeout(const Duration(seconds: 35));
     } on TimeoutException {
+      final l10n = AppLocalizations.of(context);
       if (!mounted) return;
       setState(() {
-        _detailError = 'Không tải được chi tiết đơn hàng. Vui lòng thử lại.';
+        _detailError = l10n.translate('order.detail_load_failed');
         _isInitialLoading = false;
       });
     } catch (error) {
@@ -132,25 +134,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     final l10n = AppLocalizations.of(context);
     final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.translate('order.cancel_confirm_title')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l10n.translate('order.cancel_confirm_message')),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: l10n.translate('order.detail_cancel_reason'),
-                hintText: l10n.translate('order.detail_cancel_reason'),
-                border: const OutlineInputBorder(),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n.translate('order.cancel_confirm_message')),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonController,
+                maxLines: 3,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                validator: (value) {
+                  if ((value ?? '').trim().isEmpty) {
+                    return l10n.translate('order.cancel_reason_required');
+                  }
+                  return null;
+                },
+                decoration: InputDecoration(
+                  labelText: l10n.translate('order.detail_cancel_reason'),
+                  hintText: l10n.translate('order.detail_cancel_reason'),
+                  border: const OutlineInputBorder(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -159,16 +172,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
           TextButton(
             onPressed: () {
-              if (reasonController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context)
-                  ..removeCurrentSnackBar()
-                  ..showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        l10n.translate('order.cancel_reason_required'),
-                      ),
-                    ),
-                  );
+              if (!(formKey.currentState?.validate() ?? false)) {
                 return;
               }
               Navigator.pop(context, true);
@@ -178,6 +182,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+    final cancelReason = reasonController.text.trim();
+    reasonController.dispose();
 
     if (confirmed != true || !mounted) return;
 
@@ -185,7 +191,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     try {
       await context.read<OrderBloc>().repository.cancelOrder(
         detail.id,
-        cancelReason: reasonController.text.trim(),
+        cancelReason: cancelReason,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -231,14 +237,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       AppSnackBar.show(
         context,
-        message: 'Đơn hàng đã được hoàn thành thành công!',
+        message: l10n.translate('order.complete_success'),
         type: AppSnackBarType.success,
       );
 
-      // Refresh detail
       unawaited(_loadDetailSWR(refreshOnly: true));
-
-      // Optionally notify Bloc about the update to refresh list
       context.read<OrderBloc>().add(
         RefreshOrdersRequested(locationId: detail.locationId),
       );
@@ -251,7 +254,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
             content: Text(
-              '${ApiErrorMessageParser.parse(e)}\n\n${l10n.translate('order_create.confirm_continue_message')}',
+              l10n.translate('order_create.confirm_continue_message'),
             ),
             actions: [
               TextButton(
@@ -267,7 +270,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         );
 
         if (confirm == true) {
-          // Retry with confirmation
           setState(() => _isPublishing = false);
           await _completeOrder(detail, confirmLowStock: true);
         }
@@ -372,15 +374,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final pdf = pw.Document();
     final columns = _buildColumns(template);
     final itemRows = <List<String>>[];
-    for (var i = 0; i < detail.items.length; i++) {
-      itemRows.add(_buildRow(i, detail.items[i], columns));
+    for (var index = 0; index < detail.items.length; index++) {
+      itemRows.add(_buildRow(index, detail.items[index], columns));
     }
 
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
-          // Business Info (Seller)
           pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
@@ -408,7 +409,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           pw.SizedBox(height: 16),
           pw.Divider(),
           pw.SizedBox(height: 8),
-
           pw.Center(
             child: pw.Text(
               _pdfFormat('HOA DON BAN HANG'),
@@ -416,8 +416,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           pw.SizedBox(height: 12),
-
-          // Order & Customer Info
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
@@ -453,10 +451,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
-
           pw.SizedBox(height: 16),
           pw.TableHelper.fromTextArray(
-            headers: columns.map((c) => c['label']!).toList(),
+            headers: columns.map((column) => column['label']!).toList(),
             data: itemRows,
             headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
             cellStyle: const pw.TextStyle(fontSize: 10),
@@ -569,7 +566,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       AppSnackBar.show(
         context,
-        message: e.toString(),
+        message: ApiErrorMessageParser.parse(e),
         type: AppSnackBarType.error,
       );
     } finally {
@@ -660,7 +657,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 );
                               },
                         icon: const Icon(Icons.edit),
-                        label: const Text('Sửa đơn hàng'),
+                        label: Text(l10n.translate('order.action_edit')),
                       ),
                     ),
                   ),
@@ -745,7 +742,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                     );
                                   },
                             icon: const Icon(Icons.edit),
-                            label: const Text('Sửa đơn'),
+                            label: Text(l10n.translate('order.action_edit')),
                           ),
                         ),
                       ],
@@ -776,7 +773,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 ),
                               )
                             : const Icon(Icons.check_circle),
-                        label: const Text('Hoàn thành đơn hàng'),
+                        label: Text(l10n.translate('order.action_publish')),
                       ),
                     ),
                   ),
@@ -812,9 +809,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               Text(
                                 '${l10n.translate('order.detail_customer_name')}: ${((detail.customerName ?? '').trim().isNotEmpty) ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
                               ),
-                              if ((detail.customerPhone ?? '')
-                                  .trim()
-                                  .isNotEmpty)
+                              if ((detail.customerPhone ?? '').trim().isNotEmpty)
                                 Text(
                                   '${l10n.translate('order.detail_customer_phone')}: ${detail.customerPhone}',
                                 ),

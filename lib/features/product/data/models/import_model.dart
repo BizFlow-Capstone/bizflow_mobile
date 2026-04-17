@@ -21,14 +21,50 @@ class ImportItemModel {
   });
 
   factory ImportItemModel.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic value, {int fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse(value.toString().trim()) ?? fallback;
+    }
+
+    double parseDouble(dynamic value, {double fallback = 0.0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString().trim()) ?? fallback;
+    }
+
+    String? parseString(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
     return ImportItemModel(
-      productId: json['productId'] as int,
-      productName: json['productName'] as String?,
-      quantity: json['quantity'] as int,
-      baseUnit: json['baseUnit'] as String?,
-      costPrice: (json['costPrice'] as num?)?.toDouble() ?? 0.0,
-      totalPrice: (json['totalPrice'] as num?)?.toDouble(),
-      currentStock: json['currentStock'] as int?,
+      productId: parseInt(
+        json['productId'] ?? json['ProductId'] ?? json['productID'],
+      ),
+      productName: parseString(json['productName'] ?? json['ProductName']),
+      quantity: parseInt(json['quantity'] ?? json['Quantity']),
+      baseUnit: parseString(
+        json['baseUnit'] ??
+            json['BaseUnit'] ??
+            json['unitName'] ??
+            json['UnitName'] ??
+            json['unit'] ??
+            json['Unit'],
+      ),
+      costPrice: parseDouble(json['costPrice'] ?? json['CostPrice']),
+      totalPrice: (() {
+        final raw = json['totalPrice'] ?? json['TotalPrice'];
+        if (raw == null) return null;
+        return parseDouble(raw);
+      })(),
+      currentStock: (() {
+        final raw = json['currentStock'] ?? json['CurrentStock'];
+        if (raw == null) return null;
+        return parseInt(raw);
+      })(),
     );
   }
 
@@ -155,26 +191,70 @@ class ImportDetailModel extends ImportHistoryItemModel {
   });
 
   factory ImportDetailModel.fromJson(Map<String, dynamic> json) {
-    final itemsRaw = json['items'] as List<dynamic>? ?? [];
+    int parseInt(dynamic value, {int fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse(value.toString().trim()) ?? fallback;
+    }
+
+    double parseDouble(dynamic value, {double fallback = 0.0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString().trim()) ?? fallback;
+    }
+
+    String parseRequiredString(dynamic value) {
+      return (value ?? '').toString();
+    }
+
+    String? parseNullableString(dynamic value) {
+      if (value == null) return null;
+      final text = value.toString().trim();
+      return text.isEmpty ? null : text;
+    }
+
+    final itemsRaw =
+        (json['items'] ?? json['Items'] ?? json['importItems'] ?? json['ImportItems'])
+            as List<dynamic>? ??
+        [];
+
     return ImportDetailModel(
-      importId: json['importId'] as int,
-      importCode: json['importCode'] as String,
-      importType: json['importType'] as String,
-      status: json['status'] as String,
-      businessLocationId: json['businessLocationId'] as int,
-      businessLocationName: json['businessLocationName'] as String,
-      supplier: json['supplier'] as String?,
-      note: json['note'] as String?,
-      receivedAt: DateFormatter.parseApiDateTime(json['receivedAt'] as String?),
-      totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      importId: parseInt(json['importId'] ?? json['ImportId']),
+      importCode: parseRequiredString(json['importCode'] ?? json['ImportCode']),
+      importType: parseRequiredString(json['importType'] ?? json['ImportType']),
+      status: parseRequiredString(json['status'] ?? json['Status']),
+      businessLocationId: parseInt(
+        json['businessLocationId'] ?? json['BusinessLocationId'],
+      ),
+      businessLocationName: parseRequiredString(
+        json['businessLocationName'] ?? json['BusinessLocationName'],
+      ),
+      supplier: parseNullableString(json['supplier'] ?? json['Supplier']),
+      note: parseNullableString(json['note'] ?? json['Note']),
+      receivedAt: DateFormatter.parseApiDateTime(
+        (json['receivedAt'] ?? json['ReceivedAt']) as String?,
+      ),
+      totalAmount: parseDouble(json['totalAmount'] ?? json['TotalAmount']),
       createdAt:
           DateFormatter.parseApiDateTime(
-            json['createdAt'] as String?,
+            (json['createdAt'] ?? json['CreatedAt']) as String?,
             fallback: DateTime.now().toUtc(),
           ) ??
           DateTime.now().toUtc(),
-      updatedAt: DateFormatter.parseApiDateTime(json['updatedAt'] as String?),
-      imageUrl: json['imageUrl'] as String?,
+      updatedAt: DateFormatter.parseApiDateTime(
+        (json['updatedAt'] ?? json['UpdatedAt']) as String?,
+      ),
+      imageUrl: parseNullableString(
+        json['imageUrl'] ??
+            json['ImageUrl'] ??
+            json['invoiceImageUrl'] ??
+            json['InvoiceImageUrl'] ??
+            json['receiptImageUrl'] ??
+            json['ReceiptImageUrl'] ??
+            json['image'] ??
+            json['Image'],
+      ),
       items: itemsRaw
           .map((e) => ImportItemModel.fromJson(e as Map<String, dynamic>))
           .toList(),

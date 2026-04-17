@@ -29,7 +29,8 @@
     "error_occurred": "An error occurred, please try again",
     "status": "Status",
     "create": "Create",
-    "search_hint": "Search..."
+    "search_hint": "Search...",
+    "back_home": "Back to home"
   },
   "auth": {
     "login": "Login",
@@ -321,6 +322,7 @@
     "add_success": "Product added successfully",
     "edit_button": "Edit Product",
     "edit_success": "Product updated successfully",
+    "status_updated": "Product status updated",
     "delete_button": "Delete Product",
     "delete_success": "Product deleted successfully",
     "delete_confirm": "Are you sure you want to delete this product?",
@@ -334,6 +336,7 @@
     "required_field": "This field is required",
     "sale_price_label": "Sale Price",
     "inventory_label": "In Stock",
+    "no_inventory_management": "Inventory not managed",
     "barcode_label": "Barcode",
     "status_active_label": "Active",
     "status_inactive_label": "Inactive",
@@ -657,6 +660,9 @@
     "cancel_confirm_message": "Are you sure you want to cancel this order?",
     "cancel_reason_required": "Please provide a cancel reason",
     "cancel_success": "Order cancelled successfully",
+    "complete_success": "Order completed successfully!",
+    "delete_draft_confirm": "Delete this draft from this device?",
+    "delete_draft_success": "Draft deleted",
     "cancel_confirm_yes": "Yes",
     "cancel_confirm_no": "No",
     "detail_title": "Order detail",
@@ -682,8 +688,10 @@
     "detail_items_section": "Product details",
     "detail_qty_label": "Qty",
     "detail_unit_price_label": "Unit price",
+    "detail_load_failed": "Unable to load order details. Please try again.",
     "error_title": "An Error Occurred",
-    "loading": "Loading orders..."
+    "loading": "Loading orders...",
+    "search_hint": "Search by customer, phone or order code..."
   },
   "order_create": {
     "form_title": "Order Information",
@@ -729,6 +737,7 @@
     "sale_item_required": "Some products do not have a valid sale unit. Please reselect products.",
     "confirm_submit_title": "Confirm debt submission",
     "payment_success": "Payment completed and order created successfully!",
+    "debt_confirm_success": "Debt recorded successfully",
     "pay_method_other": "Other",
     "transfer_bank_name": "Bank",
     "transfer_account": "Account Number",
@@ -791,7 +800,9 @@
     "share_invoice": "Share Invoice",
     "download_invoice": "Download Invoice",
     "back_to_list": "Back to List",
-    "save_pdf_success": "PDF saved successfully"
+    "save_pdf_success": "PDF saved successfully",
+    "paid_amount": "Paid amount",
+    "pending_order_hint": "Tap Pay to complete this order."
   },
   "invoice_template": {
     "title": "Template Settings",
@@ -878,6 +889,8 @@
     "support": "Support",
     "help": "Help",
     "help_sub": "FAQ and guides",
+    "help_dialog_title": "Help",
+    "help_dialog_message": "Contact our hotline at 0363053659 or email support@bizflow.asia for assistance.",
     "logout": "Sign Out",
     "version": "BizFlow v1.0.0",
     "copyright": "© 2026 BizFlow. All rights reserved."
@@ -1138,6 +1151,9 @@
     "reference_order_id_hint": "Example: 123",
     "linked_order_detail": "Order detail",
     "order_detail_unavailable": "Unable to load order detail",
+    "books_empty": "No accounting books yet",
+    "unknown_template": "Unknown template: {code}",
+    "reference_label": "Reference: {value}",
     "period_list_empty": "No accounting periods yet",
     "period_list_empty_sub": "Create your first accounting period to get started",
     "create_new_period": "Create Period",
