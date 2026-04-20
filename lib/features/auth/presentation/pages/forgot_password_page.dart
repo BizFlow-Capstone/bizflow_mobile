@@ -96,7 +96,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           systemOverlayStyle: SystemUiOverlayStyle.dark,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () => AppRouter.pop(),
+            onPressed: () {
+              // If user verified OTP but hasn't set password (step 3), clear temporary token
+              if (_step == 3) {
+                context.read<AuthBloc>().add(const LogoutRequested());
+              }
+              AppRouter.pop();
+            },
+            color: Colors.black,
           ),
           title: Text(
             l10n.translate('auth.forgot_password'),
