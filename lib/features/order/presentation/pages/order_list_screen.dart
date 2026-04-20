@@ -27,6 +27,8 @@ import '../../data/order_api_service.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
+import '../../../../core/routing/app_router.dart';
+
 /// Order List Screen (SC-ORD-02) - Displays list of draft invoices/orders
 class OrderListScreen extends StatefulWidget {
   const OrderListScreen({super.key});
@@ -397,47 +399,62 @@ class _OrderListScreenState extends State<OrderListScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text(l10n.translate('order.list_title')),
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-          color: Colors.black,
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            tooltip: l10n.translate('order.action_filter'),
+    return WillPopScope(
+      onWillPop: () async {
+        if (Navigator.of(context).canPop()) {
+          return true;
+        } else {
+          Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+          return false;
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: Text(l10n.translate('order.list_title')),
+          elevation: 0,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              showOrderFilterBottomSheet(
-                context,
-                initialStatus: _currentStatusFilter,
-                initialLocationId: _currentLocationFilter,
-                onApply: _applyFilter,
-              );
+              if (Navigator.of(context).canPop()) {
+                Navigator.pop(context);
+              } else {
+                Navigator.of(context).pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
+              }
             },
             color: Colors.black,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: l10n.translate('order.action_refresh'),
-            onPressed: _refreshOrders,
-            color: Colors.black,
-          ),
-        ],
-        bottom: const AppSyncStatusText(),
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              tooltip: l10n.translate('order.action_filter'),
+              onPressed: () {
+                showOrderFilterBottomSheet(
+                  context,
+                  initialStatus: _currentStatusFilter,
+                  initialLocationId: _currentLocationFilter,
+                  onApply: _applyFilter,
+                );
+              },
+              color: Colors.black,
+            ),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: l10n.translate('order.action_refresh'),
+              onPressed: _refreshOrders,
+              color: Colors.black,
+            ),
+          ],
+          bottom: const AppSyncStatusText(),
+        ),
+        body: Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: const EdgeInsets.all(16.0),
             child: AppTextField(
               controller: _searchController,
               hintText: l10n.translate('order.search_hint'),
@@ -574,6 +591,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
           });
         },
         child: const Icon(Icons.add),
+      ),
       ),
     );
   }

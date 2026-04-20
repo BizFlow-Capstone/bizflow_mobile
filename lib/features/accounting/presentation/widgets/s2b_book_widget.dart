@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_book.dart';
+import '../../../../shared/utils/date_formatter.dart';
 
 /// Widget hiển thị Sổ doanh thu bán hàng hóa, dịch vụ mẫu S2b-HKD (TT152)
 /// 5 cột: STT | Số hiệu CT | Ngày tháng | Diễn giải | Số tiền
@@ -231,13 +232,15 @@ class S2bBookWidget extends StatelessWidget {
 
   static String _fmtDate(dynamic value) {
     if (value == null) return '';
+    if (value is DateTime) {
+      return DateFormatter.formatDate(value);
+    }
     if (value is String && value.isNotEmpty) {
-      try {
-        final d = DateTime.parse(value);
-        return '${d.day}/${d.month}';
-      } catch (_) {
-        return value;
+      final date = DateTime.tryParse(value);
+      if (date != null) {
+        return DateFormatter.formatDate(date);
       }
+      return value;
     }
     return value.toString();
   }

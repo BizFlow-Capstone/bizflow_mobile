@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 
 import '../../domain/models/accounting_book.dart';
+import '../../../../shared/utils/date_formatter.dart';
 
 class S2bExportService {
   const S2bExportService._();
@@ -702,13 +703,14 @@ class S2bExportService {
 
   static String _fmtDate(dynamic value) {
     if (value == null) return '';
-    if (value is String && value.isNotEmpty) {
-      try {
-        final date = DateTime.parse(value);
-        return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-      } catch (_) {
-        return value;
-      }
+    DateTime? date;
+    if (value is DateTime) {
+      date = value;
+    } else if (value is String && value.isNotEmpty) {
+      date = DateTime.tryParse(value);
+    }
+    if (date != null) {
+      return DateFormatter.formatDate(date);
     }
     return value.toString();
   }

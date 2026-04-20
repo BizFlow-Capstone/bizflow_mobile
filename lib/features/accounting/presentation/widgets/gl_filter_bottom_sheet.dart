@@ -38,6 +38,7 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
   DateTime? _fromDate;
   DateTime? _toDate;
   late String _viewMode;
+  bool _isReset = false;
 
   @override
   void initState() {
@@ -58,6 +59,7 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
       'fromDate': _fromDate,
       'toDate': _toDate,
       'viewMode': _viewMode,
+      'resetDates': _isReset,
     });
   }
 
@@ -69,7 +71,10 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
       _fromDate = null;
       _toDate = null;
       _viewMode = 'audit';
+      _isReset = true;
     });
+    // Auto-apply the cleared filters
+    Future.delayed(const Duration(milliseconds: 100), _apply);
   }
 
   Future<void> _selectDate(bool isFromDate) async {

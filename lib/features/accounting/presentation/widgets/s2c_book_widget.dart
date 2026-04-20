@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_book.dart';
+import '../../../../shared/utils/date_formatter.dart';
 
 /// Widget hiển thị Sổ chi tiết doanh thu, chi phí mẫu S2c-HKD (TT152)
 /// Hiển thị bảng tổng hợp cố định theo mẫu TT152 cho S2c.
@@ -670,7 +671,7 @@ class S2cBookWidget extends StatelessWidget {
 
   static String _fmtDate(DateTime? value) {
     if (value == null) return '';
-    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+    return DateFormatter.formatDate(value);
   }
 
   static num? _toNum(dynamic value) {

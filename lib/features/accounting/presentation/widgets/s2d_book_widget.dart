@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_book.dart';
+import '../../../../shared/utils/date_formatter.dart';
 
 /// Widget hiển thị sổ theo dõi xuất nhập tồn kho mẫu S2d-HKD (TT152)
 /// 11 cột: Số hiệu CT | Ngày | Diễn giải | ĐVT | Đơn giá | Sl nhập | Tiền nhập | Sl xuất | Tiền xuất | Sl tồn | Tiền tồn
@@ -585,6 +586,15 @@ class S2dBookWidget extends StatelessWidget {
       } catch (_) {
         return value;
       }
+    }
+    DateTime? date;
+    if (value is DateTime) {
+      date = value;
+    } else if (value is String && value.isNotEmpty) {
+      date = DateTime.tryParse(value);
+    }
+    if (date != null) {
+      return DateFormatter.formatDate(date);
     }
     return value.toString();
   }

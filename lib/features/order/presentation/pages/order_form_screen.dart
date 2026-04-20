@@ -2270,6 +2270,8 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                     }
 
                     final products = state.products.where((product) {
+                      // Ẩn sản phẩm bị vô hiệu hóa
+                      if (!product.isActive) return false;
                       if (_searchQuery.isEmpty) return true;
                       final name = product.name.toLowerCase();
                       final barcode = (product.barcode ?? '').toLowerCase();

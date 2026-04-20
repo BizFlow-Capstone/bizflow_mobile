@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 
 import '../../domain/models/accounting_book.dart';
+import '../../../../shared/utils/date_formatter.dart';
 
 /// Export service for template S1a (So chi tiet ban hang) using Syncfusion XlsIO.
 class S1aExportService {
@@ -452,13 +453,15 @@ class S1aExportService {
 
   static String _fmtDate(dynamic val) {
     if (val == null) return '';
+    if (val is DateTime) {
+      return DateFormatter.formatDate(val);
+    }
     if (val is String && val.isNotEmpty) {
-      try {
-        final d = DateTime.parse(val);
-        return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-      } catch (_) {
-        return val;
+      final date = DateTime.tryParse(val);
+      if (date != null) {
+        return DateFormatter.formatDate(date);
       }
+      return val;
     }
     return val.toString();
   }

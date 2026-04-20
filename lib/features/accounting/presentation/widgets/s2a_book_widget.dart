@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_book.dart';
+import '../../../../shared/utils/date_formatter.dart';
 
 /// Widget hiển thị sổ doanh thu theo mẫu S2a-HKD (TT152)
 /// 4 cột: Số hiệu chứng từ | Ngày, tháng | Diễn giải | Số tiền
@@ -310,13 +311,15 @@ class S2aBookWidget extends StatelessWidget {
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
+    if (value is DateTime) {
+      return DateFormatter.formatDate(value);
+    }
     if (value is String && value.isNotEmpty) {
-      try {
-        final date = DateTime.parse(value);
-        return '${date.day}/${date.month}';
-      } catch (_) {
-        return value;
+      final date = DateTime.tryParse(value);
+      if (date != null) {
+        return DateFormatter.formatDate(date);
       }
+      return value;
     }
     return value.toString();
   }

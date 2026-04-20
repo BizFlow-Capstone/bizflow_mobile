@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_xlsio/xlsio.dart' as xlsio;
 
 import '../../domain/models/accounting_book.dart';
+import '../../../../shared/utils/date_formatter.dart';
 
 class S2cExportService {
   const S2cExportService._();
@@ -992,7 +993,7 @@ class S2cExportService {
   }
 
   static String _fmtDisplayDate(DateTime value) {
-    return '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+    return DateFormatter.formatDate(value);
   }
 
   static Future<File?> _save(

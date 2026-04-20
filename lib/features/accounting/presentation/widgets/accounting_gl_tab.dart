@@ -81,6 +81,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     DateTime? fromDate,
     DateTime? toDate,
     String? viewMode,
+    bool resetDates = false,
   }) async {
     var locationId = context.read<BusinessContext>().currentBusinessId;
     if (locationId == null || locationId.trim().isEmpty) {
@@ -109,8 +110,9 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     final effectiveReferenceTypes =
         referenceTypes ?? currentState?.referenceTypes;
     final effectiveMoneyChannels = moneyChannels ?? currentState?.moneyChannels;
-    final effectiveFromDate = fromDate ?? currentState?.fromDate;
-    final effectiveToDate = toDate ?? currentState?.toDate;
+    // If resetDates is true, use the passed dates (even if null); otherwise fallback to currentState
+    final effectiveFromDate = resetDates ? fromDate : (fromDate ?? currentState?.fromDate);
+    final effectiveToDate = resetDates ? toDate : (toDate ?? currentState?.toDate);
     final effectiveViewMode = viewMode ?? currentState?.viewMode ?? 'audit';
 
     context.read<GLBloc>().add(
@@ -770,6 +772,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         fromDate: result['fromDate'] as DateTime?,
         toDate: result['toDate'] as DateTime?,
         viewMode: result['viewMode'] as String?,
+        resetDates: result['resetDates'] as bool? ?? false,
       );
     }
   }

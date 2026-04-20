@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/models/accounting_book.dart';
 
 /// Widget hiển thị Sổ chi tiết tiền mẫu S2e-HKD (TT152)
@@ -336,13 +337,15 @@ class S2eBookWidget extends StatelessWidget {
 
   static String _fmtDate(dynamic value) {
     if (value == null) return '';
+    if (value is DateTime) {
+      return DateFormatter.formatDate(value);
+    }
     if (value is String && value.isNotEmpty) {
-      try {
-        final d = DateTime.parse(value);
-        return '${d.day}/${d.month}';
-      } catch (_) {
-        return value;
+      final date = DateTime.tryParse(value);
+      if (date != null) {
+        return DateFormatter.formatDate(date);
       }
+      return value;
     }
     return value.toString();
   }

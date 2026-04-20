@@ -231,11 +231,10 @@ class _OrderCompletionConfirmationScreenState
                 width: double.infinity,
                 child: TextButton(
                   onPressed: () {
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      AppRoutes.orderList,
-                      (route) => false,
-                    );
+                    // Pop back to home, then navigate to order list
+                    // This ensures the navigation stack is properly maintained
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.of(context).pushNamed(AppRoutes.orderList);
                   },
                   child: Text(l10n.translate('order_payment.view_order_list')),
                 ),
