@@ -579,14 +579,6 @@ class S2dBookWidget extends StatelessWidget {
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
-    if (value is String && value.isNotEmpty) {
-      try {
-        final date = DateTime.parse(value);
-        return '${date.day}/${date.month}';
-      } catch (_) {
-        return value;
-      }
-    }
     DateTime? date;
     if (value is DateTime) {
       date = value;
