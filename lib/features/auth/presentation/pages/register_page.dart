@@ -162,14 +162,19 @@ class _RegisterPageState extends State<RegisterPage> {
               MaterialPageRoute(
                 builder: (_) => PhoneRegisterOtpPage(phone: state.phone),
               ),
-            );
+            ).then((_) {
+              if (!mounted) return;
+              context.read<AuthBloc>().add(
+                const CancelPhoneRegisterFlowRequested(),
+              );
+            });
           });
         } else if (state is PhoneRegisterFailure) {
-          AppSnackBar.error(context, state.message);
+          AppSnackBar.error(context, l10n.translateOrRaw(state.message));
         } else if (state is LoginFailure) {
           final msg =
               state.serverMessage ?? l10n.translate('auth.register_failed');
-          AppSnackBar.error(context, msg);
+          AppSnackBar.error(context, l10n.translateOrRaw(msg));
         }
       },
       child: Scaffold(
@@ -179,6 +184,7 @@ class _RegisterPageState extends State<RegisterPage> {
           backgroundColor: AppColors.surface,
           surfaceTintColor: AppColors.white,
           systemOverlayStyle: SystemUiOverlayStyle.dark,
+          automaticallyImplyLeading: false,
           actions: [
             LanguageSwitcher(
               currentLocale: localizationProvider.currentLocale,
@@ -244,9 +250,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
                       final isLoading =
-                          state is LoginInProgress ||
                           state is SignupInProgress ||
-                          state is PhoneRegisterInProgress;
+                          state is PhoneRegisterSendOtpInProgress;
 
                       return Column(
                         children: [
@@ -348,10 +353,15 @@ class _RegisterPageState extends State<RegisterPage> {
                         style: AppTextStyles.bodyMedium,
                       ),
                       GestureDetector(
-                        onTap: () => Navigator.pushReplacementNamed(
-                          context,
-                          AppRoutes.login,
-                        ),
+                        onTap: () {
+                          context.read<AuthBloc>().add(
+                            const CancelPhoneRegisterFlowRequested(),
+                          );
+                          Navigator.pushReplacementNamed(
+                            context,
+                            AppRoutes.login,
+                          );
+                        },
                         child: Text(
                           l10n.translate('auth.sign_in'),
                           style: AppTextStyles.bodyMedium.copyWith(

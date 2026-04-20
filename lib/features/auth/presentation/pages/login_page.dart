@@ -224,7 +224,7 @@ class _LoginPageContent extends StatelessWidget {
           final msg =
               state.serverMessage ??
               _mapErrorCodeToLocalization(state.errorCode);
-          _showError(context, msg);
+          _showError(context, l10n.translateOrRaw(msg));
         }
       },
       child: SafeArea(

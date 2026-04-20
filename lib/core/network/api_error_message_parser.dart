@@ -1,20 +1,27 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../localization/app_localizations.dart';
+import '../routing/app_router.dart';
 import 'api_client.dart';
 
 class ApiErrorMessageParser {
-  static const String genericMessage = 'Có lỗi xảy ra, vui lòng thử lại';
+  static String get genericMessage => _translate(
+    'error.api_generic',
+    fallback: 'Co loi xay ra, vui long thu lai',
+  );
 
-  static String parse(Object error, {String fallback = genericMessage}) {
+  static String parse(Object error, {String? fallback}) {
+    final resolvedFallback = fallback ?? genericMessage;
+
     if (error is DioException) {
       final statusCode = error.response?.statusCode;
       if (statusCode != null && statusCode >= 500) {
-        return fallback;
+        return resolvedFallback;
       }
 
       if (_isLikelyNetworkTransportError(error)) {
-        return _resolveNetworkTransportMessage(fallback: fallback);
+        return _resolveNetworkTransportMessage(fallback: resolvedFallback);
       }
 
       final payloadMessage = _extractFromPayload(error.response?.data);
@@ -27,13 +34,13 @@ class ApiErrorMessageParser {
         return cleanFromMessage;
       }
 
-      return _resolveFallbackByStatus(statusCode, fallback: fallback);
+      return _resolveFallbackByStatus(statusCode, fallback: resolvedFallback);
     }
 
     if (error is ApiException) {
       final statusCode = error.statusCode;
       if (statusCode >= 500) {
-        return fallback;
+        return resolvedFallback;
       }
 
       final payloadMessage = _extractFromPayload(error.data);
@@ -46,7 +53,7 @@ class ApiErrorMessageParser {
         return cleanFromMessage;
       }
 
-      return _resolveFallbackByStatus(statusCode, fallback: fallback);
+      return _resolveFallbackByStatus(statusCode, fallback: resolvedFallback);
     }
 
     final clean = _stripTechnicalPrefix(error.toString());
@@ -54,7 +61,21 @@ class ApiErrorMessageParser {
       return clean;
     }
 
-    return fallback;
+    return resolvedFallback;
+  }
+
+  static String _translate(String key, {required String fallback}) {
+    final context = AppRouter.context;
+    if (context == null) {
+      return fallback;
+    }
+
+    try {
+      final localized = AppLocalizations.of(context).translate(key);
+      return localized == key ? fallback : localized;
+    } catch (_) {
+      return fallback;
+    }
   }
 
   static bool _isLikelyNetworkTransportError(DioException error) {
@@ -75,7 +96,11 @@ class ApiErrorMessageParser {
 
   static String _resolveNetworkTransportMessage({required String fallback}) {
     if (_isLocalOnlyBaseUrl(AppConfig.baseUrl)) {
-      return 'Khong ket noi duoc API. Ban dang dung mang ngoai WiFi noi bo. Hay doi sang WiFi cung mang backend hoac dat API_BASE_URL la domain public.';
+      return _translate(
+        'error.api_network_local_backend',
+        fallback:
+            'Khong ket noi duoc API. Ban dang dung mang ngoai WiFi noi bo. Hay doi sang WiFi cung mang backend hoac dat API_BASE_URL la domain public.',
+      );
     }
     return fallback;
   }
@@ -114,7 +139,12 @@ class ApiErrorMessageParser {
     if (statusCode == null || statusCode <= 0 || statusCode >= 500) {
       return fallback;
     }
-    return fallback == genericMessage ? 'Yeu cau khong hop le' : fallback;
+    return fallback == genericMessage
+        ? _translate(
+            'error.api_invalid_request',
+            fallback: 'Yeu cau khong hop le',
+          )
+        : fallback;
   }
 
   static String? _extractFromPayload(dynamic payload) {

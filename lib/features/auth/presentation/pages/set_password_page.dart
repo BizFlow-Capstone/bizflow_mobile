@@ -83,7 +83,7 @@ class _SetPasswordPageState extends State<SetPasswordPage> {
             AppRouter.navigateAndClearStack(AppRoutes.googlePhoneLink);
           });
         } else if (state is SetPasswordFailure) {
-          _showError(state.message);
+          _showError(l10n.translateOrRaw(state.message));
         }
       },
       child: Scaffold(

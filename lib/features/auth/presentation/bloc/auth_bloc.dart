@@ -57,10 +57,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   String? _pendingPassword;
   String? _pendingFullName;
   String? _pendingVerificationId;
+  int _phoneRegisterFlowVersion = 0;
 
   String? _pendingLinkPhoneNumber;
   String? _pendingLinkPhonePassword;
   String? _pendingLinkPhoneVerificationId;
+
+  String? _pendingForgotPasswordIdentifier;
+  ForgotPasswordChannel? _pendingForgotPasswordChannel;
+  String? _pendingForgotPasswordVerificationId;
 
   static const String _googleOnboardingStepLinkPhone = 'link_phone';
   static const String _googleOnboardingStepSetPassword = 'set_password';
@@ -82,6 +87,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<RegisterWithPhoneRequested>(_onRegisterWithPhoneRequested);
     on<PhoneOtpCodeSubmitted>(_onPhoneOtpCodeSubmitted);
     on<ResendPhoneOtpRequested>(_onResendPhoneOtpRequested);
+    on<CancelPhoneRegisterFlowRequested>(_onCancelPhoneRegisterFlowRequested);
     on<LoadCredentialsRequested>(_onLoadCredentialsRequested);
     on<LinkEmailRequested>(_onLinkEmailRequested);
     on<LinkGoogleRequested>(_onLinkGoogleRequested);
@@ -407,12 +413,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     RegisterWithPhoneRequested event,
     Emitter<AuthState> emit,
   ) async {
-    emit(const PhoneRegisterInProgress());
+    emit(const PhoneRegisterSendOtpInProgress());
     final normalizedPhone = _normalizePhoneToE164(event.phone);
     if (normalizedPhone == null) {
       emit(
         const PhoneRegisterFailure(
-          message: 'Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng.',
+          message: 'auth.firebase_invalid_phone_format',
         ),
       );
       return;
@@ -421,6 +427,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     _pendingPhoneNumber = event.phone;
     _pendingPassword = event.password;
     _pendingFullName = event.fullName;
+    _pendingVerificationId = null;
+    final requestVersion = ++_phoneRegisterFlowVersion;
 
     final completer = Completer<String>();
     PhoneAuthCredential? autoVerifiedCredential;
@@ -445,16 +453,27 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             completer.complete(verificationId);
           }
         },
-        codeAutoRetrievalTimeout: (String verificationId) {},
+        codeAutoRetrievalTimeout: (String verificationId) {
+          if (!completer.isCompleted) {
+            // Ensure request always leaves loading state when auto-retrieval ends.
+            completer.complete(verificationId);
+          }
+        },
       );
 
-      final verificationId = await completer.future;
+      final verificationId = await completer.future.timeout(
+        const Duration(seconds: 70),
+        onTimeout: () => throw TimeoutException('Phone OTP request timed out'),
+      );
+      if (!_isPhoneRegisterFlowActive(requestVersion) || emit.isDone) {
+        return;
+      }
 
       if (verificationId == '__AUTO_VERIFIED__') {
         if (autoVerifiedCredential == null) {
           emit(
             const PhoneRegisterFailure(
-              message: 'Auto verification failed. Please try again.',
+              message: 'auth.firebase_auto_verification_failed',
             ),
           );
           return;
@@ -470,6 +489,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       _pendingVerificationId = verificationId;
       emit(PhoneOtpCodeSent(phone: event.phone));
     } catch (e) {
+      if (!_isPhoneRegisterFlowActive(requestVersion) || emit.isDone) {
+        return;
+      }
       emit(PhoneRegisterFailure(message: _mapPhoneAuthError(e)));
     }
   }
@@ -481,11 +503,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final verificationId = _pendingVerificationId;
 
     if (verificationId == null) {
-      emit(const PhoneRegisterFailure(message: 'Invalid OTP session'));
+      emit(const PhoneRegisterFailure(message: 'auth.firebase_invalid_otp_session'));
       return;
     }
 
-    emit(const PhoneRegisterInProgress());
+    emit(const PhoneRegisterVerifyOtpInProgress());
     try {
       final phoneCredential = PhoneAuthProvider.credential(
         verificationId: verificationId,
@@ -508,16 +530,94 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final phone = _pendingPhoneNumber;
     final password = _pendingPassword;
     if (phone == null || password == null) {
-      emit(const PhoneRegisterFailure(message: 'Invalid OTP session'));
+      emit(const PhoneRegisterFailure(message: 'auth.firebase_invalid_otp_session'));
       return;
     }
-    add(
-      RegisterWithPhoneRequested(
-        phone: phone,
-        password: password,
-        fullName: _pendingFullName,
-      ),
-    );
+
+    emit(const PhoneRegisterResendOtpInProgress());
+    final normalizedPhone = _normalizePhoneToE164(phone);
+    if (normalizedPhone == null) {
+      emit(
+        const PhoneRegisterFailure(
+          message: 'auth.firebase_invalid_phone_format',
+        ),
+      );
+      return;
+    }
+
+    final requestVersion = ++_phoneRegisterFlowVersion;
+    final completer = Completer<String>();
+    PhoneAuthCredential? autoVerifiedCredential;
+
+    try {
+      await _firebaseAuth.verifyPhoneNumber(
+        phoneNumber: normalizedPhone,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          autoVerifiedCredential = credential;
+          if (!completer.isCompleted) {
+            completer.complete('__AUTO_VERIFIED__');
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          if (!completer.isCompleted) {
+            // Ensure request always leaves loading state when auto-retrieval ends.
+            completer.complete(verificationId);
+          }
+        },
+      );
+
+      final verificationId = await completer.future.timeout(
+        const Duration(seconds: 70),
+        onTimeout: () => throw TimeoutException('Phone OTP resend timed out'),
+      );
+      if (!_isPhoneRegisterFlowActive(requestVersion) || emit.isDone) {
+        return;
+      }
+
+      if (verificationId == '__AUTO_VERIFIED__') {
+        if (autoVerifiedCredential == null) {
+          emit(
+            const PhoneRegisterFailure(
+              message: 'auth.firebase_auto_verification_failed',
+            ),
+          );
+          return;
+        }
+
+        await _completePhoneRegisterWithCredential(
+          phoneCredential: autoVerifiedCredential!,
+          emit: emit,
+        );
+        return;
+      }
+
+      _pendingVerificationId = verificationId;
+      emit(PhoneOtpCodeSent(phone: phone));
+    } catch (e) {
+      if (!_isPhoneRegisterFlowActive(requestVersion) || emit.isDone) {
+        return;
+      }
+      emit(PhoneRegisterFailure(message: _mapPhoneAuthError(e)));
+    }
+  }
+
+  void _onCancelPhoneRegisterFlowRequested(
+    CancelPhoneRegisterFlowRequested event,
+    Emitter<AuthState> emit,
+  ) {
+    _cancelPhoneRegisterFlow(clearPendingCredentials: true);
+    emit(const AuthInitial());
   }
 
   Future<void> _onLoadCredentialsRequested(
@@ -598,13 +698,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       await _resetGoogleSessionForAccountPicker();
       final googleUser = await _signInWithTimeout();
       if (googleUser == null) {
-        emit(const LinkCredentialFailure(message: 'Google linking canceled'));
+        emit(const LinkCredentialFailure(message: 'auth.firebase_google_canceled'));
         return;
       }
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken;
       if (idToken == null || idToken.isEmpty) {
-        emit(const LinkCredentialFailure(message: 'Google token not found'));
+        emit(const LinkCredentialFailure(message: 'auth.firebase_google_token_not_found'));
         return;
       }
 
@@ -631,7 +731,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     if (normalizedPhone == null) {
       emit(
         const LinkCredentialFailure(
-          message: 'Số điện thoại không hợp lệ. Vui lòng nhập đúng định dạng.',
+          message: 'auth.firebase_invalid_phone_format',
         ),
       );
       return;
@@ -672,7 +772,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         if (autoVerifiedCredential == null) {
           emit(
             const LinkCredentialFailure(
-              message: 'Auto verification failed. Please try again.',
+              message: 'auth.firebase_auto_verification_failed',
             ),
           );
           return;
@@ -699,7 +799,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final verificationId = _pendingLinkPhoneVerificationId;
 
     if (verificationId == null) {
-      emit(const LinkCredentialFailure(message: 'Invalid OTP session'));
+      emit(const LinkCredentialFailure(message: 'auth.firebase_invalid_otp_session'));
       return;
     }
 
@@ -726,7 +826,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     final phone = _pendingLinkPhoneNumber;
     if (phone == null) {
-      emit(const LinkCredentialFailure(message: 'Invalid OTP session'));
+      emit(const LinkCredentialFailure(message: 'auth.firebase_invalid_otp_session'));
       return;
     }
 
@@ -743,14 +843,31 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(const ForgotPasswordInProgress());
+    if (event.channel == ForgotPasswordChannel.phone) {
+      await _sendForgotPasswordOtpByPhone(
+        identifier: event.identifier,
+        emit: emit,
+      );
+      return;
+    }
+
     final result = await authRepository.forgotPasswordSendOtp(
-      email: event.email,
+      identifier: event.identifier,
     );
     if (!result.success) {
       emit(ForgotPasswordFailure(message: result.message));
       return;
     }
-    emit(ForgotPasswordOtpSent(email: event.email));
+
+    _pendingForgotPasswordIdentifier = event.identifier;
+    _pendingForgotPasswordChannel = event.channel;
+    _pendingForgotPasswordVerificationId = null;
+    emit(
+      ForgotPasswordOtpSent(
+        destination: event.identifier,
+        channel: event.channel,
+      ),
+    );
   }
 
   Future<void> _onForgotPasswordVerifyOtpRequested(
@@ -758,10 +875,19 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(const ForgotPasswordInProgress());
-    final result = await authRepository.forgotPasswordVerifyOtp(
-      email: event.email,
-      otpCode: event.otpCode,
-    );
+
+    final AuthResponse result;
+    if (event.channel == ForgotPasswordChannel.phone) {
+      result = await _verifyForgotPasswordOtpByPhone(
+        smsCode: event.otpCode,
+      );
+    } else {
+      result = await authRepository.forgotPasswordVerifyOtp(
+        identifier: event.identifier,
+        otpCode: event.otpCode,
+      );
+    }
+
     if (!result.success || result.accessToken == null) {
       emit(ForgotPasswordFailure(message: result.message));
       return;
@@ -771,6 +897,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       key: SecureStorageKeys.accessToken,
       value: result.accessToken!,
     );
+
+    _pendingForgotPasswordVerificationId = null;
     emit(const ForgotPasswordOtpVerified());
   }
 
@@ -788,7 +916,143 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
 
     await secureStorage.clearAuthTokens();
+    _pendingForgotPasswordIdentifier = null;
+    _pendingForgotPasswordChannel = null;
+    _pendingForgotPasswordVerificationId = null;
     emit(const ForgotPasswordResetSuccess());
+  }
+
+  Future<void> _sendForgotPasswordOtpByPhone({
+    required String identifier,
+    required Emitter<AuthState> emit,
+  }) async {
+    final normalizedPhone = _normalizePhoneToE164(identifier);
+    if (normalizedPhone == null) {
+      emit(
+        const ForgotPasswordFailure(message: 'auth.firebase_invalid_phone_format'),
+      );
+      return;
+    }
+
+    final completer = Completer<String>();
+    PhoneAuthCredential? autoVerifiedCredential;
+
+    try {
+      await _firebaseAuth.verifyPhoneNumber(
+        phoneNumber: normalizedPhone,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          autoVerifiedCredential = credential;
+          if (!completer.isCompleted) {
+            completer.complete('__AUTO_VERIFIED__');
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+
+      final verificationId = await completer.future;
+      _pendingForgotPasswordIdentifier = identifier;
+      _pendingForgotPasswordChannel = ForgotPasswordChannel.phone;
+
+      if (verificationId == '__AUTO_VERIFIED__') {
+        if (autoVerifiedCredential == null) {
+          emit(
+            const ForgotPasswordFailure(
+              message: 'auth.firebase_auto_verification_failed',
+            ),
+          );
+          return;
+        }
+
+        final result = await _verifyForgotPasswordWithPhoneCredential(
+          phoneCredential: autoVerifiedCredential!,
+        );
+
+        if (!result.success || result.accessToken == null) {
+          emit(ForgotPasswordFailure(message: result.message));
+          return;
+        }
+
+        await secureStorage.write(
+          key: SecureStorageKeys.accessToken,
+          value: result.accessToken!,
+        );
+        emit(const ForgotPasswordOtpVerified());
+        return;
+      }
+
+      _pendingForgotPasswordVerificationId = verificationId;
+      emit(
+        ForgotPasswordOtpSent(
+          destination: identifier,
+          channel: ForgotPasswordChannel.phone,
+        ),
+      );
+    } catch (e) {
+      emit(ForgotPasswordFailure(message: _mapPhoneAuthError(e)));
+    }
+  }
+
+  Future<AuthResponse> _verifyForgotPasswordOtpByPhone({
+    required String smsCode,
+  }) async {
+    final verificationId = _pendingForgotPasswordVerificationId;
+    if (verificationId == null) {
+      return AuthResponse(
+        success: false,
+        message: 'auth.firebase_invalid_otp_session',
+      );
+    }
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+      return await _verifyForgotPasswordWithPhoneCredential(
+        phoneCredential: credential,
+      );
+    } catch (e) {
+      return AuthResponse(success: false, message: _mapPhoneAuthError(e));
+    }
+  }
+
+  Future<AuthResponse> _verifyForgotPasswordWithPhoneCredential({
+    required PhoneAuthCredential phoneCredential,
+  }) async {
+    try {
+      final userCredential = await _firebaseAuth.signInWithCredential(
+        phoneCredential,
+      );
+      final firebaseUser = userCredential.user;
+      final firebaseIdToken = await firebaseUser?.getIdToken();
+
+      if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
+        return AuthResponse(
+          success: false,
+          message: 'auth.firebase_token_unavailable',
+        );
+      }
+
+      final result = await authRepository.forgotPasswordVerifyOtp(
+        firebaseIdToken: firebaseIdToken,
+      );
+      await _firebaseAuth.signOut();
+      return result;
+    } catch (e) {
+      return AuthResponse(success: false, message: _mapPhoneAuthError(e));
+    }
   }
 
   Future<void> _onLoadProfileRequested(
@@ -975,7 +1239,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final password = _pendingPassword;
 
     if (phone == null || password == null) {
-      emit(const PhoneRegisterFailure(message: 'Invalid OTP session'));
+      emit(const PhoneRegisterFailure(message: 'auth.firebase_invalid_otp_session'));
       return;
     }
 
@@ -986,7 +1250,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final firebaseIdToken = await firebaseUser?.getIdToken();
 
     if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
-      emit(const PhoneRegisterFailure(message: 'Cannot get Firebase token'));
+      emit(const PhoneRegisterFailure(message: 'auth.firebase_token_unavailable'));
       return;
     }
 
@@ -1029,7 +1293,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final phone = _pendingLinkPhoneNumber;
 
     if (phone == null) {
-      emit(const LinkCredentialFailure(message: 'Invalid OTP session'));
+      emit(const LinkCredentialFailure(message: 'auth.firebase_invalid_otp_session'));
       return;
     }
 
@@ -1040,7 +1304,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final firebaseIdToken = await firebaseUser?.getIdToken();
 
     if (firebaseIdToken == null || firebaseIdToken.isEmpty) {
-      emit(const LinkCredentialFailure(message: 'Cannot get Firebase token'));
+      emit(const LinkCredentialFailure(message: 'auth.firebase_token_unavailable'));
       return;
     }
 
@@ -1135,6 +1399,20 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthInitial());
   }
 
+  bool _isPhoneRegisterFlowActive(int version) {
+    return _phoneRegisterFlowVersion == version;
+  }
+
+  void _cancelPhoneRegisterFlow({required bool clearPendingCredentials}) {
+    _phoneRegisterFlowVersion++;
+    _pendingVerificationId = null;
+    if (clearPendingCredentials) {
+      _pendingPhoneNumber = null;
+      _pendingPassword = null;
+      _pendingFullName = null;
+    }
+  }
+
   Future<void> _resetGoogleSessionForAccountPicker() async {
     try {
       await _googleSignIn.signOut();
@@ -1152,77 +1430,118 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     );
   }
 
+  String _googleSignInGenericErrorMessage() =>
+      'auth.firebase_google_unavailable';
+
+  String _phoneAuthGenericErrorMessage() =>
+      'auth.firebase_phone_verification_unavailable';
+
+  String _invalidPhoneFormatMessage() => 'auth.firebase_invalid_phone_format';
+
   String _mapGoogleSignInError(Object error) {
     if (error is TimeoutException) {
-      return 'Google sign-in timed out. Please try again.';
+      return 'auth.firebase_google_timeout';
     }
 
     if (error is PlatformException) {
       final code = error.code.toLowerCase();
       final details = '${error.message ?? ''} ${error.details ?? ''}'
           .toLowerCase();
+
+      if (code.contains('sign_in_canceled') ||
+          details.contains('sign_in_canceled') ||
+          details.contains('canceled')) {
+        return 'auth.firebase_google_canceled';
+      }
+
+      if (code.contains('network') || details.contains('network')) {
+        return 'auth.firebase_network_error';
+      }
+
       if (code.contains('sign_in_failed') ||
           details.contains('developer_error')) {
-        return 'Google Sign-In configuration is invalid on this device build. Please check Firebase Android app config and Play Services.';
+        return 'auth.firebase_google_config_invalid';
       }
+
+      if (details.contains('10:') || details.contains('api exception: 10')) {
+        return 'auth.firebase_google_config_mismatch';
+      }
+
+      return _googleSignInGenericErrorMessage();
     }
 
-    return ApiErrorMessageParser.parse(error);
+    if (error is FirebaseAuthException) {
+      final code = error.code.toLowerCase();
+      if (code == 'account-exists-with-different-credential') {
+        return 'auth.firebase_google_account_exists_diff_credential';
+      }
+      if (code == 'user-disabled') {
+        return 'auth.firebase_user_disabled';
+      }
+      if (code == 'network-request-failed') {
+        return 'auth.firebase_network_error';
+      }
+      return _googleSignInGenericErrorMessage();
+    }
+
+    return _googleSignInGenericErrorMessage();
   }
 
   String _mapPhoneAuthError(Object error) {
-    final languageCode = PlatformDispatcher.instance.locale.languageCode
-        .toLowerCase();
-    final isVietnamese = languageCode.startsWith('vi');
-
-    String vi(String fallback) => fallback;
-    String en(String fallback) => fallback;
-
     if (error is FirebaseAuthException) {
       final code = error.code.toLowerCase();
 
       if (code == 'invalid-phone-number') {
-        return isVietnamese
-            ? vi('Số điện thoại không đúng định dạng E.164. Vui lòng nhập lại.')
-            : en(
-                'Invalid phone number format. Please enter a valid E.164 phone number.',
-              );
+        return _invalidPhoneFormatMessage();
       }
       if (code == 'too-many-requests' || code == 'quota-exceeded') {
-        return isVietnamese
-            ? vi('Bạn đã gửi yêu cầu OTP quá nhiều lần. Vui lòng thử lại sau.')
-            : en('Too many OTP requests. Please try again later.');
+        return 'auth.firebase_too_many_requests';
       }
       if (code == 'network-request-failed') {
-        return isVietnamese
-            ? vi(
-                'Kết nối mạng không ổn định. Vui lòng kiểm tra mạng và thử lại.',
-              )
-            : en('Network error. Please check your connection and try again.');
+        return 'auth.firebase_network_error';
       }
       if (code == 'session-expired' || code == 'invalid-verification-code') {
-        return isVietnamese
-            ? vi('Mã OTP không hợp lệ hoặc đã hết hạn.')
-            : en('The OTP code is invalid or has expired.');
+        return 'auth.firebase_otp_invalid_or_expired';
+      }
+      if (code == 'code-expired') {
+        return 'auth.firebase_otp_expired';
+      }
+      if (code == 'missing-verification-code') {
+        return 'auth.firebase_otp_required';
+      }
+      if (code == 'invalid-credential') {
+        return 'auth.firebase_invalid_credential';
       }
 
       final rawMessage = (error.message ?? '').toLowerCase();
       if (rawMessage.contains('too_long') || rawMessage.contains('too long')) {
-        return isVietnamese
-            ? vi('Số điện thoại quá dài, vui lòng kiểm tra lại.')
-            : en('The phone number is too long. Please check and try again.');
+        return 'auth.firebase_phone_too_long';
       }
+
+      return _phoneAuthGenericErrorMessage();
     }
 
-    final fallback = ApiErrorMessageParser.parse(error);
-    if (fallback.toLowerCase().contains('too_long') ||
-        fallback.toLowerCase().contains('too long')) {
-      return isVietnamese
-          ? vi('Số điện thoại quá dài, vui lòng kiểm tra lại.')
-          : en('The phone number is too long. Please check and try again.');
+    if (error is PlatformException) {
+      final code = error.code.toLowerCase();
+      final details = '${error.message ?? ''} ${error.details ?? ''}'
+          .toLowerCase();
+
+      if (code.contains('network') || details.contains('network')) {
+        return 'auth.firebase_network_error';
+      }
+
+      if (details.contains('too_long') || details.contains('too long')) {
+        return 'auth.firebase_phone_too_long';
+      }
+
+      if (details.contains('invalid-phone-number')) {
+        return _invalidPhoneFormatMessage();
+      }
+
+      return _phoneAuthGenericErrorMessage();
     }
 
-    return fallback;
+    return _phoneAuthGenericErrorMessage();
   }
 
   String _extractTokenMetadata(String token) {

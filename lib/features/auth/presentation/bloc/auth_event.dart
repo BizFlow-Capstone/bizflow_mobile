@@ -3,6 +3,8 @@ abstract class AuthEvent {
   const AuthEvent();
 }
 
+enum ForgotPasswordChannel { email, phone }
+
 /// Called on app startup to check if user is still authenticated
 class AppStarted extends AuthEvent {
   const AppStarted();
@@ -88,6 +90,10 @@ class ResendPhoneOtpRequested extends AuthEvent {
   const ResendPhoneOtpRequested();
 }
 
+class CancelPhoneRegisterFlowRequested extends AuthEvent {
+  const CancelPhoneRegisterFlowRequested();
+}
+
 class LoadCredentialsRequested extends AuthEvent {
   const LoadCredentialsRequested();
 }
@@ -128,18 +134,24 @@ class SetPasswordRequested extends AuthEvent {
 }
 
 class ForgotPasswordSendOtpRequested extends AuthEvent {
-  final String email;
+  final String identifier;
+  final ForgotPasswordChannel channel;
 
-  const ForgotPasswordSendOtpRequested({required this.email});
+  const ForgotPasswordSendOtpRequested({
+    required this.identifier,
+    required this.channel,
+  });
 }
 
 class ForgotPasswordVerifyOtpRequested extends AuthEvent {
-  final String email;
+  final String identifier;
   final String otpCode;
+  final ForgotPasswordChannel channel;
 
   const ForgotPasswordVerifyOtpRequested({
-    required this.email,
+    required this.identifier,
     required this.otpCode,
+    required this.channel,
   });
 }
 

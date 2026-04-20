@@ -21,7 +21,7 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _identifierController = TextEditingController();
   final List<TextEditingController> _otpControllers = List.generate(
     6,
     (_) => TextEditingController(),
@@ -31,11 +31,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final TextEditingController _confirmController = TextEditingController();
 
   int _step = 1;
+  ForgotPasswordChannel _channel = ForgotPasswordChannel.email;
   String? _confirmPasswordError;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     for (final c in _otpControllers) {
       c.dispose();
     }
@@ -49,6 +50,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   String get _otp => _otpControllers.map((e) => e.text).join();
 
+  bool get _isPhoneChannel => _channel == ForgotPasswordChannel.phone;
+
+  String get _currentIdentifier => _identifierController.text.trim();
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -58,8 +63,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         if (state is ForgotPasswordOtpSent) {
           setState(() {
             _step = 2;
+            _channel = state.channel;
           });
-          AppSnackBar.success(context, l10n.translate('auth.otp_sent_generic'));
+          final sentMessage = state.channel == ForgotPasswordChannel.phone
+              ? l10n.translate('auth.otp_sent_generic_phone')
+              : l10n.translate('auth.otp_sent_generic');
+          AppSnackBar.success(context, sentMessage);
         } else if (state is ForgotPasswordOtpVerified) {
           setState(() {
             _step = 3;
@@ -75,7 +84,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             (route) => false,
           );
         } else if (state is ForgotPasswordFailure) {
-          AppSnackBar.error(context, state.message);
+          AppSnackBar.error(context, l10n.translateOrRaw(state.message));
         }
       },
       child: Scaffold(
@@ -117,36 +126,86 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   ),
                   const SizedBox(height: AppSpacing.md),
                   if (_step == 1) ...[
+                    Text(
+                      l10n.translate('auth.forgot_password_method_label'),
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      children: [
+                        ChoiceChip(
+                          label: Text(
+                            l10n.translate('auth.forgot_password_via_email'),
+                          ),
+                          selected: !_isPhoneChannel,
+                          onSelected: (_) {
+                            setState(() {
+                              _channel = ForgotPasswordChannel.email;
+                            });
+                          },
+                        ),
+                        ChoiceChip(
+                          label: Text(
+                            l10n.translate('auth.forgot_password_via_phone'),
+                          ),
+                          selected: _isPhoneChannel,
+                          onSelected: (_) {
+                            setState(() {
+                              _channel = ForgotPasswordChannel.phone;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
                     AppTextField(
-                      controller: _emailController,
-                      label: l10n.translate('auth.email'),
-                      hintText: l10n.translate('auth.enter_email'),
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _identifierController,
+                      label: _isPhoneChannel
+                          ? l10n.translate('auth.phone')
+                          : l10n.translate('auth.email'),
+                      hintText: _isPhoneChannel
+                          ? l10n.translate('auth.enter_phone')
+                          : l10n.translate('auth.enter_email'),
+                      keyboardType: _isPhoneChannel
+                          ? TextInputType.phone
+                          : TextInputType.emailAddress,
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     _buildActionButton(
                       context,
                       l10n.translate('auth.send_otp'),
                       onPressed: () {
-                        final email = _emailController.text.trim();
-                        if (email.isEmpty) {
+                        final identifier = _currentIdentifier;
+                        if (identifier.isEmpty) {
                           AppSnackBar.warning(
                             context,
-                            l10n.translate('auth.email_required'),
+                            _isPhoneChannel
+                                ? l10n.translate('auth.phone_required')
+                                : l10n.translate('auth.email_required'),
                           );
                           return;
                         }
                         context.read<AuthBloc>().add(
-                          ForgotPasswordSendOtpRequested(email: email),
+                          ForgotPasswordSendOtpRequested(
+                            identifier: identifier,
+                            channel: _channel,
+                          ),
                         );
                       },
                     ),
                   ],
                   if (_step == 2) ...[
                     Text(
-                      l10n
-                          .translate('auth.otp_sent_to_email')
-                          .replaceAll('{email}', _emailController.text.trim()),
+                      _isPhoneChannel
+                          ? l10n
+                                .translate('auth.otp_sent_to_phone')
+                                .replaceAll('{phone}', _currentIdentifier)
+                          : l10n
+                                .translate('auth.otp_sent_to_email')
+                                .replaceAll('{email}', _currentIdentifier),
                       style: AppTextStyles.bodySmall.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -221,8 +280,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         }
                         context.read<AuthBloc>().add(
                           ForgotPasswordVerifyOtpRequested(
-                            email: _emailController.text.trim(),
+                            identifier: _currentIdentifier,
                             otpCode: _otp,
+                            channel: _channel,
                           ),
                         );
                       },
@@ -233,7 +293,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         onPressed: () {
                           context.read<AuthBloc>().add(
                             ForgotPasswordSendOtpRequested(
-                              email: _emailController.text.trim(),
+                              identifier: _currentIdentifier,
+                              channel: _channel,
                             ),
                           );
                         },

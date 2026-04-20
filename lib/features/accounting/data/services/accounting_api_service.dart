@@ -7,7 +7,7 @@ import '../../domain/models/accounting_book.dart';
 
 class AccountingApiService {
   final ApiClient _apiClient;
-  static const String _genericError = ApiErrorMessageParser.genericMessage;
+  static String get _genericError => ApiErrorMessageParser.genericMessage;
 
   AccountingApiService({required ApiClient apiClient})
       : _apiClient = apiClient;

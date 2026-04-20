@@ -251,11 +251,11 @@ class AuthApiService {
   }
 
   Future<Map<String, dynamic>> forgotPasswordSendOtp({
-    required String email,
+    required String identifier,
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
       ApiEndpoints.forgotPasswordSendOtp,
-      body: {'email': email.trim()},
+      body: {'email': identifier.trim()},
       parser: (data) {
         if (data is Map<String, dynamic>) {
           return data;
@@ -276,12 +276,25 @@ class AuthApiService {
   }
 
   Future<Map<String, dynamic>> forgotPasswordVerifyOtp({
-    required String email,
-    required String otpCode,
+    String? identifier,
+    String? otpCode,
+    String? firebaseIdToken,
   }) async {
+    final hasFirebaseToken =
+        firebaseIdToken != null && firebaseIdToken.trim().isNotEmpty;
+
+    final body = <String, dynamic>{
+      if (hasFirebaseToken)
+        'firebaseIdToken': firebaseIdToken!.trim()
+      else ...{
+        'email': identifier?.trim() ?? '',
+        'otpCode': otpCode?.trim() ?? '',
+      },
+    };
+
     final response = await _apiClient.post<Map<String, dynamic>>(
       ApiEndpoints.forgotPasswordVerifyOtp,
-      body: {'email': email.trim(), 'otpCode': otpCode.trim()},
+      body: body,
       parser: (data) {
         if (data is Map<String, dynamic>) {
           return data;

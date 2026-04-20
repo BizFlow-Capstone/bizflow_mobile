@@ -1,4 +1,5 @@
 import 'auth_bloc.dart';
+import 'auth_event.dart';
 
 // Auth States - UI states
 abstract class AuthState {
@@ -175,8 +176,16 @@ class LinkPhoneOtpCodeSent extends AuthState {
   const LinkPhoneOtpCodeSent({required this.phone});
 }
 
-class PhoneRegisterInProgress extends AuthState {
-  const PhoneRegisterInProgress();
+class PhoneRegisterSendOtpInProgress extends AuthState {
+  const PhoneRegisterSendOtpInProgress();
+}
+
+class PhoneRegisterResendOtpInProgress extends AuthState {
+  const PhoneRegisterResendOtpInProgress();
+}
+
+class PhoneRegisterVerifyOtpInProgress extends AuthState {
+  const PhoneRegisterVerifyOtpInProgress();
 }
 
 class PhoneOtpCodeSent extends AuthState {
@@ -190,9 +199,13 @@ class ForgotPasswordInProgress extends AuthState {
 }
 
 class ForgotPasswordOtpSent extends AuthState {
-  final String email;
+  final String destination;
+  final ForgotPasswordChannel channel;
 
-  const ForgotPasswordOtpSent({required this.email});
+  const ForgotPasswordOtpSent({
+    required this.destination,
+    required this.channel,
+  });
 }
 
 class ForgotPasswordOtpVerified extends AuthState {

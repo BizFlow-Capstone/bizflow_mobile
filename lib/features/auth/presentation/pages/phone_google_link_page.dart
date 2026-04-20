@@ -33,7 +33,7 @@ class _PhoneGoogleLinkPageState extends State<PhoneGoogleLinkPage> {
             context.read<AuthBloc>().add(const AuthOnboardingCompleted());
           });
         } else if (state is LinkCredentialFailure) {
-          AppSnackBar.error(context, state.message);
+          AppSnackBar.error(context, l10n.translateOrRaw(state.message));
         } else if (state is LoginSuccess) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;

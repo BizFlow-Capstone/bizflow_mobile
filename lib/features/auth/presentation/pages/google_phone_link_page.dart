@@ -64,7 +64,7 @@ class _GooglePhoneLinkPageState extends State<GooglePhoneLinkPage> {
             context.read<AuthBloc>().add(const AuthOnboardingCompleted());
           });
         } else if (state is LinkCredentialFailure) {
-          AppSnackBar.error(context, state.message);
+          AppSnackBar.error(context, l10n.translateOrRaw(state.message));
         }
       },
       child: Scaffold(

@@ -58,22 +58,34 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
         } else if (state is LoginSuccess) {
           PostAuthNavigation.route(context);
         } else if (state is PhoneRegisterFailure) {
-          AppSnackBar.error(context, state.message);
+          AppSnackBar.error(context, l10n.translateOrRaw(state.message));
         }
       },
-      child: Scaffold(
-        backgroundColor: AppColors.surface,
-        appBar: AppBar(
-          title: Text(l10n.translate('auth.verify_otp_title')),
+      child: PopScope(
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) return;
+          context.read<AuthBloc>().add(
+            const CancelPhoneRegisterFlowRequested(),
+          );
+        },
+        child: Scaffold(
           backgroundColor: AppColors.surface,
-          foregroundColor: AppColors.textPrimary,
-          systemOverlayStyle: SystemUiOverlayStyle.dark,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
-            onPressed: () => Navigator.pop(context),
+          appBar: AppBar(
+            title: Text(l10n.translate('auth.verify_otp_title')),
+            backgroundColor: AppColors.surface,
+            foregroundColor: AppColors.textPrimary,
+            systemOverlayStyle: SystemUiOverlayStyle.dark,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () {
+                context.read<AuthBloc>().add(
+                  const CancelPhoneRegisterFlowRequested(),
+                );
+                Navigator.pop(context);
+              },
+            ),
           ),
-        ),
-        body: SafeArea(
+          body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Container(
@@ -165,7 +177,7 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
                   const SizedBox(height: AppSpacing.xl),
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
-                      final loading = state is PhoneRegisterInProgress;
+                      final loading = state is PhoneRegisterVerifyOtpInProgress;
                       return AppButton(
                         label: l10n.translate('auth.verify_button'),
                         isFullWidth: true,
@@ -188,23 +200,35 @@ class _PhoneRegisterOtpPageState extends State<PhoneRegisterOtpPage> {
                     },
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  TextButton(
-                    onPressed: () {
-                      context.read<AuthBloc>().add(
-                        const ResendPhoneOtpRequested(),
+                  BlocBuilder<AuthBloc, AuthState>(
+                    builder: (context, state) {
+                      final resendLoading =
+                          state is PhoneRegisterResendOtpInProgress ||
+                          state is PhoneRegisterSendOtpInProgress;
+                      return TextButton(
+                        onPressed: resendLoading
+                            ? null
+                            : () {
+                                context.read<AuthBloc>().add(
+                                  const ResendPhoneOtpRequested(),
+                                );
+                              },
+                        child: Text(
+                          resendLoading
+                              ? '${l10n.translate('auth.resend_otp')}...'
+                              : l10n.translate('auth.resend_otp'),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       );
                     },
-                    child: Text(
-                      l10n.translate('auth.resend_otp'),
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                   ),
                 ],
               ),
             ),
+          ),
           ),
         ),
       ),

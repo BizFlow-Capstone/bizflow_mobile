@@ -37,7 +37,7 @@ class OrderConfirmationRequiredException implements Exception {
 /// 4. Return DTOs to Repository
 class OrderApiService {
   final ApiClient _apiClient;
-  static const String _genericError = ApiErrorMessageParser.genericMessage;
+  static String get _genericError => ApiErrorMessageParser.genericMessage;
 
   OrderApiService({required ApiClient apiClient}) : _apiClient = apiClient;
 

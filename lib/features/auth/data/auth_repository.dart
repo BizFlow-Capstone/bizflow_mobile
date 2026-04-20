@@ -47,11 +47,12 @@ abstract class AuthRepository {
 
   Future<AuthResponse> refreshToken();
 
-  Future<AuthResponse> forgotPasswordSendOtp({required String email});
+  Future<AuthResponse> forgotPasswordSendOtp({required String identifier});
 
   Future<AuthResponse> forgotPasswordVerifyOtp({
-    required String email,
-    required String otpCode,
+    String? identifier,
+    String? otpCode,
+    String? firebaseIdToken,
   });
 
   Future<AuthResponse> forgotPasswordReset({required String password});
@@ -262,9 +263,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<AuthResponse> forgotPasswordSendOtp({required String email}) async {
+  Future<AuthResponse> forgotPasswordSendOtp({required String identifier}) async {
     try {
-      final response = await _apiService.forgotPasswordSendOtp(email: email);
+      final response = await _apiService.forgotPasswordSendOtp(
+        identifier: identifier,
+      );
       return AuthResponse.fromJson(response);
     } catch (e) {
       return _errorResponse(e);
@@ -273,13 +276,15 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<AuthResponse> forgotPasswordVerifyOtp({
-    required String email,
-    required String otpCode,
+    String? identifier,
+    String? otpCode,
+    String? firebaseIdToken,
   }) async {
     try {
       final response = await _apiService.forgotPasswordVerifyOtp(
-        email: email,
+        identifier: identifier,
         otpCode: otpCode,
+        firebaseIdToken: firebaseIdToken,
       );
       return AuthResponse.fromJson(response);
     } catch (e) {
