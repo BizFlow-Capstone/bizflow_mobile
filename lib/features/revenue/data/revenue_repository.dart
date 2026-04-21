@@ -34,6 +34,7 @@ class RevenueRepository {
       referenceCode: dto.referenceCode,
       businessTypeId: dto.businessTypeId,
       businessTypeName: dto.businessTypeName,
+      imagePath: dto.imagePath,
       createdAt: dto.createdAt,
     );
   }

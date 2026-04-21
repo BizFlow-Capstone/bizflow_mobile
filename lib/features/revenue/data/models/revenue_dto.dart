@@ -16,6 +16,7 @@ class RevenueDto extends Equatable {
   final String? businessTypeId;
   final String? businessTypeName;
   final String createdBy;
+  final String? imagePath;
   final DateTime createdAt;
 
   const RevenueDto({
@@ -32,6 +33,7 @@ class RevenueDto extends Equatable {
     this.referenceCode,
     this.businessTypeId,
     this.businessTypeName,
+    this.imagePath,
     required this.createdBy,
     required this.createdAt,
   });
@@ -106,6 +108,9 @@ class RevenueDto extends Equatable {
       businessTypeName: asNullableString(
         json['businessTypeName'] ?? json['BusinessTypeName'],
       ),
+      imagePath: asNullableString(
+        json['imagePath'] ?? json['ImagePath'] ?? json['imageUrl'] ?? json['receiptImageUrl'],
+      ),
       createdBy: json['createdBy'] as String? ?? '',
       createdAt:
           DateFormatter.parseApiDateTime(json['createdAt'] as String?) ??
@@ -128,6 +133,7 @@ class RevenueDto extends Equatable {
       'referenceCode': referenceCode,
       'businessTypeId': businessTypeId,
       'businessTypeName': businessTypeName,
+      'imagePath': imagePath,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
     };
@@ -148,6 +154,7 @@ class RevenueDto extends Equatable {
     referenceCode,
     businessTypeId,
     businessTypeName,
+    imagePath,
     createdBy,
     createdAt,
   ];

@@ -33,6 +33,7 @@ class CostRepository {
       referenceType: dto.referenceType,
       referenceId: dto.referenceId,
       referenceCode: dto.referenceCode,
+      imagePath: dto.imagePath,
       createdAt: dto.createdAt,
     );
   }

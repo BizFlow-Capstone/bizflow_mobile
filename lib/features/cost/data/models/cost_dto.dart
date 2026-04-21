@@ -15,6 +15,7 @@ class CostDto extends Equatable {
   final int? referenceId;
   final String? referenceCode;
   final String createdBy;
+  final String? imagePath;
   final DateTime createdAt;
 
   const CostDto({
@@ -30,6 +31,7 @@ class CostDto extends Equatable {
     this.referenceType,
     this.referenceId,
     this.referenceCode,
+    this.imagePath,
     required this.createdBy,
     required this.createdAt,
   });
@@ -99,6 +101,9 @@ class CostDto extends Equatable {
       referenceCode: asNullableString(
         json['referenceCode'] ?? json['ReferenceCode'] ?? json['code'],
       ),
+      imagePath: asNullableString(
+        json['imagePath'] ?? json['ImagePath'] ?? json['imageUrl'] ?? json['receiptImageUrl'],
+      ),
       createdBy: json['createdBy'] as String? ?? '',
       createdAt:
           DateFormatter.parseApiDateTime(json['createdAt'] as String?) ??
@@ -120,6 +125,7 @@ class CostDto extends Equatable {
       'referenceType': referenceType,
       'referenceId': referenceId,
       'referenceCode': referenceCode,
+      'imagePath': imagePath,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
     };
@@ -139,6 +145,7 @@ class CostDto extends Equatable {
     referenceType,
     referenceId,
     referenceCode,
+    imagePath,
     createdBy,
     createdAt,
   ];

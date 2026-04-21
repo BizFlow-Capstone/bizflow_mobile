@@ -24,6 +24,8 @@ import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
+import '../../../accounting/data/repositories/accounting_repository.dart';
+import '../../../accounting/domain/models/accounting_period.dart';
 import '../../data/order_api_service.dart';
 import '../../domain/entities/order_entity.dart';
 import '../bloc/order_bloc.dart';
@@ -45,15 +47,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _isCancelling = false;
   bool _isPublishing = false;
   bool _isInvoiceActionInProgress = false;
+  List<AccountingPeriod> _periods = [];
 
   String _formatDateTime(DateTime value) {
     return DateFormat('dd/MM/yyyy HH:mm').format(value.toLocal());
+  }
+
+  bool _canEditOrder(OrderEntity order) {
+    // 1. Age check (> 30 days)
+    final age = DateTime.now().difference(order.createdAt).inDays;
+    if (age > 30) return false;
+
+    // 2. Accounting Period check (Chốt sổ)
+    final orderDateStr = DateFormat('yyyy-MM-dd').format(order.createdAt.toLocal());
+    for (final period in _periods) {
+      if (orderDateStr.compareTo(period.startDate) >= 0 &&
+          orderDateStr.compareTo(period.endDate) <= 0) {
+        if (period.isFinalized) return false;
+      }
+    }
+
+    return true;
   }
 
   @override
   void initState() {
     super.initState();
     _loadDetailSWR();
+  }
+
+  Future<void> _loadAccountingPeriods(String locationId) async {
+    try {
+      await context.read<AccountingRepository>().fetchPeriodsSWR(
+        locationId: locationId,
+        onData: (periods, _) {
+          if (!mounted) return;
+          setState(() {
+            _periods = periods;
+          });
+        },
+      );
+    } catch (e) {
+      debugPrint('Error loading accounting periods: $e');
+    }
   }
 
   Future<void> _loadDetailSWR({bool refreshOnly = false}) async {
@@ -90,6 +126,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 _detailError = null;
                 _isInitialLoading = false;
               });
+              _loadAccountingPeriods(order.locationId);
             },
             onError: (error) {
               if (!mounted) return;
@@ -631,7 +668,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
             return Column(
               children: [
-                if (detail.isPublished && !detail.isCancelled)
+                if (detail.isPublished && !detail.isCancelled && _canEditOrder(detail))
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
@@ -725,26 +762,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: (_isCancelling || _isPublishing)
-                                ? null
-                                : () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => OrderFormScreen(
-                                          inputType: 'manual',
-                                          initialOrder: detail,
-                                          pendingOrderId: detail.id,
+                        if (_canEditOrder(detail))
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: (_isCancelling || _isPublishing)
+                                  ? null
+                                  : () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => OrderFormScreen(
+                                            inputType: 'manual',
+                                            initialOrder: detail,
+                                            pendingOrderId: detail.id,
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                            icon: const Icon(Icons.edit),
-                            label: Text(l10n.translate('order.action_edit')),
+                                      );
+                                    },
+                              icon: const Icon(Icons.edit),
+                              label: Text(l10n.translate('order.action_edit')),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
