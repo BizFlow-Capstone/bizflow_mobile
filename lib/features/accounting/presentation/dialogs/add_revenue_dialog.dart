@@ -1,3 +1,5 @@
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -35,8 +37,17 @@ Future<void> showAddRevenueDialog({
   DateTime? selectedDocumentDate;
   String? selectedMoneyChannel;
   String? selectedBusinessTypeId;
+  File? selectedImage;
   var isSubmitting = false;
   List<BusinessTypeDto> businessTypes = [];
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> pickImage(ImageSource source, void Function(void Function()) setDialogState) async {
+    final pickedFile = await _picker.pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
+    if (pickedFile != null) {
+      setDialogState(() => selectedImage = File(pickedFile.path));
+    }
+  }
 
   try {
     final result =
@@ -76,10 +87,36 @@ Future<void> showAddRevenueDialog({
               TextField(
                 controller: descriptionController,
                 decoration: InputDecoration(
-                  labelText:
-                      l10n.translate('accounting.revenue_description'),
+                  labelText: l10n.translate('accounting.revenue_description'),
                 ),
               ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.photo_library),
+                    label: Text(l10n.translate('accounting.select_image')),
+                    onPressed: () => pickImage(ImageSource.gallery, setDialogState),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.camera_alt),
+                    label: Text(l10n.translate('accounting.take_photo')),
+                    onPressed: () => pickImage(ImageSource.camera, setDialogState),
+                  ),
+                ],
+              ),
+              if (selectedImage != null) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    selectedImage!,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<String>(
                 initialValue: selectedMoneyChannel,
@@ -255,14 +292,11 @@ Future<void> showAddRevenueDialog({
                     context.read<RevenueBloc>().add(
                       CreateManualRevenueRequested(
                         body: {
-                          'businessLocationId':
-                              int.tryParse(locationId ?? '') ?? 0,
+                          'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
                           'amount': amount,
-                          'revenueDate': DateFormat('yyyy-MM-dd')
-                              .format(selectedDate),
+                          'revenueDate': DateFormat('yyyy-MM-dd').format(selectedDate),
                           if (selectedDocumentDate != null)
-                            'documentDate': DateFormat('yyyy-MM-dd')
-                                .format(selectedDocumentDate!),
+                            'documentDate': DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
                           'description': descriptionController.text,
                           'moneyChannel': selectedMoneyChannel,
                           if ((selectedBusinessTypeId ?? '').isNotEmpty)
@@ -271,6 +305,8 @@ Future<void> showAddRevenueDialog({
                             'referenceType': 'order',
                           if (referenceOrderId != null)
                             'referenceId': referenceOrderId,
+                          if (selectedImage != null)
+                            'imagePath': selectedImage!.path,
                         },
                       ),
                     );

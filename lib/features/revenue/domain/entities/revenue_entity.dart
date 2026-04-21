@@ -14,6 +14,7 @@ class RevenueEntity extends Equatable {
   final String? referenceCode;
   final String? businessTypeId;
   final String? businessTypeName;
+  final String? imagePath;
   final DateTime createdAt;
 
   const RevenueEntity({
@@ -30,6 +31,7 @@ class RevenueEntity extends Equatable {
     this.referenceCode,
     this.businessTypeId,
     this.businessTypeName,
+    this.imagePath,
     required this.createdAt,
   });
 
@@ -48,6 +50,7 @@ class RevenueEntity extends Equatable {
     referenceCode,
     businessTypeId,
     businessTypeName,
+    imagePath,
     createdAt,
   ];
 }

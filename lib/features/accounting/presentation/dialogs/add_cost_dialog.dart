@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -25,7 +27,16 @@ Future<void> showAddCostDialog(BuildContext context) async {
   DateTime? selectedDocumentDate;
   String? selectedCostType;
   String? selectedPaymentMethod;
+  File? selectedImage;
   var isSubmitting = false;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> pickImage(ImageSource source, void Function(void Function()) setDialogState) async {
+    final pickedFile = await _picker.pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
+    if (pickedFile != null) {
+      setDialogState(() => selectedImage = File(pickedFile.path));
+    }
+  }
 
   List<String> getCostTypes() {
     final state = context.read<ReferenceBloc>().state;
@@ -73,6 +84,33 @@ Future<void> showAddCostDialog(BuildContext context) async {
                   labelText: l10n.translate('accounting.amount'),
                 ),
               ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.photo_library),
+                    label: Text(l10n.translate('accounting.select_image')),
+                    onPressed: () => pickImage(ImageSource.gallery, setDialogState),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.camera_alt),
+                    label: Text(l10n.translate('accounting.take_photo')),
+                    onPressed: () => pickImage(ImageSource.camera, setDialogState),
+                  ),
+                ],
+              ),
+              if (selectedImage != null) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    selectedImage!,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<String>(
                 initialValue: selectedCostType,
@@ -189,18 +227,16 @@ Future<void> showAddCostDialog(BuildContext context) async {
                     context.read<CostBloc>().add(
                       CreateManualCostRequested(
                         body: {
-                          'businessLocationId':
-                              int.tryParse(locationId ?? '') ?? 0,
+                          'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
                           'amount': amount,
-                          'costDate':
-                              DateFormat('yyyy-MM-dd').format(selectedDate),
+                          'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
                           if (selectedDocumentDate != null)
-                            'documentDate': DateFormat(
-                              'yyyy-MM-dd',
-                            ).format(selectedDocumentDate!),
+                            'documentDate': DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
                           'description': descriptionController.text,
                           'costType': selectedCostType,
                           'paymentMethod': selectedPaymentMethod,
+                          if (selectedImage != null)
+                            'imagePath': selectedImage!.path,
                         },
                       ),
                     );

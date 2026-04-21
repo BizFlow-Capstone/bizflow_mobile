@@ -120,7 +120,7 @@
     "checking_auth": "Checking...",
     "welcome_new_user": "Welcome! Please set your password",
     "passwords_not_match": "Passwords do not match",
-    "password_min_length_8": "Password must be at least 8 characters",
+    "password_min_length_6": "Password must be at least 6 characters",
     "send_otp": "Send OTP",
     "otp_sent_generic": "OTP sent. Please check your email",
     "otp_sent_generic_phone": "OTP sent. Please check your SMS",
@@ -1277,7 +1277,8 @@
     "action_create_books": "Create Books",
     "books_created_success": "Accounting books created successfully",
     "period_info": "Period Info",
-    "books": "Books"
+    "books": "Books",
+    "payment_method":"Payment Method"
   },
   "accunting": {
     "cost_description": "Cost description",

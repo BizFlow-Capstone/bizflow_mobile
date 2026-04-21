@@ -120,7 +120,7 @@
     "checking_auth": "Đang kiểm tra...",
     "welcome_new_user": "Chào mừng! Vui lòng thiết lập mật khẩu",
     "passwords_not_match": "Mật khẩu không khớp",
-    "password_min_length_8": "Mật khẩu phải có ít nhất 8 ký tự",
+    "password_min_length_6": "Mật khẩu phải có ít nhất 6 ký tự",
     "send_otp": "Gửi mã OTP",
     "otp_sent_generic": "Đã gửi mã OTP, vui lòng kiểm tra email",
     "otp_sent_generic_phone": "Đã gửi mã OTP, vui lòng kiểm tra SMS",
@@ -1277,7 +1277,8 @@
     "action_create_books": "Tạo Sổ",
     "books_created_success": "Sổ kế toán đã được tạo thành công",
     "period_info": "Thông tin kỳ",
-    "books": "Sổ kế toán"
+    "books": "Sổ kế toán",
+    "payment_method":"Phương thức thanh toán"
   },
   "accunting": {
     "cost_description": "Mô tả chi phí",

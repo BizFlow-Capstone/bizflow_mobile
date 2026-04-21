@@ -13,6 +13,7 @@ class CostEntity extends Equatable {
   final String? referenceType;
   final int? referenceId;
   final String? referenceCode;
+  final String? imagePath;
   final DateTime createdAt;
 
   const CostEntity({
@@ -28,6 +29,7 @@ class CostEntity extends Equatable {
     this.referenceType,
     this.referenceId,
     this.referenceCode,
+    this.imagePath,
     required this.createdAt,
   });
 
@@ -45,6 +47,7 @@ class CostEntity extends Equatable {
     referenceType,
     referenceId,
     referenceCode,
+    imagePath,
     createdAt,
   ];
 }

@@ -90,8 +90,8 @@ class _RegisterPageState extends State<RegisterPage> {
     if (password.isEmpty) {
       passwordError = l10n.translate('auth.password_required');
       firstInvalidFocus ??= _passwordFocusNode;
-    } else if (password.length < 8) {
-      passwordError = l10n.translate('auth.password_min_length_8');
+    } else if (password.length < 6) {
+      passwordError = l10n.translate('auth.password_min_length_6');
       firstInvalidFocus ??= _passwordFocusNode;
     }
     if (confirmPassword.isEmpty) {

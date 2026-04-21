@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
@@ -1751,6 +1752,33 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              if ((revenue.imagePath ?? '').isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => Dialog(
+                          child: InteractiveViewer(
+                            child: Image.file(
+                              File(revenue.imagePath!),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(revenue.imagePath!),
+                        height: 120,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
               Text(
                 '${l10n.translate('accounting.amount')}: ${CurrencyFormatter.formatVND(revenue.amount)}',
               ),
@@ -1893,6 +1921,33 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              if ((cost.imagePath ?? '').isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => Dialog(
+                          child: InteractiveViewer(
+                            child: Image.file(
+                              File(cost.imagePath!),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(cost.imagePath!),
+                        height: 120,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ),
               Text(
                 '${l10n.translate('accounting.amount')}: ${CurrencyFormatter.formatVND(cost.amount)}',
               ),

@@ -1,3 +1,5 @@
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -69,7 +71,16 @@ Future<void> showEditRevenueDialog({
       !businessTypeIds.contains(selectedBusinessTypeId)) {
     selectedBusinessTypeId = null;
   }
+  File? selectedImage;
   var isSubmitting = false;
+  final ImagePicker _picker = ImagePicker();
+
+  Future<void> pickImage(ImageSource source, void Function(void Function()) setDialogState) async {
+    final pickedFile = await _picker.pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
+    if (pickedFile != null) {
+      setDialogState(() => selectedImage = File(pickedFile.path));
+    }
+  }
 
   await showDialog(
     context: context,
@@ -98,6 +109,33 @@ Future<void> showEditRevenueDialog({
                       l10n.translate('accounting.revenue_description'),
                 ),
               ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.photo_library),
+                    label: Text(l10n.translate('accounting.select_image')),
+                    onPressed: () => pickImage(ImageSource.gallery, setDialogState),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.camera_alt),
+                    label: Text(l10n.translate('accounting.take_photo')),
+                    onPressed: () => pickImage(ImageSource.camera, setDialogState),
+                  ),
+                ],
+              ),
+              if (selectedImage != null) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    selectedImage!,
+                    height: 120,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<String>(
                 initialValue: selectedMoneyChannel,
@@ -240,20 +278,16 @@ Future<void> showEditRevenueDialog({
                       UpdateManualRevenueRequested(
                         revenueId: item.id,
                         body: {
-                          'businessLocationId':
-                              int.tryParse(locationId ?? '') ??
-                              item.locationId,
+                          'businessLocationId': int.tryParse(locationId ?? '') ?? item.locationId,
                           'amount': amount,
-                          'revenueDate': DateFormat('yyyy-MM-dd')
-                              .format(selectedDate),
-                          'documentDate': selectedDocumentDate == null
-                              ? null
-                              : DateFormat('yyyy-MM-dd')
-                                  .format(selectedDocumentDate!),
+                          'revenueDate': DateFormat('yyyy-MM-dd').format(selectedDate),
+                          'documentDate': selectedDocumentDate == null ? null : DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
                           'description': descriptionController.text.trim(),
                           'moneyChannel': selectedMoneyChannel,
                           if ((selectedBusinessTypeId ?? '').isNotEmpty)
                             'businessTypeId': selectedBusinessTypeId,
+                          if (selectedImage != null)
+                            'imagePath': selectedImage!.path,
                         },
                       ),
                     );
