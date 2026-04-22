@@ -426,7 +426,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      entry.transactionType,
+                      entry.transactionTypeLabel ?? entry.transactionType,
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -456,7 +456,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                           child: Text(
                             context.tr(
                               'accounting.gl_detail_channel_chip',
-                              params: {'channel': entry.moneyChannel ?? '-'},
+                              params: {
+                                'channel':
+                                    entry.moneyChannelLabel ??
+                                    entry.moneyChannel ??
+                                    '-',
+                              },
                             ),
                             style: const TextStyle(
                               fontSize: 12,
@@ -603,14 +608,19 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 Text(
                   context.tr(
                     'accounting.gl_detail_transaction_type',
-                    params: {'value': entry.transactionType},
+                    params: {
+                      'value': entry.transactionTypeLabel ?? entry.transactionType,
+                    },
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   context.tr(
                     'accounting.gl_detail_money_channel',
-                    params: {'value': entry.moneyChannel ?? '-'},
+                    params: {
+                      'value':
+                          entry.moneyChannelLabel ?? entry.moneyChannel ?? '-',
+                    },
                   ),
                 ),
                 const SizedBox(height: 6),

@@ -9,6 +9,7 @@ class EmployeeEntity extends Equatable {
   final String phone;
   final String email;
   final EmployeeStatus status;
+  final String? statusLabel;
   final bool isActive;
   final String employmentStatus;
   final DateTime? startedAt;
@@ -23,6 +24,7 @@ class EmployeeEntity extends Equatable {
     this.phone = '',
     this.email = '',
     this.status = EmployeeStatus.active,
+    this.statusLabel,
     this.isActive = true,
     this.employmentStatus = 'accepted',
     this.startedAt,
@@ -38,6 +40,7 @@ class EmployeeEntity extends Equatable {
     String? phone,
     String? email,
     EmployeeStatus? status,
+    String? statusLabel,
     bool? isActive,
     String? employmentStatus,
     DateTime? startedAt,
@@ -54,6 +57,7 @@ class EmployeeEntity extends Equatable {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       status: status ?? this.status,
+      statusLabel: statusLabel ?? this.statusLabel,
       isActive: isActive ?? this.isActive,
       employmentStatus: employmentStatus ?? this.employmentStatus,
       startedAt: clearStartedAt ? null : (startedAt ?? this.startedAt),
@@ -71,6 +75,7 @@ class EmployeeEntity extends Equatable {
         phone,
         email,
         status,
+        statusLabel,
         isActive,
         employmentStatus,
         startedAt,

@@ -105,8 +105,11 @@ class RevenueRepository {
     await _localApiCache.removeByGroup('revenues');
   }
 
-  Future<RevenueEntity> createManualRevenue(Map<String, dynamic> body) async {
-    final dto = await _apiService.createManualRevenue(body);
+  Future<RevenueEntity> createManualRevenue(
+    Map<String, dynamic> body, {
+    File? image,
+  }) async {
+    final dto = await _apiService.createManualRevenue(body, image: image);
     await clearCache();
     return _mapToEntity(dto);
   }
@@ -114,8 +117,15 @@ class RevenueRepository {
   Future<RevenueEntity> updateManualRevenue(
     int revenueId,
     Map<String, dynamic> body,
+    {
+    File? image,
+  }
   ) async {
-    final dto = await _apiService.updateManualRevenue(revenueId, body);
+    final dto = await _apiService.updateManualRevenue(
+      revenueId,
+      body,
+      image: image,
+    );
     await clearCache();
     return _mapToEntity(dto);
   }

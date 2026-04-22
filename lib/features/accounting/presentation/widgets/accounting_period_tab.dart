@@ -774,6 +774,8 @@ class _AuditLogItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormatter.formatDateTime(log.createdAt);
+    final actionColor = _actionColor(log.action);
+    final actionIcon = _actionIcon(log.action);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
@@ -786,7 +788,7 @@ class _AuditLogItem extends StatelessWidget {
                 height: 10,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.secondary,
+                  color: actionColor,
                 ),
               ),
               Container(width: 2, height: 40, color: Colors.grey[200]),
@@ -797,13 +799,21 @@ class _AuditLogItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  _auditActionLabel(log.action),
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.secondary,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
+                Row(
+                  children: [
+                    Icon(actionIcon, size: 14, color: actionColor),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        _auditActionLabel(log.action),
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: actionColor,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 if (log.reason != null && log.reason!.isNotEmpty)
                   Text(log.reason!, style: AppTextStyles.bodySmall),
@@ -827,6 +837,28 @@ class _AuditLogItem extends StatelessWidget {
     final translated = l10n.translate(key);
     if (translated != key) return translated;
     return action.replaceAll('_', ' ').toUpperCase();
+  }
+
+  Color _actionColor(String action) {
+    final normalized = action.trim().toLowerCase();
+    if (normalized.contains('reopen')) return Colors.orange;
+    if (normalized.contains('final') ||
+        normalized.contains('close') ||
+        normalized.contains('lock')) {
+      return AppColors.error;
+    }
+    return AppColors.secondary;
+  }
+
+  IconData _actionIcon(String action) {
+    final normalized = action.trim().toLowerCase();
+    if (normalized.contains('reopen')) return Icons.lock_open_outlined;
+    if (normalized.contains('final') ||
+        normalized.contains('close') ||
+        normalized.contains('lock')) {
+      return Icons.lock_outline;
+    }
+    return Icons.history;
   }
 }
 

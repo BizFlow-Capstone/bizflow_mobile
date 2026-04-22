@@ -40,6 +40,7 @@ class OrderRepository {
       locationId: dto.locationId,
       locationName: dto.locationName,
       status: dto.status,
+      statusLabel: dto.statusLabel,
       items: dto.items
           .map(
             (item) => OrderItemEntity(

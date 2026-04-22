@@ -731,7 +731,15 @@ class ProductApiService {
 
       final data = response.data;
       if (data != null && data['data'] != null) {
-        final List<dynamic> list = data['data'];
+        final dataNode = data['data'];
+        List<dynamic> list;
+        if (dataNode is List) {
+          list = dataNode;
+        } else if (dataNode is Map<String, dynamic>) {
+          list = (dataNode['items'] as List<dynamic>?) ?? <dynamic>[];
+        } else {
+          list = <dynamic>[];
+        }
         return list
             .map((e) => BusinessTypeDto.fromJson(e as Map<String, dynamic>))
             .toList();

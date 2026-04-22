@@ -1056,8 +1056,10 @@
     "worked_duration": "Duration: {duration}",
     "duration_month_day": "{months} month(s) {days} day(s)",
     "duration_day": "{days} day(s)",
+    "duration_hour": "{hours} hour(s)",
+    "duration_less_than_day": "Less than 1 day",
     "status_rejected": "Rejected",
-    "status_inactive": "Inactive"
+    "status_inactive": "Resigned"
   },
   "accounting": {
     "title": "Accounting",
@@ -1094,6 +1096,7 @@
     "revenue_description": "Revenue Description",
     "revenue_date": "Recognition Date",
     "revenue_business_type": "Business Type",
+    "revenue_business_type_empty": "No business type is available yet. You can still save the AI draft.",
     "revenue_created_success": "New revenue added",
     "revenue_updated_success": "Revenue updated",
     "revenue_deleted_success": "Revenue deleted",
@@ -1172,6 +1175,8 @@
     "voice_transcript_empty": "(empty)",
     "voice_no_record_found": "No recording available",
     "voice_upload_file": "Upload audio file",
+    "select_image": "Upload image",
+    "take_photo": "Take photo",
     "audio_saved_to": "Recording saved to {path}",
     "audio_file_label": "Audio: {file}",
     "document_date": "Document date",

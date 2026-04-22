@@ -69,7 +69,10 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
     Emitter<RevenueState> emit,
   ) async {
     try {
-      final revenue = await repository.createManualRevenue(event.body);
+      final revenue = await repository.createManualRevenue(
+        event.body,
+        image: event.image,
+      );
       emit(RevenueCreated(revenue: revenue));
 
       if (event.body['businessLocationId'] != null) {
@@ -105,6 +108,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
       final revenue = await repository.updateManualRevenue(
         event.revenueId,
         event.body,
+        image: event.image,
       );
       emit(RevenueUpdated(revenue: revenue));
 

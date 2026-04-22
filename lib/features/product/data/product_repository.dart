@@ -149,6 +149,7 @@ class ProductRepository {
               unit: dto.unit,
               barcode: dto.barcode,
               isActive: dto.isActive,
+              statusLabel: dto.statusLabel,
               trackInventory: dto.trackInventory,
               saleItems: dto.saleItems,
             ),
@@ -503,7 +504,7 @@ class ProductRepository {
     final cachedBusinessTypes = await _readBusinessTypesFromCache(cacheKey);
     if (cachedBusinessTypes.isNotEmpty) {
       unawaited(_refreshBusinessTypesCache(cacheKey));
-      return cachedBusinessTypes;
+      return _activeBusinessTypesOnly(cachedBusinessTypes);
     }
 
     try {
@@ -517,11 +518,11 @@ class ProductRepository {
         cacheType: 'list',
       );
 
-      return result;
+      return _activeBusinessTypesOnly(result);
     } catch (e) {
       final fallback = await _readBusinessTypesFromCache(cacheKey);
       if (fallback.isNotEmpty) {
-        return fallback;
+        return _activeBusinessTypesOnly(fallback);
       }
       debugPrint('ProductRepository.getBusinessTypes error: $e');
       rethrow;
@@ -564,6 +565,17 @@ class ProductRepository {
         .toList();
   }
 
+  List<BusinessTypeDto> _activeBusinessTypesOnly(List<BusinessTypeDto> source) {
+    return source
+        .where((item) {
+          final status = item.status.trim().toLowerCase();
+          final hasId = item.businessTypeId.trim().isNotEmpty;
+          final hasName = item.name.trim().isNotEmpty;
+          return status == 'active' && hasId && hasName;
+        })
+        .toList();
+  }
+
   ProductEntity _mapDtoToEntity(ProductDto dto) {
     return ProductEntity(
       id: dto.id,
@@ -580,6 +592,7 @@ class ProductRepository {
       unit: dto.unit,
       barcode: dto.barcode,
       isActive: dto.isActive,
+      statusLabel: dto.statusLabel,
       trackInventory: dto.trackInventory,
       saleItems: dto.saleItems,
     );

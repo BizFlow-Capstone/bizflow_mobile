@@ -1,6 +1,7 @@
 /// Employee DTO - Data Transfer Object
 library;
 
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../shared/utils/date_formatter.dart';
 
 /// Employee Response from API
@@ -49,6 +50,7 @@ class EmployeeDto {
   final bool isAlreadyHired;
   final bool isActive;
   final String status;
+  final String? statusLabel;
   final DateTime? startAt;
   final DateTime? endAt;
 
@@ -61,6 +63,7 @@ class EmployeeDto {
     this.isAlreadyHired = false,
     this.isActive = true,
     this.status = '',
+    this.statusLabel,
     this.startAt,
     this.endAt,
   });
@@ -73,12 +76,15 @@ class EmployeeDto {
       return DateFormatter.parseApiDateTime(value);
     }
 
-    final rawStatus = (json['status'] ?? json['Status'] ?? '').toString().trim();
-    final status = rawStatus.toLowerCase();
+    final rawStatus = json['status'] ?? json['Status'] ?? '';
+    final statusCode = referenceCodeFromDynamic(rawStatus)
+      .trim()
+      .toLowerCase();
+    final statusLabel = referenceLabelFromDynamic(rawStatus)?.trim();
     final isAlreadyHired = json['isAlreadyHired'] as bool? ?? false;
     final isActive = json['isActive'] as bool? ??
         json['IsActive'] as bool? ??
-        (status == 'accepted' || status == 'active' || isAlreadyHired);
+      (statusCode == 'accepted' || statusCode == 'active' || isAlreadyHired);
 
     return EmployeeDto(
       profileId: json['profileId'] as String? ??
@@ -92,7 +98,8 @@ class EmployeeDto {
       avatarUrl: json['avatarUrl'] as String?,
       isAlreadyHired: isAlreadyHired,
       isActive: isActive,
-      status: status,
+      status: statusCode,
+      statusLabel: statusLabel,
       startAt: parseDate(json['startAt'] ?? json['StartAt']),
       endAt: parseDate(json['endAt'] ?? json['EndAt']),
     );
@@ -108,6 +115,7 @@ class EmployeeDto {
       'isAlreadyHired': isAlreadyHired,
       'isActive': isActive,
       'status': status,
+      'statusLabel': statusLabel,
       'startAt': startAt != null ? DateFormatter.toApiUtcIsoString(startAt!) : null,
       'endAt': endAt != null ? DateFormatter.toApiUtcIsoString(endAt!) : null,
     };

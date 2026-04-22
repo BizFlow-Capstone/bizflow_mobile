@@ -134,6 +134,12 @@ class CacheManager {
     debugPrint('CacheManager: Aggressive clear all finished');
   }
 
+  /// Reset thời điểm fetch cuối cùng của một key để buộc SWR revalidate ngầm
+  /// mà không xóa cache — data cũ vẫn được serve nếu network fail.
+  void resetRevalidateTimer(String key) {
+    _lastNetworkFetchAt.remove(key);
+  }
+
   /// Triển khai SWR logic: Local First + Sync Ngầm (Non-blocking)
   Future<void> fetchWithSWR<T>({
     required String key,

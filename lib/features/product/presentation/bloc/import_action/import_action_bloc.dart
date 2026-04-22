@@ -105,12 +105,16 @@ class ImportActionBloc extends Bloc<ImportActionEvent, ImportActionState> {
         event.importId,
         event.request,
       );
+      final importPayload = response['data'];
+      final importData = importPayload is Map<String, dynamic>
+          ? ImportDetailModel.fromJson(importPayload)
+          : state.importDetail;
       await _invalidateImportHistoryCache();
       emit(
         state.copyWith(
           status: ImportActionStatus.success,
           actionType: ImportActionType.confirm,
-          importDetail: state.importDetail,
+          importDetail: importData,
           successMessage: response['message'],
         ),
       );

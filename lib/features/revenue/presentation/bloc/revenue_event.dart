@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'dart:io';
 
 abstract class RevenueEvent extends Equatable {
   const RevenueEvent();
@@ -34,24 +35,27 @@ class LoadRevenuesRequested extends RevenueEvent {
 
 class CreateManualRevenueRequested extends RevenueEvent {
   final Map<String, dynamic> body;
+  final File? image;
 
-  const CreateManualRevenueRequested({required this.body});
+  const CreateManualRevenueRequested({required this.body, this.image});
 
   @override
-  List<Object?> get props => [body];
+  List<Object?> get props => [body, image];
 }
 
 class UpdateManualRevenueRequested extends RevenueEvent {
   final int revenueId;
   final Map<String, dynamic> body;
+  final File? image;
 
   const UpdateManualRevenueRequested({
     required this.revenueId,
     required this.body,
+    this.image,
   });
 
   @override
-  List<Object?> get props => [revenueId, body];
+  List<Object?> get props => [revenueId, body, image];
 }
 
 class DeleteManualRevenueRequested extends RevenueEvent {

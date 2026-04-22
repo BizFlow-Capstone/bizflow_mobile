@@ -59,12 +59,12 @@ Future<void> showAddRevenueDialog({
 
   if (!context.mounted) return;
 
-  List<String> getMoneyChannels() {
+  List<ReferenceItem> getMoneyChannels() {
     final state = context.read<ReferenceBloc>().state;
     if (state is ReferenceLoaded) {
-      return state.references['moneyChannelTypes'] ?? const <String>[];
+      return state.references['moneyChannelTypes'] ?? const <ReferenceItem>[];
     }
-    return const <String>[];
+    return const <ReferenceItem>[];
   }
 
   await showDialog(
@@ -124,10 +124,11 @@ Future<void> showAddRevenueDialog({
                   labelText: l10n.translate('accounting.channel'),
                 ),
                 items: getMoneyChannels()
+                    .where((item) => item.label.trim().isNotEmpty)
                     .map(
-                      (channel) => DropdownMenuItem<String>(
-                        value: channel,
-                        child: Text(channel),
+                      (item) => DropdownMenuItem<String>(
+                        value: item.code,
+                        child: Text(item.label),
                       ),
                     )
                     .toList(),
@@ -305,9 +306,8 @@ Future<void> showAddRevenueDialog({
                             'referenceType': 'order',
                           if (referenceOrderId != null)
                             'referenceId': referenceOrderId,
-                          if (selectedImage != null)
-                            'imagePath': selectedImage!.path,
                         },
+                        image: selectedImage,
                       ),
                     );
                     Navigator.of(dialogCtx).pop();

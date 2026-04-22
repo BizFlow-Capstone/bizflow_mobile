@@ -18,6 +18,33 @@ class ImportRepository {
   }) : _localApiCache = localApiCacheStore ?? LocalApiCacheStore(),
        _localDataSource = localDataSource ?? ImportLocalDataSource();
 
+  int? _parseImportId(Map<String, dynamic>? payload) {
+    if (payload == null) return null;
+
+    final raw = payload['importId'] ?? payload['ImportId'];
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    return int.tryParse(raw?.toString() ?? '');
+  }
+
+  Future<Map<String, dynamic>?> _tryGetFreshImportDetail(int? importId) async {
+    if (importId == null || importId <= 0) return null;
+
+    try {
+      final detail = await _apiService.getImportDetail(importId);
+      await _localDataSource.upsertDetail(ImportDetailModel.fromJson(detail));
+      await _localApiCache.setMap(
+        'import_detail_$importId',
+        detail,
+        groupKey: 'imports',
+        cacheType: 'detail',
+      );
+      return detail;
+    } catch (_) {
+      return null;
+    }
+  }
+
   String _importsCacheKey({
     String? status,
     String? importType,
@@ -136,11 +163,10 @@ class ImportRepository {
   Future<Map<String, dynamic>> createImport(CreateImportRequest request) async {
     try {
       final response = await _apiService.createImport(request);
-      final payload = response['data'];
-      if (payload is Map<String, dynamic>) {
-        await _localDataSource.upsertDetail(
-          ImportDetailModel.fromJson(payload),
-        );
+      final payload = response['data'] as Map<String, dynamic>?;
+      final detail = await _tryGetFreshImportDetail(_parseImportId(payload));
+      if (detail != null) {
+        return {...response, 'data': detail};
       }
       return response;
     } catch (e) {
@@ -154,11 +180,12 @@ class ImportRepository {
   ) async {
     try {
       final response = await _apiService.updateImport(importId, request);
-      final payload = response['data'];
-      if (payload is Map<String, dynamic>) {
-        await _localDataSource.upsertDetail(
-          ImportDetailModel.fromJson(payload),
-        );
+      final payload = response['data'] as Map<String, dynamic>?;
+      final detail = await _tryGetFreshImportDetail(
+        _parseImportId(payload) ?? importId,
+      );
+      if (detail != null) {
+        return {...response, 'data': detail};
       }
       return response;
     } catch (e) {
@@ -172,11 +199,12 @@ class ImportRepository {
   ) async {
     try {
       final response = await _apiService.confirmImport(importId, request);
-      final payload = response['data'];
-      if (payload is Map<String, dynamic>) {
-        await _localDataSource.upsertDetail(
-          ImportDetailModel.fromJson(payload),
-        );
+      final payload = response['data'] as Map<String, dynamic>?;
+      final detail = await _tryGetFreshImportDetail(
+        _parseImportId(payload) ?? importId,
+      );
+      if (detail != null) {
+        return {...response, 'data': detail};
       }
       return response;
     } catch (e) {

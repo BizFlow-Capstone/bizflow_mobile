@@ -1,5 +1,6 @@
 import '../../../shared/cache/cache_manager.dart';
 import 'reference_api_service.dart';
+import 'reference_item.dart';
 
 class ReferenceRepository {
   final ReferenceApiService _apiService;
@@ -11,12 +12,17 @@ class ReferenceRepository {
   })  : _apiService = apiService,
         _cache = cacheManager ?? CacheManager();
 
+  /// Buộc SWR revalidate ngầm lần tới mà không xóa cache.
+  /// Nếu network fail, data cũ vẫn được serve — tránh UI trống khi mất mạng.
+  void scheduleForceRevalidate() {
+    _cache.resetRevalidateTimer('reference_data');
+  }
+
   Future<void> getAllReferences({
-    required Function(Map<String, List<String>> data, bool isFromCache) onData,
+    required Function(Map<String, List<ReferenceItem>> data, bool isFromCache) onData,
     Function(dynamic error)? onError,
   }) async {
-    // Implement SWR logic using fetchWithSWR to fetch all reference enums in parallel
-    await _cache.fetchWithSWR<Map<String, List<String>>>(
+    await _cache.fetchWithSWR<Map<String, List<ReferenceItem>>>(
       key: 'reference_data',
       fetcher: ({cancelToken}) async {
         final results = await Future.wait([
@@ -55,14 +61,19 @@ class ReferenceRepository {
       },
       onData: onData,
       onError: onError,
-      toJson: (data) => data,
-      fromJson: (json) {
-        final map = json;
-        return map.map((key, value) {
-          final list = value is List ? value.map((e) => e.toString()).toList() : <String>[];
-          return MapEntry(key, list);
-        });
-      },
+      toJson: (data) => data.map(
+        (key, items) => MapEntry(key, items.map((i) => i.toJson()).toList()),
+      ),
+      fromJson: (json) => json.map((key, value) {
+        final list = value is List
+            ? value.map((e) {
+                if (e is Map<String, dynamic>) return ReferenceItem.fromJson(e);
+                final str = e?.toString() ?? '';
+                return ReferenceItem(code: str, label: str);
+              }).toList()
+            : <ReferenceItem>[];
+        return MapEntry(key, list);
+      }),
     );
   }
 }

@@ -1,4 +1,7 @@
 import 'package:equatable/equatable.dart';
+import '../../../reference/data/reference_item.dart';
+
+export '../../../reference/data/reference_item.dart';
 
 abstract class ReferenceState extends Equatable {
   const ReferenceState();
@@ -12,7 +15,7 @@ class ReferenceInitial extends ReferenceState {}
 class ReferenceLoading extends ReferenceState {}
 
 class ReferenceLoaded extends ReferenceState {
-  final Map<String, List<String>> references;
+  final Map<String, List<ReferenceItem>> references;
   final bool isFromCache;
 
   const ReferenceLoaded(

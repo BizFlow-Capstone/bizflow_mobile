@@ -1,15 +1,19 @@
 import 'package:equatable/equatable.dart';
 import '../../../../shared/utils/date_formatter.dart';
 
+import '../../../../core/reference/data/reference_item.dart';
+
 class CostDto extends Equatable {
   final int costId;
   final int businessLocationId;
   final String costType;
+  final String? costTypeLabel;
   final double amount;
   final DateTime costDate;
   final DateTime? documentDate;
   final String description;
   final String? paymentMethod;
+  final String? paymentMethodLabel;
   final String? documentUrl;
   final String? referenceType;
   final int? referenceId;
@@ -22,11 +26,13 @@ class CostDto extends Equatable {
     required this.costId,
     required this.businessLocationId,
     required this.costType,
+    this.costTypeLabel,
     required this.amount,
     required this.costDate,
     this.documentDate,
     required this.description,
     this.paymentMethod,
+    this.paymentMethodLabel,
     this.documentUrl,
     this.referenceType,
     this.referenceId,
@@ -66,19 +72,33 @@ class CostDto extends Equatable {
       return normalized;
     }
 
+    String asString(dynamic value, {String fallback = ''}) {
+      final normalized = value?.toString().trim();
+      if (normalized == null || normalized.isEmpty) return fallback;
+      return normalized;
+    }
+
     return CostDto(
       costId: asInt(json['costId'] ?? json['id']),
       businessLocationId: asInt(json['businessLocationId']),
-      costType: json['costType'] as String? ?? '',
+      costType: referenceCodeFromDynamic(json['costType']),
+      costTypeLabel: referenceLabelFromDynamic(json['costType']),
       amount: asDouble(json['amount']),
       costDate:
-          DateFormatter.parseApiDateTime(json['costDate'] as String?) ??
+          DateFormatter.parseApiDateTime(asNullableString(json['costDate'])) ??
           DateTime.now(),
       documentDate: DateFormatter.parseApiDateTime(
-        json['documentDate'] as String?,
+        asNullableString(json['documentDate']),
       ),
-      description: json['description'] as String? ?? '',
-      paymentMethod: asNullableString(
+      description: asString(json['description']),
+      paymentMethod: referenceCodeFromDynamic(
+        json['paymentMethod'] ?? json['PaymentMethod'],
+      ).isEmpty
+          ? null
+          : referenceCodeFromDynamic(
+              json['paymentMethod'] ?? json['PaymentMethod'],
+            ),
+      paymentMethodLabel: referenceLabelFromDynamic(
         json['paymentMethod'] ?? json['PaymentMethod'],
       ),
       documentUrl: asNullableString(json['documentUrl'] ?? json['DocumentUrl']),
@@ -104,9 +124,9 @@ class CostDto extends Equatable {
       imagePath: asNullableString(
         json['imagePath'] ?? json['ImagePath'] ?? json['imageUrl'] ?? json['receiptImageUrl'],
       ),
-      createdBy: json['createdBy'] as String? ?? '',
+        createdBy: asString(json['createdBy']),
       createdAt:
-          DateFormatter.parseApiDateTime(json['createdAt'] as String?) ??
+          DateFormatter.parseApiDateTime(asNullableString(json['createdAt'])) ??
           DateTime.now(),
     );
   }

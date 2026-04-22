@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../../core/reference/data/reference_item.dart';
 
 /// Product DTO - Data Transfer Object
 
@@ -46,6 +47,7 @@ class ProductDto {
   final String? unit;
   final String? barcode;
   final bool isActive;
+  final String? statusLabel;
   final bool trackInventory;
   final List<Map<String, dynamic>> saleItems;
 
@@ -65,6 +67,7 @@ class ProductDto {
     this.unit,
     this.barcode,
     this.isActive = true,
+    this.statusLabel,
     this.trackInventory = true,
     this.saleItems = const [],
   });
@@ -208,6 +211,10 @@ class ProductDto {
       json['trackInventory'] ?? json['TrackInventory'],
       fallback: true,
     );
+    final rawStatus = json['status'] ?? json['Status'];
+    final normalizedStatusCode = referenceCodeFromDynamic(rawStatus)
+        .trim()
+        .toLowerCase();
 
     return ProductDto(
       id: idValue?.toString() ?? '',
@@ -242,8 +249,9 @@ class ProductDto {
           (json['sku'] ?? json['Sku'] ?? json['barcode'] ?? json['Barcode'])
               as String?,
       isActive:
-          (json['status'] ?? json['Status']) == 'active' ||
+          normalizedStatusCode == 'active' ||
           (json['isActive'] ?? json['IsActive']) == true,
+        statusLabel: referenceLabelFromDynamic(rawStatus),
       trackInventory: resolvedTrackInventory,
       saleItems: saleItems,
     );
@@ -267,6 +275,7 @@ class ProductDto {
       if (unit != null) 'unit': unit,
       if (barcode != null) 'barcode': barcode,
       'isActive': isActive,
+      if ((statusLabel ?? '').trim().isNotEmpty) 'statusLabel': statusLabel,
       'trackInventory': trackInventory,
       'saleItems': saleItems,
     };

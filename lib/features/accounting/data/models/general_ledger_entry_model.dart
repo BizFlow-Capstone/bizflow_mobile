@@ -1,3 +1,5 @@
+import '../../../../core/reference/data/reference_item.dart';
+
 class GeneralLedgerEntryModel {
   final int entryId;
   final String documentNumber;
@@ -6,12 +8,15 @@ class GeneralLedgerEntryModel {
   final String note;
   final double amount;
   final String transactionType;
+  final String? transactionTypeLabel;
   final String transactionCategory;
   final String accountType;
   final String accountCategory;
   final String? moneyChannel;
+  final String? moneyChannelLabel;
   final String? effectiveStatus;
   final String referenceType;
+  final String? referenceTypeLabel;
   final int? referenceId;
   final String? entityType;
   final int? entityId;
@@ -24,12 +29,15 @@ class GeneralLedgerEntryModel {
     required this.note,
     required this.amount,
     required this.transactionType,
+    this.transactionTypeLabel,
     required this.transactionCategory,
     required this.accountType,
     required this.accountCategory,
     this.moneyChannel,
+    this.moneyChannelLabel,
     this.effectiveStatus,
     required this.referenceType,
+    this.referenceTypeLabel,
     this.referenceId,
     this.entityType,
     this.entityId,
@@ -75,7 +83,10 @@ class GeneralLedgerEntryModel {
         ? (debitAmount - creditAmount)
         : asDouble(json['amount']);
 
-    final refType = asString(source['referenceType'] ?? json['referenceType']);
+    final rawTransactionType = json['transactionType'];
+    final rawMoneyChannel = json['moneyChannel'];
+    final rawReferenceType = source['referenceType'] ?? json['referenceType'];
+    final refType = referenceCodeFromDynamic(rawReferenceType);
     final refId = asNullableInt(source['referenceId'] ?? json['referenceId']);
     final entityType = asString(source['entityType'], fallback: '');
     final entityId = asNullableInt(source['entityId']);
@@ -101,17 +112,20 @@ class GeneralLedgerEntryModel {
       date: asString(json['date'] ?? json['entryDate'] ?? json['createdAt']),
       note: asString(json['note'] ?? json['description']),
       amount: normalizedAmount,
-      transactionType: asString(json['transactionType']),
+        transactionType: referenceCodeFromDynamic(rawTransactionType),
+        transactionTypeLabel: referenceLabelFromDynamic(rawTransactionType),
       transactionCategory: asString(json['transactionCategory']),
       accountType: asString(json['accountType']),
       accountCategory: asString(json['accountCategory']),
-      moneyChannel: asString(json['moneyChannel']).trim().isEmpty
+        moneyChannel: referenceCodeFromDynamic(rawMoneyChannel).trim().isEmpty
           ? null
-          : asString(json['moneyChannel']).trim(),
+          : referenceCodeFromDynamic(rawMoneyChannel).trim(),
+        moneyChannelLabel: referenceLabelFromDynamic(rawMoneyChannel),
       effectiveStatus: asString(json['effectiveStatus']).trim().isEmpty
           ? null
           : asString(json['effectiveStatus']).trim(),
       referenceType: refType,
+        referenceTypeLabel: referenceLabelFromDynamic(rawReferenceType),
       referenceId: refId,
       entityType: entityType.trim().isEmpty ? null : entityType.trim(),
       entityId: entityId,
@@ -127,12 +141,15 @@ class GeneralLedgerEntryModel {
       'note': note,
       'amount': amount,
       'transactionType': transactionType,
+      'transactionTypeLabel': transactionTypeLabel,
       'transactionCategory': transactionCategory,
       'accountType': accountType,
       'accountCategory': accountCategory,
       'moneyChannel': moneyChannel,
+      'moneyChannelLabel': moneyChannelLabel,
       'effectiveStatus': effectiveStatus,
       'referenceType': referenceType,
+      'referenceTypeLabel': referenceTypeLabel,
       'referenceId': referenceId,
       'entityType': entityType,
       'entityId': entityId,

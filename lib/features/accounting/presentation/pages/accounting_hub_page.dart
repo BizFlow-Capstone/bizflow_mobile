@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
@@ -12,6 +13,7 @@ import 'package:record/record.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_bloc.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_event.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_state.dart';
+import 'package:bizflow_mobile/core/reference/data/reference_item.dart';
 import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
 import 'package:bizflow_mobile/features/order/presentation/pages/order_detail_screen.dart';
 import 'package:bizflow_mobile/features/revenue/presentation/bloc/revenue_bloc.dart';
@@ -44,6 +46,7 @@ import '../widgets/accounting_period_tab.dart';
 import '../../../accounting/domain/utils/accounting_reference_display.dart';
 import '../../../subscription/data/subscription_repository.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 
 class AccountingHubPage extends StatefulWidget {
   const AccountingHubPage({super.key});
@@ -59,6 +62,39 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   static const String _featureAi = SubscriptionFeatureCodes.ai;
 
   late final TabController _tabController;
+  
+  // Helper method: Check if date falls within a finalized period
+  bool _isDateInFinalizedPeriod(DateTime date) {
+    try {
+      final periodBloc = context.read<AccountingPeriodBloc>();
+      final periodState = periodBloc.state;
+      
+      final periods = periodState.periods;
+      for (final period in periods) {
+        if (period.isFinalized) {
+          final start = DateTime.parse(period.startDate);
+          final end = DateTime.parse(period.endDate);
+          if (date.isAfter(start.subtract(const Duration(days: 1))) && 
+              date.isBefore(end.add(const Duration(days: 1)))) {
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  bool _canModifyRevenueEntry(RevenueEntity item) {
+    if (!_isManualRevenueEntry(item)) return false;
+    if (_isDateInFinalizedPeriod(item.date)) return false;
+    return true;
+  }
+
+  bool _canModifyCostEntry(CostEntity item) {
+    if (!_isManualCostEntry(item)) return false;
+    if (_isDateInFinalizedPeriod(item.date)) return false;
+    return true;
+  }
 
   // Period BLoC data is managed by AccountingPeriodBloc
   // Other tabs still use local/mock state for now
@@ -77,6 +113,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    SyncStatusController().clearError();
     SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
 
     _tabController.addListener(_handleTabSelection);
@@ -278,10 +315,27 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
   }
 
+  Future<void> _pickImage(
+    ImageSource source,
+    void Function(void Function()) setDialogState,
+    void Function(File file) onPicked,
+  ) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: source,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 85,
+    );
+    if (pickedFile != null) {
+      setDialogState(() => onPicked(File(pickedFile.path)));
+    }
+  }
+
   Widget _buildStringDropdownField({
     required String label,
     required String? value,
-    required List<String> options,
+    required List<ReferenceItem> options,
     required ValueChanged<String?> onChanged,
     bool isExpanded = false,
     FocusNode? focusNode,
@@ -296,10 +350,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       autovalidateMode: autovalidateMode,
       decoration: InputDecoration(labelText: label),
       items: options
+          .where((item) => item.label.trim().isNotEmpty)
           .map(
-            (option) => DropdownMenuItem<String>(
-              value: option,
-              child: Text(option, overflow: TextOverflow.ellipsis),
+            (item) => DropdownMenuItem<String>(
+              value: item.code,
+              child: Text(item.label, overflow: TextOverflow.ellipsis),
             ),
           )
           .toList(),
@@ -436,6 +491,17 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       return;
     }
 
+    if (_isDateInFinalizedPeriod(item.date)) {
+      AppSnackBar.warning(
+        context,
+        _translateWithFallback(
+          'accounting.period_finalized_readonly',
+          'Kỳ kế toán đã chốt sổ, không thể xóa',
+        ),
+      );
+      return;
+    }
+
     final ok = await _confirmAction(
       title: l10n.translate('accounting.confirm_title'),
       message: l10n.translate('accounting.confirm_delete_revenue'),
@@ -458,6 +524,17 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   Future<void> _onDeleteCost(CostEntity item) async {
     if (!_isManualCostEntry(item)) {
       _showManualOnlyWarning();
+      return;
+    }
+
+    if (_isDateInFinalizedPeriod(item.date)) {
+      AppSnackBar.warning(
+        context,
+        _translateWithFallback(
+          'accounting.period_finalized_readonly',
+          'Kỳ kế toán đã chốt sổ, không thể xóa',
+        ),
+      );
       return;
     }
 
@@ -666,6 +743,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     const AccountingGlTab(),
                     BlocBuilder<RevenueBloc, RevenueState>(
                       builder: (context, revenueState) {
+                        // Watch both RevenueBloc and AccountingPeriodBloc for changes
+                        context.watch<AccountingPeriodBloc>().state;
+                        
                         List<RevenueEntity> revenueEntities = _cachedRevenues;
                         if (revenueState is RevenuesLoaded) {
                           revenueEntities = revenueState.revenues;
@@ -687,11 +767,16 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onEditCost: _showEditCostDialog,
                           onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
+                          canModifyRevenue: _canModifyRevenueEntry,
+                          canModifyCost: (item) => false, // revenue tab doesn't show costs
                         );
                       },
                     ),
                     BlocBuilder<CostBloc, CostState>(
                       builder: (context, costState) {
+                        // Watch both CostBloc and AccountingPeriodBloc for changes
+                        context.watch<AccountingPeriodBloc>().state;
+                        
                         List<CostEntity> costEntities = _cachedCosts;
                         if (costState is CostsLoaded) {
                           costEntities = costState.costs;
@@ -713,6 +798,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onEditCost: _showEditCostDialog,
                           onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
+                          canModifyRevenue: (item) => false, // cost tab doesn't show revenues
+                          canModifyCost: _canModifyCostEntry,
                         );
                       },
                     ),
@@ -726,23 +813,23 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
   }
 
-  List<String> _getMoneyChannelsForDialog() {
+  List<ReferenceItem> _getMoneyChannelsForDialog() {
     final state = context.read<ReferenceBloc>().state;
     if (state is ReferenceLoaded) {
-      return state.references['moneyChannelTypes'] ?? const <String>[];
+      return state.references['moneyChannelTypes'] ?? const <ReferenceItem>[];
     }
-    return const <String>[];
+    return const <ReferenceItem>[];
   }
 
-  List<String> _getCostTypesForDialog() {
+  List<ReferenceItem> _getCostTypesForDialog() {
     final state = context.read<ReferenceBloc>().state;
     if (state is ReferenceLoaded) {
-      return (state.references['costTypes'] ?? const <String>[])
-          .where((c) => c.toLowerCase() != 'import')
+      return (state.references['costTypes'] ?? const <ReferenceItem>[])
+          .where((c) => c.code.toLowerCase() != 'import')
           .toSet()
           .toList();
     }
-    return const <String>[];
+    return const <ReferenceItem>[];
   }
 
   Future<void> _showCreateRevenueModeDialog() async {
@@ -846,6 +933,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     DateTime? selectedDocumentDate;
     String? selectedMoneyChannel;
     String? selectedBusinessTypeId;
+    File? selectedImage;
     List<BusinessTypeDto> businessTypes = [];
 
     try {
@@ -860,12 +948,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     if (!mounted) return;
 
-    List<String> getMoneyChannels() {
+    List<ReferenceItem> getMoneyChannels() {
       final state = context.read<ReferenceBloc>().state;
       if (state is ReferenceLoaded) {
-        return state.references['moneyChannelTypes'] ?? const <String>[];
+        return state.references['moneyChannelTypes'] ?? const <ReferenceItem>[];
       }
-      return const <String>[];
+      return const <ReferenceItem>[];
     }
 
     bool isSubmitting = false;
@@ -1031,6 +1119,43 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       setDialogState(() => selectedDocumentDate = value);
                     },
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  // Image upload section
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.photo_library),
+                        label: Text(l10n.translate('accounting.select_image')),
+                        onPressed: () => _pickImage(
+                          ImageSource.gallery,
+                          setDialogState,
+                          (file) => selectedImage = file,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.camera_alt),
+                        label: Text(l10n.translate('accounting.take_photo')),
+                        onPressed: () => _pickImage(
+                          ImageSource.camera,
+                          setDialogState,
+                          (file) => selectedImage = file,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (selectedImage != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      child: Image.file(
+                        selectedImage!,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1127,9 +1252,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           .read<BusinessContext>()
                           .currentBusinessId;
 
-                      context.read<RevenueBloc>().add(
-                        CreateManualRevenueRequested(
-                          body: {
+                      try {
+                        await context.read<RevenueBloc>().repository
+                            .createManualRevenue(
+                          {
                             'businessLocationId':
                                 int.tryParse(locationId ?? '') ?? 0,
                             'amount': amount,
@@ -1148,9 +1274,26 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             if (referenceOrderId != null)
                               'referenceId': referenceOrderId,
                           },
-                        ),
-                      );
-                      Navigator.of(dialogCtx).pop();
+                          image: selectedImage,
+                        );
+                        if (!mounted || !dialogCtx.mounted) return;
+                        Navigator.of(dialogCtx).pop();
+                        _showSuccess(
+                          l10n.translate('accounting.revenue_created_success'),
+                        );
+                        if (locationId != null) {
+                          context.read<RevenueBloc>().add(
+                            LoadRevenuesRequested(businessLocationId: locationId),
+                          );
+                        }
+                      } catch (e) {
+                        if (!dialogCtx.mounted) return;
+                        AppSnackBar.error(
+                          dialogCtx,
+                          ApiErrorMessageParser.parse(e),
+                        );
+                        setDialogState(() => isSubmitting = false);
+                      }
                     },
               child: isSubmitting
                   ? const SizedBox(
@@ -1211,28 +1354,29 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     String? selectedCostType;
     String? selectedPaymentMethod;
 
-    List<String> getCostTypes() {
+    List<ReferenceItem> getCostTypes() {
       final state = context.read<ReferenceBloc>().state;
       if (state is ReferenceLoaded) {
-        return (state.references['costTypes'] ?? const <String>[])
+        return (state.references['costTypes'] ?? const <ReferenceItem>[])
             .toSet()
             .toList();
       }
-      return const <String>[];
+      return const <ReferenceItem>[];
     }
 
-    List<String> getPaymentMethods() {
+    List<ReferenceItem> getPaymentMethods() {
       final state = context.read<ReferenceBloc>().state;
       if (state is ReferenceLoaded) {
-        return (state.references['paymentMethods'] ?? const <String>[])
+        return (state.references['paymentMethods'] ?? const <ReferenceItem>[])
             .toSet()
             .toList();
       }
-      return const <String>[];
+      return const <ReferenceItem>[];
     }
 
     bool isSubmitting = false;
     bool didSubmit = false;
+    File? selectedImage;
 
     await showDialog(
       context: context,
@@ -1306,7 +1450,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         ? AutovalidateMode.onUserInteraction
                         : AutovalidateMode.disabled,
                     options: getCostTypes()
-                        .where((c) => c.toLowerCase() != 'import')
+                        .where((c) => c.code.toLowerCase() != 'import')
                         .toList(),
                     onChanged: (value) =>
                         setDialogState(() => selectedCostType = value),
@@ -1356,6 +1500,43 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       setDialogState(() => selectedDocumentDate = value);
                     },
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  // Image upload section
+                  Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    children: [
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.photo_library),
+                        label: Text(l10n.translate('accounting.select_image')),
+                        onPressed: () => _pickImage(
+                          ImageSource.gallery,
+                          setDialogState,
+                          (file) => selectedImage = file,
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.camera_alt),
+                        label: Text(l10n.translate('accounting.take_photo')),
+                        onPressed: () => _pickImage(
+                          ImageSource.camera,
+                          setDialogState,
+                          (file) => selectedImage = file,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (selectedImage != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                      child: Image.file(
+                        selectedImage!,
+                        height: 100,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1413,9 +1594,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       final locationId = context
                           .read<BusinessContext>()
                           .currentBusinessId;
-                      context.read<CostBloc>().add(
-                        CreateManualCostRequested(
-                          body: {
+                      try {
+                        await context.read<CostBloc>().repository
+                            .createManualCost(
+                          {
                             'businessLocationId':
                                 int.tryParse(locationId ?? '') ?? 0,
                             'amount': amount,
@@ -1430,9 +1612,28 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             'costType': selectedCostType,
                             'paymentMethod': selectedPaymentMethod,
                           },
-                        ),
-                      );
-                      Navigator.pop(dialogCtx);
+                          image: selectedImage,
+                        );
+                        if (!mounted || !dialogCtx.mounted) return;
+                        Navigator.pop(dialogCtx);
+                        _showSuccess(
+                          l10n.translate('accounting.updated_success'),
+                        );
+                        if (locationId != null) {
+                          context.read<CostBloc>().add(
+                            LoadCostsRequested(
+                              businessLocationId: locationId,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (!dialogCtx.mounted) return;
+                        AppSnackBar.error(
+                          dialogCtx,
+                          ApiErrorMessageParser.parse(e),
+                        );
+                        setDialogState(() => isSubmitting = false);
+                      }
                     },
               child: isSubmitting
                   ? const SizedBox(
@@ -1461,6 +1662,18 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       return;
     }
 
+    // Check if date falls in finalized period
+    if (_isDateInFinalizedPeriod(item.date)) {
+      AppSnackBar.warning(
+        context,
+        _translateWithFallback(
+          'accounting.period_finalized_readonly',
+          'Kỳ kế toán đã chốt sổ, không thể chỉnh sửa',
+        ),
+      );
+      return;
+    }
+
     final l10n = AppLocalizations.of(context);
     final refState = context.read<ReferenceBloc>().state;
     if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
@@ -1476,41 +1689,42 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     String? selectedCostType = item.type;
     String? selectedPaymentMethod = item.paymentMethod;
 
-    List<String> getCostTypes() {
+    List<ReferenceItem> getCostTypes() {
       final state = context.read<ReferenceBloc>().state;
       if (state is ReferenceLoaded) {
-        return (state.references['costTypes'] ?? const <String>[])
+        return (state.references['costTypes'] ?? const <ReferenceItem>[])
             .toSet()
             .toList();
       }
-      return const <String>[];
+      return const <ReferenceItem>[];
     }
 
-    List<String> getPaymentMethods() {
+    List<ReferenceItem> getPaymentMethods() {
       final state = context.read<ReferenceBloc>().state;
       if (state is ReferenceLoaded) {
-        return (state.references['paymentMethods'] ?? const <String>[])
+        return (state.references['paymentMethods'] ?? const <ReferenceItem>[])
             .toSet()
             .toList();
       }
-      return const <String>[];
+      return const <ReferenceItem>[];
     }
 
     final costTypeOptions = getCostTypes()
-        .where((c) => c.toLowerCase() != 'import')
-        .toSet();
+        .where((c) => c.code.toLowerCase() != 'import')
+        .toList();
     if ((selectedCostType ?? '').isNotEmpty &&
-        !costTypeOptions.contains(selectedCostType)) {
+        !costTypeOptions.any((c) => c.code == selectedCostType)) {
       selectedCostType = null;
     }
 
-    final paymentOptions = getPaymentMethods().toSet();
+    final paymentOptions = getPaymentMethods();
     if ((selectedPaymentMethod ?? '').isNotEmpty &&
-        !paymentOptions.contains(selectedPaymentMethod)) {
+        !paymentOptions.any((p) => p.code == selectedPaymentMethod)) {
       selectedPaymentMethod = null;
     }
 
     bool isSubmitting = false;
+    File? selectedImage = item.imagePath != null ? File(item.imagePath!) : null;
 
     await showDialog(
       context: context,
@@ -1572,6 +1786,43 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     setDialogState(() => selectedDocumentDate = value);
                   },
                 ),
+                const SizedBox(height: AppSpacing.md),
+                // Image upload section
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.photo_library),
+                      label: Text(l10n.translate('accounting.select_image')),
+                      onPressed: () => _pickImage(
+                        ImageSource.gallery,
+                        setDialogState,
+                        (file) => selectedImage = file,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.camera_alt),
+                      label: Text(l10n.translate('accounting.take_photo')),
+                      onPressed: () => _pickImage(
+                        ImageSource.camera,
+                        setDialogState,
+                        (file) => selectedImage = file,
+                      ),
+                    ),
+                  ],
+                ),
+                if (selectedImage != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    child: Image.file(
+                      selectedImage!,
+                      height: 100,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1673,6 +1924,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                                 selectedPaymentMethod ?? item.paymentMethod,
                             'removeDocument': false,
                           },
+                          image: selectedImage,
                         ),
                       );
                       Navigator.of(dialogCtx).pop();
@@ -1757,24 +2009,42 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: GestureDetector(
                     onTap: () {
+                      final image = (revenue.imagePath ?? '').trim();
+                      final isNetwork =
+                          image.startsWith('http://') || image.startsWith('https://');
                       showDialog(
                         context: context,
                         builder: (_) => Dialog(
                           child: InteractiveViewer(
-                            child: Image.file(
-                              File(revenue.imagePath!),
-                              fit: BoxFit.contain,
-                            ),
+                            child: isNetwork
+                                ? Image.network(image, fit: BoxFit.contain)
+                                : Image.file(
+                                    File(revenue.imagePath!),
+                                    fit: BoxFit.contain,
+                                  ),
                           ),
                         ),
                       );
                     },
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(revenue.imagePath!),
-                        height: 120,
-                        fit: BoxFit.cover,
+                      child: Builder(
+                        builder: (_) {
+                          final image = (revenue.imagePath ?? '').trim();
+                          final isNetwork = image.startsWith('http://') ||
+                              image.startsWith('https://');
+                          return isNetwork
+                              ? Image.network(
+                                  image,
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                )
+                              : Image.file(
+                                  File(revenue.imagePath!),
+                                  height: 120,
+                                  fit: BoxFit.cover,
+                                );
+                        },
                       ),
                     ),
                   ),
@@ -1836,7 +2106,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${l10n.translate('order.detail_status')}: ${order.status}',
+                          '${l10n.translate('order.detail_status')}: ${order.statusLabel ?? (() {
+                            final refState = context.read<ReferenceBloc>().state;
+                            if (refState is ReferenceLoaded) {
+                              final orderStatuses = refState.references['orderStatuses'] ?? <ReferenceItem>[];
+                              return orderStatuses.getLabelByCode(order.status);
+                            }
+                            return order.status;
+                          })()}',
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -1921,7 +2198,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if ((cost.imagePath ?? '').isNotEmpty)
+              if ((cost.documentUrl ?? cost.imagePath ?? '').isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: GestureDetector(
@@ -1930,21 +2207,32 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         context: context,
                         builder: (_) => Dialog(
                           child: InteractiveViewer(
-                            child: Image.file(
-                              File(cost.imagePath!),
-                              fit: BoxFit.contain,
-                            ),
+                            child: (cost.documentUrl ?? '').isNotEmpty
+                                ? Image.network(
+                                    cost.documentUrl!,
+                                    fit: BoxFit.contain,
+                                  )
+                                : Image.file(
+                                    File(cost.imagePath!),
+                                    fit: BoxFit.contain,
+                                  ),
                           ),
                         ),
                       );
                     },
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(cost.imagePath!),
-                        height: 120,
-                        fit: BoxFit.cover,
-                      ),
+                      child: (cost.documentUrl ?? '').isNotEmpty
+                          ? Image.network(
+                              cost.documentUrl!,
+                              height: 120,
+                              fit: BoxFit.cover,
+                            )
+                          : Image.file(
+                              File(cost.imagePath!),
+                              height: 120,
+                              fit: BoxFit.cover,
+                            ),
                     ),
                   ),
                 ),
@@ -2028,6 +2316,18 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       return;
     }
 
+    // Check if date falls in finalized period
+    if (_isDateInFinalizedPeriod(item.date)) {
+      AppSnackBar.warning(
+        context,
+        _translateWithFallback(
+          'accounting.period_finalized_readonly',
+          'Kỳ kế toán đã chốt sổ, không thể chỉnh sửa',
+        ),
+      );
+      return;
+    }
+
     final l10n = AppLocalizations.of(context);
     final refState = context.read<ReferenceBloc>().state;
     if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
@@ -2041,12 +2341,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     DateTime selectedDate = item.date;
     DateTime? selectedDocumentDate = item.documentDate;
 
-    List<String> getMoneyChannels() {
+    List<ReferenceItem> getMoneyChannels() {
       final state = context.read<ReferenceBloc>().state;
       if (state is ReferenceLoaded) {
-        return state.references['moneyChannelTypes'] ?? const <String>[];
+        return state.references['moneyChannelTypes'] ?? const <ReferenceItem>[];
       }
-      return const <String>[];
+      return const <ReferenceItem>[];
     }
 
     List<BusinessTypeDto> businessTypes = [];
@@ -2066,7 +2366,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     String? selectedMoneyChannel = item.moneyChannel;
     final channels = getMoneyChannels();
     if ((selectedMoneyChannel ?? '').isNotEmpty &&
-        !channels.contains(selectedMoneyChannel)) {
+        !channels.any((c) => c.code == selectedMoneyChannel)) {
       selectedMoneyChannel = null;
     }
     String? selectedBusinessTypeId = item.businessTypeId;
@@ -2077,6 +2377,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     }
 
     bool isSubmitting = false;
+    File? selectedImage = item.imagePath != null ? File(item.imagePath!) : null;
 
     await showDialog(
       context: context,
@@ -2099,19 +2400,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   label: l10n.translate('accounting.revenue_description'),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedMoneyChannel,
-                  decoration: InputDecoration(
-                    labelText: l10n.translate('accounting.channel'),
-                  ),
-                  items: getMoneyChannels()
-                      .map(
-                        (channel) => DropdownMenuItem<String>(
-                          value: channel,
-                          child: Text(channel),
-                        ),
-                      )
-                      .toList(),
+                _buildStringDropdownField(
+                  label: l10n.translate('accounting.channel'),
+                  value: selectedMoneyChannel,
+                  options: getMoneyChannels(),
                   onChanged: (value) {
                     setDialogState(() {
                       selectedMoneyChannel = value;
@@ -2168,6 +2460,43 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     setDialogState(() => selectedDocumentDate = value);
                   },
                 ),
+                const SizedBox(height: AppSpacing.md),
+                // Image upload section
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.photo_library),
+                      label: Text(l10n.translate('accounting.select_image')),
+                      onPressed: () => _pickImage(
+                        ImageSource.gallery,
+                        setDialogState,
+                        (file) => selectedImage = file,
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.camera_alt),
+                      label: Text(l10n.translate('accounting.take_photo')),
+                      onPressed: () => _pickImage(
+                        ImageSource.camera,
+                        setDialogState,
+                        (file) => selectedImage = file,
+                      ),
+                    ),
+                  ],
+                ),
+                if (selectedImage != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    child: Image.file(
+                      selectedImage!,
+                      height: 100,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -2240,6 +2569,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             if ((selectedBusinessTypeId ?? '').isNotEmpty)
                               'businessTypeId': selectedBusinessTypeId,
                           },
+                          image: selectedImage,
                         ),
                       );
                       Navigator.of(dialogCtx).pop();

@@ -610,11 +610,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       : AppColors.error,
                 ),
                 child: Text(
-                  _currentProduct.isActive
+                  _currentProduct.statusLabel ??
+                      (_currentProduct.isActive
                       ? (l10n?.translate('product.detail.status_active') ??
-                            'Đang hoạt động')
+                        'Đang hoạt động')
                       : (l10n?.translate('product.detail.status_inactive') ??
-                            'Ngừng hoạt động'),
+                        'Ngừng hoạt động')),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,

@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import '../../../../shared/utils/date_formatter.dart';
 
+import '../../../../core/reference/data/reference_item.dart';
+
 class RevenueDto extends Equatable {
   final int revenueId;
   final int businessLocationId;
@@ -10,6 +12,7 @@ class RevenueDto extends Equatable {
   final DateTime? documentDate;
   final String description;
   final String? moneyChannel;
+  final String? moneyChannelLabel;
   final String? referenceType;
   final int? referenceId;
   final String? referenceCode;
@@ -28,6 +31,7 @@ class RevenueDto extends Equatable {
     this.documentDate,
     required this.description,
     this.moneyChannel,
+    this.moneyChannelLabel,
     this.referenceType,
     this.referenceId,
     this.referenceCode,
@@ -68,19 +72,34 @@ class RevenueDto extends Equatable {
       return normalized;
     }
 
+    String asString(dynamic value, {String fallback = ''}) {
+      final normalized = value?.toString().trim();
+      if (normalized == null || normalized.isEmpty) return fallback;
+      return normalized;
+    }
+
     return RevenueDto(
       revenueId: asInt(json['revenueId'] ?? json['id']),
       businessLocationId: asInt(json['businessLocationId']),
-      revenueType: json['revenueType'] as String? ?? '',
+      revenueType: referenceCodeFromDynamic(json['revenueType']).trim().isEmpty
+          ? asString(json['revenueType'])
+          : referenceCodeFromDynamic(json['revenueType']).trim(),
       amount: asDouble(json['amount']),
       revenueDate:
-          DateFormatter.parseApiDateTime(json['revenueDate'] as String?) ??
+          DateFormatter.parseApiDateTime(asNullableString(json['revenueDate'])) ??
           DateTime.now(),
       documentDate: DateFormatter.parseApiDateTime(
-        json['documentDate'] as String?,
+        asNullableString(json['documentDate']),
       ),
-      description: json['description'] as String? ?? '',
-      moneyChannel: asNullableString(
+      description: asString(json['description']),
+      moneyChannel: referenceCodeFromDynamic(
+        json['moneyChannel'] ?? json['MoneyChannel'],
+      ).isEmpty
+          ? null
+          : referenceCodeFromDynamic(
+              json['moneyChannel'] ?? json['MoneyChannel'],
+            ),
+      moneyChannelLabel: referenceLabelFromDynamic(
         json['moneyChannel'] ?? json['MoneyChannel'],
       ),
       referenceType: asNullableString(
@@ -102,18 +121,28 @@ class RevenueDto extends Equatable {
       referenceCode: asNullableString(
         json['referenceCode'] ?? json['ReferenceCode'] ?? json['code'],
       ),
-      businessTypeId: asNullableString(
-        json['businessTypeId'] ?? json['BusinessTypeId'],
-      ),
-      businessTypeName: asNullableString(
-        json['businessTypeName'] ?? json['BusinessTypeName'],
-      ),
+      businessTypeId:
+          referenceCodeFromDynamic(json['businessTypeId'] ?? json['BusinessTypeId'])
+                  .trim()
+                  .isEmpty
+              ? asNullableString(json['businessTypeId'] ?? json['BusinessTypeId'])
+              : referenceCodeFromDynamic(
+                  json['businessTypeId'] ?? json['BusinessTypeId'],
+                ).trim(),
+      businessTypeName:
+          referenceLabelFromDynamic(json['businessTypeId'] ?? json['BusinessTypeId']) ??
+          asNullableString(json['businessTypeName'] ?? json['BusinessTypeName']),
       imagePath: asNullableString(
-        json['imagePath'] ?? json['ImagePath'] ?? json['imageUrl'] ?? json['receiptImageUrl'],
+        json['imagePath'] ??
+            json['ImagePath'] ??
+            json['imageUrl'] ??
+            json['receiptImageUrl'] ??
+            json['documentUrl'] ??
+            json['DocumentUrl'],
       ),
-      createdBy: json['createdBy'] as String? ?? '',
+        createdBy: asString(json['createdBy']),
       createdAt:
-          DateFormatter.parseApiDateTime(json['createdAt'] as String?) ??
+          DateFormatter.parseApiDateTime(asNullableString(json['createdAt'])) ??
           DateTime.now(),
     );
   }

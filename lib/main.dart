@@ -146,6 +146,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _localizationProvider = LocalizationProvider();
+    _localizationProvider.addListener(_onLocaleChanged);
     _remoteConfigService = RemoteConfigService();
     unawaited(_initializeRemoteConfig());
 
@@ -305,6 +306,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
+  /// Called whenever the UI language changes. Forces reference data to be
+  /// re-fetched from the network so labels are returned in the new locale.
+  void _onLocaleChanged() {
+    final ctx = AppRouter.navigatorKey.currentContext;
+    if (ctx == null) return;
+    ctx.read<ReferenceBloc>().add(ForceReloadAllReferencesRequested());
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -331,6 +340,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _deepLinkSubscription?.cancel();
+    _localizationProvider.removeListener(_onLocaleChanged);
     unawaited(_subscriptionRepository.dispose());
     _firebaseMessagingService.dispose();
     _notificationRealtimeService.dispose();

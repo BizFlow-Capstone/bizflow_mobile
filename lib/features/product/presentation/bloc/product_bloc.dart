@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:dio/dio.dart';
 import '../../data/product_repository.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import 'product_event.dart';
@@ -395,15 +396,20 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             item['barcode'] ?? item['Barcode'] ?? item['sku'] ?? item['Sku'],
           );
 
-          final String? resolvedStatus = parseString(
-            item['status'] ?? item['Status'],
+          final dynamic rawStatus = item['status'] ?? item['Status'];
+          final String? resolvedStatusCode = (() {
+            final code = referenceCodeFromDynamic(rawStatus).trim();
+            return code.isEmpty ? null : code;
+          })();
+          final String? resolvedStatusLabel = referenceLabelFromDynamic(
+            rawStatus,
           );
           final bool resolvedTrackInventory = parseBool(
             item['trackInventory'] ?? item['TrackInventory'] ?? true,
             fallback: true,
           );
-          final bool resolvedIsActive = resolvedStatus != null
-              ? parseBool(resolvedStatus, fallback: true)
+          final bool resolvedIsActive = resolvedStatusCode != null
+              ? resolvedStatusCode.toLowerCase() == 'active'
               : parseBool(
                   item['isActive'] ??
                       item['IsActive'] ??
@@ -447,6 +453,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             salePrice: resolvedSalePrice,
             unit: resolvedBaseUnit,
             isActive: resolvedIsActive,
+            statusLabel: resolvedStatusLabel,
             trackInventory: resolvedTrackInventory,
             saleItems: resolvedSaleItems,
             createdAt: (item['createdAt'] ?? item['CreatedAt']) != null

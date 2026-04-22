@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -23,12 +24,13 @@ import '../../../cost/presentation/bloc/cost_bloc.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../core/reference/data/reference_item.dart';
 
 // Extracted Cost AI Draft Dialog
 class AIDraftCostDialog extends StatefulWidget {
   final List<AiDraftCostItemDto> voiceItems;
-  final List<String> Function() getMoneyChannels;
-  final List<String> Function() getCostTypes;
+  final List<ReferenceItem> Function() getMoneyChannels;
+  final List<ReferenceItem> Function() getCostTypes;
   final BuildContext parentContext;
 
   const AIDraftCostDialog({
@@ -143,21 +145,34 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
     return recordDir;
   }
 
-  String? _mapCostTypeFromAi(String? aiValue, List<String> available) {
-    final raw = (aiValue ?? '').trim();
+  String? _mapCostTypeFromAi(dynamic aiValue, List<ReferenceItem> available) {
+    // Handle both string and object formats: {code, label}
+    final raw = _extractStringFromDynamic(aiValue).trim();
     if (raw.isEmpty || available.isEmpty) return null;
     final lower = raw.toLowerCase();
 
-    for (final value in available) {
-      if (value.toLowerCase() == lower) return value;
+    for (final item in available) {
+      if (item.code.toLowerCase() == lower) return item.code;
     }
 
-    for (final value in available) {
-      final v = value.toLowerCase();
-      if (v.contains(lower) || lower.contains(v)) return value;
+    for (final item in available) {
+      final code = item.code.toLowerCase();
+      final label = item.label.toLowerCase();
+      if (code.contains(lower) || lower.contains(code) ||
+          label.contains(lower) || lower.contains(label)) return item.code;
     }
 
     return null;
+  }
+
+  String _extractStringFromDynamic(dynamic value) {
+    if (value == null) return '';
+    if (value is String) return value;
+    if (value is Map) {
+      // Try to extract 'code' first, then 'label'
+      return ((value['code'] ?? value['label']) ?? '').toString().trim();
+    }
+    return value.toString().trim();
   }
 
   Future<void> _parseDraftFromAudioFile({
@@ -374,8 +389,9 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
     }
   }
 
-  String? _mapMoneyChannelFromAi(String? aiValue, List<String> available) {
-    final raw = (aiValue ?? '').trim().toLowerCase();
+  String? _mapMoneyChannelFromAi(dynamic aiValue, List<ReferenceItem> available) {
+    // Handle both string and object formats: {code, label}
+    final raw = _extractStringFromDynamic(aiValue).toLowerCase();
     if (raw.isEmpty || available.isEmpty) return null;
 
     bool matchCash(String source) =>
@@ -392,14 +408,14 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
         source.contains('vi');
 
     if (matchCash(raw)) {
-      for (final value in available) {
-        if (matchCash(value.toLowerCase())) return value;
+      for (final item in available) {
+        if (matchCash(item.code.toLowerCase()) || matchCash(item.label.toLowerCase())) return item.code;
       }
       return null;
     }
     if (matchBank(raw)) {
-      for (final value in available) {
-        if (matchBank(value.toLowerCase())) return value;
+      for (final item in available) {
+        if (matchBank(item.code.toLowerCase()) || matchBank(item.label.toLowerCase())) return item.code;
       }
       return null;
     }
@@ -622,10 +638,15 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
                 0)
             .toDouble();
 
+    // Validate: amount, description, moneyChannel bắt buộc.
+    // costTypeId chỉ bắt buộc nếu cost types list có dữ liệu.
+    final costTypeRequired =
+        widget.getCostTypes().where((c) => c.label.trim().isNotEmpty).toList().isNotEmpty;
     if (amount <= 0 ||
         draft.description.trim().isEmpty ||
         (draft.moneyChannel ?? '').trim().isEmpty ||
-        (draft.costTypeId ?? '').trim().isEmpty) {
+        (costTypeRequired &&
+            (draft.costTypeId ?? '').trim().isEmpty)) {
       AppSnackBar.info(
         context,
         l10n.translate('accounting.ai_draft_validation_failed'),
@@ -638,14 +659,20 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
     });
 
     try {
-      await context.read<CostBloc>().repository.createManualCost({
-        'businessLocationId': int.tryParse(locationId) ?? 0,
-        'amount': amount,
-        'costDate': DateFormat('yyyy-MM-dd').format(draft.costDate),
-        'description': draft.description.trim(),
-        'paymentMethod': draft.moneyChannel,
-        'costType': draft.costTypeId,
-      });
+      final File? imageFile = (draft.imagePath ?? '').isNotEmpty
+          ? File(draft.imagePath!)
+          : null;
+      await context.read<CostBloc>().repository.createManualCost(
+        {
+          'businessLocationId': int.tryParse(locationId) ?? 0,
+          'amount': amount,
+          'costDate': DateFormat('yyyy-MM-dd').format(draft.costDate),
+          'description': draft.description.trim(),
+          'paymentMethod': draft.moneyChannel,
+          'costType': draft.costTypeId,
+        },
+        image: imageFile,
+      );
 
       if (!mounted) return;
       AppSnackBar.success(
@@ -676,8 +703,8 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
 class _KeyedCostDraftItem extends StatefulWidget {
   final int index;
   final _CostAIDraft draft;
-  final List<String> Function() getMoneyChannels;
-  final List<String> Function() getCostTypes;
+  final List<ReferenceItem> Function() getMoneyChannels;
+  final List<ReferenceItem> Function() getCostTypes;
   final VoidCallback onDelete;
   final VoidCallback onSave;
   final Function(DateTime) onDateChanged;
@@ -701,6 +728,22 @@ class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
   late TextEditingController _descriptionController;
   late TextEditingController _amountController;
 
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    if (!mounted) return;
+    setState(() {
+      widget.draft.imagePath = picked.path;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -720,10 +763,12 @@ class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final channels = widget.getMoneyChannels();
+    final channels = widget.getMoneyChannels()
+        .where((item) => item.label.trim().isNotEmpty)
+        .toList();
     final costTypes = widget
         .getCostTypes()
-        .where((c) => c.toLowerCase() != 'import')
+        .where((c) => c.code.toLowerCase() != 'import' && c.label.trim().isNotEmpty)
         .toList();
 
     return Container(
@@ -810,9 +855,12 @@ class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
               ),
             ),
             items: costTypes
+                .where((item) => item.label.trim().isNotEmpty)
                 .map(
-                  (type) =>
-                      DropdownMenuItem<String>(value: type, child: Text(type)),
+                  (type) => DropdownMenuItem<String>(
+                    value: type.code,
+                    child: Text(type.label),
+                  ),
                 )
                 .toList(),
             onChanged: (value) => widget.draft.costTypeId = value,
@@ -830,13 +878,60 @@ class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
             items: channels
                 .map(
                   (channel) => DropdownMenuItem<String>(
-                    value: channel,
-                    child: Text(channel),
+                    value: channel.code,
+                    child: Text(channel.label),
                   ),
                 )
                 .toList(),
             onChanged: (value) => widget.draft.moneyChannel = value,
           ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _pickImage(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library),
+                label: Text(l10n.translate('accounting.select_image')),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _pickImage(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt),
+                label: Text(l10n.translate('accounting.take_photo')),
+              ),
+            ],
+          ),
+          if ((widget.draft.imagePath ?? '').isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  child: Image.file(
+                    File(widget.draft.imagePath!),
+                    height: 100,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Material(
+                    color: AppColors.white.withValues(alpha: 0.9),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () {
+                        setState(() => widget.draft.imagePath = null);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             width: double.infinity,
@@ -863,6 +958,7 @@ class _CostAIDraft {
   String? moneyChannel;
   DateTime costDate;
   String? costTypeId;
+  String? imagePath;
   bool isSaving;
 
   _CostAIDraft({
@@ -871,6 +967,7 @@ class _CostAIDraft {
     this.moneyChannel,
     required this.costDate,
     this.costTypeId,
+    this.imagePath,
     this.isSaving = false,
   });
 

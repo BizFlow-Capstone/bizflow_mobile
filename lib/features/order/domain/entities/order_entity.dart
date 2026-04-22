@@ -10,6 +10,7 @@ class OrderEntity extends Equatable {
   final String locationId;
   final String locationName;
   final String status; // backend: pending, completed, cancelled
+  final String? statusLabel;
   final List<OrderItemEntity> items;
   final double subtotal;
   final double discountAmount;
@@ -37,6 +38,7 @@ class OrderEntity extends Equatable {
     required this.locationId,
     required this.locationName,
     required this.status,
+    this.statusLabel,
     required this.items,
     required this.subtotal,
     required this.discountAmount,
@@ -71,6 +73,7 @@ class OrderEntity extends Equatable {
     String? locationId,
     String? locationName,
     String? status,
+    String? statusLabel,
     List<OrderItemEntity>? items,
     double? subtotal,
     double? discountAmount,
@@ -97,6 +100,7 @@ class OrderEntity extends Equatable {
       locationId: locationId ?? this.locationId,
       locationName: locationName ?? this.locationName,
       status: status ?? this.status,
+      statusLabel: statusLabel ?? this.statusLabel,
       items: items ?? this.items,
       subtotal: subtotal ?? this.subtotal,
       discountAmount: discountAmount ?? this.discountAmount,
@@ -127,6 +131,7 @@ class OrderEntity extends Equatable {
     locationId,
     locationName,
     status,
+    statusLabel,
     items,
     subtotal,
     discountAmount,

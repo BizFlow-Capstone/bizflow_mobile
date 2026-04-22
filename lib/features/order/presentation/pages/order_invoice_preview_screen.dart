@@ -480,9 +480,10 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
               children: [
                 Text('${l10n.translate('order.detail_status')}:'),
                 Text(
-                  order.status == 'pending'
-                      ? l10n.translate('order_payment.pending_confirmation')
-                      : order.status.toUpperCase(),
+                  order.statusLabel ??
+                      (order.status == 'pending'
+                          ? l10n.translate('order_payment.pending_confirmation')
+                          : order.status.toUpperCase()),
                   style: TextStyle(
                     color: order.status == 'completed'
                         ? AppColors.success

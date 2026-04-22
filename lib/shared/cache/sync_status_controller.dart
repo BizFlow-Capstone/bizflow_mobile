@@ -70,6 +70,19 @@ class SyncStatusController extends ChangeNotifier {
     }
   }
 
+  /// Clear stale error state (for example when entering a new screen)
+  /// while preserving the latest update timestamp.
+  void clearError() {
+    if (_state.hasError && !_state.isSyncing) {
+      _state = SyncStatusState(
+        isSyncing: false,
+        lastUpdatedAt: _state.lastUpdatedAt,
+        hasError: false,
+      );
+      notifyListeners();
+    }
+  }
+
   void reset() {
     _activeRequests = 0;
     _state = const SyncStatusState(isSyncing: false, hasError: false);

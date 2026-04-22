@@ -1,3 +1,5 @@
+import '../../../../core/reference/data/reference_item.dart';
+
 class BusinessTypeDto {
   final String businessTypeId;
   final String code;
@@ -14,12 +16,35 @@ class BusinessTypeDto {
   });
 
   factory BusinessTypeDto.fromJson(Map<String, dynamic> json) {
+    String asString(dynamic value, {String fallback = ''}) {
+      final normalized = value?.toString().trim();
+      if (normalized == null || normalized.isEmpty) return fallback;
+      return normalized;
+    }
+
+    final rawBusinessTypeId =
+        json['businessTypeId'] ?? json['BusinessTypeId'] ?? json['id'];
+    final rawCode = json['code'] ?? json['Code'] ?? rawBusinessTypeId;
+    final rawName = json['name'] ?? json['Name'] ?? json['label'];
+    final rawStatus = json['status'] ?? json['Status'];
+
+    final businessTypeIdCode = referenceCodeFromDynamic(rawBusinessTypeId);
+    final codeValue = referenceCodeFromDynamic(rawCode);
+    final nameValue = referenceLabelFromDynamic(rawName) ?? asString(rawName);
+
     return BusinessTypeDto(
-      businessTypeId: json['businessTypeId'] as String,
-      code: json['code'] as String,
-      name: json['name'] as String,
-      description: json['description'] as String? ?? '',
-      status: json['status'] as String? ?? 'active',
+      businessTypeId: businessTypeIdCode.isNotEmpty
+          ? businessTypeIdCode
+          : asString(rawBusinessTypeId),
+      code: codeValue.isNotEmpty ? codeValue : asString(rawCode),
+      name: nameValue,
+      description: asString(json['description'] ?? json['Description']),
+      status: (() {
+        final statusCode = referenceCodeFromDynamic(rawStatus).trim();
+        if (statusCode.isNotEmpty) return statusCode;
+        final statusText = asString(rawStatus, fallback: 'active').toLowerCase();
+        return statusText.isEmpty ? 'active' : statusText;
+      })(),
     );
   }
 

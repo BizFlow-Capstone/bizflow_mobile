@@ -74,6 +74,7 @@ class _StockImportViewState extends State<_StockImportView> {
   // Import type: true = INVOICE, false = MANUAL
   bool _hasInvoice = true;
   String _status = 'DRAFT'; // DRAFT, CONFIRMED, CANCELLED
+  String? _statusLabel;
 
   // Selected products for import
   List<ImportItemModel> _selectedItems = [];
@@ -1027,6 +1028,7 @@ class _StockImportViewState extends State<_StockImportView> {
           final detail = state.importDetail!;
           setState(() {
             _status = detail.status;
+            _statusLabel = detail.statusLabel;
             _hasInvoice = detail.importType.toUpperCase() == 'INVOICE';
             _supplierController.text = detail.supplier ?? '';
             _noteController.text = detail.note ?? '';
@@ -1781,7 +1783,7 @@ class _StockImportViewState extends State<_StockImportView> {
                     style: AppTextStyles.bodyMedium,
                   ),
                   Text(
-                    _status,
+                    _statusLabel ?? _status,
                     style: AppTextStyles.titleSmall.copyWith(
                       color: _status == 'CONFIRMED'
                           ? AppColors.success

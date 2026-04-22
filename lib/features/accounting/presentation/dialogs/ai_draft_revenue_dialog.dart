@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -20,16 +21,18 @@ import '../../../../shared/utils/formatters.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../../product/data/models/business_type_model.dart';
 import '../../../product/presentation/bloc/product_bloc.dart';
+import '../../../product/presentation/bloc/product_state.dart';
 import '../../../revenue/presentation/bloc/revenue_bloc.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../revenue/data/models/ai_draft_revenue_dto.dart';
 
 // Extracted Revenue AI Draft Dialog
 class AIDraftRevenueDialog extends StatefulWidget {
   final List<AiDraftRevenueItemDto> voiceItems;
-  final List<String> Function() getMoneyChannels;
+  final List<ReferenceItem> Function() getMoneyChannels;
   final BuildContext parentContext;
 
   const AIDraftRevenueDialog({
@@ -319,16 +322,43 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
   }
 
   Future<void> _loadBusinessTypes() async {
+    final productState = context.read<ProductBloc>().state;
+    if (productState is BusinessTypesLoaded &&
+        productState.businessTypes.isNotEmpty) {
+      if (!mounted) return;
+      setState(() {
+        businessTypes = List<BusinessTypeDto>.from(productState.businessTypes)
+            .where(
+              (type) =>
+                  type.businessTypeId.trim().isNotEmpty &&
+                  type.name.trim().isNotEmpty,
+            )
+            .toList();
+      });
+      return;
+    }
+
     try {
       final result = await context
           .read<ProductBloc>()
           .repository
           .getBusinessTypes();
       setState(() {
-        businessTypes = List<BusinessTypeDto>.from(result);
+        businessTypes = List<BusinessTypeDto>.from(result)
+            .where(
+              (type) =>
+                  type.businessTypeId.trim().isNotEmpty &&
+                  type.name.trim().isNotEmpty,
+            )
+            .toList();
       });
-    } catch (_) {
-      businessTypes = [];
+    } catch (e) {
+      debugPrint('AIDraftRevenueDialog._loadBusinessTypes error: $e');
+      if (mounted) {
+        setState(() {
+          businessTypes = [];
+        });
+      }
     }
   }
 
@@ -368,8 +398,9 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
     }
   }
 
-  String? _mapMoneyChannelFromAi(String? aiValue, List<String> available) {
-    final raw = (aiValue ?? '').trim().toLowerCase();
+  String? _mapMoneyChannelFromAi(dynamic aiValue, List<ReferenceItem> available) {
+    // Handle both string and object formats: {code, label}
+    final raw = _extractStringFromDynamic(aiValue).toLowerCase();
     if (raw.isEmpty || available.isEmpty) return null;
 
     bool matchCash(String source) =>
@@ -386,19 +417,29 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
         source.contains('vi');
 
     if (matchCash(raw)) {
-      for (final value in available) {
-        if (matchCash(value.toLowerCase())) return value;
+      for (final item in available) {
+        if (matchCash(item.code.toLowerCase()) || matchCash(item.label.toLowerCase())) return item.code;
       }
       return null;
     }
     if (matchBank(raw)) {
-      for (final value in available) {
-        if (matchBank(value.toLowerCase())) return value;
+      for (final item in available) {
+        if (matchBank(item.code.toLowerCase()) || matchBank(item.label.toLowerCase())) return item.code;
       }
       return null;
     }
 
     return null;
+  }
+
+  String _extractStringFromDynamic(dynamic value) {
+    if (value == null) return '';
+    if (value is String) return value;
+    if (value is Map) {
+      // Try to extract 'code' first, then 'label'
+      return ((value['code'] ?? value['label']) ?? '').toString().trim();
+    }
+    return value.toString().trim();
   }
 
   @override
@@ -616,10 +657,14 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                 0)
             .toDouble();
 
+    // Validate: amount, description, moneyChannel bắt buộc.
+    // businessTypeId chỉ bắt buộc nếu businessTypes list có dữ liệu.
+    final businessTypeRequired = businessTypes.isNotEmpty;
     if (amount <= 0 ||
         draft.description.trim().isEmpty ||
         (draft.moneyChannel ?? '').trim().isEmpty ||
-        (draft.businessTypeId ?? '').trim().isEmpty) {
+        (businessTypeRequired &&
+            (draft.businessTypeId ?? '').trim().isEmpty)) {
       AppSnackBar.info(
         context,
         l10n.translate('accounting.ai_draft_validation_failed'),
@@ -632,15 +677,21 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
     });
 
     try {
-      await context.read<RevenueBloc>().repository.createManualRevenue({
-        'businessLocationId': int.tryParse(locationId) ?? 0,
-        'amount': amount,
-        'revenueDate': DateFormat('yyyy-MM-dd').format(draft.revenueDate),
-        'description': draft.description.trim(),
-        'moneyChannel': draft.moneyChannel,
-        if ((draft.businessTypeId ?? '').isNotEmpty)
-          'businessTypeId': draft.businessTypeId,
-      });
+      final File? imageFile = (draft.imagePath ?? '').isNotEmpty
+          ? File(draft.imagePath!)
+          : null;
+      await context.read<RevenueBloc>().repository.createManualRevenue(
+        {
+          'businessLocationId': int.tryParse(locationId) ?? 0,
+          'amount': amount,
+          'revenueDate': DateFormat('yyyy-MM-dd').format(draft.revenueDate),
+          'description': draft.description.trim(),
+          'moneyChannel': draft.moneyChannel,
+          if ((draft.businessTypeId ?? '').isNotEmpty)
+            'businessTypeId': draft.businessTypeId,
+        },
+        image: imageFile,
+      );
 
       if (!mounted) return;
       AppSnackBar.success(
@@ -672,7 +723,7 @@ class _KeyedDraftItem extends StatefulWidget {
   final int index;
   final _RevenueAIDraft draft;
   final List<BusinessTypeDto> businessTypes;
-  final List<String> Function() getMoneyChannels;
+  final List<ReferenceItem> Function() getMoneyChannels;
   final VoidCallback onDelete;
   final VoidCallback onSave;
   final Function(DateTime) onDateChanged;
@@ -696,6 +747,22 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
   late TextEditingController _descriptionController;
   late TextEditingController _amountController;
 
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    if (!mounted) return;
+    setState(() {
+      widget.draft.imagePath = picked.path;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -715,7 +782,9 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final channels = widget.getMoneyChannels();
+    final channels = widget.getMoneyChannels()
+        .where((item) => item.label.trim().isNotEmpty)
+        .toList();
 
     return Container(
       key: ValueKey('container_${widget.index}'),
@@ -804,35 +873,110 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
             items: channels
                 .map(
                   (channel) => DropdownMenuItem<String>(
-                    value: channel,
-                    child: Text(channel),
+                    value: channel.code,
+                    child: Text(channel.label),
                   ),
                 )
                 .toList(),
             onChanged: (value) => widget.draft.moneyChannel = value,
           ),
           const SizedBox(height: AppSpacing.sm),
-          DropdownButtonFormField<String>(
-            isExpanded: true,
-            initialValue: widget.draft.businessTypeId,
-            decoration: InputDecoration(
-              labelText:
-                  '${l10n.translate('accounting.revenue_business_type')} *',
-              labelStyle: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.error,
-                fontWeight: FontWeight.w600,
+          if (widget.businessTypes.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                border: Border.all(color: AppColors.warning, width: 1),
               ),
-            ),
-            items: widget.businessTypes
-                .map(
-                  (type) => DropdownMenuItem<String>(
-                    value: type.businessTypeId,
-                    child: Text(type.name, overflow: TextOverflow.ellipsis),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: AppColors.warning,
                   ),
-                )
-                .toList(),
-            onChanged: (value) => widget.draft.businessTypeId = value,
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      l10n.translate('accounting.revenue_business_type_empty'),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            DropdownButtonFormField<String>(
+              isExpanded: true,
+              initialValue: widget.draft.businessTypeId,
+              decoration: InputDecoration(
+                labelText:
+                    '${l10n.translate('accounting.revenue_business_type')} *',
+                labelStyle: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              items: widget.businessTypes
+                  .map(
+                    (type) => DropdownMenuItem<String>(
+                      value: type.businessTypeId,
+                      child: Text(type.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => widget.draft.businessTypeId = value,
+            ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _pickImage(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library),
+                label: Text(l10n.translate('accounting.select_image')),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _pickImage(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt),
+                label: Text(l10n.translate('accounting.take_photo')),
+              ),
+            ],
           ),
+          if ((widget.draft.imagePath ?? '').isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  child: Image.file(
+                    File(widget.draft.imagePath!),
+                    height: 100,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: Material(
+                    color: AppColors.white.withValues(alpha: 0.9),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () {
+                        setState(() => widget.draft.imagePath = null);
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           SizedBox(
             width: double.infinity,
@@ -859,6 +1003,7 @@ class _RevenueAIDraft {
   String? moneyChannel;
   DateTime revenueDate;
   String? businessTypeId;
+  String? imagePath;
   bool isSaving;
 
   _RevenueAIDraft({
@@ -867,6 +1012,7 @@ class _RevenueAIDraft {
     this.moneyChannel,
     required this.revenueDate,
     this.businessTypeId,
+    this.imagePath,
     this.isSaving = false,
   });
 

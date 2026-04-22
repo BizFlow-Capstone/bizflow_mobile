@@ -312,19 +312,19 @@ class _ImportHistoryCard extends StatelessWidget {
     switch (item.status) {
       case 'DRAFT':
         statusColor = AppColors.warning;
-        statusText = l10n.translate('stock_import.status_draft');
+        statusText = item.statusLabel ?? l10n.translate('stock_import.status_draft');
         break;
       case 'CONFIRMED':
         statusColor = AppColors.success;
-        statusText = l10n.translate('stock_import.status_imported');
+        statusText = item.statusLabel ?? l10n.translate('stock_import.status_imported');
         break;
       case 'CANCELLED':
         statusColor = AppColors.error;
-        statusText = l10n.translate('order.status_cancelled');
+        statusText = item.statusLabel ?? l10n.translate('order.status_cancelled');
         break;
       default:
         statusColor = AppColors.textSecondary;
-        statusText = item.status;
+        statusText = item.statusLabel ?? item.status;
     }
 
     final formatCurrency = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');

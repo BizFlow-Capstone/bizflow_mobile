@@ -311,7 +311,9 @@ class EmployeeBloc extends Bloc<EmployeeEvent, EmployeeState> {
         .where((e) => e.status == EmployeeStatus.pending)
         .length;
     final historyCount = employees.where(_isHistoryEmployee).length;
-    final totalCount = employees.length;
+    final totalCount = employees
+        .where((e) => !_isHistoryEmployee(e) && e.status != EmployeeStatus.pending)
+        .length;
 
     return EmployeeLoaded(
       allEmployees: employees,

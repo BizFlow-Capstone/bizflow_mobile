@@ -14,6 +14,22 @@ class EmployeeCardWidget extends StatelessWidget {
     required this.onActionTap,
   });
 
+  static const Set<String> _genericStatusLabels = {
+    'active',
+    'accepted',
+    'accept',
+    'accepted invitation',
+    'da chap nhan',
+    'đã chấp nhận',
+    'đã chấp nhận lời mời',
+    'pending',
+    'inactive',
+    'resigned',
+    'terminated',
+    'deleted',
+    'rejected',
+  };
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -25,12 +41,22 @@ class EmployeeCardWidget extends StatelessWidget {
         : employee.phone;
 
     // Màu sắc trạng thái
-    final (Color statusColor, String statusText) = switch (employee.status) {
+    final (Color statusColor, String defaultStatusText) = switch (employee.status) {
       EmployeeStatus.pending => (Colors.orange, t.translate('employee.tab_pending')),
       EmployeeStatus.rejected => (AppColors.error, t.translate('employee.status_rejected')),
       EmployeeStatus.inactive => (AppColors.textSecondary, t.translate('employee.status_inactive')),
       EmployeeStatus.active => (AppColors.success, t.translate('employee.tab_active')),
     };
+    final rawStatusLabel = (employee.statusLabel ?? '').trim();
+    final normalizedStatusLabel = rawStatusLabel
+      .toLowerCase()
+      .replaceAll(RegExp(r'\s+'), ' ');
+    final shouldUseServerStatusLabel =
+      rawStatusLabel.isNotEmpty &&
+      !_genericStatusLabels.contains(normalizedStatusLabel);
+    final statusText = shouldUseServerStatusLabel
+      ? rawStatusLabel
+      : defaultStatusText;
 
     String assignmentLabel;
     if (employee.assignedLocationNames.isEmpty) {
@@ -66,11 +92,18 @@ class EmployeeCardWidget extends StatelessWidget {
           'employee.duration_month_day',
           params: {'months': months.toString(), 'days': days.toString()},
         );
-      } else {
+      } else if (duration.inDays > 0) {
         durationText = t.translate(
           'employee.duration_day',
           params: {'days': duration.inDays.toString()},
         );
+      } else if (duration.inHours > 0) {
+        durationText = t.translate(
+          'employee.duration_hour',
+          params: {'hours': duration.inHours.toString()},
+        );
+      } else {
+        durationText = t.translate('employee.duration_less_than_day');
       }
     }
 

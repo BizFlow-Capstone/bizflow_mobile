@@ -9,6 +9,7 @@ class ReferenceBloc extends Bloc<ReferenceEvent, ReferenceState> {
 
   ReferenceBloc({required this.repository}) : super(ReferenceInitial()) {
     on<LoadAllReferencesRequested>(_onLoadAllReferencesRequested);
+    on<ForceReloadAllReferencesRequested>(_onForceReloadAllReferencesRequested);
   }
 
   Future<void> _onLoadAllReferencesRequested(
@@ -22,6 +23,25 @@ class ReferenceBloc extends Bloc<ReferenceEvent, ReferenceState> {
       },
       onError: (e) {
         emit(ReferenceError(ApiErrorMessageParser.parse(e)));
+      },
+    );
+  }
+
+  Future<void> _onForceReloadAllReferencesRequested(
+    ForceReloadAllReferencesRequested event,
+    Emitter<ReferenceState> emit,
+  ) async {
+    // Chỉ reset timer, không xóa cache — nếu mất mạng thì data cũ vẫn được giữ
+    repository.scheduleForceRevalidate();
+    await repository.getAllReferences(
+      onData: (data, isFromCache) {
+        emit(ReferenceLoaded(data, isFromCache: isFromCache));
+      },
+      onError: (e) {
+        // Không emit error nếu đang có data cũ — tránh UI trống khi offline
+        if (state is! ReferenceLoaded) {
+          emit(ReferenceError(ApiErrorMessageParser.parse(e)));
+        }
       },
     );
   }

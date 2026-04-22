@@ -1,4 +1,5 @@
 // Import Models - Manual JSON serialization (no code generation required)
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../shared/utils/date_formatter.dart';
 
 class ImportItemModel {
@@ -86,6 +87,7 @@ class ImportHistoryItemModel {
   final String importCode;
   final String importType;
   final String status;
+  final String? statusLabel;
   final int businessLocationId;
   final String businessLocationName;
   final String? supplier;
@@ -101,6 +103,7 @@ class ImportHistoryItemModel {
     required this.importCode,
     required this.importType,
     required this.status,
+    this.statusLabel,
     required this.businessLocationId,
     required this.businessLocationName,
     this.supplier,
@@ -121,11 +124,15 @@ class ImportHistoryItemModel {
       return fallback;
     }
 
+    final rawStatus = json['status'] ?? json['Status'];
+    final rawImportType = json['importType'] ?? json['ImportType'];
+
     return ImportHistoryItemModel(
       importId: (json['importId'] ?? json['ImportId'] ?? 0) as int,
       importCode: (json['importCode'] ?? json['ImportCode'] ?? '').toString(),
-      importType: (json['importType'] ?? json['ImportType'] ?? '').toString(),
-      status: (json['status'] ?? json['Status'] ?? '').toString(),
+      importType: referenceCodeFromDynamic(rawImportType).trim().toUpperCase(),
+      status: referenceCodeFromDynamic(rawStatus).trim().toUpperCase(),
+      statusLabel: referenceLabelFromDynamic(rawStatus),
       businessLocationId:
           (json['businessLocationId'] ?? json['BusinessLocationId'] ?? 0)
               as int,
@@ -155,6 +162,7 @@ class ImportHistoryItemModel {
       'importCode': importCode,
       'importType': importType,
       'status': status,
+      if ((statusLabel ?? '').trim().isNotEmpty) 'statusLabel': statusLabel,
       'businessLocationId': businessLocationId,
       'businessLocationName': businessLocationName,
       if (supplier != null) 'supplier': supplier,
@@ -178,6 +186,7 @@ class ImportDetailModel extends ImportHistoryItemModel {
     required super.importCode,
     required super.importType,
     required super.status,
+    super.statusLabel,
     required super.businessLocationId,
     required super.businessLocationName,
     super.supplier,
@@ -219,11 +228,15 @@ class ImportDetailModel extends ImportHistoryItemModel {
             as List<dynamic>? ??
         [];
 
+    final rawStatus = json['status'] ?? json['Status'];
+    final rawImportType = json['importType'] ?? json['ImportType'];
+
     return ImportDetailModel(
       importId: parseInt(json['importId'] ?? json['ImportId']),
       importCode: parseRequiredString(json['importCode'] ?? json['ImportCode']),
-      importType: parseRequiredString(json['importType'] ?? json['ImportType']),
-      status: parseRequiredString(json['status'] ?? json['Status']),
+      importType: referenceCodeFromDynamic(rawImportType).trim().toUpperCase(),
+      status: referenceCodeFromDynamic(rawStatus).trim().toUpperCase(),
+      statusLabel: referenceLabelFromDynamic(rawStatus),
       businessLocationId: parseInt(
         json['businessLocationId'] ?? json['BusinessLocationId'],
       ),

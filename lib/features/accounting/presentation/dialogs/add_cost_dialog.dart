@@ -38,24 +38,24 @@ Future<void> showAddCostDialog(BuildContext context) async {
     }
   }
 
-  List<String> getCostTypes() {
+  List<ReferenceItem> getCostTypes() {
     final state = context.read<ReferenceBloc>().state;
     if (state is ReferenceLoaded) {
-      return (state.references['costTypes'] ?? const <String>[])
+      return (state.references['costTypes'] ?? const <ReferenceItem>[])
           .toSet()
           .toList();
     }
-    return const <String>[];
+    return const <ReferenceItem>[];
   }
 
-  List<String> getPaymentMethods() {
+  List<ReferenceItem> getPaymentMethods() {
     final state = context.read<ReferenceBloc>().state;
     if (state is ReferenceLoaded) {
-      return (state.references['paymentMethods'] ?? const <String>[])
+      return (state.references['paymentMethods'] ?? const <ReferenceItem>[])
           .toSet()
           .toList();
     }
-    return const <String>[];
+    return const <ReferenceItem>[];
   }
 
   await showDialog(
@@ -118,11 +118,11 @@ Future<void> showAddCostDialog(BuildContext context) async {
                   labelText: l10n.translate('accounting.ai_cost_type'),
                 ),
                 items: getCostTypes()
-                    .where((c) => c.toLowerCase() != 'import')
+                    .where((c) => c.code.toLowerCase() != 'import' && c.label.trim().isNotEmpty)
                     .map(
-                      (val) => DropdownMenuItem<String>(
-                        value: val,
-                        child: Text(val),
+                      (item) => DropdownMenuItem<String>(
+                        value: item.code,
+                        child: Text(item.label),
                       ),
                     )
                     .toList(),
@@ -136,10 +136,11 @@ Future<void> showAddCostDialog(BuildContext context) async {
                   labelText: l10n.translate('accounting.ai_payment_method'),
                 ),
                 items: getPaymentMethods()
+                    .where((item) => item.label.trim().isNotEmpty)
                     .map(
-                      (val) => DropdownMenuItem<String>(
-                        value: val,
-                        child: Text(val),
+                      (item) => DropdownMenuItem<String>(
+                        value: item.code,
+                        child: Text(item.label),
                       ),
                     )
                     .toList(),

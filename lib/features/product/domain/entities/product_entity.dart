@@ -14,6 +14,7 @@ class ProductEntity {
   final double? salePrice;
   final String? unit;
   final bool isActive;
+  final String? statusLabel;
   final DateTime? createdAt;
   final int? locationId;
   final String? businessTypeId;
@@ -35,6 +36,7 @@ class ProductEntity {
     this.salePrice,
     this.unit,
     this.isActive = true,
+    this.statusLabel,
     this.createdAt,
     this.locationId,
     this.businessTypeId,
@@ -57,6 +59,7 @@ class ProductEntity {
     double? salePrice,
     String? unit,
     bool? isActive,
+    String? statusLabel,
     DateTime? createdAt,
     int? locationId,
     String? businessTypeId,
@@ -78,6 +81,7 @@ class ProductEntity {
       salePrice: salePrice ?? this.salePrice,
       unit: unit ?? this.unit,
       isActive: isActive ?? this.isActive,
+      statusLabel: statusLabel ?? this.statusLabel,
       createdAt: createdAt ?? this.createdAt,
       locationId: locationId ?? this.locationId,
       businessTypeId: businessTypeId ?? this.businessTypeId,
@@ -103,6 +107,7 @@ class ProductEntity {
       'salePrice': salePrice,
       'unit': unit,
       'isActive': isActive,
+      'statusLabel': statusLabel,
       'createdAt': createdAt != null
           ? DateFormatter.toApiUtcIsoString(createdAt!)
           : null,
@@ -189,6 +194,7 @@ class ProductEntity {
       salePrice: salePriceValue ?? priceValue,
       unit: map['unit'] as String?,
       isActive: map['isActive'] as bool? ?? true,
+      statusLabel: map['statusLabel'] as String?,
       createdAt: DateFormatter.parseApiDateTime(map['createdAt'] as String?),
       locationId: map['locationId'] as int?,
       businessTypeId: map['businessTypeId'] as String?,

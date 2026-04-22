@@ -12,6 +12,10 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
+import '../../../../core/reference/presentation/bloc/reference_event.dart';
+import '../../../../core/reference/presentation/bloc/reference_state.dart';
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -24,6 +28,7 @@ import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
+import '../../../../shared/context/business_context.dart';
 import '../../../accounting/data/repositories/accounting_repository.dart';
 import '../../../accounting/domain/models/accounting_period.dart';
 import '../../data/order_api_service.dart';
@@ -48,22 +53,29 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _isPublishing = false;
   bool _isInvoiceActionInProgress = false;
   List<AccountingPeriod> _periods = [];
+  bool _periodsLoaded = false;
 
   String _formatDateTime(DateTime value) {
     return DateFormat('dd/MM/yyyy HH:mm').format(value.toLocal());
   }
 
   bool _canEditOrder(OrderEntity order) {
-    // 1. Age check (> 30 days)
-    final age = DateTime.now().difference(order.createdAt).inDays;
-    if (age > 30) return false;
+    // Rule 0: do not allow edit until accounting periods are loaded.
+    if (!_periodsLoaded) return false;
 
-    // 2. Accounting Period check (Chốt sổ)
-    final orderDateStr = DateFormat('yyyy-MM-dd').format(order.createdAt.toLocal());
+    // Rule 1: if order belongs to a closed/finalized accounting period, editing is blocked.
     for (final period in _periods) {
-      if (orderDateStr.compareTo(period.startDate) >= 0 &&
-          orderDateStr.compareTo(period.endDate) <= 0) {
-        if (period.isFinalized) return false;
+      DateTime? start;
+      DateTime? end;
+      try {
+        start = DateUtils.dateOnly(DateTime.parse(period.startDate));
+        end = DateUtils.dateOnly(DateTime.parse(period.endDate));
+      } catch (_) {
+        continue;
+      }
+
+      if (!period.isOpen) {
+        return false;
       }
     }
 
@@ -74,21 +86,52 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   void initState() {
     super.initState();
     _loadDetailSWR();
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
   }
 
   Future<void> _loadAccountingPeriods(String locationId) async {
+    final fallbackLocationId = context.read<BusinessContext>().currentBusinessId;
+    final resolvedLocationId = int.tryParse(locationId) != null
+        ? locationId
+        : (fallbackLocationId ?? '');
+
+    if (resolvedLocationId.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          _periods = const <AccountingPeriod>[];
+          _periodsLoaded = true;
+        });
+      }
+      return;
+    }
+
     try {
       await context.read<AccountingRepository>().fetchPeriodsSWR(
-        locationId: locationId,
+        locationId: resolvedLocationId,
         onData: (periods, _) {
           if (!mounted) return;
           setState(() {
             _periods = periods;
+            _periodsLoaded = true;
+          });
+        },
+        onError: (error) {
+          if (!mounted) return;
+          setState(() {
+            _periodsLoaded = true;
           });
         },
       );
     } catch (e) {
       debugPrint('Error loading accounting periods: $e');
+      if (mounted) {
+        setState(() {
+          _periodsLoaded = true;
+        });
+      }
     }
   }
 
@@ -111,6 +154,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _isInitialLoading = true;
       }
       _detailError = null;
+      _periodsLoaded = false;
     });
 
     try {
@@ -633,41 +677,43 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ),
         bottom: const AppSyncStatusText(),
       ),
-      body: BlocListener<OrderBloc, OrderState>(
-        listener: (context, state) {
-          if (state is OrderPublished || state is OrderUpdated) {
-            final orderId = state is OrderPublished
-                ? state.order.id
-                : (state as OrderUpdated).order.id;
-            if (orderId == widget.orderId) {
-              unawaited(_loadDetailSWR(refreshOnly: true));
+      body: SafeArea(
+        top: false,
+        child: BlocListener<OrderBloc, OrderState>(
+          listener: (context, state) {
+            if (state is OrderPublished || state is OrderUpdated) {
+              final orderId = state is OrderPublished
+                  ? state.order.id
+                  : (state as OrderUpdated).order.id;
+              if (orderId == widget.orderId) {
+                unawaited(_loadDetailSWR(refreshOnly: true));
+              }
+            } else if (state is OrderError) {
+              ScaffoldMessenger.of(context)
+                ..removeCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
             }
-          } else if (state is OrderError) {
-            ScaffoldMessenger.of(context)
-              ..removeCurrentSnackBar()
-              ..showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: AppColors.error,
-                ),
-              );
-          }
-        },
-        child: Builder(
-          builder: (context) {
-            if (_isInitialLoading && _detail == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
+          },
+          child: Builder(
+            builder: (context) {
+              if (_isInitialLoading && _detail == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            final detail = _detail;
-            if (detail == null) {
-              return Center(
-                child: Text(_detailError ?? l10n.translate('common.no_data')),
-              );
-            }
+              final detail = _detail;
+              if (detail == null) {
+                return Center(
+                  child: Text(_detailError ?? l10n.translate('common.no_data')),
+                );
+              }
 
-            return Column(
-              children: [
+              return Column(
+                children: [
                 if (detail.isPublished && !detail.isCancelled && _canEditOrder(detail))
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -839,7 +885,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               Text(
-                                '${l10n.translate('order.detail_status')}: ${detail.status}',
+                                '${l10n.translate('order.detail_status')}: ${detail.statusLabel ?? (() {
+                                  final refState = context.read<ReferenceBloc>().state;
+                                  if (refState is ReferenceLoaded) {
+                                    final orderStatuses = refState.references['orderStatuses'] ?? <ReferenceItem>[];
+                                    return orderStatuses.getLabelByCode(detail.status);
+                                  }
+                                  return detail.status;
+                                })()} ',
                               ),
                               Text(
                                 '${l10n.translate('order.detail_location')}: ${detail.locationName}',
@@ -948,9 +1001,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ],
                   ),
                 ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

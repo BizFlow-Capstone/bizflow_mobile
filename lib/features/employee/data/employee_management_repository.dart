@@ -79,6 +79,7 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
         phone: employee.phone,
         email: employee.email,
         status: _toEmployeeStatus(employee),
+        statusLabel: employee.statusLabel,
         isActive: employee.isActive,
         employmentStatus: employee.status,
         startedAt: employee.startAt,
@@ -140,6 +141,7 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
                 'phone': employee.phone,
                 'email': employee.email,
                 'status': employee.status.name,
+                'statusLabel': employee.statusLabel,
                 'isActive': employee.isActive,
                 'employmentStatus': employee.employmentStatus,
                 'startedAt': employee.startedAt?.toIso8601String(),
@@ -162,6 +164,7 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       phone: employee.phone,
       email: employee.email,
       status: _toEmployeeStatus(employee),
+      statusLabel: employee.statusLabel,
       isActive: employee.isActive,
       employmentStatus: employee.status,
       startedAt: employee.startAt,
@@ -188,6 +191,9 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String? ?? '',
       status: status,
+        statusLabel: (json['statusLabel'] as String?)?.trim().isNotEmpty == true
+          ? (json['statusLabel'] as String?)!.trim()
+          : null,
       isActive: json['isActive'] as bool? ?? false,
       employmentStatus: json['employmentStatus'] as String? ?? '',
       startedAt: parseDate('startedAt'),

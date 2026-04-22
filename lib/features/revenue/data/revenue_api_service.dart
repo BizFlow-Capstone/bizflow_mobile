@@ -45,12 +45,39 @@ class RevenueApiService {
     }
   }
 
-  Future<RevenueDto> createManualRevenue(Map<String, dynamic> body) async {
+  Future<RevenueDto> createManualRevenue(
+    Map<String, dynamic> body, {
+    File? image,
+  }) async {
     try {
-      final response = await _apiClient.post(
-        ApiEndpoints.createManualRevenue,
-        body: body,
-      );
+      final response = image == null
+          ? await _apiClient.post(
+              ApiEndpoints.createManualRevenue,
+              body: body,
+            )
+          : await _apiClient.postMultipart<Map<String, dynamic>>(
+              ApiEndpoints.createManualRevenue,
+              fields: {
+                'BusinessLocationId':
+                    body['businessLocationId']?.toString() ?? '0',
+                if (body['businessTypeId'] != null)
+                  'BusinessTypeId': body['businessTypeId'].toString(),
+                'Amount': body['amount']?.toString() ?? '0',
+                if (body['revenueDate'] != null)
+                  'RevenueDate': body['revenueDate'].toString(),
+                'Description': body['description']?.toString() ?? '',
+                'MoneyChannel': body['moneyChannel']?.toString() ?? '',
+                if (body['documentDate'] != null)
+                  'DocumentDate': body['documentDate'].toString(),
+                if (body['documentNumber'] != null)
+                  'DocumentNumber': body['documentNumber'].toString(),
+                if (body['referenceType'] != null)
+                  'ReferenceType': body['referenceType'].toString(),
+                if (body['referenceId'] != null)
+                  'ReferenceId': body['referenceId'].toString(),
+              },
+              files: {'image': image},
+            );
 
       if (response.isSuccess && response.data != null) {
         final data = response.data as Map<String, dynamic>;
@@ -89,12 +116,37 @@ class RevenueApiService {
   Future<RevenueDto> updateManualRevenue(
     int revenueId,
     Map<String, dynamic> body,
+    {
+    File? image,
+  }
   ) async {
     try {
-      final response = await _apiClient.put(
-        ApiEndpoints.updateManualRevenue(revenueId.toString()),
-        body: body,
-      );
+      final response = image == null
+          ? await _apiClient.put(
+              ApiEndpoints.updateManualRevenue(revenueId.toString()),
+              body: body,
+            )
+          : await _apiClient.putMultipart<Map<String, dynamic>>(
+              ApiEndpoints.updateManualRevenue(revenueId.toString()),
+              fields: {
+                if (body['businessTypeId'] != null)
+                  'BusinessTypeId': body['businessTypeId'].toString(),
+                'Amount': body['amount']?.toString() ?? '0',
+                if (body['revenueDate'] != null)
+                  'RevenueDate': body['revenueDate'].toString(),
+                'Description': body['description']?.toString() ?? '',
+                'MoneyChannel': body['moneyChannel']?.toString() ?? '',
+                if (body['documentDate'] != null)
+                  'DocumentDate': body['documentDate'].toString(),
+                if (body['documentNumber'] != null)
+                  'DocumentNumber': body['documentNumber'].toString(),
+                if (body['referenceType'] != null)
+                  'ReferenceType': body['referenceType'].toString(),
+                if (body['referenceId'] != null)
+                  'ReferenceId': body['referenceId'].toString(),
+              },
+              files: {'image': image},
+            );
 
       if (response.isSuccess && response.data != null) {
         final data = response.data as Map<String, dynamic>;

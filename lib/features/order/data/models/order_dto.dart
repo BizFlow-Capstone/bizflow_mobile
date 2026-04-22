@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import 'order_item_dto.dart';
 
@@ -30,6 +31,7 @@ class OrderDto extends Equatable {
   final String locationId;
   final String locationName;
   final String status; // pending, completed, cancelled
+  final String? statusLabel;
   final List<OrderItemDto> items;
   final double subtotal;
   final double discountAmount;
@@ -56,6 +58,7 @@ class OrderDto extends Equatable {
     required this.locationId,
     required this.locationName,
     required this.status,
+    this.statusLabel,
     required this.items,
     required this.subtotal,
     required this.discountAmount,
@@ -102,6 +105,8 @@ class OrderDto extends Equatable {
       return DateFormatter.parseApiDateTime(value?.toString());
     }
 
+    final rawStatus = json['status'];
+
     return OrderDto(
       id: asString(json['id'] ?? json['orderId']),
       orderCode: asString(json['orderCode']),
@@ -111,7 +116,9 @@ class OrderDto extends Equatable {
         json['locationId'] ?? json['businessLocationId'],
       ),
       locationName: asString(json['locationName'] ?? json['businessLocationName']),
-      status: asString(json['status'], fallback: 'pending').toLowerCase(),
+        status: referenceCodeFromDynamic(rawStatus, fallback: 'pending')
+          .toLowerCase(),
+        statusLabel: referenceLabelFromDynamic(rawStatus),
       items:
           (json['items'] as List<dynamic>?)
               ?.map(
@@ -149,6 +156,7 @@ class OrderDto extends Equatable {
       'locationId': locationId,
       'locationName': locationName,
       'status': status,
+      if ((statusLabel ?? '').trim().isNotEmpty) 'statusLabel': statusLabel,
       'items': items.map((item) => item.toJson()).toList(),
       'subtotal': subtotal,
       'discountAmount': discountAmount,
@@ -183,6 +191,7 @@ class OrderDto extends Equatable {
     String? locationId,
     String? locationName,
     String? status,
+    String? statusLabel,
     List<OrderItemDto>? items,
     double? subtotal,
     double? discountAmount,
@@ -209,6 +218,7 @@ class OrderDto extends Equatable {
       locationId: locationId ?? this.locationId,
       locationName: locationName ?? this.locationName,
       status: status ?? this.status,
+      statusLabel: statusLabel ?? this.statusLabel,
       items: items ?? this.items,
       subtotal: subtotal ?? this.subtotal,
       discountAmount: discountAmount ?? this.discountAmount,
@@ -238,6 +248,7 @@ class OrderDto extends Equatable {
     locationId,
     locationName,
     status,
+    statusLabel,
     items,
     subtotal,
     discountAmount,

@@ -24,6 +24,8 @@ class AccountingCostRevenueTab extends StatelessWidget {
   final ValueChanged<CostEntity> onEditCost;
   final ValueChanged<CostEntity> onTapCost;
   final ValueChanged<CostEntity> onDeleteCost;
+  final bool Function(RevenueEntity) canModifyRevenue;
+  final bool Function(CostEntity) canModifyCost;
 
   const AccountingCostRevenueTab({
     super.key,
@@ -39,6 +41,8 @@ class AccountingCostRevenueTab extends StatelessWidget {
     required this.onEditCost,
     required this.onTapCost,
     required this.onDeleteCost,
+    required this.canModifyRevenue,
+    required this.canModifyCost,
   });
 
   @override
@@ -73,6 +77,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
                             onTap: () => onTapRevenue(item),
                             onEdit: () => onEditRevenue(item),
                             onDelete: () => onDeleteRevenue(item),
+                            isModifiable: canModifyRevenue(item),
                           ),
                         )
                         .toList(),
@@ -98,6 +103,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
                             onTap: () => onTapCost(item),
                             onEdit: () => onEditCost(item),
                             onDelete: () => onDeleteCost(item),
+                            isModifiable: canModifyCost(item),
                           ),
                         )
                         .toList(),
@@ -121,6 +127,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     BuildContext context, {
     required dynamic item,
     required bool isRevenue,
+    required bool isModifiable,
     VoidCallback? onTap,
     required VoidCallback onEdit,
     required VoidCallback onDelete,
@@ -128,7 +135,6 @@ class AccountingCostRevenueTab extends StatelessWidget {
     String title = '';
     String subtitle = '';
     double amount = 0;
-    bool canModify = false;
     final effectiveLanguageCode = languageCode;
 
     if (item is RevenueEntity) {
@@ -146,7 +152,6 @@ class AccountingCostRevenueTab extends StatelessWidget {
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;
-      canModify = _isManualRevenue(item);
     } else if (item is CostEntity) {
       title = AccountingReferenceDisplay.displayReference(
         referenceType: 'cost',
@@ -162,7 +167,6 @@ class AccountingCostRevenueTab extends StatelessWidget {
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;
-      canModify = _isManualCost(item);
     }
 
     return ListTile(
@@ -184,7 +188,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
               color: isRevenue ? AppColors.success : AppColors.error,
             ),
           ),
-          if (canModify) ...[
+          if (isModifiable) ...[
             const SizedBox(width: AppSpacing.xs),
             IconButton(
               icon: const Icon(Icons.edit_outlined),

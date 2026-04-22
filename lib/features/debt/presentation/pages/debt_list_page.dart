@@ -8,6 +8,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -55,16 +56,18 @@ class _DebtListPageState extends State<DebtListPage> {
     _loadDebtors();
   }
 
-  List<String> _paymentMethodsFromReference() {
+  List<ReferenceItem> _paymentMethodsFromReference() {
     final state = context.read<ReferenceBloc>().state;
     if (state is ReferenceLoaded) {
-      final methods = (state.references['paymentMethods'] ?? const <String>[])
-          .where((m) => m.trim().isNotEmpty)
-          .toSet()
+      final methods = (state.references['paymentMethods'] ?? const <ReferenceItem>[])
+          .where((m) => m.code.trim().isNotEmpty)
           .toList();
       if (methods.isNotEmpty) return methods;
     }
-    return const <String>['CASH', 'BANK_TRANSFER'];
+    return const [
+      ReferenceItem(code: 'CASH', label: 'CASH'),
+      ReferenceItem(code: 'BANK_TRANSFER', label: 'BANK_TRANSFER'),
+    ];
   }
 
   @override
@@ -1307,7 +1310,7 @@ class _DebtListPageState extends State<DebtListPage> {
     final noteController = TextEditingController();
     String direction = 'increase';
     final paymentMethods = _paymentMethodsFromReference();
-    String paymentMethod = paymentMethods.first;
+    String paymentMethod = paymentMethods.first.code;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1372,10 +1375,11 @@ class _DebtListPageState extends State<DebtListPage> {
                           AppSpacing.radiusSm,
                         ),
                         items: paymentMethods
+                            .where((item) => item.label.trim().isNotEmpty)
                             .map(
-                              (method) => DropdownMenuItem(
-                                value: method,
-                                child: Text(method),
+                              (item) => DropdownMenuItem(
+                                value: item.code,
+                                child: Text(item.label),
                               ),
                             )
                             .toList(),

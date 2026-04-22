@@ -6,6 +6,7 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_button.dart';
 
@@ -40,6 +41,32 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
   late String _viewMode;
   bool _isReset = false;
 
+  String _extractViewModeCode(dynamic raw) {
+    final text = (raw ?? '').toString().trim();
+    if (text.isEmpty) return 'audit';
+
+    if (text == 'audit' || text == 'effective') {
+      return text;
+    }
+
+    final codeMatch = RegExp(r'code\s*:\s*([a-zA-Z_\-]+)').firstMatch(text);
+    final code = codeMatch?.group(1)?.trim().toLowerCase();
+    if (code == 'audit' || code == 'effective') {
+      return code!;
+    }
+
+    final lowered = text.toLowerCase();
+    if (lowered.contains('effective')) return 'effective';
+    return 'audit';
+  }
+
+  String _viewModeLabel(AppLocalizations l10n, String code) {
+    if (code == 'effective') {
+      return l10n.translate('accounting.gl_view_effective');
+    }
+    return l10n.translate('accounting.gl_view_audit');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -48,7 +75,7 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
     _selectedMoneyChannels = List.from(widget.currentMoneyChannels);
     _fromDate = widget.currentFromDate;
     _toDate = widget.currentToDate;
-    _viewMode = widget.currentViewMode;
+    _viewMode = _extractViewModeCode(widget.currentViewMode);
   }
 
   void _apply() {
@@ -108,7 +135,7 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
 
   Widget _buildMultiSelectFilter({
     required String title,
-    required List<String> options,
+    required List<ReferenceItem> options,
     required List<String> selected,
   }) {
     return Column(
@@ -122,17 +149,19 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: options.map((option) {
-            final isSelected = selected.contains(option);
+          children: options
+              .where((item) => item.label.trim().isNotEmpty)
+              .map((item) {
+            final isSelected = selected.contains(item.code);
             return FilterChip(
-              label: Text(option),
+              label: Text(item.label),
               selected: isSelected,
               onSelected: (checked) {
                 setState(() {
                   if (checked) {
-                    selected.add(option);
+                    selected.add(item.code);
                   } else {
-                    selected.remove(option);
+                    selected.remove(item.code);
                   }
                 });
               },
@@ -232,12 +261,20 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
 
                   final refs = state.references;
                   final transactionTypes =
-                      refs['generalLedgerTransactionTypes'] ?? <String>[];
+                      refs['generalLedgerTransactionTypes'] ?? <ReferenceItem>[];
                   final referenceTypes =
-                      refs['generalLedgerReferenceTypes'] ?? <String>[];
-                  final moneyChannels = refs['moneyChannelTypes'] ?? <String>[];
-                  final viewModes =
-                      refs['generalLedgerViewModes'] ?? <String>['audit', 'effective'];
+                      refs['generalLedgerReferenceTypes'] ?? <ReferenceItem>[];
+                  final moneyChannels = refs['moneyChannelTypes'] ?? <ReferenceItem>[];
+                    final rawViewModes =
+                      refs['generalLedgerViewModes'] ?? <ReferenceItem>[];
+                    final viewModes = rawViewModes
+                      .map((item) => _extractViewModeCode(item.code))
+                      .where((mode) => mode == 'audit' || mode == 'effective')
+                      .toSet()
+                      .toList();
+                    if (viewModes.isEmpty) {
+                    viewModes.addAll(const <String>['audit', 'effective']);
+                    }
 
                   return SingleChildScrollView(
                     child: Column(
@@ -257,7 +294,7 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
                           children: viewModes.map((mode) {
                             final isSelected = _viewMode == mode;
                             return ChoiceChip(
-                              label: Text(mode),
+                              label: Text(_viewModeLabel(l10n, mode)),
                               selected: isSelected,
                               onSelected: (selected) {
                                 if (!selected) return;
