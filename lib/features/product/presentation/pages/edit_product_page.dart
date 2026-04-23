@@ -30,7 +30,7 @@ class EditProductPage extends StatefulWidget {
   final String? category;
   final double? costPrice;
   final double? salePrice;
-  final int? quantity;
+  final double? quantity;
   final String? unit;
   final String? description;
   final bool isActive;
@@ -444,8 +444,10 @@ class _EditProductPageState extends State<EditProductPage> {
       return double.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
     }
 
-    int? parseQuantity(String value) {
-      return int.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
+    double? parseStock(String value) {
+      final normalized = value.trim().replaceAll(',', '.');
+      if (normalized.isEmpty) return null;
+      return double.tryParse(normalized);
     }
 
     final costPriceText = _costPriceController.text.trim();
@@ -454,7 +456,7 @@ class _EditProductPageState extends State<EditProductPage> {
 
     final costPrice = costPriceText.isEmpty ? null : parseMoney(costPriceText);
     final salePrice = salePriceText.isEmpty ? null : parseMoney(salePriceText);
-    final quantity = quantityText.isEmpty ? null : parseQuantity(quantityText);
+    final quantity = quantityText.isEmpty ? null : parseStock(quantityText);
 
     setState(() {
       _productNameError = _productNameController.text.trim().isEmpty
@@ -1034,7 +1036,14 @@ class _EditProductPageState extends State<EditProductPage> {
                           if (_quantityError == null) return;
                           setState(() => _quantityError = null);
                         },
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[0-9.,]'),
+                          ),
+                        ],
                       ),
                     ),
                     SizedBox(width: AppSpacing.md),

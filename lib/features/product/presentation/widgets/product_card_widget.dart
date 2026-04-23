@@ -56,10 +56,18 @@ class ProductCardWidget extends StatelessWidget {
     }
 
     final resolvedUnit = _resolveBaseUnit();
+    final stockText = _formatStock(product.quantity);
     if (resolvedUnit.isEmpty) {
-      return '${product.quantity}';
+      return stockText;
     }
-    return '${product.quantity} $resolvedUnit';
+    return '$stockText $resolvedUnit';
+  }
+
+  String _formatStock(double value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+    return value.toString();
   }
 
   String _resolveBaseUnit() {

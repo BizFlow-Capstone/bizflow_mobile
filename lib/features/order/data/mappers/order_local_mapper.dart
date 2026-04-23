@@ -108,7 +108,7 @@ class OrderLocalMapper {
               unitName: item['unitName']?.toString(),
               productName: item['productName']?.toString() ?? '',
               price: (item['price'] as num?)?.toDouble() ?? 0,
-              quantity: (item['quantity'] as num?)?.toInt() ?? 0,
+              quantity: (item['quantity'] as num?)?.toDouble() ?? 0,
               discount: (item['discount'] as num?)?.toDouble() ?? 0,
               note: item['note']?.toString(),
             ),

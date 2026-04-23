@@ -188,18 +188,20 @@ class _HomePageState extends State<HomePage> with RouteAware {
       await _prefetchSubscription();
 
       if (!mounted) return;
+
       setState(() {
         _summaryRefreshTick++;
       });
 
       SyncStatusController().endSync(updatedAt: DateTime.now());
-    } catch (_) {
+    } catch (e) {
       SyncStatusController().endSync(hasError: true);
     }
   }
 
   @override
   void didPopNext() {
+    SyncStatusController().setManualRefreshCallback(_triggerManualRefresh);
     if (!mounted) return;
     setState(() {
       _summaryRefreshTick++;

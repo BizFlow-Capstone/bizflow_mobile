@@ -40,11 +40,17 @@ String referenceCodeFromDynamic(dynamic raw, {String fallback = ''}) {
   if (raw == null) return fallback;
   if (raw is ReferenceItem) return raw.code;
   if (raw is Map<String, dynamic>) {
-    final code = raw['code']?.toString().trim() ?? '';
+    final code =
+        raw['code']?.toString().trim() ??
+        raw['Code']?.toString().trim() ??
+        '';
     return code.isNotEmpty ? code : fallback;
   }
   if (raw is Map) {
-    final code = raw['code']?.toString().trim() ?? '';
+    final code =
+        raw['code']?.toString().trim() ??
+        raw['Code']?.toString().trim() ??
+        '';
     return code.isNotEmpty ? code : fallback;
   }
   final text = raw.toString().trim();
@@ -58,11 +64,17 @@ String? referenceLabelFromDynamic(dynamic raw) {
     return label.isEmpty ? null : label;
   }
   if (raw is Map<String, dynamic>) {
-    final label = raw['label']?.toString().trim() ?? '';
+    final label =
+        raw['label']?.toString().trim() ??
+        raw['Label']?.toString().trim() ??
+        '';
     return label.isEmpty ? null : label;
   }
   if (raw is Map) {
-    final label = raw['label']?.toString().trim() ?? '';
+    final label =
+        raw['label']?.toString().trim() ??
+        raw['Label']?.toString().trim() ??
+        '';
     return label.isEmpty ? null : label;
   }
   return null;

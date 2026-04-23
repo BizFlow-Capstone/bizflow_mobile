@@ -18,6 +18,7 @@ import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart'
 import 'package:bizflow_mobile/features/order/presentation/pages/order_detail_screen.dart';
 import 'package:bizflow_mobile/features/revenue/presentation/bloc/revenue_bloc.dart';
 import 'package:bizflow_mobile/features/cost/presentation/bloc/cost_bloc.dart';
+import 'package:bizflow_mobile/features/product/data/import_repository.dart';
 import 'package:bizflow_mobile/features/product/data/models/business_type_model.dart';
 import 'package:bizflow_mobile/features/product/presentation/bloc/product_bloc.dart';
 import 'package:bizflow_mobile/features/revenue/domain/entities/revenue_entity.dart';
@@ -32,12 +33,18 @@ import '../../../../shared/dialogs/app_bottom_sheet.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/cache/sync_status_controller.dart';
+import '../../../../shared/cache/cache_manager.dart';
+import '../../../../shared/cache/local_api_cache_store.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../../core/storage/secure_storage.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../bloc/accounting_period_bloc.dart';
+import '../bloc/gl_bloc/gl_bloc.dart';
+import '../bloc/gl_bloc/gl_event.dart';
+import '../bloc/gl_bloc/gl_state.dart';
 import '../dialogs/ai_draft_cost_dialog.dart';
 import '../dialogs/ai_draft_revenue_dialog.dart';
 import '../widgets/accounting_cost_revenue_tab.dart';
@@ -47,6 +54,7 @@ import '../../../accounting/domain/utils/accounting_reference_display.dart';
 import '../../../subscription/data/subscription_repository.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/config/app_config.dart';
 
 class AccountingHubPage extends StatefulWidget {
   const AccountingHubPage({super.key});
@@ -103,6 +111,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   bool _isVoiceRecording = false;
   String? _lastVoicePath;
   String? _lastVoiceTranscript;
+  String? _imageAccessToken;
   List<RevenueEntity> _cachedRevenues = const <RevenueEntity>[];
   List<CostEntity> _cachedCosts = const <CostEntity>[];
   bool _suppressNextRevenueError = false;
@@ -115,6 +124,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     _tabController = TabController(length: 4, vsync: this);
     SyncStatusController().clearError();
     SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
+    unawaited(_warmImageAuthToken());
 
     _tabController.addListener(_handleTabSelection);
 
@@ -141,6 +151,37 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           LoadPeriodsRequested(locationId),
         );
         break;
+      case 1: // Sổ cái
+        final locationIdInt = int.tryParse(locationId);
+        if (locationIdInt == null || locationIdInt <= 0) {
+          return;
+        }
+
+        final glState = context.read<GLBloc>().state;
+        if (glState is GLLoaded) {
+          context.read<GLBloc>().add(
+            LoadGLEntriesRequested(
+              businessLocationId: locationIdInt,
+              pageNumber: 1,
+              pageSize: glState.pageSize,
+              transactionTypes: glState.transactionTypes,
+              referenceTypes: glState.referenceTypes,
+              moneyChannels: glState.moneyChannels,
+              fromDate: glState.fromDate,
+              toDate: glState.toDate,
+              viewMode: glState.viewMode,
+            ),
+          );
+        } else {
+          context.read<GLBloc>().add(
+            LoadGLEntriesRequested(
+              businessLocationId: locationIdInt,
+              pageNumber: 1,
+              pageSize: 20,
+            ),
+          );
+        }
+        break;
       case 2: // Doanh thu
         context.read<RevenueBloc>().add(
           LoadRevenuesRequested(businessLocationId: locationId),
@@ -165,10 +206,44 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   }
 
   void _refreshCurrentTab() {
+    unawaited(_refreshCurrentTabAsync());
+  }
+
+  Future<void> _refreshCurrentTabAsync() async {
     if (!mounted) return;
+
+    SyncStatusController().startSync();
     try {
       _loadReferences();
+
+      // Force SWR revalidate for manual refresh.
+      switch (_tabController.index) {
+        case 1:
+          await CacheManager().removeByPrefix('gl_entries_');
+          await LocalApiCacheStore().removeByGroup('gl_entries');
+          break;
+        case 2:
+          await CacheManager().removeByPrefix('revenues_');
+          await LocalApiCacheStore().removeByGroup('revenues');
+          break;
+        case 3:
+          await CacheManager().removeByPrefix('costs_');
+          await LocalApiCacheStore().removeByGroup('costs');
+          break;
+      }
+
       _loadTab(_tabController.index);
+      SyncStatusController().endSync(updatedAt: DateTime.now());
+    } catch (_) {
+      SyncStatusController().endSync(hasError: true);
+    }
+  }
+
+  Future<void> _warmImageAuthToken() async {
+    try {
+      final token = await SecureStorage().getAccessToken();
+      if (!mounted) return;
+      setState(() => _imageAccessToken = token);
     } catch (_) {}
   }
 
@@ -1288,9 +1363,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         }
                       } catch (e) {
                         if (!dialogCtx.mounted) return;
-                        AppSnackBar.error(
+                        await AppDialog.error(
                           dialogCtx,
-                          ApiErrorMessageParser.parse(e),
+                          title: l10n.translate('common.error'),
+                          message: ApiErrorMessageParser.parse(e),
                         );
                         setDialogState(() => isSubmitting = false);
                       }
@@ -1628,9 +1704,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         }
                       } catch (e) {
                         if (!dialogCtx.mounted) return;
-                        AppSnackBar.error(
+                        await AppDialog.error(
                           dialogCtx,
-                          ApiErrorMessageParser.parse(e),
+                          title: l10n.translate('common.error'),
+                          message: ApiErrorMessageParser.parse(e),
                         );
                         setDialogState(() => isSubmitting = false);
                       }
@@ -1840,48 +1917,56 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           (CurrencyFormatter.parse(amountController.text) ?? 0)
                               .toDouble();
                       if (descriptionController.text.trim().isEmpty) {
-                        AppSnackBar.warning(
+                        await AppDialog.show(
                           dialogCtx,
-                          _translateWithFallback(
+                          title: l10n.translate('common.warning'),
+                          message: _translateWithFallback(
                             'accounting.description_required',
                             'Vui lòng nhập mô tả',
                           ),
+                          type: AppDialogType.warning,
                         );
                         setDialogState(() => isSubmitting = false);
                         return;
                       }
 
                       if (amount <= 0) {
-                        AppSnackBar.warning(
+                        await AppDialog.show(
                           dialogCtx,
-                          _translateWithFallback(
+                          title: l10n.translate('common.warning'),
+                          message: _translateWithFallback(
                             'accounting.amount_required',
                             'Vui lòng nhập số tiền hợp lệ',
                           ),
+                          type: AppDialogType.warning,
                         );
                         setDialogState(() => isSubmitting = false);
                         return;
                       }
 
                       if ((selectedCostType ?? '').trim().isEmpty) {
-                        AppSnackBar.warning(
+                        await AppDialog.show(
                           dialogCtx,
-                          _translateWithFallback(
+                          title: l10n.translate('common.warning'),
+                          message: _translateWithFallback(
                             'accounting.cost_type_required',
                             'Vui lòng chọn loại chi phí',
                           ),
+                          type: AppDialogType.warning,
                         );
                         setDialogState(() => isSubmitting = false);
                         return;
                       }
 
                       if ((selectedPaymentMethod ?? '').trim().isEmpty) {
-                        AppSnackBar.warning(
+                        await AppDialog.show(
                           dialogCtx,
-                          _translateWithFallback(
+                          title: l10n.translate('common.warning'),
+                          message: _translateWithFallback(
                             'accounting.payment_method_required',
                             'Vui lòng chọn phương thức thanh toán',
                           ),
+                          type: AppDialogType.warning,
                         );
                         setDialogState(() => isSubmitting = false);
                         return;
@@ -1946,7 +2031,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     descriptionController.dispose();
   }
 
-  void _showRevenueDetailDialog(RevenueEntity revenue) {
+  Future<void> _showRevenueDetailDialog(RevenueEntity revenue) async {
+    final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
     final languageCode = Localizations.localeOf(context).languageCode;
     final referenceLabel = AccountingReferenceDisplay.displayReference(
       referenceType: revenue.referenceType,
@@ -1964,19 +2050,23 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           languageCode: languageCode,
         );
 
-    final refId = revenue.referenceId ?? 0;
-    final refType = revenue.referenceType;
-    final refCode = revenue.referenceCode;
-    if (refId > 0) {
-      if (_shouldOpenImportFromRevenue(revenue)) {
-        final locationId =
-            context.read<BusinessContext>().currentBusinessId ?? '';
+    final shouldOpenImport = _shouldOpenImportFromRevenue(revenue);
+    int refId = _resolveReferenceId(revenue.referenceId, revenue.referenceCode);
+    if (shouldOpenImport) {
+      if (refId <= 0) {
+        refId = await _resolveImportIdByReferenceCode(revenue.referenceCode);
+        if (!mounted) return;
+      }
+      if (refId > 0) {
         AppRouter.navigateTo(
           AppRoutes.stockImport,
           arguments: {'locationId': locationId, 'importId': refId},
         );
         return;
       }
+    }
+
+    if (refId > 0) {
       if (_shouldOpenOrderFromRevenue(revenue)) {
         Navigator.push(
           context,
@@ -1987,6 +2077,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         return;
       }
     }
+
+    if (!mounted) return;
 
     AppDialog.show(
       context,
@@ -2009,19 +2101,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: GestureDetector(
                     onTap: () {
-                      final image = (revenue.imagePath ?? '').trim();
-                      final isNetwork =
-                          image.startsWith('http://') || image.startsWith('https://');
+                      final imageSource = _resolveImageSource(revenue.imagePath);
+                      if (imageSource == null) {
+                        return;
+                      }
                       showDialog(
                         context: context,
                         builder: (_) => Dialog(
                           child: InteractiveViewer(
-                            child: isNetwork
-                                ? Image.network(image, fit: BoxFit.contain)
-                                : Image.file(
-                                    File(revenue.imagePath!),
-                                    fit: BoxFit.contain,
-                                  ),
+                            child: _buildDetailImage(imageSource),
                           ),
                         ),
                       );
@@ -2030,20 +2118,22 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       borderRadius: BorderRadius.circular(8),
                       child: Builder(
                         builder: (_) {
-                          final image = (revenue.imagePath ?? '').trim();
-                          final isNetwork = image.startsWith('http://') ||
-                              image.startsWith('https://');
-                          return isNetwork
-                              ? Image.network(
-                                  image,
-                                  height: 120,
-                                  fit: BoxFit.cover,
-                                )
-                              : Image.file(
-                                  File(revenue.imagePath!),
-                                  height: 120,
-                                  fit: BoxFit.cover,
-                                );
+                          final imageSource = _resolveImageSource(
+                            revenue.imagePath,
+                          );
+                          if (imageSource == null) {
+                            return const SizedBox(
+                              height: 120,
+                              child: Center(
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            );
+                          }
+
+                          return _buildDetailImage(imageSource, height: 120);
                         },
                       ),
                     ),
@@ -2140,7 +2230,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
   }
 
-  void _showCostDetailDialog(CostEntity cost) {
+  Future<void> _showCostDetailDialog(CostEntity cost) async {
+    final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
     final languageCode = Localizations.localeOf(context).languageCode;
     final referenceLabel = AccountingReferenceDisplay.displayReference(
       referenceType: cost.referenceType,
@@ -2158,19 +2249,23 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           languageCode: languageCode,
         );
 
-    final refId = cost.referenceId ?? 0;
-    final refType = cost.referenceType;
-    final refCode = cost.referenceCode;
-    if (refId > 0) {
-      if (_shouldOpenImportFromCost(cost)) {
-        final locationId =
-            context.read<BusinessContext>().currentBusinessId ?? '';
+    final shouldOpenImport = _shouldOpenImportFromCost(cost);
+    int refId = _resolveReferenceId(cost.referenceId, cost.referenceCode);
+    if (shouldOpenImport) {
+      if (refId <= 0) {
+        refId = await _resolveImportIdByReferenceCode(cost.referenceCode);
+        if (!mounted) return;
+      }
+      if (refId > 0) {
         AppRouter.navigateTo(
           AppRoutes.stockImport,
           arguments: {'locationId': locationId, 'importId': refId},
         );
         return;
       }
+    }
+
+    if (refId > 0) {
       if (_shouldOpenOrderFromCost(cost)) {
         Navigator.push(
           context,
@@ -2181,6 +2276,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         return;
       }
     }
+
+    if (!mounted) return;
 
     AppDialog.show(
       context,
@@ -2203,36 +2300,42 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: GestureDetector(
                     onTap: () {
+                      final imageSource = _resolveImageSource(
+                        cost.documentUrl ?? cost.imagePath,
+                      );
+                      if (imageSource == null) {
+                        return;
+                      }
                       showDialog(
                         context: context,
                         builder: (_) => Dialog(
                           child: InteractiveViewer(
-                            child: (cost.documentUrl ?? '').isNotEmpty
-                                ? Image.network(
-                                    cost.documentUrl!,
-                                    fit: BoxFit.contain,
-                                  )
-                                : Image.file(
-                                    File(cost.imagePath!),
-                                    fit: BoxFit.contain,
-                                  ),
+                            child: _buildDetailImage(imageSource),
                           ),
                         ),
                       );
                     },
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: (cost.documentUrl ?? '').isNotEmpty
-                          ? Image.network(
-                              cost.documentUrl!,
+                      child: Builder(
+                        builder: (_) {
+                          final imageSource = _resolveImageSource(
+                            cost.documentUrl ?? cost.imagePath,
+                          );
+                          if (imageSource == null) {
+                            return const SizedBox(
                               height: 120,
-                              fit: BoxFit.cover,
-                            )
-                          : Image.file(
-                              File(cost.imagePath!),
-                              height: 120,
-                              fit: BoxFit.cover,
-                            ),
+                              child: Center(
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            );
+                          }
+                          return _buildDetailImage(imageSource, height: 120);
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -2279,7 +2382,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final normalizedCode = (referenceCode ?? '').trim().toLowerCase();
     return normalizedType.contains('import') ||
         normalizedType.contains('inventory') ||
+      normalizedType.contains('stockin') ||
         normalizedCode.startsWith('imp') ||
+      normalizedCode.contains('pnk') ||
+      normalizedCode.startsWith('pnk') ||
         normalizedCode.startsWith('import');
   }
 
@@ -2308,6 +2414,195 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     return _isImportReference(cost.referenceType, cost.referenceCode) ||
         normalizedType.contains('import') ||
         normalizedType.contains('inventory');
+  }
+
+  int _resolveReferenceId(int? referenceId, String? referenceCode) {
+    if (referenceId != null && referenceId > 0) {
+      return referenceId;
+    }
+
+    final code = (referenceCode ?? '').trim();
+    if (code.isEmpty) {
+      return 0;
+    }
+
+    if (RegExp(r'^\d+$').hasMatch(code)) {
+      return int.tryParse(code) ?? 0;
+    }
+
+    final pnkMatch = RegExp(r'pnk[\-_/:#]*\d+[\-_/:#]*(\d+)$', caseSensitive: false)
+        .firstMatch(code);
+    if (pnkMatch != null) {
+      return int.tryParse(pnkMatch.group(1) ?? '') ?? 0;
+    }
+
+    // Only infer id from explicit id-like prefixes to avoid guessing from
+    // document serials such as PNK-2026-007.
+    final match =
+        RegExp(r'(?:import|imp|order|ord|id)[^0-9]*(\d+)$', caseSensitive: false)
+            .firstMatch(code) ??
+        RegExp(r'\b(id|importid|orderid)\s*[:=#-]\s*(\d+)\b', caseSensitive: false)
+            .firstMatch(code);
+    if (match == null) {
+      return 0;
+    }
+
+    final idGroup = match.groupCount >= 2 ? match.group(2) : match.group(1);
+    return int.tryParse(idGroup ?? '') ?? 0;
+  }
+
+  Future<int> _resolveImportIdByReferenceCode(String? referenceCode) async {
+    final code = (referenceCode ?? '').trim();
+    if (code.isEmpty) {
+      return 0;
+    }
+
+    final locationIdRaw = context.read<BusinessContext>().currentBusinessId;
+    final locationId = int.tryParse(locationIdRaw ?? '');
+    if (locationId == null || locationId <= 0) {
+      return 0;
+    }
+
+    final repository = context.read<ImportRepository>();
+
+    String normalize(String value) {
+      return value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    }
+
+    try {
+      final data = await repository.getImports(
+        businessLocationId: locationId,
+        pageNumber: 1,
+        pageSize: 200,
+      );
+
+      final items = (data['items'] as List<dynamic>? ?? const []);
+      final normalizedCode = normalize(code);
+      for (final raw in items) {
+        if (raw is! Map<String, dynamic>) {
+          continue;
+        }
+
+        final importCode =
+            (raw['importCode'] ?? raw['ImportCode'] ?? '').toString();
+        if (importCode.trim().isEmpty) {
+          continue;
+        }
+
+        if (normalize(importCode) == normalizedCode) {
+          final importIdRaw = raw['importId'] ?? raw['ImportId'];
+          if (importIdRaw is int && importIdRaw > 0) {
+            return importIdRaw;
+          }
+          if (importIdRaw is num && importIdRaw > 0) {
+            return importIdRaw.toInt();
+          }
+          final parsed = int.tryParse(importIdRaw?.toString() ?? '');
+          if (parsed != null && parsed > 0) {
+            return parsed;
+          }
+        }
+      }
+    } catch (_) {
+      return 0;
+    }
+
+    return 0;
+  }
+
+  _ImageSource? _resolveImageSource(String? rawPath) {
+    final value = (rawPath ?? '').trim();
+    if (value.isEmpty) {
+      return null;
+    }
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return _ImageSource.network(Uri.encodeFull(value));
+    }
+
+    if (value.startsWith('file://')) {
+      final localPath = Uri.tryParse(value)?.toFilePath() ?? value;
+      return _ImageSource.file(localPath);
+    }
+
+    if (_looksLikeLocalFilePath(value)) {
+      return _ImageSource.file(value);
+    }
+
+    final normalizedBase = AppConfig.baseUrl.endsWith('/')
+        ? AppConfig.baseUrl.substring(0, AppConfig.baseUrl.length - 1)
+        : AppConfig.baseUrl;
+    final slashNormalized = value.replaceAll('\\', '/');
+    final normalizedPath = slashNormalized.startsWith('/')
+        ? slashNormalized
+        : '/$slashNormalized';
+    return _ImageSource.network(Uri.encodeFull('$normalizedBase$normalizedPath'));
+  }
+
+  Widget _buildDetailImage(_ImageSource imageSource, {double? height}) {
+    if (imageSource.isNetwork) {
+      final token = _imageAccessToken?.trim();
+      final headers = (token != null && token.isNotEmpty)
+          ? <String, String>{'Authorization': 'Bearer $token'}
+          : null;
+
+      return Image.network(
+        imageSource.value,
+        headers: headers,
+        height: height,
+        fit: height == null ? BoxFit.contain : BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) {
+            return child;
+          }
+          return SizedBox(
+            height: height ?? 220,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) {
+          return SizedBox(
+            height: height ?? 220,
+            child: const Center(
+              child: Icon(Icons.broken_image_outlined, color: AppColors.textSecondary),
+            ),
+          );
+        },
+      );
+    }
+
+    return Image.file(
+      File(imageSource.value),
+      height: height,
+      fit: height == null ? BoxFit.contain : BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return SizedBox(
+          height: height ?? 220,
+          child: const Center(
+            child: Icon(Icons.broken_image_outlined, color: AppColors.textSecondary),
+          ),
+        );
+      },
+    );
+  }
+
+  bool _looksLikeLocalFilePath(String path) {
+    if (path.startsWith('content://')) {
+      return true;
+    }
+
+    final hasWindowsDrivePrefix = RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(path);
+    if (hasWindowsDrivePrefix) {
+      return true;
+    }
+
+    if (path.startsWith('/storage/') ||
+        path.startsWith('/data/') ||
+        path.startsWith('/var/')) {
+      return true;
+    }
+
+    return File(path).existsSync();
   }
 
   Future<void> _showEditRevenueDialog(RevenueEntity item) async {
@@ -2593,6 +2888,21 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 }
 
 enum _EntryCreateMode { manual, aiDraft }
+
+class _ImageSource {
+  final String value;
+  final bool isNetwork;
+
+  const _ImageSource._({required this.value, required this.isNetwork});
+
+  factory _ImageSource.network(String value) {
+    return _ImageSource._(value: value, isNetwork: true);
+  }
+
+  factory _ImageSource.file(String value) {
+    return _ImageSource._(value: value, isNetwork: false);
+  }
+}
 
 class _VoicePlayBtn extends StatefulWidget {
   final AudioPlayer player;

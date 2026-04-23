@@ -657,7 +657,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
 }
 
 class _QuickAdjustStockFormData {
-  final int stock;
+  final double stock;
   final String memo;
   final double? costPrice;
 
@@ -669,7 +669,7 @@ class _QuickAdjustStockFormData {
 }
 
 class _QuickAdjustStockDialog extends StatefulWidget {
-  final int initialStock;
+  final double initialStock;
   final double? initialCostPrice;
 
   const _QuickAdjustStockDialog({
@@ -721,9 +721,13 @@ class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
           children: [
             TextField(
               controller: _stockController,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
               ),
               decoration: InputDecoration(
                 labelText: l10n.translate('product.stock_adjust.stock'),
@@ -758,7 +762,9 @@ class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
         ),
         ElevatedButton(
           onPressed: () {
-            final stock = int.tryParse(_stockController.text);
+            final stock = double.tryParse(
+              _stockController.text.trim().replaceAll(',', '.'),
+            );
             final parsedCostPrice = CurrencyFormatter.parse(
               _costPriceController.text,
             );

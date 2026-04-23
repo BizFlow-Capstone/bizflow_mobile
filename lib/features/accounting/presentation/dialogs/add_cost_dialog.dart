@@ -236,9 +236,8 @@ Future<void> showAddCostDialog(BuildContext context) async {
                           'description': descriptionController.text,
                           'costType': selectedCostType,
                           'paymentMethod': selectedPaymentMethod,
-                          if (selectedImage != null)
-                            'imagePath': selectedImage!.path,
                         },
+                        image: selectedImage,
                       ),
                     );
                     Navigator.pop(dialogCtx);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 class SyncStatusState {
@@ -23,9 +25,20 @@ class SyncStatusController extends ChangeNotifier {
 
   /// Callback registered by the current screen to trigger a full data refresh.
   VoidCallback? _manualRefreshCallback;
+  static const Duration _manualRefreshCooldown = Duration(seconds: 3);
+  DateTime? _lastManualRefreshAt;
+  Timer? _manualRefreshCooldownTimer;
 
   /// Whether a manual refresh callback is currently registered.
   bool get hasManualRefreshCallback => _manualRefreshCallback != null;
+
+  bool get isManualRefreshCoolingDown {
+    final last = _lastManualRefreshAt;
+    if (last == null) {
+      return false;
+    }
+    return DateTime.now().difference(last) < _manualRefreshCooldown;
+  }
 
   /// Register a callback that will be called when the user taps the refresh button.
   void setManualRefreshCallback(VoidCallback? callback) {
@@ -38,6 +51,17 @@ class SyncStatusController extends ChangeNotifier {
 
   /// Called by the refresh button in [AppSyncStatusText] to trigger a reload.
   void triggerManualRefresh() {
+    if (_manualRefreshCallback == null || isManualRefreshCoolingDown) {
+      return;
+    }
+
+    _lastManualRefreshAt = DateTime.now();
+    _manualRefreshCooldownTimer?.cancel();
+    _manualRefreshCooldownTimer = Timer(_manualRefreshCooldown, () {
+      notifyListeners();
+    });
+    notifyListeners();
+
     _manualRefreshCallback?.call();
   }
 
@@ -86,6 +110,9 @@ class SyncStatusController extends ChangeNotifier {
   void reset() {
     _activeRequests = 0;
     _state = const SyncStatusState(isSyncing: false, hasError: false);
+    _lastManualRefreshAt = null;
+    _manualRefreshCooldownTimer?.cancel();
+    _manualRefreshCooldownTimer = null;
     notifyListeners();
   }
 }

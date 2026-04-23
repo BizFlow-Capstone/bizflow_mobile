@@ -1,3 +1,40 @@
+String? _readStringValue(dynamic value) {
+  if (value == null) {
+    return null;
+  }
+
+  if (value is String) {
+    return value;
+  }
+
+  if (value is num || value is bool) {
+    return value.toString();
+  }
+
+  if (value is Map) {
+    final map = Map<String, dynamic>.from(value);
+    final code = map['code'] ?? map['Code'];
+    if (code is String && code.trim().isNotEmpty) {
+      return code;
+    }
+
+    final label = map['label'] ?? map['Label'];
+    if (label is String && label.trim().isNotEmpty) {
+      return label;
+    }
+  }
+
+  return null;
+}
+
+String _readRequiredString(dynamic value, {String fallback = ''}) {
+  final parsed = _readStringValue(value);
+  if (parsed == null || parsed.trim().isEmpty) {
+    return fallback;
+  }
+  return parsed;
+}
+
 class SubscriptionPlanPriceDto {
   final int priceId;
   final double basePrice;
@@ -140,10 +177,12 @@ class CurrentSubscriptionDto {
 
   factory CurrentSubscriptionDto.fromJson(Map<String, dynamic> json) {
     return CurrentSubscriptionDto(
-      subscriptionId: json['subscriptionId'] as String?,
-      status: (json['status'] as String? ?? 'inactive').trim().toLowerCase(),
-      startDate: json['startDate'] as String?,
-      endDate: json['endDate'] as String?,
+      subscriptionId: _readStringValue(json['subscriptionId']),
+      status: _readRequiredString(json['status'], fallback: 'inactive')
+          .trim()
+          .toLowerCase(),
+      startDate: _readStringValue(json['startDate']),
+      endDate: _readStringValue(json['endDate']),
       plan: json['plan'] != null
           ? SubscriptionPlanDto.fromJson(json['plan'] as Map<String, dynamic>)
           : null,
@@ -180,13 +219,13 @@ class CheckoutSessionResponseDto {
 
   factory CheckoutSessionResponseDto.fromJson(Map<String, dynamic> json) {
     return CheckoutSessionResponseDto(
-      transactionId: json['transactionId'] as String? ?? '',
-      sessionUrl: json['sessionUrl'] as String? ?? '',
+      transactionId: _readRequiredString(json['transactionId']),
+      sessionUrl: _readRequiredString(json['sessionUrl']),
       planPrice: (json['planPrice'] as num?)?.toDouble() ?? 0.0,
       prorationCredit: (json['prorationCredit'] as num?)?.toDouble() ?? 0.0,
       finalAmount: (json['finalAmount'] as num?)?.toDouble() ?? 0.0,
-      currency: json['currency'] as String? ?? 'VND',
-      transactionType: json['transactionType'] as String? ?? '',
+      currency: _readRequiredString(json['currency'], fallback: 'VND'),
+      transactionType: _readRequiredString(json['transactionType']),
     );
   }
 
@@ -231,14 +270,14 @@ class SubscriptionTransactionDto {
         0.0;
 
     return SubscriptionTransactionDto(
-      transactionId: json['transactionId'] as String? ?? '',
-      transactionType: json['transactionType'] as String? ?? '',
-      status: json['status'] as String? ?? '',
+      transactionId: _readRequiredString(json['transactionId']),
+      transactionType: _readRequiredString(json['transactionType']),
+      status: _readRequiredString(json['status']),
       amount: resolvedAmount,
-      currency: json['currency'] as String? ?? 'VND',
-      planName: json['planName'] as String?,
-      createdAt: json['createdAt'] as String?,
-      paidAt: json['paidAt'] as String?,
+      currency: _readRequiredString(json['currency'], fallback: 'VND'),
+      planName: _readStringValue(json['planName']),
+      createdAt: _readStringValue(json['createdAt']),
+      paidAt: _readStringValue(json['paidAt']),
     );
   }
 }

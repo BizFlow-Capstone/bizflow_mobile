@@ -100,7 +100,7 @@ class AddProductRequested extends ProductEvent {
   final String? category;
   final double? costPrice;
   final double? salePrice;
-  final int? quantity;
+  final double? quantity;
   final String? unit;
   final bool trackInventory;
   final bool isActive;
@@ -157,7 +157,7 @@ class UpdateProductRequested extends ProductEvent {
   final String? category;
   final double? costPrice;
   final double? salePrice;
-  final int? quantity;
+  final double? quantity;
   final String? unit;
   final bool trackInventory;
   final bool isActive;

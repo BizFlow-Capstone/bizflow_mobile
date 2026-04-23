@@ -38,7 +38,7 @@ class ProductDto {
   final double price; // Legacy field, kept for compatibility
   final double? costPrice;
   final double? salePrice;
-  final int quantity;
+  final double quantity;
   final String? imageUrl;
   final int? locationId;
   final String? businessTypeId;
@@ -153,7 +153,7 @@ class ProductDto {
         json['Quantity'] ??
         json['currentStock'] ??
         json['stock_quantity'];
-    final int resolvedQty = (rawQty as num?)?.toInt() ?? 0;
+    final double resolvedQty = (rawQty as num?)?.toDouble() ?? 0;
 
     final List<Map<String, dynamic>> saleItems =
         (json['saleItems'] as List<dynamic>?)

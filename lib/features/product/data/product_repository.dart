@@ -369,7 +369,7 @@ class ProductRepository {
   /// Adjust product stock manually
   Future<dynamic> adjustProductStock({
     required String productId,
-    required int stock,
+    required double stock,
     String? memo,
     double? costPrice,
   }) async {
@@ -398,7 +398,7 @@ class ProductRepository {
     bool trackInventory = true,
     double? costPrice,
     double? price,
-    int? stock,
+    double? stock,
     String? manufacturer,
     List<Map<String, dynamic>>? priceTiers,
     String? imagePath,
@@ -437,7 +437,7 @@ class ProductRepository {
     bool? trackInventory,
     double? costPrice,
     double? price,
-    int? stock,
+    double? stock,
     String? manufacturer,
     List<Map<String, dynamic>>? priceTiers,
     String? imagePath,

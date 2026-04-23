@@ -13,6 +13,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../domain/models/accounting_period.dart';
 import '../bloc/accounting_period_bloc.dart';
 import 'accounting_books_list_widget.dart';
+import 'accounting_period_tax_guide_page.dart';
 
 class AccountingPeriodTab extends StatefulWidget {
   final String locationId;
@@ -109,19 +110,42 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
             Positioned(
               bottom: AppSpacing.xl,
               right: AppSpacing.md,
-              child: FloatingActionButton.extended(
-                heroTag: 'create_period_fab',
-                backgroundColor: AppColors.secondary,
-                foregroundColor: AppColors.white,
-                onPressed: () => _showCreatePeriodSheet(
-                  context,
-                  widget.locationId,
-                  l10n,
-                  messenger: messenger,
-                  isFirstPeriod: periods.isEmpty,
-                ),
-                icon: const Icon(Icons.add),
-                label: Text(l10n.translate('accounting.create_new_period')),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  FloatingActionButton.extended(
+                    heroTag: 'period_guide_fab',
+                    backgroundColor: AppColors.white,
+                    foregroundColor: AppColors.secondary,
+                    elevation: 2,
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AccountingPeriodTaxGuidePage(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.menu_book_outlined),
+                    label: Text(l10n.translate('common.guide')),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  FloatingActionButton.extended(
+                    heroTag: 'create_period_fab',
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: AppColors.white,
+                    onPressed: () => _showCreatePeriodSheet(
+                      context,
+                      widget.locationId,
+                      l10n,
+                      messenger: messenger,
+                      isFirstPeriod: periods.isEmpty,
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: Text(l10n.translate('accounting.create_new_period')),
+                  ),
+                ],
               ),
             ),
           ],

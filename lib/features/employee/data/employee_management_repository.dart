@@ -173,7 +173,13 @@ class EmployeeManagementRepositoryApi implements EmployeeManagementRepository {
   }
 
   EmployeeEntity _employeeFromCachedMap(Map<String, dynamic> json) {
-    final statusText = (json['status'] as String? ?? '').toLowerCase();
+    final rawStatus = json['status'];
+    final statusText = switch (rawStatus) {
+      String value => value.toLowerCase(),
+      Map value =>
+        ((value['code'] ?? value['label']) as String? ?? '').toLowerCase(),
+      _ => '',
+    };
     final status = EmployeeStatus.values.firstWhere(
       (value) => value.name == statusText,
       orElse: () => EmployeeStatus.pending,

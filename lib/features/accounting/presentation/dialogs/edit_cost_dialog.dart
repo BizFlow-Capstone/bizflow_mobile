@@ -255,9 +255,8 @@ Future<void> showEditCostDialog({
                           'costType': selectedCostType ?? item.type,
                           'paymentMethod': selectedPaymentMethod ?? item.paymentMethod,
                           'removeDocument': false,
-                          if (selectedImage != null)
-                            'imagePath': selectedImage!.path,
                         },
+                        image: selectedImage,
                       ),
                     );
                     Navigator.of(dialogCtx).pop();

@@ -11,7 +11,7 @@ class ProductsTable extends Table {
 
   RealColumn get price => real().withDefault(const Constant(0.0))();
 
-  IntColumn get quantity => integer().withDefault(const Constant(0))();
+  RealColumn get quantity => real().withDefault(const Constant(0.0))();
 
   TextColumn get imageUrl => text().nullable()();
 

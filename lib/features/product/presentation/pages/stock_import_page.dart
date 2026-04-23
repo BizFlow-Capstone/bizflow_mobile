@@ -117,6 +117,12 @@ class _StockImportViewState extends State<_StockImportView> {
     super.dispose();
   }
 
+  String _formatQuantity(double value) {
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
+  }
+
   Future<ImageSource?> _selectImageSource() async {
     return showModalBottomSheet<ImageSource>(
       context: context,
@@ -330,12 +336,12 @@ class _StockImportViewState extends State<_StockImportView> {
           continue;
         }
 
-        final quantity = item.quantity > 0 ? item.quantity.round() : 1;
+        final quantity = item.quantity > 0 ? item.quantity : 1.0;
         final existing = matchedItemsByProductId[matchedProductId];
         matchedItemsByProductId[matchedProductId] = ImportItemModel(
           productId: matchedProductId,
           productName: matchedProduct.name,
-          quantity: (existing?.quantity ?? 0) + quantity,
+          quantity: (existing?.quantity ?? 0.0) + quantity,
           costPrice: item.unitPrice > 0
               ? item.unitPrice
               : (existing?.costPrice ?? matchedProduct.costPrice ?? 0),
@@ -1646,7 +1652,7 @@ class _StockImportViewState extends State<_StockImportView> {
                                               ImportItemModel(
                                                 productId: item.productId,
                                                 productName: item.productName,
-                                                quantity: item.quantity - 1,
+                                                quantity: item.quantity - 1.0,
                                                 costPrice: item.costPrice,
                                                 baseUnit: item.baseUnit,
                                               );
@@ -1659,14 +1665,21 @@ class _StockImportViewState extends State<_StockImportView> {
                                     width: 56,
                                     child: TextFormField(
                                       key: ValueKey('qty_${item.productId}'),
-                                      initialValue: item.quantity.toString(),
+                                      initialValue:
+                                          item.quantity > 0
+                                              ? _formatQuantity(item.quantity)
+                                              : '',
                                       textAlign: TextAlign.center,
-                                      keyboardType: TextInputType.number,
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                            decimal: true,
+                                          ),
                                       inputFormatters:
                                           AppInputFormatters.withSqlInjectionGuard(
                                             inputFormatters: [
-                                              FilteringTextInputFormatter
-                                                  .digitsOnly,
+                                              FilteringTextInputFormatter.allow(
+                                                RegExp(r'[0-9,\.]'),
+                                              ),
                                             ],
                                           ),
                                       decoration: const InputDecoration(
@@ -1678,7 +1691,13 @@ class _StockImportViewState extends State<_StockImportView> {
                                         border: OutlineInputBorder(),
                                       ),
                                       onChanged: (value) {
-                                        final parsed = int.tryParse(value);
+                                        final normalized = value.trim();
+                                        if (normalized.isEmpty) {
+                                          return;
+                                        }
+                                        final parsed = double.tryParse(
+                                          normalized.replaceAll(',', '.'),
+                                        );
                                         if (parsed == null || parsed <= 0) {
                                           return;
                                         }
@@ -1706,7 +1725,7 @@ class _StockImportViewState extends State<_StockImportView> {
                                         _selectedItems[index] = ImportItemModel(
                                           productId: item.productId,
                                           productName: item.productName,
-                                          quantity: item.quantity + 1,
+                                          quantity: item.quantity + 1.0,
                                           costPrice: item.costPrice,
                                           baseUnit: item.baseUnit,
                                         );
@@ -1952,7 +1971,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
         _items[idx] = ImportItemModel(
           productId: existing.productId,
           productName: existing.productName,
-          quantity: existing.quantity + 1,
+          quantity: existing.quantity + 1.0,
           costPrice: existing.costPrice,
           baseUnit: existing.baseUnit,
         );
@@ -1961,7 +1980,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
           ImportItemModel(
             productId: productId,
             productName: product.name,
-            quantity: 1,
+            quantity: 1.0,
             costPrice: resolvedCostPrice,
             baseUnit: resolvedBaseUnit,
           ),
@@ -2077,7 +2096,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     _loadingCostPriceProductIds.remove(productId);
   }
 
-  Future<void> _setQuantity(ProductEntity product, int quantity) async {
+  Future<void> _setQuantity(ProductEntity product, double quantity) async {
     final idx = _items.indexWhere(
       (e) => e.productId == int.tryParse(product.id),
     );
@@ -2130,7 +2149,9 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
         _items[idx] = ImportItemModel(
           productId: existing.productId,
           productName: existing.productName,
-          quantity: existing.quantity - 1,
+            quantity: (existing.quantity - 1.0) > 0
+              ? existing.quantity - 1.0
+              : 0.0,
           costPrice: existing.costPrice,
           baseUnit: existing.baseUnit,
         );
@@ -2140,11 +2161,17 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     });
   }
 
-  int _quantityFor(ProductEntity product) {
+  double _quantityFor(ProductEntity product) {
     final idx = _items.indexWhere(
       (e) => e.productId == int.tryParse(product.id),
     );
-    return idx >= 0 ? _items[idx].quantity : 0;
+    return idx >= 0 ? _items[idx].quantity : 0.0;
+  }
+
+  String _formatQuantity(double value) {
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
   }
 
   @override
@@ -2190,9 +2217,12 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                         l10n.translate(
                           'stock_import.done_with_count',
                           params: {
-                            'count': _items
-                                .fold<int>(0, (sum, e) => sum + e.quantity)
-                                .toString(),
+                            'count': _formatQuantity(
+                              _items.fold<double>(
+                                0.0,
+                                (sum, e) => sum + e.quantity,
+                              ),
+                            ),
                           },
                         ),
                         style: AppTextStyles.labelLarge.copyWith(
@@ -2310,7 +2340,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                               ),
                             ),
                             subtitle: Text(
-                              '${l10n.translate('order_create.sale_unit_label')}: $saleUnitsText\n${l10n.translate('stock_import.cost_price_label')}${CurrencyFormatter.formatNumber(displayCostPrice)}\n${l10n.translate('stock_import.stock_label')}${product.quantity} ${product.unit ?? ''}',
+                              '${l10n.translate('order_create.sale_unit_label')}: $saleUnitsText\n${l10n.translate('stock_import.cost_price_label')}${CurrencyFormatter.formatNumber(displayCostPrice)}\n${l10n.translate('stock_import.stock_label')}${_formatQuantity(product.quantity)} ${product.unit ?? ''}',
                               style: AppTextStyles.bodySmall.copyWith(
                                 color: AppColors.textSecondary,
                               ),
@@ -2349,14 +2379,19 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                                           key: ValueKey(
                                             'selector_qty_${product.id}',
                                           ),
-                                          initialValue: qty.toString(),
+                                          initialValue:
+                                              qty > 0 ? _formatQuantity(qty) : '',
                                           textAlign: TextAlign.center,
-                                          keyboardType: TextInputType.number,
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                decimal: true,
+                                              ),
                                           inputFormatters:
                                               AppInputFormatters.withSqlInjectionGuard(
                                                 inputFormatters: [
-                                                  FilteringTextInputFormatter
-                                                      .digitsOnly,
+                                                  FilteringTextInputFormatter.allow(
+                                                    RegExp(r'[0-9,\.]'),
+                                                  ),
                                                 ],
                                               ),
                                           decoration: const InputDecoration(
@@ -2375,7 +2410,13 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                           onChanged: (value) {
-                                            final parsed = int.tryParse(value);
+                                            final normalized = value.trim();
+                                            if (normalized.isEmpty) {
+                                              return;
+                                            }
+                                            final parsed = double.tryParse(
+                                              normalized.replaceAll(',', '.'),
+                                            );
                                             if (parsed == null) return;
                                             _setQuantity(product, parsed);
                                           },

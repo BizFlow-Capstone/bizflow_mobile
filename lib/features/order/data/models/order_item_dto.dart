@@ -8,7 +8,7 @@ class OrderItemDto extends Equatable {
   final String? unitName;
   final String productName;
   final double price;
-  final int quantity;
+  final double quantity;
   final double discount;
   final String? note;
 
@@ -35,18 +35,18 @@ class OrderItemDto extends Equatable {
       return value.toString();
     }
 
+    double asDouble(dynamic value, {double fallback = 0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
     int asInt(dynamic value, {int fallback = 0}) {
       if (value == null) return fallback;
       if (value is int) return value;
       if (value is num) return value.toInt();
       if (value is String) return int.tryParse(value) ?? fallback;
-      return fallback;
-    }
-
-    double asDouble(dynamic value, {double fallback = 0}) {
-      if (value == null) return fallback;
-      if (value is num) return value.toDouble();
-      if (value is String) return double.tryParse(value) ?? fallback;
       return fallback;
     }
 
@@ -61,7 +61,7 @@ class OrderItemDto extends Equatable {
       ),
       productName: asString(json['productName'] ?? json['saleItemName']),
       price: asDouble(json['price'] ?? json['unitPrice']),
-      quantity: asInt(json['quantity']),
+      quantity: asDouble(json['quantity']),
       discount: asDouble(json['discount']),
       note: json['note']?.toString(),
     );
@@ -88,7 +88,7 @@ class OrderItemDto extends Equatable {
     String? unitName,
     String? productName,
     double? price,
-    int? quantity,
+    double? quantity,
     double? discount,
     String? note,
   }) {

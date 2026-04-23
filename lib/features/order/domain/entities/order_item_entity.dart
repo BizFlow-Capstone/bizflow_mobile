@@ -8,7 +8,7 @@ class OrderItemEntity extends Equatable {
   final String? unitName;
   final String productName;
   final double price;
-  final int quantity;
+  final double quantity;
   final double discount;
   final String? note;
 

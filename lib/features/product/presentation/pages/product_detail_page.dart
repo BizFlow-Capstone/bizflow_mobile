@@ -45,6 +45,13 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   ProductRepository get _repository => context.read<ProductBloc>().repository;
 
+  String _formatStock(double value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+    return value.toString();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -355,7 +362,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   Future<void> _showAdjustStockDialog(AppLocalizations? l10n) async {
     final stockController = TextEditingController(
-      text: _currentProduct.quantity.toString(),
+      text: _formatStock(_currentProduct.quantity),
     );
     final memoController = TextEditingController();
     final costPriceController = TextEditingController(
@@ -381,10 +388,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   children: [
                     TextField(
                       controller: stockController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: AppInputFormatters.withSqlInjectionGuard(
                         inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[0-9.,]'),
+                          ),
                         ],
                       ),
                       decoration: InputDecoration(
@@ -432,7 +443,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   onPressed: isSubmitting
                       ? null
                       : () async {
-                          final stock = int.tryParse(stockController.text);
+                          final stock = double.tryParse(
+                            stockController.text.trim().replaceAll(',', '.'),
+                          );
                           final parsedCostPrice = CurrencyFormatter.parse(
                             costPriceController.text,
                           );
@@ -738,7 +751,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               SizedBox(
                 width: 60,
                 child: Text(
-                  '${_currentProduct.quantity}',
+                  _formatStock(_currentProduct.quantity),
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,

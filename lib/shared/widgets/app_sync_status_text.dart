@@ -4,6 +4,7 @@ import '../../core/localization/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../cache/cache_manager.dart';
 import '../cache/sync_status_controller.dart';
 import '../utils/date_formatter.dart';
 
@@ -42,6 +43,8 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
 
         final hasRefreshCallback =
             SyncStatusController().hasManualRefreshCallback;
+        final isCoolingDown =
+          SyncStatusController().isManualRefreshCoolingDown;
 
         return Container(
           alignment: Alignment.centerRight,
@@ -74,9 +77,10 @@ class AppSyncStatusText extends StatelessWidget implements PreferredSizeWidget {
                         : const Icon(Icons.refresh_rounded),
                     color: AppColors.textSecondary,
                     tooltip: l10n.translate('sync.refresh'),
-                    onPressed: state.isSyncing || !hasRefreshCallback
+                    onPressed: state.isSyncing || !hasRefreshCallback || isCoolingDown
                         ? null
                         : () {
+                            CacheManager().forceRevalidateAll();
                             SyncStatusController().triggerManualRefresh();
                           },
                   ),

@@ -1,5 +1,26 @@
 import 'template_field_definition.dart';
 
+String _readStatusCode(dynamic raw, {String fallback = 'ACTIVE'}) {
+  if (raw is String && raw.trim().isNotEmpty) {
+    return raw;
+  }
+
+  if (raw is Map) {
+    final map = Map<String, dynamic>.from(raw);
+    final code = map['code'];
+    if (code is String && code.trim().isNotEmpty) {
+      return code;
+    }
+
+    final label = map['label'];
+    if (label is String && label.trim().isNotEmpty) {
+      return label;
+    }
+  }
+
+  return fallback;
+}
+
 class AccountingBook {
   final int bookId;
   final String bookCode;
@@ -37,7 +58,7 @@ class AccountingBook {
       bookCode: json['bookCode'] as String? ?? '',
       templateCode: json['templateCode'] as String? ?? '',
       templateName: json['templateName'] as String?,
-      status: json['status'] as String? ?? 'ACTIVE',
+      status: _readStatusCode(json['status']),
       periodId: json['periodId'] as int? ?? 0,
       groupNumber: json['groupNumber'] as int? ?? 0,
       taxMethod: json['taxMethod'] as String?,

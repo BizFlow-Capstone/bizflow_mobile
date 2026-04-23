@@ -19,7 +19,7 @@ class StockImportItemEntity {
   final String productId;
   final String productName;
   final String? supplier;
-  int quantity;
+  double quantity;
   final String unit;
   final double? unitPrice;
 
@@ -36,7 +36,7 @@ class StockImportItemEntity {
     String? productId,
     String? productName,
     String? supplier,
-    int? quantity,
+    double? quantity,
     String? unit,
     double? unitPrice,
   }) {
@@ -99,7 +99,7 @@ class StockImportEntity {
   int get totalItemsCount => items.length;
 
   /// Calculate total quantity
-  int get totalQuantity => items.fold(0, (sum, item) => sum + item.quantity);
+  double get totalQuantity => items.fold(0.0, (sum, item) => sum + item.quantity);
 }
 
 /// Low stock suggestion for a product
@@ -121,7 +121,7 @@ class LowStockSuggestionEntity {
   });
 
   /// Suggested quantity to order (to reach minimum stock)
-  int get suggestedQuantity => minimumStock - currentStock;
+  double get suggestedQuantity => (minimumStock - currentStock).toDouble();
 
   /// Convert to stock import item
   StockImportItemEntity toStockImportItem() {

@@ -43,6 +43,10 @@ class CostDto extends Equatable {
   });
 
   factory CostDto.fromJson(Map<String, dynamic> json) {
+    final source = json['source'] is Map<String, dynamic>
+      ? json['source'] as Map<String, dynamic>
+      : const <String, dynamic>{};
+
     int asInt(dynamic value, {int fallback = 0}) {
       if (value == null) return fallback;
       if (value is int) return value;
@@ -63,6 +67,22 @@ class CostDto extends Equatable {
       if (value is int) return value;
       if (value is num) return value.toInt();
       if (value is String) return int.tryParse(value);
+      return null;
+    }
+
+    int? firstPositiveNullableInt(List<dynamic> values) {
+      int? fallback;
+      for (final value in values) {
+        final parsed = asNullableInt(value);
+        if (parsed == null) continue;
+        fallback ??= parsed;
+        if (parsed > 0) {
+          return parsed;
+        }
+      }
+      if (fallback != null && fallback > 0) {
+        return fallback;
+      }
       return null;
     }
 
@@ -101,30 +121,93 @@ class CostDto extends Equatable {
       paymentMethodLabel: referenceLabelFromDynamic(
         json['paymentMethod'] ?? json['PaymentMethod'],
       ),
-      documentUrl: asNullableString(json['documentUrl'] ?? json['DocumentUrl']),
+      documentUrl: asNullableString(
+        json['documentUrl'] ??
+        json['DocumentUrl'] ??
+        source['documentUrl'] ??
+        source['DocumentUrl'] ??
+        json['imageUrl'] ??
+        json['ImageUrl'] ??
+        source['imageUrl'] ??
+        source['ImageUrl'] ??
+        json['receiptImageUrl'] ??
+        json['ReceiptImageUrl'] ??
+        source['receiptImageUrl'] ??
+        source['ReceiptImageUrl'],
+      ),
       referenceType: asNullableString(
-        json['referenceType'] ??
-            json['ReferenceType'] ??
-            json['entityType'] ??
-            json['EntityType'],
+        json['entityType'] ??
+          json['EntityType'] ??
+          source['entityType'] ??
+          source['EntityType'] ??
+          json['referenceType'] ??
+          json['ReferenceType'] ??
+            source['referenceType'] ??
+          source['ReferenceType'],
       ),
-      referenceId: asNullableInt(
-        json['referenceId'] ??
-            json['ReferenceId'] ??
-            json['entityId'] ??
-            json['EntityId'] ??
-            json['orderId'] ??
-            json['OrderId'] ??
-            json['importId'] ??
-            json['ImportId'],
-      ),
+      referenceId: firstPositiveNullableInt([
+        json['importId'],
+        json['ImportId'],
+        json['stockImportId'],
+        json['StockImportId'],
+        source['importId'],
+        source['ImportId'],
+        source['stockImportId'],
+        source['StockImportId'],
+        json['orderId'],
+        json['OrderId'],
+        source['orderId'],
+        source['OrderId'],
+        json['referenceId'],
+        json['ReferenceId'],
+        source['referenceId'],
+        source['ReferenceId'],
+        json['entityId'],
+        json['EntityId'],
+        source['entityId'],
+        source['EntityId'],
+      ]),
       referenceCode: asNullableString(
-        json['referenceCode'] ?? json['ReferenceCode'] ?? json['code'],
+        json['referenceCode'] ??
+            json['ReferenceCode'] ??
+            json['code'] ??
+            json['Code'] ??
+            json['importCode'] ??
+            json['ImportCode'] ??
+            json['orderCode'] ??
+            json['OrderCode'] ??
+            source['referenceCode'] ??
+            source['ReferenceCode'] ??
+            source['code'] ??
+            source['Code'] ??
+            source['importCode'] ??
+            source['ImportCode'] ??
+            source['orderCode'] ??
+            source['OrderCode'],
       ),
       imagePath: asNullableString(
-        json['imagePath'] ?? json['ImagePath'] ?? json['imageUrl'] ?? json['receiptImageUrl'],
+        json['imagePath'] ??
+            json['ImagePath'] ??
+            source['imagePath'] ??
+            source['ImagePath'] ??
+            json['imageUrl'] ??
+            json['ImageUrl'] ??
+            source['imageUrl'] ??
+            source['ImageUrl'] ??
+            json['receiptImageUrl'] ??
+            json['ReceiptImageUrl'] ??
+            source['receiptImageUrl'] ??
+            source['ReceiptImageUrl'] ??
+            json['documentUrl'] ??
+            json['DocumentUrl'] ??
+            source['documentUrl'] ??
+            source['DocumentUrl'] ??
+            json['documentImageUrl'] ??
+            json['DocumentImageUrl'] ??
+            source['documentImageUrl'] ??
+            source['DocumentImageUrl'],
       ),
-        createdBy: asString(json['createdBy']),
+      createdBy: asString(json['createdBy'] ?? source['createdBy']),
       createdAt:
           DateFormatter.parseApiDateTime(asNullableString(json['createdAt'])) ??
           DateTime.now(),

@@ -50,34 +50,28 @@ class RevenueApiService {
     File? image,
   }) async {
     try {
-      final response = image == null
-          ? await _apiClient.post(
-              ApiEndpoints.createManualRevenue,
-              body: body,
-            )
-          : await _apiClient.postMultipart<Map<String, dynamic>>(
-              ApiEndpoints.createManualRevenue,
-              fields: {
-                'BusinessLocationId':
-                    body['businessLocationId']?.toString() ?? '0',
-                if (body['businessTypeId'] != null)
-                  'BusinessTypeId': body['businessTypeId'].toString(),
-                'Amount': body['amount']?.toString() ?? '0',
-                if (body['revenueDate'] != null)
-                  'RevenueDate': body['revenueDate'].toString(),
-                'Description': body['description']?.toString() ?? '',
-                'MoneyChannel': body['moneyChannel']?.toString() ?? '',
-                if (body['documentDate'] != null)
-                  'DocumentDate': body['documentDate'].toString(),
-                if (body['documentNumber'] != null)
-                  'DocumentNumber': body['documentNumber'].toString(),
-                if (body['referenceType'] != null)
-                  'ReferenceType': body['referenceType'].toString(),
-                if (body['referenceId'] != null)
-                  'ReferenceId': body['referenceId'].toString(),
-              },
-              files: {'image': image},
-            );
+      final response = await _apiClient.postMultipart<Map<String, dynamic>>(
+        ApiEndpoints.createManualRevenue,
+        fields: {
+          'BusinessLocationId': body['businessLocationId']?.toString() ?? '0',
+          if (body['businessTypeId'] != null)
+            'BusinessTypeId': body['businessTypeId'].toString(),
+          'Amount': body['amount']?.toString() ?? '0',
+          if (body['revenueDate'] != null)
+            'RevenueDate': body['revenueDate'].toString(),
+          'Description': body['description']?.toString() ?? '',
+          'MoneyChannel': body['moneyChannel']?.toString() ?? '',
+          if (body['documentDate'] != null)
+            'DocumentDate': body['documentDate'].toString(),
+          if (body['documentNumber'] != null)
+            'DocumentNumber': body['documentNumber'].toString(),
+          if (body['referenceType'] != null)
+            'ReferenceType': body['referenceType'].toString(),
+          if (body['referenceId'] != null)
+            'ReferenceId': body['referenceId'].toString(),
+        },
+        files: image != null ? {'image': image} : null,
+      );
 
       if (response.isSuccess && response.data != null) {
         final data = response.data as Map<String, dynamic>;
@@ -121,32 +115,27 @@ class RevenueApiService {
   }
   ) async {
     try {
-      final response = image == null
-          ? await _apiClient.put(
-              ApiEndpoints.updateManualRevenue(revenueId.toString()),
-              body: body,
-            )
-          : await _apiClient.putMultipart<Map<String, dynamic>>(
-              ApiEndpoints.updateManualRevenue(revenueId.toString()),
-              fields: {
-                if (body['businessTypeId'] != null)
-                  'BusinessTypeId': body['businessTypeId'].toString(),
-                'Amount': body['amount']?.toString() ?? '0',
-                if (body['revenueDate'] != null)
-                  'RevenueDate': body['revenueDate'].toString(),
-                'Description': body['description']?.toString() ?? '',
-                'MoneyChannel': body['moneyChannel']?.toString() ?? '',
-                if (body['documentDate'] != null)
-                  'DocumentDate': body['documentDate'].toString(),
-                if (body['documentNumber'] != null)
-                  'DocumentNumber': body['documentNumber'].toString(),
-                if (body['referenceType'] != null)
-                  'ReferenceType': body['referenceType'].toString(),
-                if (body['referenceId'] != null)
-                  'ReferenceId': body['referenceId'].toString(),
-              },
-              files: {'image': image},
-            );
+      final response = await _apiClient.putMultipart<Map<String, dynamic>>(
+        ApiEndpoints.updateManualRevenue(revenueId.toString()),
+        fields: {
+          if (body['businessTypeId'] != null)
+            'BusinessTypeId': body['businessTypeId'].toString(),
+          'Amount': body['amount']?.toString() ?? '0',
+          if (body['revenueDate'] != null)
+            'RevenueDate': body['revenueDate'].toString(),
+          'Description': body['description']?.toString() ?? '',
+          'MoneyChannel': body['moneyChannel']?.toString() ?? '',
+          if (body['documentDate'] != null)
+            'DocumentDate': body['documentDate'].toString(),
+          if (body['documentNumber'] != null)
+            'DocumentNumber': body['documentNumber'].toString(),
+          if (body['referenceType'] != null)
+            'ReferenceType': body['referenceType'].toString(),
+          if (body['referenceId'] != null)
+            'ReferenceId': body['referenceId'].toString(),
+        },
+        files: image != null ? {'image': image} : null,
+      );
 
       if (response.isSuccess && response.data != null) {
         final data = response.data as Map<String, dynamic>;

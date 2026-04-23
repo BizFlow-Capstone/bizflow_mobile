@@ -35,6 +35,18 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
   String _transcribedText = '';
   String? _inlineError;
 
+  @override
+  void initState() {
+    super.initState();
+    _audioRecorder = AudioRecorder();
+  }
+
+  @override
+  void dispose() {
+    _audioRecorder.dispose();
+    super.dispose();
+  }
+
   String _resolveDirectNetworkError(AppLocalizations l10n, Object error) {
     if (!ConnectivityService().isOnline) {
       return l10n.translate('error.no_internet');
@@ -80,22 +92,18 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _audioRecorder = AudioRecorder();
-  }
-
-  @override
-  void dispose() {
-    _audioRecorder.dispose();
-    super.dispose();
-  }
-
   Future<void> _toggleRecording() async {
     if (_isProcessing) return;
 
     final l10n = AppLocalizations.of(context);
+
+    if (!_isRecording) {
+      final aiAllowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.ai,
+      );
+      if (!aiAllowed || !mounted) return;
+    }
 
     if (_isRecording) {
       String? recordedPath;
@@ -164,12 +172,6 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
     required File audioFile,
     required AppLocalizations l10n,
   }) async {
-    final aiAllowed = await SubscriptionFeatureGuard.ensureAllowed(
-      context,
-      featureCode: SubscriptionFeatureCodes.ai,
-    );
-    if (!aiAllowed || !mounted) return;
-
     final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
     if (locationId == null || locationId <= 0) {
       AppSnackBar.show(
@@ -236,7 +238,7 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
             .map((item) => item.customerName!.trim())
             .firstWhere((name) => name.isNotEmpty, orElse: () => ''),
         items: matchedItems.map((item) {
-          final quantity = item.quantity <= 0 ? 1 : item.quantity;
+          final quantity = item.quantity <= 0 ? 1.0 : item.quantity.toDouble();
           final calculatedPrice =
               item.unitPrice ??
               ((item.lineTotal ?? 0) > 0 ? (item.lineTotal! / quantity) : 0);
@@ -260,8 +262,11 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              OrderFormScreen(inputType: 'voice', initialOrder: initialOrder),
+          builder: (_) => OrderFormScreen(
+            inputType: 'voice',
+            initialOrder: initialOrder,
+            sourceAudioPath: audioFile.path,
+          ),
         ),
       );
     } catch (error) {
@@ -304,7 +309,7 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
       discountAmount: 0,
       taxAmount: 0,
       totalAmount: resolvedTotal.toDouble(),
-      debtAmount: hasDebt ? 1.0 : 0, // Mark as debt if any item is debt
+      debtAmount: hasDebt ? 1.0 : 0,
       customerName: customerName.trim().isEmpty ? null : customerName.trim(),
       note: rawTranscript.isEmpty ? null : rawTranscript,
       aiConfidence: aiConfidence,
@@ -364,6 +369,7 @@ class _OrderVoiceRecordScreenState extends State<OrderVoiceRecordScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
                 const Spacer(),
                 GestureDetector(
                   onTap: _isProcessing ? null : _toggleRecording,

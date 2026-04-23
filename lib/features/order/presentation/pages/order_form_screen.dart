@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -39,6 +41,7 @@ class OrderFormScreen extends StatefulWidget {
   final String? draftId;
   final OrderEntity? initialOrder;
   final String? pendingOrderId;
+  final String? sourceAudioPath;
 
   const OrderFormScreen({
     super.key,
@@ -46,6 +49,7 @@ class OrderFormScreen extends StatefulWidget {
     this.draftId,
     this.initialOrder,
     this.pendingOrderId,
+    this.sourceAudioPath,
   });
 
   @override
@@ -80,6 +84,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   String? _draftCreatedAtIso;
   String? _aiRawTranscript;
   String? _aiConfidence;
+  final AudioPlayer _aiAudioPlayer = AudioPlayer();
+  StreamSubscription<PlayerState>? _aiAudioPlayerStateSub;
+  bool _isAiAudioPlaying = false;
 
   final List<OrderItemEntity> _items = [];
 
@@ -131,16 +138,57 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
         LoadActiveDebtorsByLocationRequested(locationId: locationId),
       );
     }
+    _aiAudioPlayerStateSub = _aiAudioPlayer.onPlayerStateChanged.listen((
+      state,
+    ) {
+      if (!mounted) return;
+      setState(() {
+        _isAiAudioPlaying = state == PlayerState.playing;
+      });
+    });
     _loadDraftIfNeeded();
   }
 
   @override
   void dispose() {
+    _aiAudioPlayerStateSub?.cancel();
+    _aiAudioPlayer.dispose();
     _customerNameController.dispose();
     _customerPhoneController.dispose();
     _notesController.dispose();
     _documentNumberController.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleAiAudioPlayback(AppLocalizations l10n) async {
+    final path = widget.sourceAudioPath;
+    if (path == null || path.trim().isEmpty) {
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('accounting.voice_no_record_found'),
+        type: AppSnackBarType.info,
+      );
+      return;
+    }
+
+    final file = File(path);
+    if (!await file.exists()) {
+      if (!mounted) return;
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('accounting.voice_no_record_found'),
+        type: AppSnackBarType.warning,
+      );
+      return;
+    }
+
+    if (_isAiAudioPlaying) {
+      await _aiAudioPlayer.stop();
+      return;
+    }
+
+    await _aiAudioPlayer.stop();
+    await _aiAudioPlayer.play(DeviceFileSource(path));
   }
 
   Color _confidenceBackgroundColor(String? confidence) {
@@ -887,6 +935,32 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                               ],
                             ),
                             const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _toggleAiAudioPlayback(l10n),
+                                    icon: Icon(
+                                      _isAiAudioPlaying
+                                          ? Icons.stop
+                                          : Icons.play_arrow,
+                                      size: 18,
+                                    ),
+                                    label: Text(
+                                      _isAiAudioPlaying
+                                          ? l10n.translate(
+                                              'accounting.voice_stop_playback',
+                                            )
+                                          : l10n.translate(
+                                              'accounting.voice_replay_latest',
+                                            ),
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                             if (_aiConfidence != null &&
                                 _aiConfidence!.isNotEmpty)
                               Container(
@@ -1615,7 +1689,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
               unitName: item['unitName']?.toString(),
               productName: item['productName']?.toString() ?? '',
               price: asDouble(item['price']),
-              quantity: asInt(item['quantity'], fallback: 1),
+              quantity: asDouble(item['quantity'], fallback: 1),
               discount: asDouble(item['discount']),
               note: item['note']?.toString(),
             );
@@ -2156,8 +2230,9 @@ class _OrderProductPickerSheet extends StatefulWidget {
 }
 
 class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
-  late final Map<String, int> _selectedQuantities;
+  late final Map<String, double> _selectedQuantities;
   late final Map<String, String?> _selectedSaleItemKeyByProduct;
+  late final Map<String, TextEditingController> _quantityControllers;
   String _searchQuery = '';
 
   @override
@@ -2170,6 +2245,20 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
       for (final item in widget.initialItems)
         item.productId: item.saleItemId?.toString(),
     };
+    _quantityControllers = {
+      for (final item in widget.initialItems)
+        item.productId: TextEditingController(
+          text: _formatQuantity(item.quantity),
+        ),
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _quantityControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -2296,7 +2385,7 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                           productId,
                           saleItems,
                         );
-                        final quantity = _selectedQuantities[productId] ?? 0;
+                        final quantity = _selectedQuantities[productId] ?? 0.0;
                         final unitPrice = (selectedSaleItem['price'] as num)
                             .toDouble();
                         final selectedUnit =
@@ -2355,30 +2444,74 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                               ),
                             ],
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline),
-                                onPressed: quantity <= 0
-                                    ? null
-                                    : () =>
-                                          _setQuantity(productId, quantity - 1),
-                              ),
-                              SizedBox(
-                                width: 24,
-                                child: Text(
-                                  '$quantity',
-                                  textAlign: TextAlign.center,
+                          trailing: quantity > 0
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                      ),
+                                      onPressed: () =>
+                                          _setQuantity(productId, quantity - 1.0),
+                                    ),
+                                    SizedBox(
+                                      width: 64,
+                                      child: TextFormField(
+                                        key: ValueKey('order_qty_$productId'),
+                                        controller: _quantityControllers.putIfAbsent(
+                                          productId,
+                                          () => TextEditingController(
+                                            text: _formatQuantity(quantity),
+                                          ),
+                                        ),
+                                        textAlign: TextAlign.center,
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                            ),
+                                        inputFormatters:
+                                            AppInputFormatters.withSqlInjectionGuard(
+                                              inputFormatters: [
+                                                FilteringTextInputFormatter.allow(
+                                                  RegExp(r'[0-9,\.]'),
+                                                ),
+                                              ],
+                                            ),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          counterText: '',
+                                          contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 4,
+                                            vertical: 6,
+                                          ),
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        onChanged: (value) {
+                                          final normalized = value.trim();
+                                          if (normalized.isEmpty) {
+                                            _setQuantity(productId, 0.0);
+                                            return;
+                                          }
+                                          final parsed = double.tryParse(
+                                            normalized.replaceAll(',', '.'),
+                                          );
+                                          if (parsed == null) return;
+                                          _setQuantity(productId, parsed);
+                                        },
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle_outline),
+                                      onPressed: () =>
+                                          _setQuantity(productId, quantity + 1.0),
+                                    ),
+                                  ],
+                                )
+                              : IconButton(
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  onPressed: () => _setQuantity(productId, 1.0),
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline),
-                                onPressed: () =>
-                                    _setQuantity(productId, quantity + 1),
-                              ),
-                            ],
-                          ),
                         );
                       },
                     );
@@ -2392,14 +2525,19 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
     );
   }
 
-  void _setQuantity(String productId, int quantity) {
-    final safeQuantity = quantity.clamp(0, 99999).toInt();
+  void _setQuantity(String productId, double quantity) {
+    final safeQuantity = quantity.clamp(0, 99999).toDouble();
     setState(() {
       if (safeQuantity <= 0) {
         _selectedQuantities.remove(productId);
         _selectedSaleItemKeyByProduct.remove(productId);
+        _quantityControllers[productId]?.text = '';
       } else {
         _selectedQuantities[productId] = safeQuantity;
+        _quantityControllers.putIfAbsent(
+          productId,
+          () => TextEditingController(),
+        ).text = _formatQuantity(safeQuantity);
       }
     });
   }
@@ -2432,9 +2570,9 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
                 ({
                   required String productId,
                   required String saleItemKey,
-                  required int quantity,
+                  required double quantity,
                 }) {
-                  final current = _selectedQuantities[productId] ?? 0;
+                  final current = _selectedQuantities[productId] ?? 0.0;
                   _setSaleItemKey(productId, saleItemKey);
                   _setQuantity(productId, current + quantity);
                 },
@@ -2458,7 +2596,7 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
 
     final items = <OrderItemEntity>[];
     for (final product in products) {
-      final quantity = _selectedQuantities[product.id] ?? 0;
+      final quantity = _selectedQuantities[product.id] ?? 0.0;
       if (quantity <= 0) continue;
 
       final saleItems = _normalizedSaleItems(product);
@@ -2558,6 +2696,12 @@ class _OrderProductPickerSheetState extends State<_OrderProductPickerSheet> {
         ? normalized
         : AppLocalizations.of(context).translate('order_create.default_unit');
   }
+
+  String _formatQuantity(double value) {
+    return value == value.roundToDouble()
+        ? value.toInt().toString()
+        : value.toString();
+  }
 }
 
 class _BarcodeOrderAddPanel extends StatefulWidget {
@@ -2565,7 +2709,7 @@ class _BarcodeOrderAddPanel extends StatefulWidget {
   final void Function({
     required String productId,
     required String saleItemKey,
-    required int quantity,
+    required double quantity,
   })
   onAdd;
 
@@ -2675,8 +2819,8 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
                           width: double.infinity,
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              final totalQty = _pendingItems.values.fold<int>(
-                                0,
+                              final totalQty = _pendingItems.values.fold<double>(
+                                0.0,
                                 (sum, item) => sum + item.quantity,
                               );
                               for (final item in _pendingItems.values) {
@@ -2762,7 +2906,7 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
 
       final existing = _pendingItems[matched.id];
       if (existing != null) {
-        existing.quantity = (existing.quantity + 1).clamp(1, 99999);
+        existing.quantity = (existing.quantity + 1).clamp(1, 99999).toDouble();
         _scanHint = l10n
             .translate('order_create.barcode_increased')
             .replaceAll('{name}', matched.name)
@@ -2776,7 +2920,7 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
         product: matched,
         saleItems: saleItems,
         selectedSaleItemKey: defaultKey,
-        quantity: 1,
+        quantity: 1.0,
       );
       _scanHint = l10n
           .translate('order_create.barcode_scanned')
@@ -2856,7 +3000,7 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
                     ? null
                     : () {
                         setState(() {
-                          item.quantity -= 1;
+                          item.quantity = (item.quantity - 1).clamp(1, 99999).toDouble();
                         });
                       },
                 icon: const Icon(Icons.remove_circle_outline),
@@ -2872,7 +3016,7 @@ class _BarcodeOrderAddPanelState extends State<_BarcodeOrderAddPanel> {
               IconButton(
                 onPressed: () {
                   setState(() {
-                    item.quantity = (item.quantity + 1).clamp(1, 99999);
+                    item.quantity = (item.quantity + 1).clamp(1, 99999).toDouble();
                   });
                 },
                 icon: const Icon(Icons.add_circle_outline),
@@ -2963,7 +3107,7 @@ class _ScannedPendingItem {
   final ProductEntity product;
   final List<Map<String, dynamic>> saleItems;
   String selectedSaleItemKey;
-  int quantity;
+  double quantity;
 
   _ScannedPendingItem({
     required this.product,

@@ -5,11 +5,11 @@ import '../../../../shared/utils/date_formatter.dart';
 class ImportItemModel {
   final int productId;
   final String? productName;
-  final int quantity;
+  final double quantity;
   final String? baseUnit;
   final double costPrice;
   final double? totalPrice;
-  final int? currentStock;
+  final double? currentStock;
 
   ImportItemModel({
     required this.productId,
@@ -22,17 +22,17 @@ class ImportItemModel {
   });
 
   factory ImportItemModel.fromJson(Map<String, dynamic> json) {
+    double parseDouble(dynamic value, {double fallback = 0.0}) {
+      if (value == null) return fallback;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString().trim()) ?? fallback;
+    }
+
     int parseInt(dynamic value, {int fallback = 0}) {
       if (value == null) return fallback;
       if (value is int) return value;
       if (value is num) return value.toInt();
       return int.tryParse(value.toString().trim()) ?? fallback;
-    }
-
-    double parseDouble(dynamic value, {double fallback = 0.0}) {
-      if (value == null) return fallback;
-      if (value is num) return value.toDouble();
-      return double.tryParse(value.toString().trim()) ?? fallback;
     }
 
     String? parseString(dynamic value) {
@@ -46,7 +46,7 @@ class ImportItemModel {
         json['productId'] ?? json['ProductId'] ?? json['productID'],
       ),
       productName: parseString(json['productName'] ?? json['ProductName']),
-      quantity: parseInt(json['quantity'] ?? json['Quantity']),
+      quantity: parseDouble(json['quantity'] ?? json['Quantity']),
       baseUnit: parseString(
         json['baseUnit'] ??
             json['BaseUnit'] ??
@@ -64,7 +64,7 @@ class ImportItemModel {
       currentStock: (() {
         final raw = json['currentStock'] ?? json['CurrentStock'];
         if (raw == null) return null;
-        return parseInt(raw);
+        return parseDouble(raw);
       })(),
     );
   }

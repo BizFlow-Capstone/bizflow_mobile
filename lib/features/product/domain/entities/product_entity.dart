@@ -6,7 +6,7 @@ class ProductEntity {
   final String name;
   final String? description;
   final double price;
-  final int quantity;
+  final double quantity;
   final String? imageUrl;
   final String? barcode;
   final String? category;
@@ -51,7 +51,7 @@ class ProductEntity {
     String? name,
     String? description,
     double? price,
-    int? quantity,
+    double? quantity,
     String? imageUrl,
     String? barcode,
     String? category,
@@ -174,7 +174,7 @@ class ProductEntity {
       name: map['name'] as String? ?? 'Unknown',
       description: map['description'] as String?,
       price: priceValue,
-      quantity: (map['quantity'] as num?)?.toInt() ?? 0,
+      quantity: (map['quantity'] as num?)?.toDouble() ?? 0,
       imageUrl: map['imageUrl'] as String?,
       barcode: map['barcode'] as String?,
       category: map['category'] as String?,

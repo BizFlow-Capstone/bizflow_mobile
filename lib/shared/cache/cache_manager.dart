@@ -17,6 +17,7 @@ class CacheManager {
   final Map<String, CancelToken> _cancelTokens = {};
   final Map<String, int> _sequences = {};
   final Map<String, DateTime> _lastNetworkFetchAt = {};
+  DateTime? _forceRevalidateUntil;
 
   Future<void> init() async {
     if (_storage == null) {
@@ -128,8 +129,9 @@ class CacheManager {
 
     if (locale != null) await _storage?.setString(StorageKeys.locale, locale);
     if (theme != null) await _storage?.setString(StorageKeys.themeMode, theme);
-    if (isFirstLaunch != null)
+    if (isFirstLaunch != null) {
       await _storage?.setBool(StorageKeys.isFirstLaunch, isFirstLaunch);
+    }
 
     debugPrint('CacheManager: Aggressive clear all finished');
   }
@@ -138,6 +140,27 @@ class CacheManager {
   /// mà không xóa cache — data cũ vẫn được serve nếu network fail.
   void resetRevalidateTimer(String key) {
     _lastNetworkFetchAt.remove(key);
+  }
+
+  /// Force SWR to bypass [minRevalidateInterval] for a short window.
+  /// This is used by manual refresh from the sync status bar so every screen
+  /// can trigger a true network revalidate without custom per-page logic.
+  void forceRevalidateAll({
+    Duration window = const Duration(seconds: 12),
+  }) {
+    _forceRevalidateUntil = DateTime.now().add(window);
+  }
+
+  bool get _isForceRevalidateActive {
+    final until = _forceRevalidateUntil;
+    if (until == null) {
+      return false;
+    }
+    if (DateTime.now().isAfter(until)) {
+      _forceRevalidateUntil = null;
+      return false;
+    }
+    return true;
   }
 
   /// Triển khai SWR logic: Local First + Sync Ngầm (Non-blocking)
@@ -192,7 +215,9 @@ class CacheManager {
 
     // With local cache available, skip very frequent revalidate requests to
     // avoid re-sync flicker and redundant API calls when users switch tabs fast.
-    if (hasLocalData) {
+    final forceRevalidate = _isForceRevalidateActive;
+
+    if (hasLocalData && !forceRevalidate) {
       final lastFetch = _lastNetworkFetchAt[key];
       if (lastFetch != null &&
           DateTime.now().difference(lastFetch) < minRevalidateInterval) {
@@ -296,7 +321,8 @@ class CacheManager {
         return;
       }
 
-      debugPrint('SWR Fetcher Error: $e');
+      debugPrint('SWR Fetcher Error [$key]: $e');
+      
       if (trackSyncStatus) {
         SyncStatusController().endSync(hasError: true);
       }

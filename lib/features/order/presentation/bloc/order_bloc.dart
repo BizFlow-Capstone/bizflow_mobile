@@ -42,6 +42,11 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
     on<ResetOrders>(_onResetOrders);
   }
 
+  int _normalizeQuantity(double quantity) {
+    if (!quantity.isFinite) return 1;
+    return quantity.round().clamp(1, 99999);
+  }
+
   /// Load all orders
   Future<void> _onLoadOrdersRequested(
     LoadOrdersRequested event,
@@ -149,7 +154,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
               (e) => {
                 'productId': e.productId,
                 'saleItemId': e.saleItemId,
-                'quantity': e.quantity,
+                'quantity': _normalizeQuantity(e.quantity),
                 'discount': e.discount,
               },
             )
@@ -205,7 +210,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
               .map(
                 (e) => {
                   'saleItemId': e.saleItemId,
-                  'quantity': e.quantity,
+                  'quantity': _normalizeQuantity(e.quantity),
                   'discount': e.discount,
                 },
               )
@@ -502,7 +507,7 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
                 unitName: asString(map['unitName'], fallback: ''),
                 productName: asString(map['productName']),
                 price: asDouble(map['price']),
-                quantity: asInt(map['quantity'], fallback: 1),
+                quantity: asDouble(map['quantity'], fallback: 1),
                 discount: asDouble(map['discount']),
                 note: asString(map['note'], fallback: ''),
               );

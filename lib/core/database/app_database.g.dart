@@ -927,13 +927,13 @@ class $ProductsTableTable extends ProductsTable
     'quantity',
   );
   @override
-  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
+  late final GeneratedColumn<double> quantity = GeneratedColumn<double>(
     'quantity',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.double,
     requiredDuringInsert: false,
-    defaultValue: const Constant(0),
+    defaultValue: const Constant(0.0),
   );
   static const VerificationMeta _imageUrlMeta = const VerificationMeta(
     'imageUrl',
@@ -1328,7 +1328,7 @@ class $ProductsTableTable extends ProductsTable
         data['${effectivePrefix}price'],
       )!,
       quantity: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.double,
         data['${effectivePrefix}quantity'],
       )!,
       imageUrl: attachedDatabase.typeMapping.read(
@@ -1407,7 +1407,7 @@ class ProductsTableData extends DataClass
   final String name;
   final String description;
   final double price;
-  final int quantity;
+  final double quantity;
   final String? imageUrl;
   final String? barcode;
   final String? category;
@@ -1454,7 +1454,7 @@ class ProductsTableData extends DataClass
     map['name'] = Variable<String>(name);
     map['description'] = Variable<String>(description);
     map['price'] = Variable<double>(price);
-    map['quantity'] = Variable<int>(quantity);
+    map['quantity'] = Variable<double>(quantity);
     if (!nullToAbsent || imageUrl != null) {
       map['image_url'] = Variable<String>(imageUrl);
     }
@@ -1552,7 +1552,7 @@ class ProductsTableData extends DataClass
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String>(json['description']),
       price: serializer.fromJson<double>(json['price']),
-      quantity: serializer.fromJson<int>(json['quantity']),
+      quantity: serializer.fromJson<double>(json['quantity']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       barcode: serializer.fromJson<String?>(json['barcode']),
       category: serializer.fromJson<String?>(json['category']),
@@ -1581,7 +1581,7 @@ class ProductsTableData extends DataClass
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String>(description),
       'price': serializer.toJson<double>(price),
-      'quantity': serializer.toJson<int>(quantity),
+      'quantity': serializer.toJson<double>(quantity),
       'imageUrl': serializer.toJson<String?>(imageUrl),
       'barcode': serializer.toJson<String?>(barcode),
       'category': serializer.toJson<String?>(category),
@@ -1606,7 +1606,7 @@ class ProductsTableData extends DataClass
     String? name,
     String? description,
     double? price,
-    int? quantity,
+    double? quantity,
     Value<String?> imageUrl = const Value.absent(),
     Value<String?> barcode = const Value.absent(),
     Value<String?> category = const Value.absent(),
@@ -1780,7 +1780,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
   final Value<String> name;
   final Value<String> description;
   final Value<double> price;
-  final Value<int> quantity;
+  final Value<double> quantity;
   final Value<String?> imageUrl;
   final Value<String?> barcode;
   final Value<String?> category;
@@ -1854,7 +1854,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     Expression<String>? name,
     Expression<String>? description,
     Expression<double>? price,
-    Expression<int>? quantity,
+    Expression<double>? quantity,
     Expression<String>? imageUrl,
     Expression<String>? barcode,
     Expression<String>? category,
@@ -1905,7 +1905,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     Value<String>? name,
     Value<String>? description,
     Value<double>? price,
-    Value<int>? quantity,
+    Value<double>? quantity,
     Value<String?>? imageUrl,
     Value<String?>? barcode,
     Value<String?>? category,
@@ -1968,7 +1968,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
       map['price'] = Variable<double>(price.value);
     }
     if (quantity.present) {
-      map['quantity'] = Variable<int>(quantity.value);
+      map['quantity'] = Variable<double>(quantity.value);
     }
     if (imageUrl.present) {
       map['image_url'] = Variable<String>(imageUrl.value);
@@ -6682,7 +6682,7 @@ typedef $$ProductsTableTableCreateCompanionBuilder =
       required String name,
       Value<String> description,
       Value<double> price,
-      Value<int> quantity,
+      Value<double> quantity,
       Value<String?> imageUrl,
       Value<String?> barcode,
       Value<String?> category,
@@ -6707,7 +6707,7 @@ typedef $$ProductsTableTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> description,
       Value<double> price,
-      Value<int> quantity,
+      Value<double> quantity,
       Value<String?> imageUrl,
       Value<String?> barcode,
       Value<String?> category,
@@ -6760,7 +6760,7 @@ class $$ProductsTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get quantity => $composableBuilder(
+  ColumnFilters<double> get quantity => $composableBuilder(
     column: $table.quantity,
     builder: (column) => ColumnFilters(column),
   );
@@ -6875,7 +6875,7 @@ class $$ProductsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get quantity => $composableBuilder(
+  ColumnOrderings<double> get quantity => $composableBuilder(
     column: $table.quantity,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6982,7 +6982,7 @@ class $$ProductsTableTableAnnotationComposer
   GeneratedColumn<double> get price =>
       $composableBuilder(column: $table.price, builder: (column) => column);
 
-  GeneratedColumn<int> get quantity =>
+  GeneratedColumn<double> get quantity =>
       $composableBuilder(column: $table.quantity, builder: (column) => column);
 
   GeneratedColumn<String> get imageUrl =>
@@ -7087,7 +7087,7 @@ class $$ProductsTableTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<double> price = const Value.absent(),
-                Value<int> quantity = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
                 Value<String?> barcode = const Value.absent(),
                 Value<String?> category = const Value.absent(),
@@ -7135,7 +7135,7 @@ class $$ProductsTableTableTableManager
                 required String name,
                 Value<String> description = const Value.absent(),
                 Value<double> price = const Value.absent(),
-                Value<int> quantity = const Value.absent(),
+                Value<double> quantity = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
                 Value<String?> barcode = const Value.absent(),
                 Value<String?> category = const Value.absent(),

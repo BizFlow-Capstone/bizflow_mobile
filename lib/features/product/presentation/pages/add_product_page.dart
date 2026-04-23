@@ -315,8 +315,10 @@ class _AddProductPageState extends State<AddProductPage> {
       return double.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
     }
 
-    int? parseQuantity(String value) {
-      return int.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
+    double? parseStock(String value) {
+      final normalized = value.trim().replaceAll(',', '.');
+      if (normalized.isEmpty) return null;
+      return double.tryParse(normalized);
     }
 
     final costPriceText = _costPriceController.text.trim();
@@ -325,7 +327,7 @@ class _AddProductPageState extends State<AddProductPage> {
 
     final costPrice = costPriceText.isEmpty ? null : parseMoney(costPriceText);
     final salePrice = salePriceText.isEmpty ? null : parseMoney(salePriceText);
-    final quantity = quantityText.isEmpty ? null : parseQuantity(quantityText);
+    final quantity = quantityText.isEmpty ? null : parseStock(quantityText);
 
     setState(() {
       _productNameError = _productNameController.text.trim().isEmpty
@@ -709,7 +711,14 @@ class _AddProductPageState extends State<AddProductPage> {
                           if (_quantityError == null) return;
                           setState(() => _quantityError = null);
                         },
-                        keyboardType: TextInputType.number,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[0-9.,]'),
+                          ),
+                        ],
                       ),
                     ),
                     SizedBox(width: AppSpacing.md),

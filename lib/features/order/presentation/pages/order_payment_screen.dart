@@ -97,15 +97,27 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
   double get _totalPaid => _cashAmount + _bankAmount + _debtAmount;
   double get _remaining => widget.totalAmount - _totalPaid;
 
+  int _normalizeQuantity(double quantity) {
+    if (!quantity.isFinite) return 1;
+    return quantity.round().clamp(1, 99999);
+  }
+
+  String _formatAmount(double value) {
+    if (value == value.roundToDouble()) {
+      return CurrencyFormatter.formatNumber(value.toInt());
+    }
+
+    final fixed = value.toStringAsFixed(2);
+    return fixed.replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
   @override
   void initState() {
     super.initState();
 
     // Pre-select cash and auto-fill total
     _selectedMethods.add(PaymentMethod.cash);
-    _cashController.text = CurrencyFormatter.formatNumber(
-      widget.totalAmount.round(),
-    );
+    _cashController.text = _formatAmount(widget.totalAmount);
 
     if (widget.initialDebtorId != null && widget.initialDebtorId! > 0) {
       _selectedDebtor = DebtorEntity(
@@ -171,9 +183,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
 
     if (methods.length == 1) {
       // Single method → fill total
-      _controllerFor(methods.first).text = CurrencyFormatter.formatNumber(
-        widget.totalAmount.round(),
-      );
+      _controllerFor(methods.first).text = _formatAmount(widget.totalAmount);
       return;
     }
 
@@ -198,8 +208,8 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
     }
 
     final remaining = widget.totalAmount - otherSum;
-    _controllerFor(autoFillTarget).text = CurrencyFormatter.formatNumber(
-      remaining.round().clamp(0, 999999999999),
+    _controllerFor(autoFillTarget).text = _formatAmount(
+      remaining.clamp(0, 999999999999),
     );
   }
 
@@ -338,7 +348,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
               if (e.saleItemId != null && e.saleItemId! > 0)
                 'saleItemId': e.saleItemId,
               if (e.productId.isNotEmpty) 'productId': e.productId,
-              'quantity': e.quantity,
+              'quantity': _normalizeQuantity(e.quantity),
               'discount': e.discount,
             },
           )
@@ -728,9 +738,11 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         border: const OutlineInputBorder(),
         suffixText: 'VND',
       ),
-      keyboardType: TextInputType.number,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-        inputFormatters: [CurrencyInputFormatter()],
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9,\.]')),
+        ],
       ),
       onChanged: onChanged,
     );

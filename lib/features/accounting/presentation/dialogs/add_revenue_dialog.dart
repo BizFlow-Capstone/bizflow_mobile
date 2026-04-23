@@ -10,8 +10,8 @@ import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/dialogs/app_dialog.dart';
 import '../../../../shared/utils/formatters.dart';
-import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../product/data/models/business_type_model.dart';
 import '../../../product/presentation/bloc/product_bloc.dart';
 import '../../../revenue/presentation/bloc/revenue_bloc.dart';
@@ -249,17 +249,14 @@ Future<void> showAddRevenueDialog({
                     }
 
                     if ((selectedMoneyChannel ?? '').trim().isEmpty) {
-                      ScaffoldMessenger.of(dialogCtx)
-                        ..removeCurrentSnackBar()
-                        ..showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              l10n.translate(
-                                'accounting.money_channel_required',
-                              ),
-                            ),
-                          ),
-                        );
+                      await AppDialog.show(
+                        dialogCtx,
+                        title: l10n.translate('common.warning'),
+                        message: l10n.translate(
+                          'accounting.money_channel_required',
+                        ),
+                        type: AppDialogType.warning,
+                      );
                       setDialogState(() => isSubmitting = false);
                       return;
                     }

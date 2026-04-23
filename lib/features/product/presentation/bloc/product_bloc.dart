@@ -299,6 +299,16 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
             return fallback;
           }
 
+          double parseQuantity(dynamic value, {double fallback = 0}) {
+            if (value == null) return fallback;
+            if (value is num) return value.toDouble();
+            if (value is String) {
+              final normalized = value.trim().replaceAll(',', '.');
+              return double.tryParse(normalized) ?? fallback;
+            }
+            return fallback;
+          }
+
           bool parseBool(dynamic value, {bool fallback = true}) {
             if (value == null) return fallback;
             if (value is bool) return value;
@@ -383,7 +393,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               item['Quantity'] ??
               item['currentStock'] ??
               item['stock_quantity'];
-          final int resolvedQty = parseInt(rawQty);
+          final double resolvedQty = parseQuantity(rawQty);
 
             final List<Map<String, dynamic>> resolvedSaleItems =
               (item['saleItems'] as List<dynamic>?)
@@ -740,7 +750,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         name: event.productName,
         description: event.description ?? '',
         price: event.salePrice ?? 0,
-        quantity: event.trackInventory ? (event.quantity ?? 0) : 0,
+        quantity: event.trackInventory ? (event.quantity ?? 0.0) : 0.0,
         barcode: event.barcode,
         category: event.category,
         costPrice: event.costPrice,
@@ -825,7 +835,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
           name: event.productName,
           quantity: event.trackInventory
               ? (event.quantity ?? _products[index].quantity)
-              : 0,
+              : 0.0,
           barcode: event.barcode,
           costPrice: event.costPrice,
           salePrice: event.salePrice,
@@ -859,7 +869,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               name: event.productName,
               description: event.description ?? '',
               price: event.salePrice ?? 0,
-              quantity: event.quantity ?? 0,
+              quantity: event.quantity ?? 0.0,
               barcode: event.barcode,
               category: event.category,
               costPrice: event.costPrice,
@@ -973,7 +983,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
               id: event.productId,
               name: '',
               price: 0,
-              quantity: 0,
+              quantity: 0.0,
               isActive: event.isActive,
             ),
           ),

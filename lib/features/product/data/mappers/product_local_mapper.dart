@@ -12,7 +12,7 @@ class ProductLocalMapper {
       name: row.name,
       description: row.description,
       price: row.price,
-      quantity: row.quantity,
+      quantity: row.quantity.toDouble(),
       imageUrl: row.imageUrl,
       barcode: row.barcode,
       category: row.category,

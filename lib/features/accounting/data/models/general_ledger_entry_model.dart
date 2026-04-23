@@ -20,6 +20,7 @@ class GeneralLedgerEntryModel {
   final int? referenceId;
   final String? entityType;
   final int? entityId;
+  final String? createdAt;
 
   GeneralLedgerEntryModel({
     required this.entryId,
@@ -41,6 +42,7 @@ class GeneralLedgerEntryModel {
     this.referenceId,
     this.entityType,
     this.entityId,
+    this.createdAt,
   });
 
   factory GeneralLedgerEntryModel.fromJson(Map<String, dynamic> json) {
@@ -129,6 +131,10 @@ class GeneralLedgerEntryModel {
       referenceId: refId,
       entityType: entityType.trim().isEmpty ? null : entityType.trim(),
       entityId: entityId,
+      createdAt:
+          asString(json['createdAt'] ?? source['createdAt']).trim().isEmpty
+          ? null
+          : asString(json['createdAt'] ?? source['createdAt']).trim(),
     );
   }
 
@@ -153,6 +159,7 @@ class GeneralLedgerEntryModel {
       'referenceId': referenceId,
       'entityType': entityType,
       'entityId': entityId,
+      'createdAt': createdAt,
     };
   }
 }

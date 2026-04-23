@@ -79,40 +79,6 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
   Future<void> _pickAudioFile() async {
     if (_isProcessing) return;
 
-    setState(() => _isProcessing = true);
-
-    try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.audio);
-      if (result == null || result.files.isEmpty || !mounted) return;
-
-      final selected = result.files.single;
-      final selectedPath = selected.path;
-
-      setState(() {
-        _selectedFileName = selected.name;
-        _inlineError = null;
-      });
-
-      if (selectedPath == null || selectedPath.trim().isEmpty) {
-        AppSnackBar.show(
-          context,
-          message: AppLocalizations.of(
-            context,
-          ).translate('common.error_occurred'),
-          type: AppSnackBarType.error,
-        );
-        return;
-      }
-
-      await _parseAndNavigate(audioFile: File(selectedPath));
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
-    }
-  }
-
-  Future<void> _parseAndNavigate({required File audioFile}) async {
     final l10n = AppLocalizations.of(context);
     final aiAllowed = await SubscriptionFeatureGuard.ensureAllowed(
       context,
@@ -120,13 +86,47 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
     );
     if (!aiAllowed || !mounted) return;
 
+    setState(() {
+      _isProcessing = true;
+      _inlineError = null;
+    });
+
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.audio);
+      if (result == null || result.files.isEmpty || !mounted) return;
+
+      final selected = result.files.single;
+      final selectedPath = selected.path;
+      if (selectedPath == null || selectedPath.trim().isEmpty) {
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('common.error_occurred'),
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedFileName = selected.name;
+      });
+
+      await _parseAndNavigate(audioFile: File(selectedPath));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _parseAndNavigate({required File audioFile}) async {
+    final l10n = AppLocalizations.of(context);
     final locationId = int.tryParse(BusinessContext().currentBusinessId ?? '');
     if (locationId == null || locationId <= 0) {
       AppSnackBar.show(
         context,
-        message: AppLocalizations.of(
-          context,
-        ).translate('common.error_occurred'),
+        message: l10n.translate('common.error_occurred'),
         type: AppSnackBarType.error,
       );
       return;
@@ -175,7 +175,7 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
             .map((item) => item.customerName!.trim())
             .firstWhere((name) => name.isNotEmpty, orElse: () => ''),
         items: matchedItems.map((item) {
-          final quantity = item.quantity <= 0 ? 1 : item.quantity;
+          final quantity = item.quantity <= 0 ? 1.0 : item.quantity.toDouble();
           final calculatedPrice =
               item.unitPrice ??
               ((item.lineTotal ?? 0) > 0 ? (item.lineTotal! / quantity) : 0);
@@ -194,11 +194,16 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
         aiConfidence: result.confidence,
       );
 
+      if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              OrderFormScreen(inputType: 'audio', initialOrder: initialOrder),
+          builder: (_) => OrderFormScreen(
+            inputType: 'audio',
+            initialOrder: initialOrder,
+            sourceAudioPath: audioFile.path,
+          ),
         ),
       );
     } catch (error) {
@@ -235,7 +240,7 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
       discountAmount: 0,
       taxAmount: 0,
       totalAmount: resolvedTotal.toDouble(),
-      debtAmount: hasDebt ? 1.0 : 0, // Mark as debt if any item is debt
+      debtAmount: hasDebt ? 1.0 : 0,
       customerName: customerName.trim().isEmpty ? null : customerName.trim(),
       note: rawTranscript.isEmpty ? null : rawTranscript,
       aiConfidence: aiConfidence,
@@ -290,22 +295,19 @@ class _OrderAudioUploadScreenState extends State<OrderAudioUploadScreen> {
                       color: Colors.blue,
                     ),
                   ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 40),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: _isProcessing ? null : _pickAudioFile,
-                    icon: const Icon(Icons.audio_file),
-                    label: _isProcessing
+                    icon: _isProcessing
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(l10n.translate('order_create.audio_upload_btn')),
+                        : const Icon(Icons.audio_file),
+                    label: Text(l10n.translate('order_create.audio_upload_btn')),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),

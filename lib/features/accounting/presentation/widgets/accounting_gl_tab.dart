@@ -10,6 +10,7 @@ import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../bloc/gl_bloc/gl_bloc.dart';
 import '../bloc/gl_bloc/gl_event.dart';
 import '../bloc/gl_bloc/gl_state.dart';
@@ -70,6 +71,39 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     final maxScroll = _scrollController.position.maxScrollExtent;
     final currentScroll = _scrollController.offset;
     return currentScroll >= (maxScroll * 0.9);
+  }
+
+  static final RegExp _dateOnlyRegExp = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+  DateTime? _parseApiDateTime(String? value) {
+    return DateFormatter.parseApiDateTime(value);
+  }
+
+  DateTime? _resolveDisplayDateTime(GeneralLedgerEntryModel entry) {
+    final primaryDate = _parseApiDateTime(entry.date);
+    final createdAt = _parseApiDateTime(entry.createdAt);
+
+    if (primaryDate == null) {
+      return createdAt;
+    }
+
+    final rawDate = entry.date.trim();
+    final isDateOnly = _dateOnlyRegExp.hasMatch(rawDate);
+    if (isDateOnly && createdAt != null) {
+      final localCreatedAt = createdAt.toLocal();
+      return DateTime(
+        primaryDate.year,
+        primaryDate.month,
+        primaryDate.day,
+        localCreatedAt.hour,
+        localCreatedAt.minute,
+        localCreatedAt.second,
+        localCreatedAt.millisecond,
+        localCreatedAt.microsecond,
+      );
+    }
+
+    return primaryDate;
   }
 
   Future<void> _loadData({
@@ -322,11 +356,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   }
 
   Widget _buildEntryCard(GeneralLedgerEntryModel entry) {
-    // Parse date safely
-    DateTime? dateObj;
-    try {
-      dateObj = DateTime.parse(entry.date);
-    } catch (_) {}
+    final dateObj = _resolveDisplayDateTime(entry);
 
     final languageCode = Localizations.localeOf(context).languageCode;
     final displayDocument = AccountingReferenceDisplay.displayDocument(
