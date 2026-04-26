@@ -57,6 +57,8 @@ class CostApiService {
       'CostDate': body['costDate']?.toString() ?? '',
       if (body['documentDate'] != null)
         'DocumentDate': body['documentDate'].toString(),
+      if (body['documentNumber'] != null)
+        'DocumentNumber': body['documentNumber'].toString(),
       'Description': body['description']?.toString() ?? '',
       if (body['paymentMethod'] != null)
         'PaymentMethod': body['paymentMethod'].toString(),
@@ -86,6 +88,8 @@ class CostApiService {
       'CostDate': body['costDate']?.toString() ?? '',
       if (body['documentDate'] != null)
         'DocumentDate': body['documentDate'].toString(),
+      if (body['documentNumber'] != null)
+        'DocumentNumber': body['documentNumber'].toString(),
       'Description': body['description']?.toString() ?? '',
       if (body['paymentMethod'] != null)
         'PaymentMethod': body['paymentMethod'].toString(),

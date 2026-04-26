@@ -36,8 +36,14 @@ class S2cBookWidget extends StatelessWidget {
     'nganh_nghe',
   ];
   static const _soHieuAliases = [
-    'so_hieu', 'importCode', 'orderCode', 'bookCode', 'code', 'importId',
-    'CostId', 'costId',
+    'so_hieu',
+    'documentNumber',
+    'DocumentNumber',
+    'voucherNo',
+    'voucher_no',
+    'so_chung_tu',
+    'documentNo',
+    'DocumentNo',
   ];
   static const _costHints = [
     'CostType',

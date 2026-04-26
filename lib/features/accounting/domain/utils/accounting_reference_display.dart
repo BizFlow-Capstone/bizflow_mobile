@@ -25,15 +25,24 @@
     'CostId',
   ];
 
-  static const List<String> _codeKeys = <String>[
+  static const List<String> _documentKeys = <String>[
+    'so_hieu',
+    'documentNumber',
+    'DocumentNumber',
+    'voucherNo',
+    'voucher_no',
+    'so_chung_tu',
+    'documentNo',
+    'DocumentNo',
+  ];
+
+  static const List<String> _referenceCodeKeys = <String>[
     'referenceCode',
     'ReferenceCode',
-    'so_hieu',
     'code',
     'bookCode',
     'orderCode',
     'importCode',
-    'voucherNo',
   ];
 
   static const List<String> _descriptionKeys = <String>[
@@ -64,9 +73,9 @@
 
     final referenceType = _firstText(row, _typeKeys);
     final referenceId = _firstValue(row, _idKeys);
-    final referenceCode = _firstText(row, _codeKeys);
+    final referenceCode = _firstText(row, _referenceCodeKeys);
 
-    final rawCode = _firstText(normalized, _codeKeys);
+    final rawCode = _firstText(normalized, _documentKeys);
     final rawDescription = _firstText(normalized, _descriptionKeys);
 
     final displayCode = displayDocument(
@@ -76,9 +85,7 @@
       referenceCode: referenceCode,
       languageCode: languageCode,
     );
-    if (displayCode.isNotEmpty) {
-      normalized['so_hieu'] = displayCode;
-    }
+    normalized['so_hieu'] = displayCode;
 
     final displayDescription = displayDescriptionValue(
       description: rawDescription,
@@ -134,32 +141,12 @@
     String languageCode = 'vi',
   }) {
     final raw = (documentNumber ?? '').trim();
-    final lang = _normalizeLanguage(languageCode);
-    final label = displayReference(
-      referenceType: referenceType,
-      referenceId: referenceId,
-      referenceCode: referenceCode ?? raw,
-      languageCode: lang,
-    );
 
     if (raw.isEmpty) {
-      return label;
+      return '';
     }
-
-    final tokenLabel = _humanizeToken(
-      raw,
-      referenceType: referenceType,
-      referenceId: referenceId,
-      languageCode: lang,
-    );
-    if (tokenLabel != null && tokenLabel.isNotEmpty) {
-      return tokenLabel;
-    }
-
-    if (_isNumeric(raw) && label.isNotEmpty) {
-      return label;
-    }
-
+    // Keep user-entered document numbers as-is (e.g. ORD-123456).
+    // Humanized labels are only used when documentNumber is missing.
     return raw;
   }
 

@@ -32,6 +32,9 @@ Future<void> showEditCostDialog({
     text: CurrencyFormatter.formatNumber(item.amount),
   );
   final descriptionController = TextEditingController(text: item.description);
+  final documentNumberController = TextEditingController(
+    text: item.referenceCode ?? '',
+  );
   DateTime selectedDate = item.date;
   DateTime? selectedDocumentDate = item.documentDate;
   String? selectedCostType;
@@ -162,51 +165,17 @@ Future<void> showEditCostDialog({
                 title: Text(l10n.translate('accounting.cost_date')),
                 subtitle:
                     Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: dialogCtx,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setDialogState(() => selectedDate = picked);
-                  }
-                },
+                trailing: const Icon(Icons.lock),
+                enabled: false,
+                onTap: null,
               ),
               const SizedBox(height: AppSpacing.sm),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(l10n.translate('accounting.document_date')),
-                subtitle: Text(
-                  selectedDocumentDate == null
-                      ? l10n.translate('common.no_data')
-                      : DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
+              TextField(
+                controller: documentNumberController,
+                decoration: InputDecoration(
+                  labelText: l10n.translate('accounting.document_number'),
+                  hintText: l10n.translate('accounting.document_number_hint'),
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (selectedDocumentDate != null)
-                      IconButton(
-                        onPressed: () =>
-                            setDialogState(() => selectedDocumentDate = null),
-                        icon: const Icon(Icons.close),
-                      ),
-                    const Icon(Icons.calendar_today),
-                  ],
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: dialogCtx,
-                    initialDate: selectedDocumentDate ?? selectedDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setDialogState(() => selectedDocumentDate = picked);
-                  }
-                },
               ),
             ],
           ),
@@ -251,6 +220,8 @@ Future<void> showEditCostDialog({
                           'amount': amount,
                           'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
                           'documentDate': selectedDocumentDate == null ? null : DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
+                          if (documentNumberController.text.trim().isNotEmpty)
+                            'documentNumber': documentNumberController.text.trim(),
                           'description': descriptionController.text.trim(),
                           'costType': selectedCostType ?? item.type,
                           'paymentMethod': selectedPaymentMethod ?? item.paymentMethod,

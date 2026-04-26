@@ -456,13 +456,6 @@ class _StockImportViewState extends State<_StockImportView> {
               style: AppTextStyles.bodySmall,
             ),
           ],
-          if (invoiceDate.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              '${l10n.translate('stock_import.document_date')}: $invoiceDate',
-              style: AppTextStyles.bodySmall,
-            ),
-          ],
           if (totalAmount != null) ...[
             const SizedBox(height: 4),
             Text(
@@ -1453,40 +1446,6 @@ class _StockImportViewState extends State<_StockImportView> {
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                SizedBox(height: AppSpacing.md),
-                // Document Date
-                InkWell(
-                  onTap: isEditable
-                      ? () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _documentDate ?? DateTime.now(),
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            setState(() => _documentDate = picked);
-                          }
-                        }
-                      : null,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: l10n.translate('stock_import.document_date'),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      suffixIcon: const Icon(Icons.calendar_today, size: 20),
-                    ),
-                    child: Text(
-                      _documentDate != null
-                          ? DateFormatter.formatDate(_documentDate)
-                          : l10n.translate('stock_import.document_date_hint'),
-                      style: _documentDate != null
-                          ? null
-                          : TextStyle(color: AppColors.textSecondary),
                     ),
                   ),
                 ),

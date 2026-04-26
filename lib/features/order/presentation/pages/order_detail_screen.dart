@@ -82,6 +82,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return true;
   }
 
+  bool _isDateInPeriod(DateTime date, AccountingPeriod period) {
+    try {
+      final targetDate = DateUtils.dateOnly(date.toLocal());
+      final startDate = DateUtils.dateOnly(DateTime.parse(period.startDate));
+      final endDate = DateUtils.dateOnly(DateTime.parse(period.endDate));
+      return !targetDate.isBefore(startDate) && !targetDate.isAfter(endDate);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _hideCancelForCompletedOrder(OrderEntity order) {
+    if (!order.isPublished || !_periodsLoaded) {
+      return false;
+    }
+
+    final orderDate = order.completedAt ?? order.createdAt;
+    for (final period in _periods) {
+      if (_isDateInPeriod(orderDate, period) && period.isFinalized) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -377,8 +403,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   String _pdfFormat(String text) => StringUtils.removeDiacritics(text);
-  String _pdfCurrency(num? amount) =>
-      '${CurrencyFormatter.formatNumber(amount?.round() ?? 0)} VND';
+  String _formatMoney(num? amount) => CurrencyFormatter.formatVND(amount);
+  String _pdfCurrency(num? amount) => _formatMoney(amount).replaceAll('đ', ' VND');
 
   List<Map<String, String>> _buildColumns(InvoiceTemplateEntity template) {
     final columns = <Map<String, String>>[];
@@ -714,36 +740,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
               return Column(
                 children: [
-                if (detail.isPublished && !detail.isCancelled && _canEditOrder(detail))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed:
-                            (_isCancelling ||
-                                _isPublishing ||
-                                _isInvoiceActionInProgress)
-                            ? null
-                            : () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => OrderFormScreen(
-                                      inputType: 'manual',
-                                      initialOrder: detail,
-                                    ),
-                                  ),
-                                );
-                              },
-                        icon: const Icon(Icons.edit),
-                        label: Text(l10n.translate('order.action_edit')),
-                      ),
-                    ),
-                  ),
                 if (detail.status.toLowerCase() == 'completed')
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -778,7 +774,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ],
                     ),
                   ),
-                if (detail.isPending) ...[
+                if (detail.isPending ||
+                    (detail.isPublished && !_hideCancelForCompletedOrder(detail))) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md,
@@ -808,7 +805,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        if (_canEditOrder(detail))
+                        if ((detail.isPending || (detail.isPublished && !_hideCancelForCompletedOrder(detail))) && _canEditOrder(detail))
                           Expanded(
                             child: OutlinedButton.icon(
                               onPressed: (_isCancelling || _isPublishing)
@@ -832,35 +829,36 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: (_isPublishing || _isCancelling)
-                            ? null
-                            : () => _completeOrder(detail),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.success,
-                          foregroundColor: Colors.white,
+                  if (detail.isPending)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: (_isPublishing || _isCancelling)
+                              ? null
+                              : () => _completeOrder(detail),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            foregroundColor: Colors.white,
+                          ),
+                          icon: _isPublishing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.check_circle),
+                          label: Text(l10n.translate('order.action_publish')),
                         ),
-                        icon: _isPublishing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.check_circle),
-                        label: Text(l10n.translate('order.action_publish')),
                       ),
                     ),
-                  ),
                 ],
                 Expanded(
                   child: ListView(
@@ -941,27 +939,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               Text(
-                                '${l10n.translate('order.detail_cash_amount')}: ${CurrencyFormatter.formatVND(detail.cashAmount)}',
+                                '${l10n.translate('order.detail_cash_amount')}: ${_formatMoney(detail.cashAmount)}',
                               ),
                               Text(
-                                '${l10n.translate('order.detail_bank_amount')}: ${CurrencyFormatter.formatVND(detail.bankAmount)}',
+                                '${l10n.translate('order.detail_bank_amount')}: ${_formatMoney(detail.bankAmount)}',
                               ),
                               Text(
-                                '${l10n.translate('order.detail_debt_amount')}: ${CurrencyFormatter.formatVND(detail.debtAmount)}',
+                                '${l10n.translate('order.detail_debt_amount')}: ${_formatMoney(detail.debtAmount)}',
                               ),
                               const Divider(height: 20),
                               Text(
-                                '${l10n.translate('order.detail_subtotal')}: ${CurrencyFormatter.formatVND(detail.subtotal)}',
+                                '${l10n.translate('order.detail_subtotal')}: ${_formatMoney(detail.subtotal)}',
                               ),
                               Text(
-                                '${l10n.translate('order.detail_discount')}: ${CurrencyFormatter.formatVND(detail.discountAmount)}',
+                                '${l10n.translate('order.detail_discount')}: ${_formatMoney(detail.discountAmount)}',
                               ),
                               Text(
-                                '${l10n.translate('order.detail_tax')}: ${CurrencyFormatter.formatVND(detail.taxAmount)}',
+                                '${l10n.translate('order.detail_tax')}: ${_formatMoney(detail.taxAmount)}',
                               ),
                               const SizedBox(height: AppSpacing.xs),
                               Text(
-                                '${l10n.translate('order.detail_total')}: ${CurrencyFormatter.formatVND(detail.totalAmount)}',
+                                '${l10n.translate('order.detail_total')}: ${_formatMoney(detail.totalAmount)}',
                                 style: AppTextStyles.titleSmall.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppColors.primary,
@@ -985,10 +983,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           child: ListTile(
                             title: Text(item.productName),
                             subtitle: Text(
-                              '${l10n.translate('order.detail_qty_label')}: ${item.quantity} | ${l10n.translate('order.detail_unit_price_label')}: ${CurrencyFormatter.formatVND(item.price)}',
+                              '${l10n.translate('order.detail_qty_label')}: ${item.quantity} | ${l10n.translate('order.detail_unit_price_label')}: ${_formatMoney(item.price)}',
                             ),
                             trailing: Text(
-                              CurrencyFormatter.formatVND(
+                              _formatMoney(
                                 item.price * item.quantity,
                               ),
                               style: AppTextStyles.titleSmall.copyWith(

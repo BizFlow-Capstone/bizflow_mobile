@@ -26,6 +26,8 @@ import 'order_form_screen.dart';
 import '../../data/order_api_service.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
+import '../../../accounting/data/repositories/accounting_repository.dart';
+import '../../../accounting/domain/models/accounting_period.dart';
 
 import '../../../../core/routing/app_router.dart';
 
@@ -45,6 +47,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
   final ActionGuard _openOrderCreationGuard = ActionGuard();
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
+  List<AccountingPeriod> _periods = const <AccountingPeriod>[];
+  bool _periodsLoaded = false;
 
   String? _resolveLocationId({String? preferred}) {
     final raw = (preferred ?? context.read<BusinessContext>().currentBusinessId)
@@ -62,6 +66,62 @@ class _OrderListScreenState extends State<OrderListScreen> {
     _loadInitialOrders();
   }
 
+  Future<void> _loadAccountingPeriodsForLocation(String locationId) async {
+    setState(() {
+      _periodsLoaded = false;
+    });
+
+    try {
+      await context.read<AccountingRepository>().fetchPeriodsSWR(
+        locationId: locationId,
+        onData: (periods, _) {
+          if (!mounted) return;
+          setState(() {
+            _periods = periods;
+            _periodsLoaded = true;
+          });
+        },
+        onError: (_) {
+          if (!mounted) return;
+          setState(() {
+            _periodsLoaded = true;
+          });
+        },
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _periodsLoaded = true;
+      });
+    }
+  }
+
+  bool _isDateInPeriod(DateTime date, AccountingPeriod period) {
+    try {
+      final targetDate = DateUtils.dateOnly(date.toLocal());
+      final startDate = DateUtils.dateOnly(DateTime.parse(period.startDate));
+      final endDate = DateUtils.dateOnly(DateTime.parse(period.endDate));
+      return !targetDate.isBefore(startDate) && !targetDate.isAfter(endDate);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool _hideCancelForCompletedOrder(OrderEntity order) {
+    if (!order.isPublished || !_periodsLoaded) {
+      return false;
+    }
+
+    final orderDate = order.completedAt ?? order.createdAt;
+    for (final period in _periods) {
+      if (_isDateInPeriod(orderDate, period) && period.isFinalized) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   void _loadInitialOrders() {
     final locationId = _resolveLocationId();
     if (locationId == null) {
@@ -73,6 +133,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
       );
       return;
     }
+    _loadAccountingPeriodsForLocation(locationId);
     context.read<OrderBloc>().add(LoadOrdersRequested(locationId: locationId));
   }
 
@@ -98,6 +159,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
       return;
     }
 
+    _loadAccountingPeriodsForLocation(_currentLocationFilter!);
+
     context.read<OrderBloc>().add(
       FilterOrdersRequested(
         status: _currentStatusFilter,
@@ -117,6 +180,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
       );
       return;
     }
+    _loadAccountingPeriodsForLocation(locationId);
     context.read<OrderBloc>().add(
       RefreshOrdersRequested(locationId: locationId),
     );
@@ -566,9 +630,11 @@ class _OrderListScreenState extends State<OrderListScreen> {
                         }
                       : null,
                   onPublish: () => _completeOrder(order),
-                  onCancel: () {
-                    _showCancelConfirmDialog(context, order.id);
-                  },
+                  onCancel: _hideCancelForCompletedOrder(order)
+                      ? null
+                      : () {
+                          _showCancelConfirmDialog(context, order.id);
+                        },
                 );
               },
             ),

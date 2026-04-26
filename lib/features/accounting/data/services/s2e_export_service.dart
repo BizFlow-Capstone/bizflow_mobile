@@ -19,11 +19,13 @@ class S2eExportService {
 
   static const _soHieuAliases = [
     'so_hieu',
-    'importCode',
-    'orderCode',
-    'bookCode',
-    'code',
-    'importId',
+    'documentNumber',
+    'DocumentNumber',
+    'voucherNo',
+    'voucher_no',
+    'so_chung_tu',
+    'documentNo',
+    'DocumentNo',
   ];
   static const _dateAliases = [
     'ngay_thang',

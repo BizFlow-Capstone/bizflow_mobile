@@ -199,7 +199,7 @@ class S3aBookWidget extends StatelessWidget {
       cells: [
         DataCell(Text('$stt', style: style)),
         DataCell(Text(_str(v, const ['asset_name', 'assetName', 'name', 'title', 'tenTaiSan']), style: style)),
-        DataCell(Text(_str(v, const ['voucher_no', 'voucherNo', 'code', 'so_hieu', 'importCode']), style: style)),
+        DataCell(Text(_str(v, const ['voucher_no', 'voucherNo', 'so_hieu', 'documentNumber', 'DocumentNumber', 'so_chung_tu', 'documentNo', 'DocumentNo']), style: style)),
         DataCell(Text(_fmtDate(_pick(v, const ['recorded_date', 'recordedDate', 'date', 'ngay_ghi_nhan', 'receivedAt', 'createdAt'])), style: style)),
         DataCell(Text(_fmtAmount(_pick(v, const ['increase_amount', 'increaseAmount', 'amountIn', 'tang', 'gia_tri_tang', 'revenue'])), style: style)),
         DataCell(Text(_fmtAmount(_pick(v, const ['decrease_amount', 'decreaseAmount', 'amountOut', 'giam', 'gia_tri_giam', 'cost'])), style: style)),

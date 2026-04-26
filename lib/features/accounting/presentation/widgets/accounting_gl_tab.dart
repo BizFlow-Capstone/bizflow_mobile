@@ -616,13 +616,6 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 const SizedBox(height: 6),
                 Text(
                   context.tr(
-                    'accounting.gl_detail_document_date',
-                    params: {'value': entry.documentDate ?? '-'},
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  context.tr(
                     'accounting.gl_detail_date',
                     params: {'value': entry.date},
                   ),

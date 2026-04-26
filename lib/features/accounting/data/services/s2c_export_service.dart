@@ -14,13 +14,13 @@ class S2cExportService {
   static const _columns = 4;
   static const _codeAliases = [
     'so_hieu',
-    'importCode',
-    'orderCode',
-    'bookCode',
-    'code',
-    'importId',
-    'CostId',
-    'costId',
+    'documentNumber',
+    'DocumentNumber',
+    'voucherNo',
+    'voucher_no',
+    'so_chung_tu',
+    'documentNo',
+    'DocumentNo',
   ];
   static const _businessTypeIdAliases = [
     'businessTypeId',

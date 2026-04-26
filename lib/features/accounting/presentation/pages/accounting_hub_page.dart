@@ -445,6 +445,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     required ValueChanged<DateTime?> onChanged,
     String emptyText = '-',
     bool allowClear = false,
+    bool readOnly = false,
   }) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -458,10 +459,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               onPressed: () => onChanged(null),
               icon: const Icon(Icons.close),
             ),
-          const Icon(Icons.calendar_today),
+          Icon(readOnly ? Icons.lock : Icons.calendar_today),
         ],
       ),
-      onTap: () async {
+      onTap: readOnly
+          ? null
+          : () async {
         final picked = await _pickDate(
           context: dialogCtx,
           initialDate: value ?? initialDate,
@@ -470,6 +473,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           onChanged(picked);
         }
       },
+      enabled: !readOnly,
     );
   }
 
@@ -997,6 +1001,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     final amountController = TextEditingController();
     final descriptionController = TextEditingController();
+    final documentNumberController = TextEditingController();
     final referenceOrderIdController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final amountFocusNode = FocusNode();
@@ -1176,6 +1181,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     dialogCtx: dialogCtx,
                     value: selectedDate,
                     initialDate: selectedDate,
+                    readOnly: true,
                     onChanged: (value) {
                       if (value != null) {
                         setDialogState(() => selectedDate = value);
@@ -1183,16 +1189,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     },
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  _buildDateSelectorTile(
-                    title: 'Ngay chung tu',
-                    dialogCtx: dialogCtx,
-                    value: selectedDocumentDate,
-                    initialDate: selectedDate,
-                    emptyText: l10n.translate('common.no_data'),
-                    allowClear: true,
-                    onChanged: (value) {
-                      setDialogState(() => selectedDocumentDate = value);
-                    },
+                  AppTextField(
+                    controller: documentNumberController,
+                    label: l10n.translate('accounting.document_number'),
+                    hintText: l10n.translate('accounting.document_number_hint'),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   // Image upload section
@@ -1344,6 +1344,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             'description': descriptionController.text.trim(),
                             'moneyChannel': selectedMoneyChannel,
                             'businessTypeId': selectedBusinessTypeId,
+                            if (documentNumberController.text.trim().isNotEmpty)
+                              'documentNumber': documentNumberController.text.trim(),
                             if (referenceOrderId != null)
                               'referenceType': 'order',
                             if (referenceOrderId != null)
@@ -1392,6 +1394,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     amountController.dispose();
     descriptionController.dispose();
     referenceOrderIdController.dispose();
+    documentNumberController.dispose();
   }
 
   Future<OrderEntity?> _loadLinkedOrder(RevenueEntity revenue) async {
@@ -1420,6 +1423,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     final amountController = TextEditingController();
     final descriptionController = TextEditingController();
+    final documentNumberController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final amountFocusNode = FocusNode();
     final descriptionFocusNode = FocusNode();
@@ -1554,10 +1558,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   ),
                   const SizedBox(height: AppSpacing.md),
                   _buildDateSelectorTile(
-                    title: 'Ngay chi',
+                    title: l10n.translate('accounting.cost_date'),
                     dialogCtx: dialogCtx,
                     value: selectedDate,
                     initialDate: selectedDate,
+                    readOnly: true,
                     onChanged: (value) {
                       if (value != null) {
                         setDialogState(() => selectedDate = value);
@@ -1565,16 +1570,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     },
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  _buildDateSelectorTile(
-                    title: 'Ngay chung tu',
-                    dialogCtx: dialogCtx,
-                    value: selectedDocumentDate,
-                    initialDate: selectedDate,
-                    emptyText: l10n.translate('common.no_data'),
-                    allowClear: true,
-                    onChanged: (value) {
-                      setDialogState(() => selectedDocumentDate = value);
-                    },
+                  AppTextField(
+                    controller: documentNumberController,
+                    label: l10n.translate('accounting.document_number'),
+                    hintText: l10n.translate('accounting.document_number_hint'),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   // Image upload section
@@ -1687,6 +1686,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             'description': descriptionController.text.trim(),
                             'costType': selectedCostType,
                             'paymentMethod': selectedPaymentMethod,
+                            if (documentNumberController.text.trim().isNotEmpty)
+                              'documentNumber': documentNumberController.text.trim(),
                           },
                           image: selectedImage,
                         );
@@ -1731,6 +1732,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     paymentMethodFocusNode.dispose();
     amountController.dispose();
     descriptionController.dispose();
+    documentNumberController.dispose();
   }
 
   Future<void> _showEditCostDialog(CostEntity item) async {
@@ -1761,6 +1763,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       text: CurrencyFormatter.formatNumber(item.amount),
     );
     final descriptionController = TextEditingController(text: item.description);
+    final documentNumberController = TextEditingController(
+      text: item.referenceCode ?? '',
+    );
     DateTime selectedDate = item.date;
     DateTime? selectedDocumentDate = item.documentDate;
     String? selectedCostType = item.type;
@@ -1845,6 +1850,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   dialogCtx: dialogCtx,
                   value: selectedDate,
                   initialDate: selectedDate,
+                  readOnly: true,
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() => selectedDate = value);
@@ -1852,16 +1858,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                _buildDateSelectorTile(
-                  title: 'Ngay chung tu',
-                  dialogCtx: dialogCtx,
-                  value: selectedDocumentDate,
-                  initialDate: selectedDate,
-                  emptyText: l10n.translate('common.no_data'),
-                  allowClear: true,
-                  onChanged: (value) {
-                    setDialogState(() => selectedDocumentDate = value);
-                  },
+                AppTextField(
+                  controller: documentNumberController,
+                  label: l10n.translate('accounting.document_number'),
+                  hintText: l10n.translate('accounting.document_number_hint'),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 // Image upload section
@@ -2007,6 +2007,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             'costType': selectedCostType ?? item.type,
                             'paymentMethod':
                                 selectedPaymentMethod ?? item.paymentMethod,
+                            if (documentNumberController.text.trim().isNotEmpty)
+                              'documentNumber': documentNumberController.text.trim(),
                             'removeDocument': false,
                           },
                           image: selectedImage,
@@ -2029,6 +2031,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     amountController.dispose();
     descriptionController.dispose();
+    documentNumberController.dispose();
   }
 
   Future<void> _showRevenueDetailDialog(RevenueEntity revenue) async {
@@ -2146,10 +2149,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               Text('${l10n.translate('accounting.description')}: $displayDescription'),
               const SizedBox(height: 6),
               Text('${l10n.translate('accounting.channel')}: ${revenue.moneyChannel ?? '-'}'),
-              const SizedBox(height: 6),
-              Text(
-                '${l10n.translate('accounting.document_date')}: ${_formatIsoDate(revenue.documentDate)}',
-              ),
               const SizedBox(height: 6),
               Text(
                 '${l10n.translate('accounting.revenue_business_type')}: ${revenue.businessTypeName ?? '-'}',
@@ -2633,6 +2632,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       text: CurrencyFormatter.formatNumber(item.amount),
     );
     final descriptionController = TextEditingController(text: item.description);
+    final documentNumberController = TextEditingController(
+      text: item.referenceCode ?? '',
+    );
     DateTime selectedDate = item.date;
     DateTime? selectedDocumentDate = item.documentDate;
 
@@ -2737,6 +2739,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   dialogCtx: dialogCtx,
                   value: selectedDate,
                   initialDate: selectedDate,
+                  readOnly: true,
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() => selectedDate = value);
@@ -2744,16 +2747,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                _buildDateSelectorTile(
-                  title: 'Ngay chung tu',
-                  dialogCtx: dialogCtx,
-                  value: selectedDocumentDate,
-                  initialDate: selectedDate,
-                  emptyText: l10n.translate('common.no_data'),
-                  allowClear: true,
-                  onChanged: (value) {
-                    setDialogState(() => selectedDocumentDate = value);
-                  },
+                AppTextField(
+                  controller: documentNumberController,
+                  label: l10n.translate('accounting.document_number'),
+                  hintText: l10n.translate('accounting.document_number_hint'),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 // Image upload section
@@ -2861,6 +2858,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                                   ).format(selectedDocumentDate!),
                             'description': descriptionController.text.trim(),
                             'moneyChannel': selectedMoneyChannel,
+                            if (documentNumberController.text.trim().isNotEmpty)
+                              'documentNumber': documentNumberController.text.trim(),
                             if ((selectedBusinessTypeId ?? '').isNotEmpty)
                               'businessTypeId': selectedBusinessTypeId,
                           },
@@ -2884,6 +2883,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     amountController.dispose();
     descriptionController.dispose();
+    documentNumberController.dispose();
   }
 }
 

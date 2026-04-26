@@ -226,7 +226,6 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
           ..clear()
           ..addAll(
             result.items.map((item) {
-              final firstDate = _tryParseYmdDate(item.costDate);
               return _CostAIDraft(
                 description: (item.description ?? '').trim(),
                 amountText: item.amount == null
@@ -236,7 +235,8 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
                   item.paymentMethod,
                   channels,
                 ),
-                costDate: firstDate ?? DateTime.now(),
+                costDate: DateTime.now(),
+                documentDate: null,
                 costTypeId: _mapCostTypeFromAi(item.costType, costTypes),
               );
             }),
@@ -361,7 +361,6 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
         ..clear()
         ..addAll(
           items.map((item) {
-            final firstDate = _tryParseYmdDate(item.costDate);
             return _CostAIDraft(
               description: (item.description ?? '').trim(),
               amountText: item.amount == null
@@ -371,7 +370,8 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
                 item.paymentMethod,
                 channels,
               ),
-              costDate: firstDate ?? DateTime.now(),
+              costDate: DateTime.now(),
+              documentDate: null,
               costTypeId: item.costType,
             );
           }),
@@ -608,13 +608,7 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
                           drafts.removeAt(index);
                         });
                       },
-                      onSave: () =>
-                          _saveDraft(context, l10n, locationId, index),
-                      onDateChanged: (date) {
-                        setState(() {
-                          draft.costDate = date;
-                        });
-                      },
+                      onSave: () => _saveDraft(context, l10n, locationId, index),
                     );
                   }),
               ],
@@ -667,9 +661,13 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
           'businessLocationId': int.tryParse(locationId) ?? 0,
           'amount': amount,
           'costDate': DateFormat('yyyy-MM-dd').format(draft.costDate),
+          if (draft.documentDate != null)
+            'documentDate': DateFormat('yyyy-MM-dd').format(draft.documentDate!),
           'description': draft.description.trim(),
           'paymentMethod': draft.moneyChannel,
           'costType': draft.costTypeId,
+          if ((draft.documentNumber ?? '').trim().isNotEmpty)
+            'documentNumber': draft.documentNumber!.trim(),
         },
         image: imageFile,
       );
@@ -707,7 +705,6 @@ class _KeyedCostDraftItem extends StatefulWidget {
   final List<ReferenceItem> Function() getCostTypes;
   final VoidCallback onDelete;
   final VoidCallback onSave;
-  final Function(DateTime) onDateChanged;
 
   const _KeyedCostDraftItem({
     super.key,
@@ -717,7 +714,6 @@ class _KeyedCostDraftItem extends StatefulWidget {
     required this.getCostTypes,
     required this.onDelete,
     required this.onSave,
-    required this.onDateChanged,
   });
 
   @override
@@ -727,6 +723,7 @@ class _KeyedCostDraftItem extends StatefulWidget {
 class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
   late TextEditingController _descriptionController;
   late TextEditingController _amountController;
+  late TextEditingController _documentNumberController;
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
@@ -751,12 +748,16 @@ class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
       text: widget.draft.description,
     );
     _amountController = TextEditingController(text: widget.draft.amountText);
+    _documentNumberController = TextEditingController(
+      text: widget.draft.documentNumber ?? '',
+    );
   }
 
   @override
   void dispose() {
     _descriptionController.dispose();
     _amountController.dispose();
+    _documentNumberController.dispose();
     super.dispose();
   }
 
@@ -806,18 +807,9 @@ class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
               DateFormat('yyyy-MM-dd').format(widget.draft.costDate),
               style: AppTextStyles.bodySmall,
             ),
-            trailing: const Icon(Icons.calendar_today, size: 20),
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: widget.draft.costDate,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              if (picked != null) {
-                widget.onDateChanged(picked);
-              }
-            },
+            trailing: const Icon(Icons.lock, size: 20),
+            enabled: false,
+            onTap: null,
           ),
           const SizedBox(height: AppSpacing.sm),
           TextFormField(
@@ -843,6 +835,15 @@ class _KeyedCostDraftItemState extends State<_KeyedCostDraftItem> {
               ),
             ),
             onChanged: (value) => widget.draft.amountText = value,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _documentNumberController,
+            decoration: InputDecoration(
+              labelText: l10n.translate('accounting.document_number'),
+              hintText: l10n.translate('accounting.document_number_hint'),
+            ),
+            onChanged: (value) => widget.draft.documentNumber = value,
           ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String>(
@@ -957,6 +958,8 @@ class _CostAIDraft {
   String amountText;
   String? moneyChannel;
   DateTime costDate;
+  DateTime? documentDate;
+  String? documentNumber;
   String? costTypeId;
   String? imagePath;
   bool isSaving;
@@ -966,6 +969,8 @@ class _CostAIDraft {
     required this.amountText,
     this.moneyChannel,
     required this.costDate,
+    this.documentDate,
+    this.documentNumber,
     this.costTypeId,
     this.imagePath,
     this.isSaving = false,

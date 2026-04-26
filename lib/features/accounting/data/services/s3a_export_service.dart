@@ -12,7 +12,7 @@ class S3aExportService {
   static const _columns = 8;
 
   static const _assetNameAliases = ['assetName', 'name', 'title', 'tenTaiSan', 'ten_tai_san'];
-  static const _voucherAliases = ['voucherNo', 'code', 'so_hieu', 'importCode', 'so_chung_tu'];
+  static const _voucherAliases = ['voucherNo', 'voucher_no', 'so_hieu', 'documentNumber', 'DocumentNumber', 'so_chung_tu', 'documentNo', 'DocumentNo'];
   static const _dateAliases = ['recordedDate', 'date', 'ngay_ghi_nhan', 'receivedAt', 'createdAt'];
   static const _increaseAliases = ['increaseAmount', 'amountIn', 'tang', 'gia_tri_tang', 'revenue'];
   static const _decreaseAliases = ['decreaseAmount', 'amountOut', 'giam', 'gia_tri_giam', 'cost'];

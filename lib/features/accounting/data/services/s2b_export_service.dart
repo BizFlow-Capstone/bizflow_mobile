@@ -15,11 +15,14 @@ class S2bExportService {
   static const _dataColumnCount = 4;
 
   static const _soHieuAliases = [
-    'importCode',
-    'orderCode',
-    'bookCode',
-    'code',
-    'importId',
+    'so_hieu',
+    'documentNumber',
+    'DocumentNumber',
+    'voucherNo',
+    'voucher_no',
+    'so_chung_tu',
+    'documentNo',
+    'DocumentNo',
   ];
   static const _dateAliases = [
     'receivedAt',

@@ -118,14 +118,14 @@ class OrderCard extends StatelessWidget {
               ),
 
               // Action buttons
-              if (order.isDraft || order.isPending) ...[
+              if (order.isDraft || order.isPending || (order.isPublished && onCancel != null)) ...[
                 const SizedBox(height: 12),
                 Wrap(
                   alignment: WrapAlignment.end,
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    if (onEdit != null)
+                    if ((order.isDraft || order.isPending) && onEdit != null)
                       TextButton(
                         onPressed: isPublishing ? null : onEdit,
                         child: Text(l10n.translate('order.action_edit')),
@@ -138,7 +138,7 @@ class OrderCard extends StatelessWidget {
                         ),
                         child: Text(l10n.translate('common.delete')),
                       ),
-                    if (order.isPending && onCancel != null)
+                    if ((order.isPending || order.isPublished) && onCancel != null)
                       TextButton(
                         onPressed: isPublishing ? null : onCancel,
                         style: TextButton.styleFrom(
@@ -146,7 +146,7 @@ class OrderCard extends StatelessWidget {
                         ),
                         child: Text(l10n.translate('order.action_cancel')),
                       ),
-                    if (!order.isDraft && onPublish != null)
+                    if ((order.isDraft || order.isPending) && onPublish != null)
                       TextButton(
                         onPressed: isPublishing ? null : onPublish,
                         style: TextButton.styleFrom(

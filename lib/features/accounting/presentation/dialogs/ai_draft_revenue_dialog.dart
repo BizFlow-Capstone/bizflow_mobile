@@ -199,7 +199,6 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
           ..clear()
           ..addAll(
             result.items.map((item) {
-              final firstDate = _tryParseYmdDate(item.revenueDate);
               return _RevenueAIDraft(
                 description: (item.description ?? '').trim(),
                 amountText: item.amount == null
@@ -209,7 +208,8 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                   item.moneyChannel,
                   channels,
                 ),
-                revenueDate: firstDate ?? DateTime.now(),
+                revenueDate: DateTime.now(),
+                documentDate: null,
               );
             }),
           );
@@ -374,14 +374,14 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
         ..clear()
         ..addAll(
           items.map((item) {
-            final firstDate = _tryParseYmdDate(item.revenueDate);
             return _RevenueAIDraft(
               description: (item.description ?? '').trim(),
               amountText: item.amount == null
                   ? ''
                   : CurrencyFormatter.formatNumber(item.amount!),
               moneyChannel: _mapMoneyChannelFromAi(item.moneyChannel, channels),
-              revenueDate: firstDate ?? DateTime.now(),
+              revenueDate: DateTime.now(),
+              documentDate: null,
             );
           }),
         );
@@ -627,13 +627,7 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
                           drafts.removeAt(index);
                         });
                       },
-                      onSave: () =>
-                          _saveDraft(context, l10n, locationId, index),
-                      onDateChanged: (date) {
-                        setState(() {
-                          draft.revenueDate = date;
-                        });
-                      },
+                      onSave: () => _saveDraft(context, l10n, locationId, index),
                     );
                   }),
               ],
@@ -685,8 +679,12 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
           'businessLocationId': int.tryParse(locationId) ?? 0,
           'amount': amount,
           'revenueDate': DateFormat('yyyy-MM-dd').format(draft.revenueDate),
+          if (draft.documentDate != null)
+            'documentDate': DateFormat('yyyy-MM-dd').format(draft.documentDate!),
           'description': draft.description.trim(),
           'moneyChannel': draft.moneyChannel,
+          if ((draft.documentNumber ?? '').trim().isNotEmpty)
+            'documentNumber': draft.documentNumber!.trim(),
           if ((draft.businessTypeId ?? '').isNotEmpty)
             'businessTypeId': draft.businessTypeId,
         },
@@ -726,7 +724,6 @@ class _KeyedDraftItem extends StatefulWidget {
   final List<ReferenceItem> Function() getMoneyChannels;
   final VoidCallback onDelete;
   final VoidCallback onSave;
-  final Function(DateTime) onDateChanged;
 
   const _KeyedDraftItem({
     super.key,
@@ -736,7 +733,6 @@ class _KeyedDraftItem extends StatefulWidget {
     required this.getMoneyChannels,
     required this.onDelete,
     required this.onSave,
-    required this.onDateChanged,
   });
 
   @override
@@ -746,6 +742,7 @@ class _KeyedDraftItem extends StatefulWidget {
 class _KeyedDraftItemState extends State<_KeyedDraftItem> {
   late TextEditingController _descriptionController;
   late TextEditingController _amountController;
+  late TextEditingController _documentNumberController;
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
@@ -770,12 +767,16 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
       text: widget.draft.description,
     );
     _amountController = TextEditingController(text: widget.draft.amountText);
+    _documentNumberController = TextEditingController(
+      text: widget.draft.documentNumber ?? '',
+    );
   }
 
   @override
   void dispose() {
     _descriptionController.dispose();
     _amountController.dispose();
+    _documentNumberController.dispose();
     super.dispose();
   }
 
@@ -821,18 +822,9 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
               DateFormat('yyyy-MM-dd').format(widget.draft.revenueDate),
               style: AppTextStyles.bodySmall,
             ),
-            trailing: const Icon(Icons.calendar_today, size: 20),
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: widget.draft.revenueDate,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              if (picked != null) {
-                widget.onDateChanged(picked);
-              }
-            },
+            trailing: const Icon(Icons.lock, size: 20),
+            enabled: false,
+            onTap: null,
           ),
           const SizedBox(height: AppSpacing.sm),
           TextFormField(
@@ -859,6 +851,15 @@ class _KeyedDraftItemState extends State<_KeyedDraftItem> {
               ),
             ),
             onChanged: (value) => widget.draft.amountText = value,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextFormField(
+            controller: _documentNumberController,
+            decoration: InputDecoration(
+              labelText: l10n.translate('accounting.document_number'),
+              hintText: l10n.translate('accounting.document_number_hint'),
+            ),
+            onChanged: (value) => widget.draft.documentNumber = value,
           ),
           const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<String>(
@@ -1002,6 +1003,8 @@ class _RevenueAIDraft {
   String amountText;
   String? moneyChannel;
   DateTime revenueDate;
+  DateTime? documentDate;
+  String? documentNumber;
   String? businessTypeId;
   String? imagePath;
   bool isSaving;
@@ -1011,6 +1014,8 @@ class _RevenueAIDraft {
     required this.amountText,
     this.moneyChannel,
     required this.revenueDate,
+    this.documentDate,
+    this.documentNumber,
     this.businessTypeId,
     this.imagePath,
     this.isSaving = false,

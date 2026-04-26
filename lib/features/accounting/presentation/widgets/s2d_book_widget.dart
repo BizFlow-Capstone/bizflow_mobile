@@ -20,11 +20,13 @@ class S2dBookWidget extends StatelessWidget {
   static const _sectionAliases = ['section', 'Section', 'sectionId'];
   static const _soHieuAliases = [
     'so_hieu',
-    'importCode',
-    'orderCode',
-    'bookCode',
-    'code',
-    'importId',
+    'documentNumber',
+    'DocumentNumber',
+    'voucherNo',
+    'voucher_no',
+    'so_chung_tu',
+    'documentNo',
+    'DocumentNo',
   ];
   static const _dateAliases = [
     'ngay',

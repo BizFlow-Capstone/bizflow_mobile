@@ -33,6 +33,7 @@ Future<void> showAddRevenueDialog({
   final amountController = TextEditingController();
   final descriptionController = TextEditingController();
   final referenceOrderIdController = TextEditingController();
+  final documentNumberController = TextEditingController();
   DateTime selectedDate = DateTime.now();
   DateTime? selectedDocumentDate;
   String? selectedMoneyChannel;
@@ -179,53 +180,17 @@ Future<void> showAddRevenueDialog({
                 subtitle: Text(
                   '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
                 ),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: dialogCtx,
-                    initialDate: selectedDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setDialogState(() => selectedDate = picked);
-                  }
-                },
+                trailing: const Icon(Icons.lock),
+                enabled: false,
+                onTap: null,
               ),
               const SizedBox(height: AppSpacing.sm),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(l10n.translate('accounting.document_date')),
-                subtitle: Text(
-                  selectedDocumentDate == null
-                      ? l10n.translate('common.no_data')
-                      : DateFormat('yyyy-MM-dd')
-                          .format(selectedDocumentDate!),
+              TextField(
+                controller: documentNumberController,
+                decoration: InputDecoration(
+                  labelText: l10n.translate('accounting.document_number'),
+                  hintText: l10n.translate('accounting.document_number_hint'),
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (selectedDocumentDate != null)
-                      IconButton(
-                        onPressed: () => setDialogState(
-                          () => selectedDocumentDate = null,
-                        ),
-                        icon: const Icon(Icons.close),
-                      ),
-                    const Icon(Icons.calendar_today),
-                  ],
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: dialogCtx,
-                    initialDate: selectedDocumentDate ?? selectedDate,
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                  );
-                  if (picked != null) {
-                    setDialogState(() => selectedDocumentDate = picked);
-                  }
-                },
               ),
             ],
           ),
@@ -295,6 +260,8 @@ Future<void> showAddRevenueDialog({
                           'revenueDate': DateFormat('yyyy-MM-dd').format(selectedDate),
                           if (selectedDocumentDate != null)
                             'documentDate': DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
+                          if (documentNumberController.text.trim().isNotEmpty)
+                            'documentNumber': documentNumberController.text.trim(),
                           'description': descriptionController.text,
                           'moneyChannel': selectedMoneyChannel,
                           if ((selectedBusinessTypeId ?? '').isNotEmpty)

@@ -22,7 +22,14 @@ class S2bBookWidget extends StatelessWidget {
     'so_tien', 'revenue', 'finalAmount', 'totalAmount', 'amount', 'planPrice',
   ];
   static const _soHieuAliases = [
-    'so_hieu', 'importCode', 'orderCode', 'bookCode', 'code', 'importId',
+    'so_hieu',
+    'documentNumber',
+    'DocumentNumber',
+    'voucherNo',
+    'voucher_no',
+    'so_chung_tu',
+    'documentNo',
+    'DocumentNo',
   ];
   static const _dateAliases = [
     'ngay_thang', 'receivedAt', 'createdAt', 'updatedAt', 'documentDate', 'date',

@@ -732,13 +732,6 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
             '${l10n.translate('accounting.ai_confidence')}: ${_confidenceLabel(l10n, result.confidence)}',
             style: TextStyle(fontSize: 13, color: Colors.grey[700]),
           ),
-          if ((result.invoiceDate?.trim().isNotEmpty ?? false)) ...[
-            const SizedBox(height: 4),
-            Text(
-              '${l10n.translate('stock_import.document_date')}: ${result.invoiceDate!.trim()}',
-              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
-            ),
-          ],
           const SizedBox(height: 8),
           Text(
             l10n.translate(
@@ -1445,45 +1438,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                     TextField(
                       controller: _documentNumberController,
                       decoration: InputDecoration(
-                        labelText: 'Số chứng từ',
-                        hintText: 'Nhập số chứng từ (nếu có)',
+                        labelText: 'Chứng từ',
+                        hintText: 'Nhập chứng từ (nếu có)',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Document Date
-                    InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: _documentDate ?? DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setState(() => _documentDate = picked);
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: 'Ngày chứng từ',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          suffixIcon: const Icon(
-                            Icons.calendar_today,
-                            size: 20,
-                          ),
-                        ),
-                        child: Text(
-                          _documentDate != null
-                              ? DateFormatter.formatDate(_documentDate)
-                              : 'Chọn ngày chứng từ (nếu có)',
-                          style: _documentDate != null
-                              ? null
-                              : TextStyle(color: Colors.grey[500]),
                         ),
                       ),
                     ),
