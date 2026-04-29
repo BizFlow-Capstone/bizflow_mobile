@@ -21,6 +21,7 @@ import '../../../../shared/utils/name_similarity.dart';
 import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../../shared/context/user_profile_context.dart';
 import '../../../debt/domain/entities/debtor_entity.dart';
 import '../../../debt/presentation/bloc/debtor_bloc.dart';
 import '../../../debt/presentation/bloc/debtor_event.dart';
@@ -1671,6 +1672,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
   Map<String, dynamic> _buildDraftPayload() {
     final locationId = (BusinessContext().currentBusinessId ?? '').trim();
     final locationName = (BusinessContext().currentBusinessName ?? '').trim();
+    final currentUserFullName = (UserProfileContext().fullName ?? '').trim();
+    final currentOwnerProfileId =
+      (BusinessContext().currentOwnerProfileId ?? '').trim();
     final createdAt =
         _draftCreatedAtIso ?? DateTime.now().toUtc().toIso8601String();
     final updatedAt = DateTime.now().toUtc().toIso8601String();
@@ -1697,6 +1701,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       'selectedDebtorName': _selectedDebtor?.name,
       'customerName': _customerNameController.text.trim(),
       'customerPhone': _customerPhoneController.text.trim(),
+        'createdByProfileId': widget.initialOrder?.createdByProfileId ??
+          (currentOwnerProfileId.isNotEmpty ? currentOwnerProfileId : null),
+        'createdByProfileFullName': widget.initialOrder?.createdByProfileFullName ??
+          (currentUserFullName.isNotEmpty ? currentUserFullName : null),
       'subtotal': subtotal,
       'discountAmount': totalDiscount,
       'taxAmount': 0,

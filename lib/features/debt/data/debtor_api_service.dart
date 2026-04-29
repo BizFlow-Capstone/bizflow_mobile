@@ -96,11 +96,13 @@ class DebtorApiService {
   Future<Map<String, dynamic>> recordDebtAdjustment({
     required int debtorId,
     required double amount,
+    required String action,
     required String paymentMethod,
     String? notes,
   }) async {
     final body = <String, dynamic>{
       'amount': amount,
+      'action': action,
       'paymentMethod': paymentMethod,
       'notes': notes,
     }..removeWhere((key, value) => value == null);

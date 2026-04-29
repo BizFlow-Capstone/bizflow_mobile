@@ -51,6 +51,10 @@ class OrdersTable extends Table {
 
   IntColumn get invoicedAtEpoch => integer().nullable()();
 
+  TextColumn get createdByProfileId => text().nullable()();
+
+  TextColumn get createdByProfileFullName => text().nullable()();
+
   IntColumn get cachedAtEpoch => integer()();
 
   @override

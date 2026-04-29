@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -80,9 +81,11 @@ class CostApiService {
 
   Future<CostDto> updateManualCost(
     int costId,
+    String? idempotencyKey,
     Map<String, dynamic> body, {
     File? image,
   }) async {
+    final trimmedIdempotencyKey = idempotencyKey?.trim();
     final fields = <String, String>{
       'Amount': body['amount']?.toString() ?? '0',
       'CostDate': body['costDate']?.toString() ?? '',
@@ -94,6 +97,8 @@ class CostApiService {
       if (body['paymentMethod'] != null)
         'PaymentMethod': body['paymentMethod'].toString(),
       'RemoveDocument': (body['removeDocument'] ?? false).toString(),
+      if (trimmedIdempotencyKey != null && trimmedIdempotencyKey.isNotEmpty)
+        'IdempotencyKey': trimmedIdempotencyKey,
     };
 
     final Map<String, File>? files = image != null ? {'image': image} : null;
@@ -102,7 +107,28 @@ class CostApiService {
       ApiEndpoints.updateManualCost(costId.toString()),
       fields: fields,
       files: files,
+      headers: {
+        if (trimmedIdempotencyKey != null && trimmedIdempotencyKey.isNotEmpty)
+          'Idempotency-Key': trimmedIdempotencyKey,
+      },
     );
+
+    // Persist a lightweight log for debug on devices where console isn't available.
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final logFile = File('${dir.path}/update_debug.log');
+      final logEntry = {
+        'time': DateTime.now().toIso8601String(),
+        'endpoint': ApiEndpoints.updateManualCost(costId.toString()),
+        'method': 'PUT',
+        'fields': fields.keys.toList(),
+        'hasImage': image != null,
+        'idempotencyKey': trimmedIdempotencyKey ?? '',
+      };
+      await logFile.writeAsString('${logEntry.toString()}\n', mode: FileMode.append, flush: true);
+    } catch (_) {
+      // best-effort logging only
+    }
     final responseData = response.data;
     if (responseData == null || !responseData.containsKey('data')) {
       throw Exception(ApiErrorMessageParser.genericMessage);

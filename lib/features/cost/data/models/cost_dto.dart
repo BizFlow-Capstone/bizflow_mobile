@@ -18,6 +18,8 @@ class CostDto extends Equatable {
   final String? referenceType;
   final int? referenceId;
   final String? referenceCode;
+  final String? statusCode;
+  final String? statusLabel;
   final String createdBy;
   final String? imagePath;
   final DateTime createdAt;
@@ -37,6 +39,8 @@ class CostDto extends Equatable {
     this.referenceType,
     this.referenceId,
     this.referenceCode,
+    this.statusCode,
+    this.statusLabel,
     this.imagePath,
     required this.createdBy,
     required this.createdAt,
@@ -97,6 +101,13 @@ class CostDto extends Equatable {
       if (normalized == null || normalized.isEmpty) return fallback;
       return normalized;
     }
+
+    final rawStatus =
+        json['status'] is Map<String, dynamic>
+            ? json['status'] as Map<String, dynamic>
+            : source['status'] is Map<String, dynamic>
+            ? source['status'] as Map<String, dynamic>
+            : const <String, dynamic>{};
 
     return CostDto(
       costId: asInt(json['costId'] ?? json['id']),
@@ -185,6 +196,12 @@ class CostDto extends Equatable {
             source['orderCode'] ??
             source['OrderCode'],
       ),
+      statusCode: asNullableString(
+        rawStatus['code'] ?? rawStatus['Code'] ?? json['statusCode'] ?? json['StatusCode'],
+      ),
+      statusLabel: asNullableString(
+        rawStatus['label'] ?? rawStatus['Label'] ?? json['statusLabel'] ?? json['StatusLabel'],
+      ),
       imagePath: asNullableString(
         json['imagePath'] ??
             json['ImagePath'] ??
@@ -228,6 +245,8 @@ class CostDto extends Equatable {
       'referenceType': referenceType,
       'referenceId': referenceId,
       'referenceCode': referenceCode,
+      'statusCode': statusCode,
+      'statusLabel': statusLabel,
       'imagePath': imagePath,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
@@ -248,6 +267,8 @@ class CostDto extends Equatable {
     referenceType,
     referenceId,
     referenceCode,
+    statusCode,
+    statusLabel,
     imagePath,
     createdBy,
     createdAt,
@@ -270,9 +291,10 @@ class CostResponseDto extends Equatable {
   factory CostResponseDto.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? json;
     return CostResponseDto(
-      items: (data['items'] as List<dynamic>? ?? [])
-          .map((e) => CostDto.fromJson(e as Map<String, dynamic>))
-          .toList(),
+      items: (data['items'] as List<dynamic>?)
+              ?.map((e) => CostDto.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
       totalCount: data['totalCount'] as int? ?? 0,
       pageNumber: data['pageNumber'] as int? ?? 1,
       pageSize: data['pageSize'] as int? ?? 20,

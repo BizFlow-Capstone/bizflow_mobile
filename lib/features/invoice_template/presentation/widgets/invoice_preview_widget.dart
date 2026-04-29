@@ -55,6 +55,16 @@ class InvoicePreviewWidget extends StatelessWidget {
     this.showSignature = true,
   });
 
+  String _translateOrFallback(
+    AppLocalizations l10n,
+    String key,
+    String fallback,
+  ) {
+    final translated = l10n.translate(key);
+    if (translated.trim().isEmpty || translated == key) return fallback;
+    return translated;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -99,19 +109,28 @@ class InvoicePreviewWidget extends StatelessWidget {
           const SizedBox(height: 12),
 
           Text(
-            l10n.translate('invoice_title'),
+            _translateOrFallback(l10n, 'invoice_title', 'HÓA ĐƠN BÁN HÀNG'),
             style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           Text(
             order != null
-                ? '${l10n.translate('invoice_order_code')}: ${order!.orderCode.isNotEmpty ? order!.orderCode : order!.id} - ${l10n.translate('invoice_date')}: ${CurrencyFormatter.formatDate(order!.createdAt)}'
-                : '${l10n.translate('invoice_order_code')}: HD000123 - ${l10n.translate('invoice_date')}: 12/03/2026',
+                ? '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: ${order!.orderCode.isNotEmpty ? order!.orderCode : order!.id} - ${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: ${CurrencyFormatter.formatDate(order!.createdAt)}'
+                : '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: HD000123 - ${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: 12/03/2026',
             style: AppTextStyles.labelSmall.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
+          if (order != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${_translateOrFallback(l10n, 'invoice_location', 'Địa điểm')}: ${order!.locationName.isNotEmpty ? order!.locationName : (order!.locationId?.isNotEmpty == true ? order!.locationId : '-')}',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           const Divider(),
 
@@ -129,12 +148,12 @@ class InvoicePreviewWidget extends StatelessWidget {
                     children: [
                       if (showCustomerName)
                         Text(
-                          '${l10n.translate('invoice_customer')}: ${order != null ? (order!.customerName?.isNotEmpty == true ? order!.customerName : l10n.translate('order_create.customer_walkin')) : "Nguyễn Văn A"}',
+                          '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${order != null ? (order!.customerName?.isNotEmpty == true ? order!.customerName : l10n.translate('order_create.customer_walkin')) : "Nguyễn Văn A"}',
                           style: AppTextStyles.labelSmall,
                         ),
                       if (showCustomerPhone)
                         Text(
-                          '${l10n.translate('invoice_phone')}: ${order != null ? (order!.customerPhone?.isNotEmpty == true ? order!.customerPhone : "") : "0987654321"}',
+                          '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${order != null ? (order!.customerPhone?.isNotEmpty == true ? order!.customerPhone : '-') : "0987654321"}',
                           style: AppTextStyles.labelSmall,
                         ),
                       if (showCustomerEmail)
@@ -159,14 +178,19 @@ class InvoicePreviewWidget extends StatelessWidget {
           Row(
             children: [
               if (showStt) _buildCell('STT', flex: 1),
-              if (showItemName) _buildCell('Tên hàng', flex: 3),
-              if (showQuantity) _buildCell('SL', flex: 1),
-              if (showUnit) _buildCell('ĐVT', flex: 1),
-              if (showUnitPrice) _buildCell('Đơn giá', flex: 2),
-              if (showItemDiscount) _buildCell('Chiết khấu', flex: 1),
+              if (showItemName)
+                _buildCell(_translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng'), flex: 3),
+              if (showQuantity)
+                _buildCell(_translateOrFallback(l10n, 'quantity', 'SL'), flex: 1),
+              if (showUnit)
+                _buildCell(_translateOrFallback(l10n, 'invoice_unit', 'ĐVT'), flex: 1),
+              if (showUnitPrice)
+                _buildCell(_translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá'), flex: 2),
+              if (showItemDiscount)
+                _buildCell(_translateOrFallback(l10n, 'invoice_item_discount', 'Chiết khấu'), flex: 1),
               if (showItemVat) _buildCell('VAT', flex: 1),
               if (showItemTotalAmount)
-                _buildCell('T.Tiền', flex: 2, alignRight: true),
+                _buildCell(_translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền'), flex: 2, alignRight: true),
             ],
           ),
           const Divider(thickness: 1),
@@ -244,27 +268,27 @@ class InvoicePreviewWidget extends StatelessWidget {
           // Totals
           if (showSubTotal)
             _buildTotalRow(
-              'Cộng tiền hàng:',
+              '${_translateOrFallback(l10n, 'invoice_subtotal', 'Tạm tính')}:',
               CurrencyFormatter.formatNumber(
                 (order?.subtotal ?? 250000).round(),
               ),
             ),
           if (showTotalDiscount)
             _buildTotalRow(
-              'Chiết khấu:',
+              '${_translateOrFallback(l10n, 'invoice_discount', 'Giảm giá')}:',
               CurrencyFormatter.formatNumber(
                 (order?.discountAmount ?? 15000).round(),
               ),
             ),
           if (showTotalVat)
             _buildTotalRow(
-              'VAT:',
+              '${_translateOrFallback(l10n, 'invoice_tax', 'VAT')}:',
               CurrencyFormatter.formatNumber(
                 (order?.taxAmount ?? 10000).round(),
               ),
             ),
           _buildTotalRow(
-            'TỔNG CỘNG:',
+            '${_translateOrFallback(l10n, 'invoice_total', 'Tổng thanh toán')}:',
             CurrencyFormatter.formatNumber(
               (order?.totalAmount ?? 245000).round(),
             ),
@@ -276,7 +300,11 @@ class InvoicePreviewWidget extends StatelessWidget {
             Text(
               footerNoteText.isNotEmpty
                   ? footerNoteText
-                  : 'Cảm ơn quý khách và hẹn gặp lại!',
+                  : _translateOrFallback(
+                      l10n,
+                      'invoice_footer_note',
+                      'Cảm ơn quý khách và hẹn gặp lại!',
+                    ),
               style: AppTextStyles.labelSmall.copyWith(
                 fontStyle: FontStyle.italic,
               ),
@@ -290,14 +318,22 @@ class InvoicePreviewWidget extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Người mua hàng\n(Ký, ghi rõ họ tên)',
+                    _translateOrFallback(
+                      l10n,
+                      'invoice_buyer_signature',
+                      'Người mua hàng\n(Ký, ghi rõ họ tên)',
+                    ),
                     textAlign: TextAlign.center,
                     style: AppTextStyles.labelSmall,
                   ),
                 ),
                 Expanded(
                   child: Text(
-                    'Người bán hàng\n(Ký, ghi rõ họ tên)',
+                    _translateOrFallback(
+                      l10n,
+                      'invoice_seller_signature',
+                      'Người bán hàng\n(Ký, ghi rõ họ tên)',
+                    ),
                     textAlign: TextAlign.center,
                     style: AppTextStyles.labelSmall,
                   ),

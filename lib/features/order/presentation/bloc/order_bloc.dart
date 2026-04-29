@@ -533,6 +533,13 @@ class OrderBloc extends Bloc<OrderEvent, OrderState> {
       updatedAt: parseDate(json['updatedAt']),
       invoiceNumber: null,
       invoicedAt: null,
+      createdByProfileId: asString(json['createdByProfileId']).trim().isEmpty
+          ? null
+          : asString(json['createdByProfileId']),
+      createdByProfileFullName:
+          asString(json['createdByProfileFullName']).trim().isEmpty
+              ? null
+              : asString(json['createdByProfileFullName']),
     );
   }
 }

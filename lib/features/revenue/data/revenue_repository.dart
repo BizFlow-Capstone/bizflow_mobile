@@ -34,6 +34,8 @@ class RevenueRepository {
       referenceCode: dto.referenceCode,
       businessTypeId: dto.businessTypeId,
       businessTypeName: dto.businessTypeName,
+      statusCode: dto.statusCode,
+      statusLabel: dto.statusLabel,
       imagePath: dto.imagePath,
       createdAt: dto.createdAt,
     );
@@ -118,6 +120,7 @@ class RevenueRepository {
     int revenueId,
     Map<String, dynamic> body,
     {
+      String? idempotencyKey,
     File? image,
   }
   ) async {
@@ -125,6 +128,7 @@ class RevenueRepository {
       revenueId,
       body,
       image: image,
+      idempotencyKey: idempotencyKey,
     );
     await clearCache();
     return _mapToEntity(dto);

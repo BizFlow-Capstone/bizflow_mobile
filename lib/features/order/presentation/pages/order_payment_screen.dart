@@ -385,6 +385,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
           await debtorRepo.recordDebtAdjustment(
             debtorId: _selectedDebtor!.debtorId,
             amount: _debtAmount,
+            action: 'increase_debt',
             paymentMethod: _cashAmount > 0
                 ? 'cash'
                 : (_bankAmount > 0 ? 'bank' : 'cash'),
@@ -427,6 +428,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
           await debtorRepo.recordDebtAdjustment(
             debtorId: _selectedDebtor!.debtorId,
             amount: _debtAmount,
+            action: 'increase_debt',
             paymentMethod: _cashAmount > 0
                 ? 'cash'
                 : (_bankAmount > 0 ? 'bank' : 'cash'),

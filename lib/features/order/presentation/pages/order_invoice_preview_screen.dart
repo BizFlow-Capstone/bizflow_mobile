@@ -55,6 +55,12 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
   String _pdfCurrency(num? amount) =>
       '${CurrencyFormatter.formatNumber(amount?.round() ?? 0)} VND';
 
+  String _translateOrFallback(AppLocalizations l10n, String key, String fallback) {
+    final t = l10n.translate(key);
+    if (t.trim().isEmpty || t == key) return fallback;
+    return t;
+  }
+
   List<Map<String, String>> _buildColumns(
     InvoiceTemplateEntity template,
     AppLocalizations l10n,
@@ -64,21 +70,33 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
       columns.add({'key': 'stt', 'label': _pdfFormat('STT')});
     }
     if (template.showItemName) {
-      columns.add({'key': 'name', 'label': _pdfFormat('San pham')});
+      columns.add({
+        'key': 'name',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng')),
+      });
     }
     if (template.showQuantity) {
-      columns.add({'key': 'qty', 'label': _pdfFormat('SL')});
+      columns.add({
+        'key': 'qty',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'quantity', 'SL')),
+      });
     }
     if (template.showUnit) {
-      columns.add({'key': 'unit', 'label': _pdfFormat('Don vi')});
+      columns.add({
+        'key': 'unit',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_unit', 'ĐVT')),
+      });
     }
     if (template.showUnitPrice) {
-      columns.add({'key': 'unitPrice', 'label': _pdfFormat('Don gia')});
+      columns.add({
+        'key': 'unitPrice',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá')),
+      });
     }
     if (template.showItemDiscount) {
       columns.add({
         'key': 'discount',
-        'label': _pdfFormat(l10n.translate('invoice_discount')),
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_discount', 'Chiết khấu')),
       });
     }
     if (template.showItemVat) {
@@ -90,15 +108,24 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
     if (template.showItemTotalAmount) {
       columns.add({
         'key': 'total',
-        'label': _pdfFormat(l10n.translate('invoice_total')),
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền')),
       });
     }
     if (columns.isEmpty) {
       columns.addAll([
-        {'key': 'name', 'label': _pdfFormat('San pham')},
-        {'key': 'qty', 'label': _pdfFormat('SL')},
-        {'key': 'unitPrice', 'label': _pdfFormat('Don gia')},
-        {'key': 'total', 'label': _pdfFormat(l10n.translate('invoice_total'))},
+        {
+          'key': 'name',
+          'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng')),
+        },
+        {'key': 'qty', 'label': _pdfFormat(_translateOrFallback(l10n, 'quantity', 'SL'))},
+        {
+          'key': 'unitPrice',
+          'label': _pdfFormat(_translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá')),
+        },
+        {
+          'key': 'total',
+          'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền')),
+        },
       ]);
     }
     return columns;
@@ -182,7 +209,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
 
           pw.Center(
             child: pw.Text(
-              _pdfFormat(l10n.translate('invoice_title')),
+              _pdfFormat(_translateOrFallback(l10n, 'invoice_title', 'HÓA ĐƠN BÁN HÀNG')),
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
           ),
@@ -190,45 +217,43 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
 
           // Order & Customer Info
           pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
                   pw.Text(
                     _pdfFormat(
-                      '${l10n.translate('invoice_order_code')}: ${order.orderCode.isNotEmpty ? order.orderCode : order.id}',
+                      '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: ${order.orderCode.isNotEmpty ? order.orderCode : order.id}',
                     ),
                   ),
                   pw.Text(
                     _pdfFormat(
-                      '${l10n.translate('invoice_date')}: ${CurrencyFormatter.formatDate(order.createdAt)}',
+                      '${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: ${CurrencyFormatter.formatDate(order.createdAt)}',
                     ),
                   ),
-                  pw.Text(
-                    _pdfFormat(
-                      '${l10n.translate('invoice_location')}: ${order.locationName}',
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
+              pw.SizedBox(width: 12),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
                   if (template.showCustomerName)
                     pw.Text(
                       _pdfFormat(
-                        '${l10n.translate('invoice_customer')}: ${order.customerName?.isNotEmpty == true ? order.customerName : l10n.translate('order_create.customer_walkin')}',
+                        '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${order.customerName?.isNotEmpty == true ? order.customerName : l10n.translate('order_create.customer_walkin')}',
                       ),
                     ),
-                  if (order.customerPhone?.isNotEmpty == true)
-                    if (template.showCustomerPhone)
-                      pw.Text(
-                        _pdfFormat(
-                          '${l10n.translate('invoice_phone')}: ${order.customerPhone}',
-                        ),
+                  if (template.showCustomerPhone)
+                    pw.Text(
+                      _pdfFormat(
+                        '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${order.customerPhone?.isNotEmpty == true ? order.customerPhone : '-'}',
                       ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -249,24 +274,24 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                 if (template.showSubTotal)
                   pw.Text(
                     _pdfFormat(
-                      '${l10n.translate('invoice_subtotal')}: ${_pdfCurrency(order.subtotal)}',
+                      '${_translateOrFallback(l10n, 'invoice_subtotal', 'Tạm tính')}: ${_pdfCurrency(order.subtotal)}',
                     ),
                   ),
                 if (template.showTotalDiscount)
                   pw.Text(
                     _pdfFormat(
-                      '${l10n.translate('invoice_discount')}: ${_pdfCurrency(order.discountAmount)}',
+                      '${_translateOrFallback(l10n, 'invoice_discount', 'Giảm giá')}: ${_pdfCurrency(order.discountAmount)}',
                     ),
                   ),
                 if (template.showTotalVat)
                   pw.Text(
                     _pdfFormat(
-                      '${l10n.translate('invoice_tax')}: ${_pdfCurrency(order.taxAmount)}',
+                      '${_translateOrFallback(l10n, 'invoice_tax', 'VAT')}: ${_pdfCurrency(order.taxAmount)}',
                     ),
                   ),
                 pw.Text(
                   _pdfFormat(
-                    '${l10n.translate('invoice_total')}: ${_pdfCurrency(order.totalAmount)}',
+                    '${_translateOrFallback(l10n, 'invoice_total', 'Tổng thanh toán')}: ${_pdfCurrency(order.totalAmount)}',
                   ),
                   style: pw.TextStyle(
                     fontSize: 12,
@@ -289,8 +314,24 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(_pdfFormat(l10n.translate('invoice_buyer'))),
-                pw.Text(_pdfFormat(l10n.translate('invoice_seller'))),
+                pw.Text(
+                  _pdfFormat(
+                    _translateOrFallback(
+                      l10n,
+                      'invoice_buyer_signature',
+                      'Người mua hàng\n(Ký, ghi rõ họ tên)',
+                    ),
+                  ),
+                ),
+                pw.Text(
+                  _pdfFormat(
+                    _translateOrFallback(
+                      l10n,
+                      'invoice_seller_signature',
+                      'Người bán hàng\n(Ký, ghi rõ họ tên)',
+                    ),
+                  ),
+                ),
               ],
             ),
         ],
@@ -523,17 +564,14 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              '${l10n.translate('order.detail_location')}: ${order.locationName}',
-            ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              '${l10n.translate('order.detail_customer_name')}: ${order.customerName?.isNotEmpty == true ? order.customerName : l10n.translate('order_create.customer_walkin')}',
+              '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${order.customerName?.isNotEmpty == true ? order.customerName : l10n.translate('order_create.customer_walkin')}',
             ),
             if (order.customerPhone?.isNotEmpty == true) ...[
               const SizedBox(height: AppSpacing.xs),
               Text(
-                '${l10n.translate('order.detail_customer_phone')}: ${order.customerPhone}',
+                '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${order.customerPhone}',
               ),
             ],
             const Divider(height: AppSpacing.lg),

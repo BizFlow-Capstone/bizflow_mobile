@@ -41,6 +41,8 @@ class OrderLocalMapper {
       invoicedAt: row.invoicedAtEpoch == null
           ? null
           : DateTime.fromMillisecondsSinceEpoch(row.invoicedAtEpoch!),
+      createdByProfileId: row.createdByProfileId,
+      createdByProfileFullName: row.createdByProfileFullName,
     );
   }
 
@@ -75,6 +77,8 @@ class OrderLocalMapper {
       cancelReason: Value(entity.cancelReason),
       invoiceNumber: Value(entity.invoiceNumber),
       invoicedAtEpoch: Value(entity.invoicedAt?.millisecondsSinceEpoch),
+      createdByProfileId: Value(entity.createdByProfileId),
+      createdByProfileFullName: Value(entity.createdByProfileFullName),
       cachedAtEpoch: cachedAtEpoch,
     );
   }

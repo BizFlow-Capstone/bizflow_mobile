@@ -399,6 +399,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
       await repository.recordDebtAdjustment(
         debtorId: event.debtorId,
         amount: event.amount,
+        action: event.action,
         paymentMethod: event.paymentMethod,
         notes: event.notes,
       );

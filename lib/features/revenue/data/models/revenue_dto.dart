@@ -18,6 +18,8 @@ class RevenueDto extends Equatable {
   final String? referenceCode;
   final String? businessTypeId;
   final String? businessTypeName;
+  final String? statusCode;
+  final String? statusLabel;
   final String createdBy;
   final String? imagePath;
   final DateTime createdAt;
@@ -37,6 +39,8 @@ class RevenueDto extends Equatable {
     this.referenceCode,
     this.businessTypeId,
     this.businessTypeName,
+    this.statusCode,
+    this.statusLabel,
     this.imagePath,
     required this.createdBy,
     required this.createdAt,
@@ -97,6 +101,13 @@ class RevenueDto extends Equatable {
       if (normalized == null || normalized.isEmpty) return fallback;
       return normalized;
     }
+
+    final rawStatus =
+        json['status'] is Map<String, dynamic>
+            ? json['status'] as Map<String, dynamic>
+            : source['status'] is Map<String, dynamic>
+            ? source['status'] as Map<String, dynamic>
+            : const <String, dynamic>{};
 
     return RevenueDto(
       revenueId: asInt(json['revenueId'] ?? json['id']),
@@ -183,6 +194,12 @@ class RevenueDto extends Equatable {
       businessTypeName:
           referenceLabelFromDynamic(json['businessTypeId'] ?? json['BusinessTypeId']) ??
           asNullableString(json['businessTypeName'] ?? json['BusinessTypeName']),
+      statusCode: asNullableString(
+        rawStatus['code'] ?? rawStatus['Code'] ?? json['statusCode'] ?? json['StatusCode'],
+      ),
+      statusLabel: asNullableString(
+        rawStatus['label'] ?? rawStatus['Label'] ?? json['statusLabel'] ?? json['StatusLabel'],
+      ),
       imagePath: asNullableString(
         json['imagePath'] ??
             json['ImagePath'] ??
@@ -227,6 +244,8 @@ class RevenueDto extends Equatable {
       'referenceCode': referenceCode,
       'businessTypeId': businessTypeId,
       'businessTypeName': businessTypeName,
+      'statusCode': statusCode,
+      'statusLabel': statusLabel,
       'imagePath': imagePath,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
@@ -248,6 +267,8 @@ class RevenueDto extends Equatable {
     referenceCode,
     businessTypeId,
     businessTypeName,
+    statusCode,
+    statusLabel,
     imagePath,
     createdBy,
     createdAt,
@@ -270,8 +291,7 @@ class RevenueResponseDto extends Equatable {
   factory RevenueResponseDto.fromJson(Map<String, dynamic> json) {
     final data = json['data'] as Map<String, dynamic>? ?? json;
     return RevenueResponseDto(
-      items:
-          (data['items'] as List<dynamic>?)
+      items: (data['items'] as List<dynamic>?)
               ?.map((e) => RevenueDto.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],

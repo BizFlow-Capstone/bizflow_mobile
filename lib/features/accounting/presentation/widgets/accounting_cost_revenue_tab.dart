@@ -135,6 +135,8 @@ class AccountingCostRevenueTab extends StatelessWidget {
     String title = '';
     String subtitle = '';
     double amount = 0;
+    bool isReplaced = false;
+    String? statusLabel;
     final effectiveLanguageCode = languageCode;
 
     if (item is RevenueEntity) {
@@ -152,6 +154,8 @@ class AccountingCostRevenueTab extends StatelessWidget {
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;
+      isReplaced = (item.statusCode ?? '').trim().toLowerCase() == 'replaced' || (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
+      statusLabel = item.statusLabel;
     } else if (item is CostEntity) {
       title = AccountingReferenceDisplay.displayReference(
         referenceType: 'cost',
@@ -167,15 +171,45 @@ class AccountingCostRevenueTab extends StatelessWidget {
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;
+      isReplaced = (item.statusCode ?? '').trim().toLowerCase() == 'replaced' || (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
+      statusLabel = item.statusLabel;
     }
+
+    final textDecoration = isReplaced ? TextDecoration.lineThrough : TextDecoration.none;
+    final editable = isModifiable && !isReplaced;
 
     return ListTile(
       onTap: onTap,
       contentPadding: EdgeInsets.zero,
-      title: Text(title, style: AppTextStyles.bodyMedium),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: AppTextStyles.bodyMedium.copyWith(decoration: textDecoration),
+            ),
+          ),
+          if ((statusLabel ?? '').trim().isNotEmpty) ...[
+            const SizedBox(width: AppSpacing.xs),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: (item.statusCode ?? '').trim().toLowerCase() == 'cancelled'
+                    ? AppColors.error
+                    : AppColors.warning,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                statusLabel!.toUpperCase(),
+                style: AppTextStyles.labelSmall.copyWith(color: Colors.white),
+              ),
+            ),
+          ],
+        ],
+      ),
       subtitle: Text(
         subtitle,
-        style: AppTextStyles.bodySmall,
+        style: AppTextStyles.bodySmall.copyWith(decoration: textDecoration),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -186,9 +220,10 @@ class AccountingCostRevenueTab extends StatelessWidget {
             CurrencyFormatter.formatVND(amount),
             style: AppTextStyles.labelSmall.copyWith(
               color: isRevenue ? AppColors.success : AppColors.error,
+              decoration: textDecoration,
             ),
           ),
-          if (isModifiable) ...[
+          if (editable) ...[
             const SizedBox(width: AppSpacing.xs),
             IconButton(
               icon: const Icon(Icons.edit_outlined),

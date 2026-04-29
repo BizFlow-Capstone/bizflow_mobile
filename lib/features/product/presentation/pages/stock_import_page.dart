@@ -79,6 +79,7 @@ class _StockImportViewState extends State<_StockImportView> {
 
   // Selected products for import
   List<ImportItemModel> _selectedItems = [];
+  final Map<int, TextEditingController> _quantityControllers = {};
 
   String? _selectedImagePath;
   String? _existingImageUrl;
@@ -111,11 +112,36 @@ class _StockImportViewState extends State<_StockImportView> {
 
   @override
   void dispose() {
+    for (final controller in _quantityControllers.values) {
+      controller.dispose();
+    }
     _noteController.dispose();
     _supplierController.dispose();
     _searchController.dispose();
     _documentNumberController.dispose();
     super.dispose();
+  }
+
+  void _syncQuantityControllers() {
+    final activeProductIds = _selectedItems.map((item) => item.productId).toSet();
+
+    final staleKeys = _quantityControllers.keys
+        .where((productId) => !activeProductIds.contains(productId))
+        .toList();
+    for (final productId in staleKeys) {
+      _quantityControllers.remove(productId)?.dispose();
+    }
+
+    for (final item in _selectedItems) {
+      final controller = _quantityControllers.putIfAbsent(
+        item.productId,
+        () => TextEditingController(),
+      );
+      final quantityText = _formatQuantity(item.quantity);
+      if (controller.text != quantityText) {
+        controller.text = quantityText;
+      }
+    }
   }
 
   String _formatQuantity(double value) {
@@ -373,6 +399,7 @@ class _StockImportViewState extends State<_StockImportView> {
         }
         if (matchedItemsByProductId.isNotEmpty) {
           _selectedItems = matchedItemsByProductId.values.toList();
+          _syncQuantityControllers();
         }
         _ocrInlineError = hasFillableData
             ? null
@@ -969,6 +996,7 @@ class _StockImportViewState extends State<_StockImportView> {
           onItemsChanged: (updatedItems) {
             setState(() {
               _selectedItems = updatedItems;
+              _syncQuantityControllers();
             });
           },
         ),
@@ -1038,6 +1066,7 @@ class _StockImportViewState extends State<_StockImportView> {
             _selectedItems = List.from(detail.items);
             _existingImageUrl = detail.imageUrl;
             _removeImage = false;
+            _syncQuantityControllers();
           });
         }
       },
@@ -1522,6 +1551,12 @@ class _StockImportViewState extends State<_StockImportView> {
                       final cost = item.costPrice;
                       final total = item.quantity * cost;
                       final baseUnit = (item.baseUnit ?? '').trim();
+                      final quantityController = _quantityControllers.putIfAbsent(
+                        item.productId,
+                        () => TextEditingController(
+                          text: _formatQuantity(item.quantity),
+                        ),
+                      );
 
                       return Padding(
                         padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -1623,14 +1658,18 @@ class _StockImportViewState extends State<_StockImportView> {
                                     onPressed: () {
                                       setState(() {
                                         if (item.quantity > 1) {
+                                          final updatedQuantity =
+                                              item.quantity - 1.0;
                                           _selectedItems[index] =
                                               ImportItemModel(
                                                 productId: item.productId,
                                                 productName: item.productName,
-                                                quantity: item.quantity - 1.0,
+                                                quantity: updatedQuantity,
                                                 costPrice: item.costPrice,
                                                 baseUnit: item.baseUnit,
                                               );
+                                          quantityController.text =
+                                              _formatQuantity(updatedQuantity);
                                         }
                                       });
                                     },
@@ -1640,10 +1679,7 @@ class _StockImportViewState extends State<_StockImportView> {
                                     width: 56,
                                     child: TextFormField(
                                       key: ValueKey('qty_${item.productId}'),
-                                      initialValue:
-                                          item.quantity > 0
-                                              ? _formatQuantity(item.quantity)
-                                              : '',
+                                      controller: quantityController,
                                       textAlign: TextAlign.center,
                                       keyboardType:
                                           const TextInputType.numberWithOptions(
@@ -1685,6 +1721,8 @@ class _StockImportViewState extends State<_StockImportView> {
                                                 costPrice: item.costPrice,
                                                 baseUnit: item.baseUnit,
                                               );
+                                          quantityController.text =
+                                              _formatQuantity(parsed);
                                         });
                                       },
                                     ),
@@ -1697,13 +1735,17 @@ class _StockImportViewState extends State<_StockImportView> {
                                     color: AppColors.warning,
                                     onPressed: () {
                                       setState(() {
+                                        final updatedQuantity =
+                                            item.quantity + 1.0;
                                         _selectedItems[index] = ImportItemModel(
                                           productId: item.productId,
                                           productName: item.productName,
-                                          quantity: item.quantity + 1.0,
+                                          quantity: updatedQuantity,
                                           costPrice: item.costPrice,
                                           baseUnit: item.baseUnit,
                                         );
+                                        quantityController.text =
+                                            _formatQuantity(updatedQuantity);
                                       });
                                     },
                                   ),
@@ -1712,6 +1754,9 @@ class _StockImportViewState extends State<_StockImportView> {
                                     color: AppColors.error,
                                     onPressed: () {
                                       setState(() {
+                                        _quantityControllers.remove(
+                                          item.productId,
+                                        )?.dispose();
                                         _selectedItems.removeAt(index);
                                       });
                                     },
@@ -1922,6 +1967,7 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
   final Map<int, String> _saleUnitsCache = {};
   final Map<int, String?> _baseUnitCache = {};
   final Set<int> _loadingCostPriceProductIds = {};
+  final Map<String, TextEditingController> _quantityControllers = {};
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -1929,6 +1975,20 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
   void initState() {
     super.initState();
     _items = List.from(widget.selectedItems);
+    for (final item in _items) {
+      _quantityControllers.putIfAbsent(
+        item.productId.toString(),
+        () => TextEditingController(text: _formatQuantity(item.quantity)),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _quantityControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _addOrIncrement(ProductEntity product) async {
@@ -1941,26 +2001,33 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
         _baseUnitCache[productId] ?? _resolveBaseUnit(product);
     if (!mounted) return;
     setState(() {
+      double newQty;
       if (idx >= 0) {
         final existing = _items[idx];
+        newQty = existing.quantity + 1.0;
         _items[idx] = ImportItemModel(
           productId: existing.productId,
           productName: existing.productName,
-          quantity: existing.quantity + 1.0,
+          quantity: newQty,
           costPrice: existing.costPrice,
           baseUnit: existing.baseUnit,
         );
       } else {
+        newQty = 1.0;
         _items.add(
           ImportItemModel(
             productId: productId,
             productName: product.name,
-            quantity: 1.0,
+            quantity: newQty,
             costPrice: resolvedCostPrice,
             baseUnit: resolvedBaseUnit,
           ),
         );
       }
+
+      final key = product.id;
+      _quantityControllers.putIfAbsent(key, () => TextEditingController());
+      _quantityControllers[key]!.text = _formatQuantity(newQty);
     });
   }
 
@@ -2086,6 +2153,8 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
         if (idx >= 0) {
           _items.removeAt(idx);
         }
+        // clear controller
+        _quantityControllers[product.id]?.text = '';
         return;
       }
 
@@ -2109,6 +2178,9 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
           ),
         );
       }
+
+      _quantityControllers.putIfAbsent(product.id, () => TextEditingController());
+      _quantityControllers[product.id]!.text = _formatQuantity(quantity);
     });
   }
 
@@ -2121,17 +2193,19 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     setState(() {
       if (_items[idx].quantity > 1) {
         final existing = _items[idx];
+        final newQty = (existing.quantity - 1.0) > 0 ? existing.quantity - 1.0 : 0.0;
         _items[idx] = ImportItemModel(
           productId: existing.productId,
           productName: existing.productName,
-            quantity: (existing.quantity - 1.0) > 0
-              ? existing.quantity - 1.0
-              : 0.0,
+          quantity: newQty,
           costPrice: existing.costPrice,
           baseUnit: existing.baseUnit,
         );
+        _quantityControllers.putIfAbsent(product.id, () => TextEditingController());
+        _quantityControllers[product.id]!.text = _formatQuantity(newQty);
       } else {
         _items.removeAt(idx);
+        _quantityControllers[product.id]?.text = '';
       }
     });
   }
@@ -2354,8 +2428,12 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                                           key: ValueKey(
                                             'selector_qty_${product.id}',
                                           ),
-                                          initialValue:
-                                              qty > 0 ? _formatQuantity(qty) : '',
+                                          controller: _quantityControllers.putIfAbsent(
+                                            product.id,
+                                            () => TextEditingController(
+                                              text: qty > 0 ? _formatQuantity(qty) : '',
+                                            ),
+                                          ),
                                           textAlign: TextAlign.center,
                                           keyboardType:
                                               const TextInputType.numberWithOptions(

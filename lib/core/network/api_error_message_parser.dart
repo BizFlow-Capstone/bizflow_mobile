@@ -207,6 +207,10 @@ class ApiErrorMessageParser {
     var value = input.trim();
     if (value.isEmpty) return null;
 
+    if (_looksLikePathNotFound(value)) {
+      return genericMessage;
+    }
+
     // Remove technical labels
     value = value.replaceFirst(
       RegExp(r'^Exception:\s*', caseSensitive: false),
@@ -234,5 +238,13 @@ class ApiErrorMessageParser {
 
     if (value.isEmpty) return null;
     return value;
+  }
+
+  static bool _looksLikePathNotFound(String value) {
+    final lower = value.toLowerCase();
+    return lower.contains('pathnotfoundexception') ||
+        lower.contains('cannot open file') ||
+        lower.contains('no such file or directory') ||
+        lower.contains('the system cannot find the path specified');
   }
 }

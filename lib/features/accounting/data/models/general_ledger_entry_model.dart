@@ -7,6 +7,8 @@ class GeneralLedgerEntryModel {
   final String date;
   final String note;
   final double amount;
+  final double debitAmount;
+  final double creditAmount;
   final String transactionType;
   final String? transactionTypeLabel;
   final String transactionCategory;
@@ -29,6 +31,8 @@ class GeneralLedgerEntryModel {
     required this.date,
     required this.note,
     required this.amount,
+    required this.debitAmount,
+    required this.creditAmount,
     required this.transactionType,
     this.transactionTypeLabel,
     required this.transactionCategory,
@@ -90,8 +94,11 @@ class GeneralLedgerEntryModel {
     final rawReferenceType = source['referenceType'] ?? json['referenceType'];
     final refType = referenceCodeFromDynamic(rawReferenceType);
     final refId = asNullableInt(source['referenceId'] ?? json['referenceId']);
-    final entityType = asString(source['entityType'], fallback: '');
-    final entityId = asNullableInt(source['entityId']);
+    final entityType = asString(
+      source['entityType'] ?? json['entityType'],
+      fallback: '',
+    );
+    final entityId = asNullableInt(source['entityId'] ?? json['entityId']);
 
     final fallbackDocument = refType.isNotEmpty && refId != null
         ? '${refType.toUpperCase()}-$refId'
@@ -114,6 +121,8 @@ class GeneralLedgerEntryModel {
       date: asString(json['date'] ?? json['entryDate'] ?? json['createdAt']),
       note: asString(json['note'] ?? json['description']),
       amount: normalizedAmount,
+      debitAmount: debitAmount,
+      creditAmount: creditAmount,
         transactionType: referenceCodeFromDynamic(rawTransactionType),
         transactionTypeLabel: referenceLabelFromDynamic(rawTransactionType),
       transactionCategory: asString(json['transactionCategory']),
@@ -146,6 +155,8 @@ class GeneralLedgerEntryModel {
       'date': date,
       'note': note,
       'amount': amount,
+      'debitAmount': debitAmount,
+      'creditAmount': creditAmount,
       'transactionType': transactionType,
       'transactionTypeLabel': transactionTypeLabel,
       'transactionCategory': transactionCategory,

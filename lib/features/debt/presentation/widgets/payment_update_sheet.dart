@@ -14,7 +14,7 @@ class PaymentUpdateSheet extends StatefulWidget {
   final double totalDebt;
   final double totalPaid;
   final double remaining;
-  final Function(double amount, String? note) onConfirm;
+  final Function(double amount, String action, String? note) onConfirm;
 
   const PaymentUpdateSheet({
     super.key,
@@ -33,21 +33,13 @@ class PaymentUpdateSheet extends StatefulWidget {
 class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  int _selectedPercent = -1;
+  String _selectedAction = 'decrease_debt'; // 'decrease_debt' or 'increase_debt'
 
   @override
   void dispose() {
     _amountController.dispose();
     _noteController.dispose();
     super.dispose();
-  }
-
-  void _selectPercent(int percent) {
-    setState(() {
-      _selectedPercent = percent;
-      final amount = (widget.remaining * percent / 100).round();
-      _amountController.text = CurrencyFormatter.formatNumber(amount);
-    });
   }
 
   @override
@@ -185,6 +177,46 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
 
+                // Action Selection
+                Text(
+                  '${l10n.translate('debt.action')} *',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildActionRadio(
+                        label: l10n.translate('debt.action_decrease_debt'),
+                        value: 'decrease_debt',
+                        groupValue: _selectedAction,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedAction = value ?? 'decrease_debt';
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: _buildActionRadio(
+                        label: l10n.translate('debt.action_increase_debt'),
+                        value: 'increase_debt',
+                        groupValue: _selectedAction,
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedAction = value ?? 'increase_debt';
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.lg),
+
                 // Payment Amount
                 Text(
                   '${l10n.translate('debt.payment_amount')} *',
@@ -224,62 +256,10 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
                     ),
                   ),
                   onChanged: (_) {
-                    setState(() {
-                      _selectedPercent = -1;
-                    });
+                    setState(() {});
                   },
                 ),
                 const SizedBox(height: AppSpacing.md),
-
-                // Quick Select Buttons
-                Text(
-                  l10n.translate('debt.quick_select'),
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [25, 50, 75, 100].map((percent) {
-                    final isSelected = _selectedPercent == percent;
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(right: percent < 100 ? 8 : 0),
-                        child: OutlinedButton(
-                          onPressed: () => _selectPercent(percent),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: isSelected
-                                ? AppColors.primary.withValues(alpha: 0.1)
-                                : null,
-                            side: BorderSide(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.divider,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppSpacing.radiusFull,
-                              ),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          child: Text(
-                            '$percent%',
-                            style: AppTextStyles.labelMedium.copyWith(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              fontWeight: isSelected
-                                  ? FontWeight.bold
-                                  : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: AppSpacing.lg),
 
                 // Note
                 Text(
@@ -349,6 +329,7 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
                           if (amount > 0) {
                             widget.onConfirm(
                               amount,
+                              _selectedAction,
                               _noteController.text.isEmpty
                                   ? null
                                   : _noteController.text,
@@ -407,6 +388,56 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
               .copyWith(color: valueColor, fontWeight: FontWeight.bold),
         ),
       ],
+    );
+  }
+
+  Widget _buildActionRadio({
+    required String label,
+    required String value,
+    required String groupValue,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final isSelected = groupValue == value;
+    return GestureDetector(
+      onTap: () => onChanged(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.1)
+              : AppColors.background,
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: isSelected ? 2 : 1,
+          ),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Radio<String>(
+              value: value,
+              groupValue: groupValue,
+              onChanged: onChanged,
+              activeColor: AppColors.primary,
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

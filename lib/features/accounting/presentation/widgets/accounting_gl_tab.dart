@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'package:bizflow_mobile/shared/utils/formatters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/routing/app_router.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
@@ -18,9 +18,35 @@ import '../widgets/gl_filter_bottom_sheet.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../accounting/data/models/general_ledger_entry_model.dart';
 import '../../../accounting/domain/utils/accounting_reference_display.dart';
+import '../../../cost/domain/entities/cost_entity.dart';
+import '../../../cost/presentation/bloc/cost_bloc.dart';
+import '../../../cost/presentation/bloc/cost_state.dart';
+import '../../../product/data/import_repository.dart';
+import '../../../product/data/models/import_model.dart';
+import '../../../revenue/domain/entities/revenue_entity.dart';
+import '../../../revenue/presentation/bloc/revenue_bloc.dart';
+import '../../../revenue/presentation/bloc/revenue_state.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../../../order/presentation/bloc/order_bloc.dart';
-import '../../../order/presentation/pages/order_detail_screen.dart';
+
+class _LinkedEntityDetailRow {
+  final String label;
+  final String value;
+
+  const _LinkedEntityDetailRow({required this.label, required this.value});
+}
+
+class _LinkedEntityDetail {
+  final String title;
+  final List<_LinkedEntityDetailRow> rows;
+  final List<String> itemLines;
+
+  const _LinkedEntityDetail({
+    required this.title,
+    required this.rows,
+    this.itemLines = const <String>[],
+  });
+}
 
 class AccountingGlTab extends StatefulWidget {
   const AccountingGlTab({super.key});
@@ -544,6 +570,290 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     }
   }
 
+  RevenueEntity? _findRevenueById(int revenueId) {
+    final revenueState = context.read<RevenueBloc>().state;
+    if (revenueState is! RevenuesLoaded) {
+      return null;
+    }
+
+    for (final revenue in revenueState.revenues) {
+      if (revenue.id == revenueId) {
+        return revenue;
+      }
+    }
+
+    return null;
+  }
+
+  CostEntity? _findCostById(int costId) {
+    final costState = context.read<CostBloc>().state;
+    if (costState is! CostsLoaded) {
+      return null;
+    }
+
+    for (final cost in costState.costs) {
+      if (cost.id == costId) {
+        return cost;
+      }
+    }
+
+    return null;
+  }
+
+  String _formatMoneyLabel(num amount) {
+    return CurrencyFormatter.formatVND(amount);
+  }
+
+  String _formatIsoDate(dynamic dateValue) {
+    if (dateValue == null) {
+      return '-';
+    }
+
+    DateTime? dateTime;
+
+    if (dateValue is DateTime) {
+      dateTime = dateValue;
+    } else if (dateValue is String) {
+      if (dateValue.trim().isEmpty) {
+        return '-';
+      }
+      dateTime = _parseApiDateTime(dateValue);
+    }
+
+    if (dateTime == null) {
+      return dateValue.toString();
+    }
+
+    return DateFormat('dd/MM/yyyy').format(dateTime.toLocal());
+  }
+
+  String _formatImportItemLine(ImportItemModel item) {
+    final unitName = (item.baseUnit ?? '').trim();
+    final quantityText = item.quantity % 1 == 0
+        ? item.quantity.toStringAsFixed(0)
+        : item.quantity.toString();
+    final totalValue = item.totalPrice ?? (item.costPrice * item.quantity);
+    final unitSuffix = unitName.isNotEmpty ? ' $unitName' : '';
+    return '${item.productName ?? '-'} x$quantityText$unitSuffix - ${_formatMoneyLabel(totalValue)}';
+  }
+
+  Future<_LinkedEntityDetail?> _loadLinkedEntityDetail(
+    GeneralLedgerEntryModel entry,
+  ) async {
+    final entityType = (entry.entityType ?? '').trim().toLowerCase();
+    final entityId = entry.entityId ?? 0;
+    if (entityType.isEmpty || entityId <= 0) {
+      return null;
+    }
+
+    final l10n = AppLocalizations.of(context);
+
+    if (entityType == 'order') {
+      final order = await _loadLinkedOrder(entry);
+      if (order == null) {
+        return null;
+      }
+
+      final rows = <_LinkedEntityDetailRow>[
+        _LinkedEntityDetailRow(
+          label: l10n.translate('order.detail_order_code'),
+          value: order.orderCode.trim().isNotEmpty
+              ? order.orderCode.trim()
+              : order.id.toString(),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('order.detail_status'),
+          value: order.statusLabel ?? order.status,
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('order.detail_total'),
+          value: _formatMoneyLabel(order.totalAmount),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('order.detail_customer_name'),
+          value: (order.customerName ?? '').trim().isNotEmpty
+              ? order.customerName!
+              : l10n.translate('order_create.customer_walkin'),
+        ),
+      ];
+
+      if ((order.customerPhone ?? '').trim().isNotEmpty) {
+        rows.add(
+          _LinkedEntityDetailRow(
+            label: l10n.translate('order.detail_customer_phone'),
+            value: order.customerPhone!,
+          ),
+        );
+      }
+
+      if (order.locationName.trim().isNotEmpty) {
+        rows.add(
+          _LinkedEntityDetailRow(
+            label: l10n.translate('order.detail_location'),
+            value: order.locationName,
+          ),
+        );
+      }
+
+      final itemLines = order.items
+          .map(
+            (item) =>
+                '${item.productName} x${item.quantity} - ${_formatMoneyLabel(item.price * item.quantity)}',
+          )
+          .toList(growable: false);
+
+      return _LinkedEntityDetail(
+        title: l10n.translate('accounting.linked_order_detail'),
+        rows: rows,
+        itemLines: itemLines,
+      );
+    }
+
+    if (entityType == 'import' || entityType == 'inventoryimport') {
+      try {
+        final repository = context.read<ImportRepository>();
+        final data = await repository.getImportDetail(entityId);
+        final rawDetail = data['data'] is Map<String, dynamic>
+            ? data['data'] as Map<String, dynamic>
+            : data;
+        final detail = ImportDetailModel.fromJson(
+          Map<String, dynamic>.from(rawDetail as Map),
+        );
+
+        final rows = <_LinkedEntityDetailRow>[
+          _LinkedEntityDetailRow(
+            label: l10n.translate('accounting.import_code'),
+            value: detail.importCode.trim().isNotEmpty
+                ? detail.importCode.trim()
+                : detail.importId.toString(),
+          ),
+          _LinkedEntityDetailRow(
+            label: l10n.translate('accounting.status'),
+            value: detail.statusLabel ?? detail.status,
+          ),
+          _LinkedEntityDetailRow(
+            label: l10n.translate('accounting.amount'),
+            value: _formatMoneyLabel(detail.totalAmount),
+          ),
+          _LinkedEntityDetailRow(
+            label: l10n.translate('order.detail_location'),
+            value: detail.businessLocationName,
+          ),
+        ];
+
+        if ((detail.supplier ?? '').trim().isNotEmpty) {
+          rows.add(
+            _LinkedEntityDetailRow(
+              label: l10n.translate('accounting.supplier'),
+              value: detail.supplier!.trim(),
+            ),
+          );
+        }
+
+        if ((detail.note ?? '').trim().isNotEmpty) {
+          rows.add(
+            _LinkedEntityDetailRow(
+              label: l10n.translate('accounting.description'),
+              value: detail.note!.trim(),
+            ),
+          );
+        }
+
+        final itemLines = detail.items
+            .map(_formatImportItemLine)
+            .toList(growable: false);
+
+        return _LinkedEntityDetail(
+          title: 'Chi tiết phiếu nhập gốc',
+          rows: rows,
+          itemLines: itemLines,
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+
+    if (entityType == 'revenue') {
+      final revenue = _findRevenueById(entityId);
+      if (revenue == null) {
+        return null;
+      }
+
+      final rows = <_LinkedEntityDetailRow>[
+        _LinkedEntityDetailRow(
+          label: l10n.translate('common.detail'),
+          value: revenue.id.toString(),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.amount'),
+          value: _formatMoneyLabel(revenue.amount),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.description'),
+          value: revenue.description,
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.channel'),
+          value: revenue.moneyChannel ?? '-',
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.revenue_business_type'),
+          value: revenue.businessTypeName ?? '-',
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.status'),
+          value: revenue.statusLabel ?? revenue.statusCode ?? '-',
+        ),
+      ];
+
+      return _LinkedEntityDetail(
+        title: l10n.translate('accounting.revenue_list'),
+        rows: rows,
+      );
+    }
+
+    if (entityType == 'cost') {
+      final cost = _findCostById(entityId);
+      if (cost == null) {
+        return null;
+      }
+
+      final rows = <_LinkedEntityDetailRow>[
+        _LinkedEntityDetailRow(
+          label: l10n.translate('common.detail'),
+          value: cost.id.toString(),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.amount'),
+          value: _formatMoneyLabel(cost.amount),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.description'),
+          value: cost.description,
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.channel'),
+          value: cost.paymentMethod ?? '-',
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.cost_date'),
+          value: _formatIsoDate(cost.date),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.status'),
+          value: cost.statusLabel ?? cost.statusCode ?? '-',
+        ),
+      ];
+
+      return _LinkedEntityDetail(
+        title: l10n.translate('accounting.cost_list'),
+        rows: rows,
+      );
+    }
+
+    return null;
+  }
+
   void _showEntryDetail(GeneralLedgerEntryModel entry) {
     final languageCode = Localizations.localeOf(context).languageCode;
     final displayDocument = AccountingReferenceDisplay.displayDocument(
@@ -568,28 +878,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       fallback: '-',
     );
 
-    final entityType = (entry.entityType ?? '').toLowerCase();
     final entityId = entry.entityId ?? 0;
-
-    if (entityType == 'order' && entityId > 0) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => OrderDetailScreen(orderId: entityId.toString()),
-        ),
-      );
-      return;
-    }
-
-    if ((entityType == 'import' || entityType == 'inventoryimport') &&
-        entityId > 0) {
-      final locationId = context.read<BusinessContext>().currentBusinessId;
-      AppRouter.navigateTo(
-        AppRoutes.stockImport,
-        arguments: {'locationId': locationId, 'importId': entityId},
-      );
-      return;
-    }
 
     showDialog(
       context: context,
@@ -648,6 +937,16 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 ),
                 const SizedBox(height: 6),
                 Text(
+                  '${context.tr('accounting.amount')}: ${_formatMoneyLabel(
+                    entry.debitAmount != 0
+                        ? entry.debitAmount
+                        : (entry.creditAmount != 0
+                            ? entry.creditAmount
+                            : entry.amount.abs()),
+                  )}',
+                ),
+                const SizedBox(height: 6),
+                Text(
                   context.tr(
                     'accounting.gl_detail_reference',
                     params: {'type': displayReference, 'id': ''},
@@ -663,18 +962,17 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                     },
                   ),
                 ),
-                if ((entry.entityType ?? '').toLowerCase() == 'order' &&
-                    (entry.entityId ?? 0) > 0) ...[
+                if (entityId > 0) ...[
                   const SizedBox(height: 12),
                   const Divider(),
                   const SizedBox(height: 8),
                   Text(
-                    context.tr('accounting.linked_order_detail'),
+                    'Chi tiết gốc đối chiếu',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  FutureBuilder<OrderEntity?>(
-                    future: _loadLinkedOrder(entry),
+                  FutureBuilder<_LinkedEntityDetail?>(
+                    future: _loadLinkedEntityDetail(entry),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Padding(
@@ -683,8 +981,8 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                         );
                       }
 
-                      final order = snapshot.data;
-                      if (order == null) {
+                      final linkedDetail = snapshot.data;
+                      if (linkedDetail == null) {
                         return Text(
                           context.tr('accounting.order_detail_unavailable'),
                         );
@@ -694,39 +992,30 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            context.tr(
-                              'accounting.gl_detail_order_id',
-                              params: {'value': order.id.toString()},
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            context.tr(
-                              'accounting.gl_detail_order_status',
-                              params: {'value': order.status},
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            context.tr(
-                              'accounting.gl_detail_order_total',
-                              params: {
-                                'value': NumberFormat.currency(
-                                  locale: 'vi',
-                                  symbol: 'đ',
-                                ).format(order.totalAmount),
-                              },
-                            ),
+                            linkedDetail.title,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 8),
-                          ...order.items.map(
-                            (item) => Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: Text(
-                                '• ${item.productName} x${item.quantity}',
-                              ),
+                          ...linkedDetail.rows.map(
+                            (row) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text('${row.label}: ${row.value}'),
                             ),
                           ),
+                          if (linkedDetail.itemLines.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Chi tiết hàng',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            ...linkedDetail.itemLines.map(
+                              (line) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text('• $line'),
+                              ),
+                            ),
+                          ],
                         ],
                       );
                     },

@@ -111,6 +111,8 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
               },
             )
             .toList(),
+        'createdByProfileId': order.createdByProfileId,
+        'createdByProfileFullName': order.createdByProfileFullName,
         'createdAt': order.createdAt.toUtc().toIso8601String(),
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       };

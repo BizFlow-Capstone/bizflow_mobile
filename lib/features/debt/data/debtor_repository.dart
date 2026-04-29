@@ -130,6 +130,7 @@ class DebtorRepository {
   Future<void> recordDebtAdjustment({
     required int debtorId,
     required double amount,
+    required String action,
     required String paymentMethod,
     String? notes,
   }) async {
@@ -137,6 +138,7 @@ class DebtorRepository {
       await _service.recordDebtAdjustment(
         debtorId: debtorId,
         amount: amount,
+        action: action,
         paymentMethod: paymentMethod,
         notes: notes,
       );

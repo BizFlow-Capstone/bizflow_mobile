@@ -325,6 +325,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
             },
           )
           .toList(),
+        'createdByProfileId': order.createdByProfileId,
+        'createdByProfileFullName': order.createdByProfileFullName,
       'createdAt': order.createdAt.toUtc().toIso8601String(),
       'updatedAt': DateTime.now().toUtc().toIso8601String(),
     };

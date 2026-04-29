@@ -77,6 +77,20 @@ class OrderRepository {
     );
   }
 
+  OrderEntity _mergeCreatedByInfo(
+    OrderEntity order,
+    OrderEntity? previousOrder,
+  ) {
+    if (previousOrder == null) return order;
+
+    return order.copyWith(
+      createdByProfileId:
+          order.createdByProfileId ?? previousOrder.createdByProfileId,
+      createdByProfileFullName: order.createdByProfileFullName ??
+          previousOrder.createdByProfileFullName,
+    );
+  }
+
   Future<AiDraftOrderResultDto> parseDraftOrderFromAudio({
     required int locationId,
     required File audioFile,
@@ -165,7 +179,8 @@ class OrderRepository {
     final key = 'order_detail_$orderId';
     try {
       final dto = await _apiService.getOrder(orderId);
-      final order = _mapToEntity(dto);
+      final existingOrder = await _localDataSource.getById(orderId);
+      final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
       await _localApiCache.setMap(
         key,
         dto.toJson(),
@@ -190,16 +205,18 @@ class OrderRepository {
   Future<OrderEntity?> getCachedOrder(String orderId) async {
     final key = 'order_detail_$orderId';
 
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      final cachedOrder = _mapToEntity(
+        OrderDto.fromJson(Map<String, dynamic>.from(localCached)),
+      );
+      final localOrder = await _localDataSource.getById(orderId);
+      return _mergeCreatedByInfo(cachedOrder, localOrder);
+    }
+
     final localOrder = await _localDataSource.getById(orderId);
     if (localOrder != null) {
       return localOrder;
-    }
-
-    final localCached = await _localApiCache.getMap(key);
-    if (localCached != null) {
-      return _mapToEntity(
-        OrderDto.fromJson(Map<String, dynamic>.from(localCached)),
-      );
     }
 
     return null;
@@ -219,7 +236,8 @@ class OrderRepository {
 
     try {
       final dto = await _apiService.getOrder(orderId);
-      final order = _mapToEntity(dto);
+      final existingOrder = await _localDataSource.getById(orderId);
+      final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
 
       await _localApiCache.setMap(
         key,
@@ -257,7 +275,8 @@ class OrderRepository {
       body: requestBody,
       idempotencyKey: idempotencyKey,
     );
-    final order = _mapToEntity(dto);
+    final existingOrder = await _localDataSource.getById(orderId);
+    final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
     await _localDataSource.upsertDetail(order);
     await clearCache();
     return order;
@@ -272,7 +291,8 @@ class OrderRepository {
       orderId,
       confirmLowStock: confirmLowStock,
     );
-    final order = _mapToEntity(dto);
+    final existingOrder = await _localDataSource.getById(orderId);
+    final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
     await _localDataSource.upsertDetail(order);
     await clearCache();
     return order;

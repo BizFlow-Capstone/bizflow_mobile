@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 
@@ -94,12 +95,20 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   }
 
   bool _canModifyRevenueEntry(RevenueEntity item) {
+    final sc = (item.statusCode ?? '').trim().toLowerCase();
+    if (sc == 'replaced' || sc == 'cancelled') {
+      return false;
+    }
     if (!_isManualRevenueEntry(item)) return false;
     if (_isDateInFinalizedPeriod(item.date)) return false;
     return true;
   }
 
   bool _canModifyCostEntry(CostEntity item) {
+    final sc = (item.statusCode ?? '').trim().toLowerCase();
+    if (sc == 'replaced' || sc == 'cancelled') {
+      return false;
+    }
     if (!_isManualCostEntry(item)) return false;
     if (_isDateInFinalizedPeriod(item.date)) return false;
     return true;
@@ -1807,7 +1816,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     }
 
     bool isSubmitting = false;
-    File? selectedImage = item.imagePath != null ? File(item.imagePath!) : null;
+    File? selectedImage = _resolveImageSource(item.imagePath)?.isNetwork == true
+      ? null
+      : (item.imagePath != null ? File(item.imagePath!) : null);
 
     await showDialog(
       context: context,
@@ -1994,6 +2005,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       context.read<CostBloc>().add(
                         UpdateManualCostRequested(
                           costId: item.id,
+                                                    idempotencyKey: const Uuid().v4(),
                           body: {
                             'amount': amount,
                             'costDate': DateFormat(
@@ -2670,7 +2682,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     }
 
     bool isSubmitting = false;
-    File? selectedImage = item.imagePath != null ? File(item.imagePath!) : null;
+    File? selectedImage = _resolveImageSource(item.imagePath)?.isNetwork == true
+      ? null
+      : (item.imagePath != null ? File(item.imagePath!) : null);
 
     await showDialog(
       context: context,
@@ -2838,6 +2852,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           .currentBusinessId;
                       context.read<RevenueBloc>().add(
                         UpdateManualRevenueRequested(
+                                                    idempotencyKey: const Uuid().v4(),
                           revenueId: item.id,
                           body: {
                             'businessLocationId':

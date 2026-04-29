@@ -1,5 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+
+import 'package:flutter/foundation.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
 import 'models/ai_draft_revenue_dto.dart';
@@ -111,10 +114,11 @@ class RevenueApiService {
     int revenueId,
     Map<String, dynamic> body,
     {
+    String? idempotencyKey,
     File? image,
-  }
-  ) async {
+  }) async {
     try {
+      final trimmedIdempotencyKey = idempotencyKey?.trim();
       final response = await _apiClient.putMultipart<Map<String, dynamic>>(
         ApiEndpoints.updateManualRevenue(revenueId.toString()),
         fields: {
@@ -133,9 +137,32 @@ class RevenueApiService {
             'ReferenceType': body['referenceType'].toString(),
           if (body['referenceId'] != null)
             'ReferenceId': body['referenceId'].toString(),
+          if (trimmedIdempotencyKey != null && trimmedIdempotencyKey.isNotEmpty)
+            'IdempotencyKey': trimmedIdempotencyKey,
         },
         files: image != null ? {'image': image} : null,
+        headers: {
+          if (trimmedIdempotencyKey != null && trimmedIdempotencyKey.isNotEmpty)
+            'Idempotency-Key': trimmedIdempotencyKey,
+        },
       );
+
+      // Persist a lightweight log for debug on devices where console isn't available.
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        final logFile = File('${dir.path}/update_debug.log');
+        final logEntry = {
+          'time': DateTime.now().toIso8601String(),
+          'endpoint': ApiEndpoints.updateManualRevenue(revenueId.toString()),
+          'method': 'PUT',
+          'fields': body.keys.toList(),
+          'hasImage': image != null,
+          'idempotencyKey': trimmedIdempotencyKey ?? '',
+        };
+        await logFile.writeAsString('${logEntry.toString()}\n', mode: FileMode.append, flush: true);
+      } catch (_) {
+        // best-effort logging only
+      }
 
       if (response.isSuccess && response.data != null) {
         final data = response.data as Map<String, dynamic>;

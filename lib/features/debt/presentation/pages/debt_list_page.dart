@@ -25,6 +25,7 @@ import '../../domain/entities/debtor_entity.dart';
 import '../bloc/debtor_bloc.dart';
 import '../bloc/debtor_event.dart';
 import '../bloc/debtor_state.dart';
+import '../widgets/payment_update_sheet.dart';
 import 'debt_detail_page.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_state.dart';
@@ -745,15 +746,22 @@ class _DebtListPageState extends State<DebtListPage> {
                   const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
-                      _buildDebtColumn(
-                        l10n.translate('debt.total_owed'),
-                        CurrencyFormatter.formatVND(customer.currentBalance),
-                        AppColors.danger,
+                      Expanded(
+                        child: _buildDebtColumn(
+                          l10n.translate('debt.total_owed'),
+                          CurrencyFormatter.formatVND(customer.currentBalance.abs()),
+                          _getBalanceStatusColor(customer.currentBalance),
+                        ),
                       ),
-                      _buildDebtColumn(
-                        l10n.translate('debt.location'),
-                        locationDisplay,
-                        AppColors.textPrimary,
+                      Expanded(
+                        child: _buildBalanceStatusBadge(customer.currentBalance, l10n),
+                      ),
+                      Expanded(
+                        child: _buildDebtColumn(
+                          l10n.translate('debt.location'),
+                          locationDisplay,
+                          AppColors.textPrimary,
+                        ),
                       ),
                     ],
                   ),
@@ -982,6 +990,55 @@ class _DebtListPageState extends State<DebtListPage> {
             overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+
+  Color _getBalanceStatusColor(double currentBalance) {
+    if (currentBalance > 0) {
+      return AppColors.danger;  // Khách đang nợ
+    } else if (currentBalance < 0) {
+      return AppColors.success;  // Khách có credit
+    }
+    return AppColors.textSecondary;  // Bằng 0
+  }
+
+  Widget _buildBalanceStatusBadge(double currentBalance, AppLocalizations l10n) {
+    String statusLabel;
+    Color statusBgColor;
+    Color statusTextColor;
+
+    if (currentBalance > 0) {
+      statusLabel = l10n.translate('debt.status_owed');
+      statusBgColor = AppColors.danger.withValues(alpha: 0.15);
+      statusTextColor = AppColors.danger;
+    } else if (currentBalance < 0) {
+      statusLabel = l10n.translate('debt.status_credit');
+      statusBgColor = AppColors.success.withValues(alpha: 0.15);
+      statusTextColor = AppColors.success;
+    } else {
+      statusLabel = l10n.translate('debt.status_balanced');
+      statusBgColor = AppColors.textSecondary.withValues(alpha: 0.15);
+      statusTextColor = AppColors.textSecondary;
+    }
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: statusBgColor,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          statusLabel,
+          style: AppTextStyles.labelSmall.copyWith(
+            color: statusTextColor,
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
     );
   }
@@ -1306,179 +1363,67 @@ class _DebtListPageState extends State<DebtListPage> {
 
   Future<void> _showDebtAdjustmentDialog(DebtorEntity customer) async {
     final l10n = AppLocalizations.of(context);
-    final amountController = TextEditingController();
-    final noteController = TextEditingController();
-    String direction = 'increase';
     final paymentMethods = _paymentMethodsFromReference();
-    String paymentMethod = paymentMethods.first.code;
 
-    final confirmed = await showDialog<bool>(
+    await showModalBottomSheet(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(l10n.translate('debt.adjust_title')),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<String>(
-                      initialValue: direction,
-                      isExpanded: true,
-                      borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                      decoration: InputDecoration(
-                        labelText: l10n.translate('debt.adjust_type'),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusSm,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.sm,
-                          vertical: AppSpacing.sm,
-                        ),
-                      ),
-                      items: [
-                        DropdownMenuItem(
-                          value: 'increase',
-                          child: Text(l10n.translate('debt.adjust_increase')),
-                        ),
-                        DropdownMenuItem(
-                          value: 'decrease',
-                          child: Text(l10n.translate('debt.adjust_reduce')),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setDialogState(() => direction = value);
-                      },
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                        inputFormatters: [CurrencyInputFormatter()],
-                      ),
-                      decoration: InputDecoration(
-                        labelText: l10n.translate('debt.adjust_amount'),
-                        suffixText: 'đ',
-                      ),
-                    ),
-                    if (direction == 'decrease') ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      DropdownButtonFormField<String>(
-                        initialValue: paymentMethod,
-                        isExpanded: true,
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.radiusSm,
-                        ),
-                        items: paymentMethods
-                            .where((item) => item.label.trim().isNotEmpty)
-                            .map(
-                              (item) => DropdownMenuItem(
-                                value: item.code,
-                                child: Text(item.label),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setDialogState(() => paymentMethod = value);
-                        },
-                        decoration: InputDecoration(
-                          labelText: l10n.translate('debt.payment_method'),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusSm,
-                            ),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.sm,
-                            vertical: AppSpacing.sm,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.sm),
-                    TextField(
-                      controller: noteController,
-                      decoration: InputDecoration(
-                        labelText: l10n.translate('debt.note'),
-                      ),
-                    ),
-                  ],
-                ),
+      isScrollControlled: true,
+      builder: (context) => PaymentUpdateSheet(
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        totalDebt: 0,
+        totalPaid: 0,
+        remaining: customer.currentBalance.abs(),
+        onConfirm: (amount, action, note) async {
+          Navigator.pop(context);
+
+          _setPermissionChecking(true);
+          final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+            context,
+            featureCode: SubscriptionFeatureCodes.debtManagement,
+          );
+          _setPermissionChecking(false);
+          if (!allowed) return;
+
+          // Check if debt increase exceeds credit limit
+          if (action == 'increase_debt' &&
+              customer.creditLimit > 0 &&
+              (customer.currentBalance + amount) > customer.creditLimit) {
+            final confirmExceed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(l10n.translate('debt.credit_limit_warning_title')),
+                content: Text(l10n.translate('debt.credit_limit_warning_message')),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(l10n.translate('common.cancel')),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(l10n.translate('common.confirm')),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: Text(l10n.translate('common.cancel')),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  child: Text(l10n.translate('common.confirm')),
-                ),
-              ],
             );
-          },
-        );
-      },
+            if (confirmExceed != true || !mounted) return;
+          }
+
+          final paymentMethod = paymentMethods.first.code;
+
+          await _runDebtorAction(() {
+            context.read<DebtorBloc>().add(
+              RecordDebtAdjustmentRequested(
+                debtorId: customer.debtorId,
+                amount: amount,
+                action: action,
+                paymentMethod: paymentMethod,
+                notes: note,
+              ),
+            );
+          });
+        },
+      ),
     );
-
-    if (confirmed != true || !mounted) return;
-
-    _setPermissionChecking(true);
-    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-      context,
-      featureCode: SubscriptionFeatureCodes.debtManagement,
-    );
-    _setPermissionChecking(false);
-    if (!allowed) return;
-
-    final rawAmount = double.tryParse(
-      amountController.text.replaceAll(RegExp(r'[^0-9.]'), ''),
-    );
-    if (rawAmount == null || rawAmount <= 0) return;
-
-    final signedAmount = direction == 'decrease' ? -rawAmount : rawAmount;
-
-    // Check if debt increase exceeds credit limit
-    if (direction == 'increase' &&
-        customer.creditLimit > 0 &&
-        (customer.currentBalance + rawAmount) > customer.creditLimit) {
-      final confirmExceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(l10n.translate('debt.credit_limit_warning_title')),
-          content: Text(l10n.translate('debt.credit_limit_warning_message')),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.translate('common.cancel')),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(l10n.translate('common.confirm')),
-            ),
-          ],
-        ),
-      );
-      if (confirmExceed != true || !mounted) return;
-    }
-
-    await _runDebtorAction(() {
-      context.read<DebtorBloc>().add(
-        RecordDebtAdjustmentRequested(
-          debtorId: customer.debtorId,
-          amount: signedAmount,
-          paymentMethod: paymentMethod,
-          notes: noteController.text.trim().isEmpty
-              ? null
-              : noteController.text.trim(),
-        ),
-      );
-    });
   }
 }

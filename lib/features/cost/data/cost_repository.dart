@@ -33,6 +33,8 @@ class CostRepository {
       referenceType: dto.referenceType,
       referenceId: dto.referenceId,
       referenceCode: dto.referenceCode,
+      statusCode: dto.statusCode,
+      statusLabel: dto.statusLabel,
       imagePath: dto.imagePath,
       createdAt: dto.createdAt,
     );
@@ -112,9 +114,15 @@ class CostRepository {
   Future<CostEntity> updateManualCost(
     int costId,
     Map<String, dynamic> body, {
+    String? idempotencyKey,
     File? image,
   }) async {
-    final dto = await _apiService.updateManualCost(costId, body, image: image);
+    final dto = await _apiService.updateManualCost(
+      costId,
+      idempotencyKey,
+      body,
+      image: image,
+    );
     await clearCache();
     return _mapToEntity(dto);
   }

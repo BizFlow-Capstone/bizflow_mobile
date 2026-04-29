@@ -151,18 +151,20 @@ class UpdateDebtorRequested extends DebtorEvent {
 class RecordDebtAdjustmentRequested extends DebtorEvent {
   final int debtorId;
   final double amount;
+  final String action; // 'decrease_debt' or 'increase_debt'
   final String paymentMethod;
   final String? notes;
 
   const RecordDebtAdjustmentRequested({
     required this.debtorId,
     required this.amount,
+    required this.action,
     required this.paymentMethod,
     this.notes,
   });
 
   @override
-  List<Object?> get props => [debtorId, amount, paymentMethod, notes];
+  List<Object?> get props => [debtorId, amount, action, paymentMethod, notes];
 }
 
 class LoadDebtorDetailRequested extends DebtorEvent {

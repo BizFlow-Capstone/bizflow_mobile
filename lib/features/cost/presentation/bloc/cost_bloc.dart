@@ -84,6 +84,7 @@ class CostBloc extends Bloc<CostEvent, CostState> {
         event.costId,
         event.body,
         image: event.image,
+        idempotencyKey: event.idempotencyKey,
       );
       emit(const CostOperationSuccess('cost_updated_successfully'));
     } catch (e) {

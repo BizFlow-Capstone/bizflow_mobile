@@ -41,15 +41,17 @@ class UpdateManualCostRequested extends CostEvent {
   final int costId;
   final Map<String, dynamic> body;
   final File? image;
+  final String? idempotencyKey;
 
   const UpdateManualCostRequested({
     required this.costId,
     required this.body,
     this.image,
+    this.idempotencyKey,
   });
 
   @override
-  List<Object?> get props => [costId, body, image];
+  List<Object?> get props => [costId, body, image, idempotencyKey];
 }
 
 class DeleteManualCostRequested extends CostEvent {

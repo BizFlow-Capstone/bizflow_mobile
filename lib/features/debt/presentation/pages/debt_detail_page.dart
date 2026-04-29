@@ -208,15 +208,15 @@ class _DebtDetailPageState extends State<DebtDetailPage> {
               Expanded(
                 child: _infoItem(
                   l10n.translate('debt.total_owed'),
-                  CurrencyFormatter.formatVND(detail.currentBalance),
-                  AppColors.danger,
+                  CurrencyFormatter.formatVND(detail.currentBalance.abs()),
+                  _getBalanceStatusColor(detail.currentBalance),
                 ),
               ),
               Expanded(
                 child: _infoItem(
-                  l10n.translate('debt.credit_limit'),
-                  CurrencyFormatter.formatVND(detail.creditLimit),
-                  AppColors.textPrimary,
+                  l10n.translate('debt.status'),
+                  _getBalanceStatusText(detail.currentBalance, l10n),
+                  _getBalanceStatusColor(detail.currentBalance),
                 ),
               ),
             ],
@@ -250,5 +250,23 @@ class _DebtDetailPageState extends State<DebtDetailPage> {
 
   String _formatDateTime(DateTime value) {
     return DateFormatter.formatDateTime(value);
+  }
+
+  Color _getBalanceStatusColor(double currentBalance) {
+    if (currentBalance > 0) {
+      return AppColors.danger;  // Khách đang nợ
+    } else if (currentBalance < 0) {
+      return AppColors.success;  // Khách có credit
+    }
+    return AppColors.textSecondary;  // Bằng 0
+  }
+
+  String _getBalanceStatusText(double currentBalance, AppLocalizations l10n) {
+    if (currentBalance > 0) {
+      return l10n.translate('debt.status_owed');  // Khách đang nợ
+    } else if (currentBalance < 0) {
+      return l10n.translate('debt.status_credit');  // Khách có credit
+    }
+    return l10n.translate('debt.status_balanced');  // Bằng 0
   }
 }

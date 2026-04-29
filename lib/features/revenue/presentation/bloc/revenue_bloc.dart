@@ -109,6 +109,7 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
         event.revenueId,
         event.body,
         image: event.image,
+        idempotencyKey: event.idempotencyKey,
       );
       emit(RevenueUpdated(revenue: revenue));
 

@@ -47,15 +47,17 @@ class UpdateManualRevenueRequested extends RevenueEvent {
   final int revenueId;
   final Map<String, dynamic> body;
   final File? image;
+  final String? idempotencyKey;
 
   const UpdateManualRevenueRequested({
     required this.revenueId,
     required this.body,
     this.image,
+    this.idempotencyKey,
   });
 
   @override
-  List<Object?> get props => [revenueId, body, image];
+  List<Object?> get props => [revenueId, body, image, idempotencyKey];
 }
 
 class DeleteManualRevenueRequested extends RevenueEvent {

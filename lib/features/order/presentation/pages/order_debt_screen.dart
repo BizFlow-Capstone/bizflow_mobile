@@ -512,6 +512,7 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
       await repository.recordDebtAdjustment(
         debtorId: debtorId,
         amount: roundedDebt,
+        action: 'increase_debt',
         paymentMethod: _selectedDebtType == 'full'
             ? 'CASH'
             : _selectedPaymentMethod.toUpperCase(),

@@ -406,38 +406,77 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   String _formatMoney(num? amount) => CurrencyFormatter.formatVND(amount);
   String _pdfCurrency(num? amount) => _formatMoney(amount).replaceAll('đ', ' VND');
 
-  List<Map<String, String>> _buildColumns(InvoiceTemplateEntity template) {
+  String _translateOrFallback(AppLocalizations l10n, String key, String fallback) {
+    final t = l10n.translate(key);
+    if (t.trim().isEmpty || t == key) return fallback;
+    return t;
+  }
+
+  List<Map<String, String>> _buildColumns(
+    InvoiceTemplateEntity template,
+    AppLocalizations l10n,
+  ) {
     final columns = <Map<String, String>>[];
     if (template.showStt) {
       columns.add({'key': 'stt', 'label': _pdfFormat('STT')});
     }
     if (template.showItemName) {
-      columns.add({'key': 'name', 'label': _pdfFormat('San pham')});
+      columns.add({
+        'key': 'name',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng')),
+      });
     }
     if (template.showQuantity) {
-      columns.add({'key': 'qty', 'label': _pdfFormat('SL')});
+      columns.add({
+        'key': 'qty',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'quantity', 'SL')),
+      });
     }
     if (template.showUnit) {
-      columns.add({'key': 'unit', 'label': _pdfFormat('Don vi')});
+      columns.add({
+        'key': 'unit',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_unit', 'ĐVT')),
+      });
     }
     if (template.showUnitPrice) {
-      columns.add({'key': 'unitPrice', 'label': _pdfFormat('Don gia')});
+      columns.add({
+        'key': 'unitPrice',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá')),
+      });
     }
     if (template.showItemDiscount) {
-      columns.add({'key': 'discount', 'label': _pdfFormat('Giam gia')});
+      columns.add({
+        'key': 'discount',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_discount', 'Chiết khấu')),
+      });
     }
     if (template.showItemVat) {
-      columns.add({'key': 'vat', 'label': _pdfFormat('VAT')});
+      columns.add({
+        'key': 'vat',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_tax', 'VAT')),
+      });
     }
     if (template.showItemTotalAmount) {
-      columns.add({'key': 'total', 'label': _pdfFormat('Thanh tien')});
+      columns.add({
+        'key': 'total',
+        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền')),
+      });
     }
     if (columns.isEmpty) {
       columns.addAll([
-        {'key': 'name', 'label': _pdfFormat('San pham')},
-        {'key': 'qty', 'label': _pdfFormat('SL')},
-        {'key': 'unitPrice', 'label': _pdfFormat('Don gia')},
-        {'key': 'total', 'label': _pdfFormat('Thanh tien')},
+        {
+          'key': 'name',
+          'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng')),
+        },
+        {'key': 'qty', 'label': _pdfFormat(_translateOrFallback(l10n, 'quantity', 'SL'))},
+        {
+          'key': 'unitPrice',
+          'label': _pdfFormat(_translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá')),
+        },
+        {
+          'key': 'total',
+          'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền')),
+        },
       ]);
     }
     return columns;
@@ -478,8 +517,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     OrderEntity detail,
     InvoiceTemplateEntity template,
   ) async {
+    final l10n = AppLocalizations.of(context);
     final pdf = pw.Document();
-    final columns = _buildColumns(template);
+    final columns = _buildColumns(template, l10n);
     final itemRows = <List<String>>[];
     for (var index = 0; index < detail.items.length; index++) {
       itemRows.add(_buildRow(index, detail.items[index], columns));
@@ -518,45 +558,51 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           pw.SizedBox(height: 8),
           pw.Center(
             child: pw.Text(
-              _pdfFormat('HOA DON BAN HANG'),
+              _pdfFormat(_translateOrFallback(l10n, 'invoice_title', 'HÓA ĐƠN BÁN HÀNG')),
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
           ),
           pw.SizedBox(height: 12),
           pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
                   pw.Text(
                     _pdfFormat(
-                      'Ma don: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+                      '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
                     ),
                   ),
                   pw.Text(
                     _pdfFormat(
-                      'Ngay: ${CurrencyFormatter.formatDate(detail.createdAt)}',
+                      '${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: ${CurrencyFormatter.formatDate(detail.createdAt)}',
                     ),
                   ),
-                  pw.Text(_pdfFormat('Dia diem: ${detail.locationName}')),
-                ],
+                  ],
+                ),
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
+              pw.SizedBox(width: 12),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
                   if (template.showCustomerName)
                     pw.Text(
                       _pdfFormat(
-                        'Khach hang: ${detail.customerName?.isNotEmpty == true ? detail.customerName : "Khach le"}',
+                        '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${detail.customerName?.isNotEmpty == true ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
                       ),
                     ),
-                  if (detail.customerPhone?.isNotEmpty == true)
-                    if (template.showCustomerPhone)
-                      pw.Text('SDT: ${detail.customerPhone}'),
-                ],
+                  if (template.showCustomerPhone)
+                    pw.Text(
+                      _pdfFormat(
+                        '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${detail.customerPhone?.isNotEmpty == true ? detail.customerPhone : '-'}',
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+          ],
           ),
           pw.SizedBox(height: 16),
           pw.TableHelper.fromTextArray(
@@ -573,19 +619,19 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 if (template.showSubTotal)
                   pw.Text(
-                    _pdfFormat('Tam tinh: ${_pdfCurrency(detail.subtotal)}'),
+                    _pdfFormat('${_translateOrFallback(l10n, 'invoice_subtotal', 'Tạm tính')}: ${_pdfCurrency(detail.subtotal)}'),
                   ),
                 if (template.showTotalDiscount)
                   pw.Text(
                     _pdfFormat(
-                      'Giam gia: ${_pdfCurrency(detail.discountAmount)}',
+                      '${_translateOrFallback(l10n, 'invoice_discount', 'Giảm giá')}: ${_pdfCurrency(detail.discountAmount)}',
                     ),
                   ),
                 if (template.showTotalVat)
-                  pw.Text(_pdfFormat('VAT: ${_pdfCurrency(detail.taxAmount)}')),
+                  pw.Text(_pdfFormat('${_translateOrFallback(l10n, 'invoice_tax', 'VAT')}: ${_pdfCurrency(detail.taxAmount)}')),
                 pw.Text(
                   _pdfFormat(
-                    'Tong thanh toan: ${_pdfCurrency(detail.totalAmount)}',
+                    '${_translateOrFallback(l10n, 'invoice_total', 'Tổng thanh toán')}: ${_pdfCurrency(detail.totalAmount)}',
                   ),
                   style: pw.TextStyle(
                     fontSize: 12,
@@ -608,8 +654,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(_pdfFormat('Nguoi mua hang')),
-                pw.Text(_pdfFormat('Nguoi ban hang')),
+                pw.Text(
+                  _pdfFormat(
+                    _translateOrFallback(
+                      l10n,
+                      'invoice_buyer_signature',
+                      'Người mua hàng\n(Ký, ghi rõ họ tên)',
+                    ),
+                  ),
+                ),
+                pw.Text(
+                  _pdfFormat(
+                    _translateOrFallback(
+                      l10n,
+                      'invoice_seller_signature',
+                      'Người bán hàng\n(Ký, ghi rõ họ tên)',
+                    ),
+                  ),
+                ),
               ],
             ),
         ],
@@ -906,7 +968,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 '${l10n.translate('order.detail_updated_at')}: ${_formatDateTime(detail.updatedAt)}',
                               ),
                               Text(
-                                '${l10n.translate('order.detail_created_by')}: ${detail.createdByProfileFullName ?? '-'}',
+                                '${l10n.translate('order.detail_created_by')}: ${detail.createdByProfileFullName ?? detail.createdByProfileId ?? '-'}',
                               ),
                               if (detail.completedAt != null)
                                 Text(

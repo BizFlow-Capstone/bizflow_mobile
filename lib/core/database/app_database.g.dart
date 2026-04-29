@@ -3130,6 +3130,28 @@ class $OrdersTableTable extends OrdersTable
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _createdByProfileIdMeta =
+      const VerificationMeta('createdByProfileId');
+  @override
+  late final GeneratedColumn<String> createdByProfileId =
+      GeneratedColumn<String>(
+        'created_by_profile_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdByProfileFullNameMeta =
+      const VerificationMeta('createdByProfileFullName');
+  @override
+  late final GeneratedColumn<String> createdByProfileFullName =
+      GeneratedColumn<String>(
+        'created_by_profile_full_name',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _cachedAtEpochMeta = const VerificationMeta(
     'cachedAtEpoch',
   );
@@ -3168,6 +3190,8 @@ class $OrdersTableTable extends OrdersTable
     cancelReason,
     invoiceNumber,
     invoicedAtEpoch,
+    createdByProfileId,
+    createdByProfileFullName,
     cachedAtEpoch,
   ];
   @override
@@ -3377,6 +3401,24 @@ class $OrdersTableTable extends OrdersTable
         ),
       );
     }
+    if (data.containsKey('created_by_profile_id')) {
+      context.handle(
+        _createdByProfileIdMeta,
+        createdByProfileId.isAcceptableOrUnknown(
+          data['created_by_profile_id']!,
+          _createdByProfileIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_by_profile_full_name')) {
+      context.handle(
+        _createdByProfileFullNameMeta,
+        createdByProfileFullName.isAcceptableOrUnknown(
+          data['created_by_profile_full_name']!,
+          _createdByProfileFullNameMeta,
+        ),
+      );
+    }
     if (data.containsKey('cached_at_epoch')) {
       context.handle(
         _cachedAtEpochMeta,
@@ -3497,6 +3539,14 @@ class $OrdersTableTable extends OrdersTable
         DriftSqlType.int,
         data['${effectivePrefix}invoiced_at_epoch'],
       ),
+      createdByProfileId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_by_profile_id'],
+      ),
+      createdByProfileFullName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}created_by_profile_full_name'],
+      ),
       cachedAtEpoch: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}cached_at_epoch'],
@@ -3536,6 +3586,8 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
   final String? cancelReason;
   final String? invoiceNumber;
   final int? invoicedAtEpoch;
+  final String? createdByProfileId;
+  final String? createdByProfileFullName;
   final int cachedAtEpoch;
   const OrdersTableData({
     required this.id,
@@ -3563,6 +3615,8 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
     this.cancelReason,
     this.invoiceNumber,
     this.invoicedAtEpoch,
+    this.createdByProfileId,
+    this.createdByProfileFullName,
     required this.cachedAtEpoch,
   });
   @override
@@ -3611,6 +3665,14 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
     if (!nullToAbsent || invoicedAtEpoch != null) {
       map['invoiced_at_epoch'] = Variable<int>(invoicedAtEpoch);
     }
+    if (!nullToAbsent || createdByProfileId != null) {
+      map['created_by_profile_id'] = Variable<String>(createdByProfileId);
+    }
+    if (!nullToAbsent || createdByProfileFullName != null) {
+      map['created_by_profile_full_name'] = Variable<String>(
+        createdByProfileFullName,
+      );
+    }
     map['cached_at_epoch'] = Variable<int>(cachedAtEpoch);
     return map;
   }
@@ -3658,6 +3720,12 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
       invoicedAtEpoch: invoicedAtEpoch == null && nullToAbsent
           ? const Value.absent()
           : Value(invoicedAtEpoch),
+      createdByProfileId: createdByProfileId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdByProfileId),
+      createdByProfileFullName: createdByProfileFullName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdByProfileFullName),
       cachedAtEpoch: Value(cachedAtEpoch),
     );
   }
@@ -3693,6 +3761,12 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
       cancelReason: serializer.fromJson<String?>(json['cancelReason']),
       invoiceNumber: serializer.fromJson<String?>(json['invoiceNumber']),
       invoicedAtEpoch: serializer.fromJson<int?>(json['invoicedAtEpoch']),
+      createdByProfileId: serializer.fromJson<String?>(
+        json['createdByProfileId'],
+      ),
+      createdByProfileFullName: serializer.fromJson<String?>(
+        json['createdByProfileFullName'],
+      ),
       cachedAtEpoch: serializer.fromJson<int>(json['cachedAtEpoch']),
     );
   }
@@ -3725,6 +3799,10 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
       'cancelReason': serializer.toJson<String?>(cancelReason),
       'invoiceNumber': serializer.toJson<String?>(invoiceNumber),
       'invoicedAtEpoch': serializer.toJson<int?>(invoicedAtEpoch),
+      'createdByProfileId': serializer.toJson<String?>(createdByProfileId),
+      'createdByProfileFullName': serializer.toJson<String?>(
+        createdByProfileFullName,
+      ),
       'cachedAtEpoch': serializer.toJson<int>(cachedAtEpoch),
     };
   }
@@ -3755,6 +3833,8 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
     Value<String?> cancelReason = const Value.absent(),
     Value<String?> invoiceNumber = const Value.absent(),
     Value<int?> invoicedAtEpoch = const Value.absent(),
+    Value<String?> createdByProfileId = const Value.absent(),
+    Value<String?> createdByProfileFullName = const Value.absent(),
     int? cachedAtEpoch,
   }) => OrdersTableData(
     id: id ?? this.id,
@@ -3792,6 +3872,12 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
     invoicedAtEpoch: invoicedAtEpoch.present
         ? invoicedAtEpoch.value
         : this.invoicedAtEpoch,
+    createdByProfileId: createdByProfileId.present
+        ? createdByProfileId.value
+        : this.createdByProfileId,
+    createdByProfileFullName: createdByProfileFullName.present
+        ? createdByProfileFullName.value
+        : this.createdByProfileFullName,
     cachedAtEpoch: cachedAtEpoch ?? this.cachedAtEpoch,
   );
   OrdersTableData copyWithCompanion(OrdersTableCompanion data) {
@@ -3853,6 +3939,12 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
       invoicedAtEpoch: data.invoicedAtEpoch.present
           ? data.invoicedAtEpoch.value
           : this.invoicedAtEpoch,
+      createdByProfileId: data.createdByProfileId.present
+          ? data.createdByProfileId.value
+          : this.createdByProfileId,
+      createdByProfileFullName: data.createdByProfileFullName.present
+          ? data.createdByProfileFullName.value
+          : this.createdByProfileFullName,
       cachedAtEpoch: data.cachedAtEpoch.present
           ? data.cachedAtEpoch.value
           : this.cachedAtEpoch,
@@ -3887,6 +3979,8 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
           ..write('cancelReason: $cancelReason, ')
           ..write('invoiceNumber: $invoiceNumber, ')
           ..write('invoicedAtEpoch: $invoicedAtEpoch, ')
+          ..write('createdByProfileId: $createdByProfileId, ')
+          ..write('createdByProfileFullName: $createdByProfileFullName, ')
           ..write('cachedAtEpoch: $cachedAtEpoch')
           ..write(')'))
         .toString();
@@ -3919,6 +4013,8 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
     cancelReason,
     invoiceNumber,
     invoicedAtEpoch,
+    createdByProfileId,
+    createdByProfileFullName,
     cachedAtEpoch,
   ]);
   @override
@@ -3950,6 +4046,8 @@ class OrdersTableData extends DataClass implements Insertable<OrdersTableData> {
           other.cancelReason == this.cancelReason &&
           other.invoiceNumber == this.invoiceNumber &&
           other.invoicedAtEpoch == this.invoicedAtEpoch &&
+          other.createdByProfileId == this.createdByProfileId &&
+          other.createdByProfileFullName == this.createdByProfileFullName &&
           other.cachedAtEpoch == this.cachedAtEpoch);
 }
 
@@ -3979,6 +4077,8 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
   final Value<String?> cancelReason;
   final Value<String?> invoiceNumber;
   final Value<int?> invoicedAtEpoch;
+  final Value<String?> createdByProfileId;
+  final Value<String?> createdByProfileFullName;
   final Value<int> cachedAtEpoch;
   final Value<int> rowid;
   const OrdersTableCompanion({
@@ -4007,6 +4107,8 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
     this.cancelReason = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
     this.invoicedAtEpoch = const Value.absent(),
+    this.createdByProfileId = const Value.absent(),
+    this.createdByProfileFullName = const Value.absent(),
     this.cachedAtEpoch = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -4036,6 +4138,8 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
     this.cancelReason = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
     this.invoicedAtEpoch = const Value.absent(),
+    this.createdByProfileId = const Value.absent(),
+    this.createdByProfileFullName = const Value.absent(),
     required int cachedAtEpoch,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -4071,6 +4175,8 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
     Expression<String>? cancelReason,
     Expression<String>? invoiceNumber,
     Expression<int>? invoicedAtEpoch,
+    Expression<String>? createdByProfileId,
+    Expression<String>? createdByProfileFullName,
     Expression<int>? cachedAtEpoch,
     Expression<int>? rowid,
   }) {
@@ -4100,6 +4206,10 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
       if (cancelReason != null) 'cancel_reason': cancelReason,
       if (invoiceNumber != null) 'invoice_number': invoiceNumber,
       if (invoicedAtEpoch != null) 'invoiced_at_epoch': invoicedAtEpoch,
+      if (createdByProfileId != null)
+        'created_by_profile_id': createdByProfileId,
+      if (createdByProfileFullName != null)
+        'created_by_profile_full_name': createdByProfileFullName,
       if (cachedAtEpoch != null) 'cached_at_epoch': cachedAtEpoch,
       if (rowid != null) 'rowid': rowid,
     });
@@ -4131,6 +4241,8 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
     Value<String?>? cancelReason,
     Value<String?>? invoiceNumber,
     Value<int?>? invoicedAtEpoch,
+    Value<String?>? createdByProfileId,
+    Value<String?>? createdByProfileFullName,
     Value<int>? cachedAtEpoch,
     Value<int>? rowid,
   }) {
@@ -4160,6 +4272,9 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
       cancelReason: cancelReason ?? this.cancelReason,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       invoicedAtEpoch: invoicedAtEpoch ?? this.invoicedAtEpoch,
+      createdByProfileId: createdByProfileId ?? this.createdByProfileId,
+      createdByProfileFullName:
+          createdByProfileFullName ?? this.createdByProfileFullName,
       cachedAtEpoch: cachedAtEpoch ?? this.cachedAtEpoch,
       rowid: rowid ?? this.rowid,
     );
@@ -4243,6 +4358,14 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
     if (invoicedAtEpoch.present) {
       map['invoiced_at_epoch'] = Variable<int>(invoicedAtEpoch.value);
     }
+    if (createdByProfileId.present) {
+      map['created_by_profile_id'] = Variable<String>(createdByProfileId.value);
+    }
+    if (createdByProfileFullName.present) {
+      map['created_by_profile_full_name'] = Variable<String>(
+        createdByProfileFullName.value,
+      );
+    }
     if (cachedAtEpoch.present) {
       map['cached_at_epoch'] = Variable<int>(cachedAtEpoch.value);
     }
@@ -4280,6 +4403,8 @@ class OrdersTableCompanion extends UpdateCompanion<OrdersTableData> {
           ..write('cancelReason: $cancelReason, ')
           ..write('invoiceNumber: $invoiceNumber, ')
           ..write('invoicedAtEpoch: $invoicedAtEpoch, ')
+          ..write('createdByProfileId: $createdByProfileId, ')
+          ..write('createdByProfileFullName: $createdByProfileFullName, ')
           ..write('cachedAtEpoch: $cachedAtEpoch, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7600,6 +7725,8 @@ typedef $$OrdersTableTableCreateCompanionBuilder =
       Value<String?> cancelReason,
       Value<String?> invoiceNumber,
       Value<int?> invoicedAtEpoch,
+      Value<String?> createdByProfileId,
+      Value<String?> createdByProfileFullName,
       required int cachedAtEpoch,
       Value<int> rowid,
     });
@@ -7630,6 +7757,8 @@ typedef $$OrdersTableTableUpdateCompanionBuilder =
       Value<String?> cancelReason,
       Value<String?> invoiceNumber,
       Value<int?> invoicedAtEpoch,
+      Value<String?> createdByProfileId,
+      Value<String?> createdByProfileFullName,
       Value<int> cachedAtEpoch,
       Value<int> rowid,
     });
@@ -7765,6 +7894,16 @@ class $$OrdersTableTableFilterComposer
 
   ColumnFilters<int> get invoicedAtEpoch => $composableBuilder(
     column: $table.invoicedAtEpoch,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdByProfileId => $composableBuilder(
+    column: $table.createdByProfileId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get createdByProfileFullName => $composableBuilder(
+    column: $table.createdByProfileFullName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7908,6 +8047,16 @@ class $$OrdersTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get createdByProfileId => $composableBuilder(
+    column: $table.createdByProfileId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get createdByProfileFullName => $composableBuilder(
+    column: $table.createdByProfileFullName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get cachedAtEpoch => $composableBuilder(
     column: $table.cachedAtEpoch,
     builder: (column) => ColumnOrderings(column),
@@ -8030,6 +8179,16 @@ class $$OrdersTableTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get createdByProfileId => $composableBuilder(
+    column: $table.createdByProfileId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get createdByProfileFullName => $composableBuilder(
+    column: $table.createdByProfileFullName,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get cachedAtEpoch => $composableBuilder(
     column: $table.cachedAtEpoch,
     builder: (column) => column,
@@ -8092,6 +8251,8 @@ class $$OrdersTableTableTableManager
                 Value<String?> cancelReason = const Value.absent(),
                 Value<String?> invoiceNumber = const Value.absent(),
                 Value<int?> invoicedAtEpoch = const Value.absent(),
+                Value<String?> createdByProfileId = const Value.absent(),
+                Value<String?> createdByProfileFullName = const Value.absent(),
                 Value<int> cachedAtEpoch = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => OrdersTableCompanion(
@@ -8120,6 +8281,8 @@ class $$OrdersTableTableTableManager
                 cancelReason: cancelReason,
                 invoiceNumber: invoiceNumber,
                 invoicedAtEpoch: invoicedAtEpoch,
+                createdByProfileId: createdByProfileId,
+                createdByProfileFullName: createdByProfileFullName,
                 cachedAtEpoch: cachedAtEpoch,
                 rowid: rowid,
               ),
@@ -8150,6 +8313,8 @@ class $$OrdersTableTableTableManager
                 Value<String?> cancelReason = const Value.absent(),
                 Value<String?> invoiceNumber = const Value.absent(),
                 Value<int?> invoicedAtEpoch = const Value.absent(),
+                Value<String?> createdByProfileId = const Value.absent(),
+                Value<String?> createdByProfileFullName = const Value.absent(),
                 required int cachedAtEpoch,
                 Value<int> rowid = const Value.absent(),
               }) => OrdersTableCompanion.insert(
@@ -8178,6 +8343,8 @@ class $$OrdersTableTableTableManager
                 cancelReason: cancelReason,
                 invoiceNumber: invoiceNumber,
                 invoicedAtEpoch: invoicedAtEpoch,
+                createdByProfileId: createdByProfileId,
+                createdByProfileFullName: createdByProfileFullName,
                 cachedAtEpoch: cachedAtEpoch,
                 rowid: rowid,
               ),
