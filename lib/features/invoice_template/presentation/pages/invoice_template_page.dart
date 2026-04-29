@@ -262,9 +262,6 @@ class _InvoiceTemplatePageState extends State<InvoiceTemplatePage> {
                                 loadedState?.template.showCustomerName ?? true,
                             showCustomerPhone:
                                 loadedState?.template.showCustomerPhone ?? true,
-                            showCustomerAddress:
-                                loadedState?.template.showCustomerAddress ??
-                                true,
                             showTotalVat:
                                 loadedState?.template.showTotalVat ?? false,
                             showTotalDiscount:

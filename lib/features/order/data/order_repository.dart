@@ -72,6 +72,8 @@ class OrderRepository {
       cancelReason: dto.cancelReason,
       invoiceNumber: dto.invoiceNumber,
       invoicedAt: dto.invoicedAt,
+      createdByProfileId: dto.createdByProfileId,
+      createdByProfileFullName: dto.createdByProfileFullName,
     );
   }
 

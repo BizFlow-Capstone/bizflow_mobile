@@ -49,6 +49,8 @@ class OrderDto extends Equatable {
   final String? cancelReason;
   final String? invoiceNumber;
   final DateTime? invoicedAt;
+  final String? createdByProfileId;
+  final String? createdByProfileFullName;
 
   const OrderDto({
     required this.id,
@@ -76,6 +78,8 @@ class OrderDto extends Equatable {
     this.cancelReason,
     this.invoiceNumber,
     this.invoicedAt,
+    this.createdByProfileId,
+    this.createdByProfileFullName,
   });
 
     bool get isDraft => status.toLowerCase() == 'draft';
@@ -141,6 +145,8 @@ class OrderDto extends Equatable {
           parseDate(json['updatedAt']) ?? DateTime.now().toUtc(),
       completedAt: parseDate(json['completedAt']),
       cancelledAt: parseDate(json['cancelledAt']),
+      createdByProfileId: json['createdByProfileId']?.toString(),
+      createdByProfileFullName: json['createdByProfileFullName']?.toString(),
       cancelReason: json['cancelReason']?.toString(),
       invoiceNumber: json['invoiceNumber']?.toString(),
       invoicedAt: parseDate(json['invoicedAt']),
@@ -175,6 +181,8 @@ class OrderDto extends Equatable {
         'cancelledAt': cancelledAt != null
           ? DateFormatter.toApiUtcIsoString(cancelledAt!)
           : null,
+          'createdByProfileId': createdByProfileId,
+          'createdByProfileFullName': createdByProfileFullName,
         'cancelReason': cancelReason,
       'invoiceNumber': invoiceNumber,
       'invoicedAt': invoicedAt != null
@@ -236,6 +244,9 @@ class OrderDto extends Equatable {
       cancelReason: cancelReason ?? this.cancelReason,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       invoicedAt: invoicedAt ?? this.invoicedAt,
+      createdByProfileId: createdByProfileId ?? this.createdByProfileId,
+      createdByProfileFullName:
+          createdByProfileFullName ?? this.createdByProfileFullName,
     );
   }
 
@@ -266,6 +277,8 @@ class OrderDto extends Equatable {
     cancelReason,
     invoiceNumber,
     invoicedAt,
+    createdByProfileId,
+    createdByProfileFullName,
   ];
 }
 

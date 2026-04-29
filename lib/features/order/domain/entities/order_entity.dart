@@ -29,6 +29,8 @@ class OrderEntity extends Equatable {
   final String? cancelReason;
   final String? invoiceNumber;
   final DateTime? invoicedAt;
+  final String? createdByProfileId;
+  final String? createdByProfileFullName;
 
   const OrderEntity({
     required this.id,
@@ -57,6 +59,8 @@ class OrderEntity extends Equatable {
     this.cancelReason,
     this.invoiceNumber,
     this.invoicedAt,
+    this.createdByProfileId,
+    this.createdByProfileFullName,
   });
 
   bool get isDraft => status.toLowerCase() == 'draft';
@@ -91,6 +95,8 @@ class OrderEntity extends Equatable {
     String? cancelReason,
     String? invoiceNumber,
     DateTime? invoicedAt,
+    String? createdByProfileId,
+    String? createdByProfileFullName,
   }) {
     return OrderEntity(
       id: id ?? this.id,
@@ -119,6 +125,9 @@ class OrderEntity extends Equatable {
       cancelReason: cancelReason ?? this.cancelReason,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       invoicedAt: invoicedAt ?? this.invoicedAt,
+      createdByProfileId: createdByProfileId ?? this.createdByProfileId,
+      createdByProfileFullName:
+          createdByProfileFullName ?? this.createdByProfileFullName,
     );
   }
 
@@ -150,5 +159,7 @@ class OrderEntity extends Equatable {
     cancelReason,
     invoiceNumber,
     invoicedAt,
+    createdByProfileId,
+    createdByProfileFullName,
   ];
 }

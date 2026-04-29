@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
@@ -204,10 +205,13 @@ class _StockImportViewState extends State<_StockImportView> {
                 maxScale: 4,
                 child: imagePath != null && imagePath.isNotEmpty
                     ? Image.file(File(imagePath), fit: BoxFit.contain)
-                    : Image.network(
-                        imageUrl!,
+                    : CachedNetworkImage(
+                        imageUrl: imageUrl!,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Center(
+                        placeholder: (_, __) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                        errorWidget: (_, __, ___) => Center(
                           child: Text(
                             l10n.translate('common.error_occurred'),
                             style: AppTextStyles.bodyMedium.copyWith(
@@ -1272,10 +1276,16 @@ class _StockImportViewState extends State<_StockImportView> {
                                             File(_selectedImagePath!),
                                             fit: BoxFit.cover,
                                           )
-                                        : Image.network(
-                                            _existingImageUrl!,
+                                        : CachedNetworkImage(
+                                            imageUrl: _existingImageUrl!,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
+                                            placeholder: (_, __) => Container(
+                                              color: AppColors.background,
+                                              child: const Center(
+                                                child: CircularProgressIndicator(),
+                                              ),
+                                            ),
+                                            errorWidget: (_, __, ___) =>
                                                 Container(
                                                   color: AppColors.background,
                                                 ),
@@ -1385,10 +1395,16 @@ class _StockImportViewState extends State<_StockImportView> {
                       child: (_existingImageUrl?.isNotEmpty == true)
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                _existingImageUrl!,
+                              child: CachedNetworkImage(
+                                imageUrl: _existingImageUrl!,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
+                                placeholder: (_, __) => Container(
+                                  color: AppColors.background,
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                                errorWidget: (_, __, ___) => Center(
                                   child: Text(
                                     l10n.translate(
                                       'stock_import.upload_invoice',

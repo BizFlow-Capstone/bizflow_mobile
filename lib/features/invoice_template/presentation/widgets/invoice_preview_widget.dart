@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/utils/formatters.dart';
@@ -19,7 +20,6 @@ class InvoicePreviewWidget extends StatelessWidget {
   final bool showItemTotalAmount;
   final bool showCustomerName;
   final bool showCustomerPhone;
-  final bool showCustomerAddress;
   final bool showCustomerEmail;
   final bool showCustomerTaxCode;
   final bool showTotalVat;
@@ -45,7 +45,6 @@ class InvoicePreviewWidget extends StatelessWidget {
     this.showItemTotalAmount = true,
     this.showCustomerName = true,
     this.showCustomerPhone = true,
-    this.showCustomerAddress = true,
     this.showCustomerEmail = false,
     this.showCustomerTaxCode = false,
     this.showTotalVat = true,
@@ -58,6 +57,7 @@ class InvoicePreviewWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 16),
       padding: const EdgeInsets.all(16),
@@ -78,7 +78,7 @@ class InvoicePreviewWidget extends StatelessWidget {
         children: [
           // Header
           Text(
-            businessName.isNotEmpty ? businessName : 'TÊN CỬA HÀNG',
+            businessName.isNotEmpty ? businessName : l10n.translate('app_name'),
             style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -99,15 +99,15 @@ class InvoicePreviewWidget extends StatelessWidget {
           const SizedBox(height: 12),
 
           Text(
-            'HÓA ĐƠN BÁN HÀNG',
+            l10n.translate('invoice_title'),
             style: AppTextStyles.titleMedium.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           Text(
             order != null
-                ? 'Số: ${order!.orderCode.isNotEmpty ? order!.orderCode : order!.id} - Ngày: ${CurrencyFormatter.formatDate(order!.createdAt)}'
-                : 'Số: HD000123 - Ngày: 12/03/2026',
+                ? '${l10n.translate('invoice_order_code')}: ${order!.orderCode.isNotEmpty ? order!.orderCode : order!.id} - ${l10n.translate('invoice_date')}: ${CurrencyFormatter.formatDate(order!.createdAt)}'
+                : '${l10n.translate('invoice_order_code')}: HD000123 - ${l10n.translate('invoice_date')}: 12/03/2026',
             style: AppTextStyles.labelSmall.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -118,7 +118,6 @@ class InvoicePreviewWidget extends StatelessWidget {
           // Customer info
           if (showCustomerName ||
               showCustomerPhone ||
-              showCustomerAddress ||
               showCustomerEmail ||
               showCustomerTaxCode) ...[
             Row(
@@ -130,22 +129,17 @@ class InvoicePreviewWidget extends StatelessWidget {
                     children: [
                       if (showCustomerName)
                         Text(
-                          'Khách hàng: ${order != null ? (order!.customerName?.isNotEmpty == true ? order!.customerName : "Khách lẻ") : "Nguyễn Văn A"}',
+                          '${l10n.translate('invoice_customer')}: ${order != null ? (order!.customerName?.isNotEmpty == true ? order!.customerName : l10n.translate('order_create.customer_walkin')) : "Nguyễn Văn A"}',
                           style: AppTextStyles.labelSmall,
                         ),
                       if (showCustomerPhone)
                         Text(
-                          'SĐT: ${order != null ? (order!.customerPhone?.isNotEmpty == true ? order!.customerPhone : "") : "0987654321"}',
+                          '${l10n.translate('invoice_phone')}: ${order != null ? (order!.customerPhone?.isNotEmpty == true ? order!.customerPhone : "") : "0987654321"}',
                           style: AppTextStyles.labelSmall,
                         ),
                       if (showCustomerEmail)
                         Text(
                           'Email: ${order != null ? "" : "nguyenvana@example.com"}',
-                          style: AppTextStyles.labelSmall,
-                        ),
-                      if (showCustomerAddress)
-                        Text(
-                          'Địa chỉ: ${order != null ? "" : "123 Đường B, Quận C"}',
                           style: AppTextStyles.labelSmall,
                         ),
                       if (showCustomerTaxCode)

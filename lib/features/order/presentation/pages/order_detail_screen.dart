@@ -893,9 +893,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 })()} ',
                               ),
                               Text(
-                                '${l10n.translate('order.detail_location')}: ${detail.locationName}',
-                              ),
-                              Text(
                                 '${l10n.translate('order.detail_customer_name')}: ${((detail.customerName ?? '').trim().isNotEmpty) ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
                               ),
                               if ((detail.customerPhone ?? '').trim().isNotEmpty)
@@ -908,6 +905,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               Text(
                                 '${l10n.translate('order.detail_updated_at')}: ${_formatDateTime(detail.updatedAt)}',
                               ),
+                              Text(
+                                '${l10n.translate('order.detail_created_by')}: ${detail.createdByProfileFullName ?? '-'}',
+                              ),
                               if (detail.completedAt != null)
                                 Text(
                                   '${l10n.translate('order.detail_completed_at')}: ${_formatDateTime(detail.completedAt!)}',
@@ -916,7 +916,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 Text(
                                   '${l10n.translate('order.detail_cancelled_at')}: ${_formatDateTime(detail.cancelledAt!)}',
                                 ),
-                              if ((detail.cancelReason ?? '').trim().isNotEmpty)
+                              if (detail.status.toLowerCase() == 'cancelled' && (detail.cancelReason ?? '').trim().isNotEmpty)
                                 Text(
                                   '${l10n.translate('order.detail_cancel_reason')}: ${detail.cancelReason}',
                                 ),
@@ -954,9 +954,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               Text(
                                 '${l10n.translate('order.detail_discount')}: ${_formatMoney(detail.discountAmount)}',
                               ),
-                              Text(
-                                '${l10n.translate('order.detail_tax')}: ${_formatMoney(detail.taxAmount)}',
-                              ),
+                              if ((detail.taxAmount).round() != 0)
+                                Text(
+                                  '${l10n.translate('order.detail_tax')}: ${_formatMoney(detail.taxAmount)}',
+                                ),
                               const SizedBox(height: AppSpacing.xs),
                               Text(
                                 '${l10n.translate('order.detail_total')}: ${_formatMoney(detail.totalAmount)}',

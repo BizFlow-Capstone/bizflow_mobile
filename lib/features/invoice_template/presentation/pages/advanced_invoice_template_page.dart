@@ -359,7 +359,6 @@ class _AdvancedInvoiceTemplatePageState
                             showItemTotalAmount: showItemTotalAmount,
                             showCustomerName: showCustomerName,
                             showCustomerPhone: showCustomerPhone,
-                            showCustomerAddress: showCustomerAddress,
                             showCustomerEmail: showCustomerEmail,
                             showCustomerTaxCode: showCustomerTaxCode,
                             showTotalVat: showTotalVat,

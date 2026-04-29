@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -2545,21 +2546,16 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ? <String, String>{'Authorization': 'Bearer $token'}
           : null;
 
-      return Image.network(
-        imageSource.value,
-        headers: headers,
+      return CachedNetworkImage(
+        imageUrl: imageSource.value,
+        httpHeaders: headers,
         height: height,
         fit: height == null ? BoxFit.contain : BoxFit.cover,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) {
-            return child;
-          }
-          return SizedBox(
-            height: height ?? 220,
-            child: const Center(child: CircularProgressIndicator()),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
+        placeholder: (context, url) => SizedBox(
+          height: height ?? 220,
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+        errorWidget: (context, url, error) {
           return SizedBox(
             height: height ?? 220,
             child: const Center(
