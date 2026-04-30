@@ -122,15 +122,7 @@ class InvoicePreviewWidget extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-          if (order != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              '${_translateOrFallback(l10n, 'invoice_location', 'Địa điểm')}: ${order!.locationName.isNotEmpty ? order!.locationName : (order!.locationId?.isNotEmpty == true ? order!.locationId : '-')}',
-              style: AppTextStyles.labelSmall.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+
           const SizedBox(height: 12),
           const Divider(),
 
