@@ -189,22 +189,6 @@ class AccountingCostRevenueTab extends StatelessWidget {
               style: AppTextStyles.bodyMedium.copyWith(decoration: textDecoration),
             ),
           ),
-          if ((statusLabel ?? '').trim().isNotEmpty) ...[
-            const SizedBox(width: AppSpacing.xs),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: (item.statusCode ?? '').trim().toLowerCase() == 'cancelled'
-                    ? AppColors.error
-                    : AppColors.warning,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                statusLabel!.toUpperCase(),
-                style: AppTextStyles.labelSmall.copyWith(color: Colors.white),
-              ),
-            ),
-          ],
         ],
       ),
       subtitle: Text(

@@ -25,6 +25,7 @@ import '../../../../shared/utils/string_utils.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
+import '../../../invoice_template/presentation/bloc/invoice_template_event.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
@@ -116,6 +117,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (refState is! ReferenceLoaded) {
       context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
     }
+    // Trigger load template khi screen mở
+    context.read<InvoiceTemplateBloc>().add(const LoadInvoiceTemplateRequested());
   }
 
   Future<void> _loadAccountingPeriods(String locationId) async {
@@ -529,29 +532,33 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                _pdfFormat(
-                  template.businessName.isNotEmpty ? template.businessName : '',
-                ),
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              if (template.businessAddress.isNotEmpty)
+          // Business Info (Seller)
+          pw.Align(
+            alignment: pw.Alignment.center,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
                 pw.Text(
-                  _pdfFormat(template.businessAddress),
-                  style: const pw.TextStyle(fontSize: 10),
+                  _pdfFormat(
+                    template.businessName.isNotEmpty ? template.businessName : '',
+                  ),
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
-              if (template.businessPhone.isNotEmpty)
-                pw.Text(
-                  'SDT: ${template.businessPhone}',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-            ],
+                if (template.businessAddress.isNotEmpty)
+                  pw.Text(
+                    _pdfFormat(template.businessAddress),
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+                if (template.businessPhone.isNotEmpty)
+                  pw.Text(
+                    'SDT: ${template.businessPhone}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+              ],
+            ),
           ),
           pw.SizedBox(height: 16),
           pw.Divider(),

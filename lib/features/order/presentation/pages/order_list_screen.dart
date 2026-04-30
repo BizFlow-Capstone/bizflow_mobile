@@ -62,7 +62,9 @@ class _OrderListScreenState extends State<OrderListScreen> {
   @override
   void initState() {
     super.initState();
-    SyncStatusController().setManualRefreshCallback(_refreshOrders);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SyncStatusController().setManualRefreshCallback(_refreshOrders);
+    });
     _loadInitialOrders();
   }
 

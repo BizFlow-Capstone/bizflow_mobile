@@ -19,6 +19,7 @@ import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/action_guard.dart';
 import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
+import '../../../invoice_template/presentation/bloc/invoice_template_event.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
 import '../../../invoice_template/presentation/widgets/invoice_preview_widget.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
@@ -26,17 +27,33 @@ import '../../../subscription/presentation/utils/subscription_feature_guard.dart
 import '../../domain/entities/order_entity.dart';
 import '../../../../shared/utils/string_utils.dart';
 
-class OrderInvoicePreviewScreen extends StatelessWidget {
+class OrderInvoicePreviewScreen extends StatefulWidget {
+  static const String _featureReportExport =
+      SubscriptionFeatureCodes.reportExport;
+
+  final OrderEntity order;
+
+  const OrderInvoicePreviewScreen({super.key, required this.order});
+
+  @override
+  State<OrderInvoicePreviewScreen> createState() =>
+      _OrderInvoicePreviewScreenState();
+}
+
+class _OrderInvoicePreviewScreenState extends State<OrderInvoicePreviewScreen> {
   static const String _featureReportExport =
       SubscriptionFeatureCodes.reportExport;
   final ActionGuard _exportGuard = ActionGuard();
 
-  final OrderEntity order;
-
-  OrderInvoicePreviewScreen({super.key, required this.order});
-
   bool get _shouldReturnToOrderListOnBack =>
-      order.status.toLowerCase() == 'completed';
+      widget.order.status.toLowerCase() == 'completed';
+
+  @override
+  void initState() {
+    super.initState();
+    // Trigger load template khi screen mở
+    context.read<InvoiceTemplateBloc>().add(const LoadInvoiceTemplateRequested());
+  }
 
   void _handleBack(BuildContext context) {
     if (_shouldReturnToOrderListOnBack) {
@@ -170,8 +187,8 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
     final pdf = pw.Document();
     final columns = _buildColumns(template, l10n);
     final itemRows = <List<String>>[];
-    for (var i = 0; i < order.items.length; i++) {
-      itemRows.add(_buildRow(i, order.items[i], columns));
+    for (var i = 0; i < widget.order.items.length; i++) {
+      itemRows.add(_buildRow(i, widget.order.items[i], columns));
     }
 
     pdf.addPage(
@@ -179,29 +196,32 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
         pageFormat: PdfPageFormat.a4,
         build: (context) => [
           // Business Info (Seller)
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                _pdfFormat(
-                  template.businessName.isNotEmpty ? template.businessName : '',
-                ),
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              if (template.businessAddress.isNotEmpty)
+          pw.Align(
+            alignment: pw.Alignment.center,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
                 pw.Text(
-                  _pdfFormat(template.businessAddress),
-                  style: const pw.TextStyle(fontSize: 10),
+                  _pdfFormat(
+                    template.businessName.isNotEmpty ? template.businessName : '',
+                  ),
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
-              if (template.businessPhone.isNotEmpty)
-                pw.Text(
-                  'SDT: ${template.businessPhone}',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-            ],
+                if (template.businessAddress.isNotEmpty)
+                  pw.Text(
+                    _pdfFormat(template.businessAddress),
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+                if (template.businessPhone.isNotEmpty)
+                  pw.Text(
+                    'SDT: ${template.businessPhone}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+              ],
+            ),
           ),
           pw.SizedBox(height: 16),
           pw.Divider(),
@@ -224,12 +244,12 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                   children: [
                   pw.Text(
                     _pdfFormat(
-                      '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: ${order.orderCode.isNotEmpty ? order.orderCode : order.id}',
+                      '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: ${widget.order.orderCode.isNotEmpty ? widget.order.orderCode : widget.order.id}',
                     ),
                   ),
                   pw.Text(
                     _pdfFormat(
-                      '${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: ${CurrencyFormatter.formatDate(order.createdAt)}',
+                      '${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: ${CurrencyFormatter.formatDate(widget.order.createdAt)}',
                     ),
                   ),
                   ],
@@ -243,13 +263,13 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                   if (template.showCustomerName)
                     pw.Text(
                       _pdfFormat(
-                        '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${order.customerName?.isNotEmpty == true ? order.customerName : l10n.translate('order_create.customer_walkin')}',
+                        '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${widget.order.customerName?.isNotEmpty == true ? widget.order.customerName : l10n.translate('order_create.customer_walkin')}',
                       ),
                     ),
                   if (template.showCustomerPhone)
                     pw.Text(
                       _pdfFormat(
-                        '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${order.customerPhone?.isNotEmpty == true ? order.customerPhone : '-'}',
+                        '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${widget.order.customerPhone?.isNotEmpty == true ? widget.order.customerPhone : '-'}',
                       ),
                     ),
                   ],
@@ -274,24 +294,24 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                 if (template.showSubTotal)
                   pw.Text(
                     _pdfFormat(
-                      '${_translateOrFallback(l10n, 'invoice_subtotal', 'Tạm tính')}: ${_pdfCurrency(order.subtotal)}',
+                      '${_translateOrFallback(l10n, 'invoice_subtotal', 'Tạm tính')}: ${_pdfCurrency(widget.order.subtotal)}',
                     ),
                   ),
                 if (template.showTotalDiscount)
                   pw.Text(
                     _pdfFormat(
-                      '${_translateOrFallback(l10n, 'invoice_discount', 'Giảm giá')}: ${_pdfCurrency(order.discountAmount)}',
+                      '${_translateOrFallback(l10n, 'invoice_discount', 'Giảm giá')}: ${_pdfCurrency(widget.order.discountAmount)}',
                     ),
                   ),
                 if (template.showTotalVat)
                   pw.Text(
                     _pdfFormat(
-                      '${_translateOrFallback(l10n, 'invoice_tax', 'VAT')}: ${_pdfCurrency(order.taxAmount)}',
+                      '${_translateOrFallback(l10n, 'invoice_tax', 'VAT')}: ${_pdfCurrency(widget.order.taxAmount)}',
                     ),
                   ),
                 pw.Text(
                   _pdfFormat(
-                    '${_translateOrFallback(l10n, 'invoice_total', 'Tổng thanh toán')}: ${_pdfCurrency(order.totalAmount)}',
+                    '${_translateOrFallback(l10n, 'invoice_total', 'Tổng thanh toán')}: ${_pdfCurrency(widget.order.totalAmount)}',
                   ),
                   style: pw.TextStyle(
                     fontSize: 12,
@@ -340,7 +360,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
 
     final directory = await getApplicationDocumentsDirectory();
     final file = File(
-      '${directory.path}/invoice_${order.id}_${DateTime.now().millisecondsSinceEpoch}.pdf',
+      '${directory.path}/invoice_${widget.order.id}_${DateTime.now().millisecondsSinceEpoch}.pdf',
     );
     await file.writeAsBytes(await pdf.save(), flush: true);
     return file;
@@ -354,7 +374,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
     await Share.shareXFiles(
       [XFile(file.path)],
       text: _pdfFormat(
-        'Hoa don ban hang #${order.orderCode.isNotEmpty ? order.orderCode : order.id}',
+        'Hoa don ban hang #${widget.order.orderCode.isNotEmpty ? widget.order.orderCode : widget.order.id}',
       ),
     );
   }
@@ -444,7 +464,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
                       businessName: template.businessName,
                       businessAddress: template.businessAddress,
                       businessPhone: template.businessPhone,
-                      order: order,
+                      order: widget.order,
                       showStt: template.showStt,
                       showItemName: template.showItemName,
                       showQuantity: template.showQuantity,
@@ -539,7 +559,7 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${l10n.translate('order.detail_order_id')}: ${order.orderCode.isNotEmpty ? order.orderCode : order.id}',
+              '${l10n.translate('order.detail_order_id')}: ${widget.order.orderCode.isNotEmpty ? widget.order.orderCode : widget.order.id}',
               style: AppTextStyles.titleMedium.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -550,12 +570,12 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
               children: [
                 Text('${l10n.translate('order.detail_status')}:'),
                 Text(
-                  order.statusLabel ??
-                      (order.status == 'pending'
+                  widget.order.statusLabel ??
+                      (widget.order.status == 'pending'
                           ? l10n.translate('order_payment.pending_confirmation')
-                          : order.status.toUpperCase()),
+                          : widget.order.status.toUpperCase()),
                   style: TextStyle(
-                    color: order.status == 'completed'
+                    color: widget.order.status == 'completed'
                         ? AppColors.success
                         : AppColors.primary,
                     fontWeight: FontWeight.bold,
@@ -566,17 +586,17 @@ class OrderInvoicePreviewScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.xs),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${order.customerName?.isNotEmpty == true ? order.customerName : l10n.translate('order_create.customer_walkin')}',
+              '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${widget.order.customerName?.isNotEmpty == true ? widget.order.customerName : l10n.translate('order_create.customer_walkin')}',
             ),
-            if (order.customerPhone?.isNotEmpty == true) ...[
+            if (widget.order.customerPhone?.isNotEmpty == true) ...[
               const SizedBox(height: AppSpacing.xs),
               Text(
-                '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${order.customerPhone}',
+                '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${widget.order.customerPhone}',
               ),
             ],
             const Divider(height: AppSpacing.lg),
             Text(
-              '${l10n.translate('order_payment.order_total')}: ${CurrencyFormatter.formatVND(order.totalAmount)}',
+              '${l10n.translate('order_payment.order_total')}: ${CurrencyFormatter.formatVND(widget.order.totalAmount)}',
               style: AppTextStyles.titleMedium.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
