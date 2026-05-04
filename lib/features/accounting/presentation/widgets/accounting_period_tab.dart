@@ -1027,11 +1027,15 @@ class _PeriodDetailSheetState extends State<_PeriodDetailSheet>
                 ),
               _DetailRow(
                 label: widget.l10n.translate('accounting.start_date'),
-                value: period.startDate,
+                value: DateFormatter.formatDate(
+                  DateFormatter.parse(period.startDate),
+                ),
               ),
               _DetailRow(
                 label: widget.l10n.translate('accounting.end_date'),
-                value: period.endDate,
+                value: DateFormatter.formatDate(
+                  DateFormatter.parse(period.endDate),
+                ),
               ),
               _DetailRow(
                 label: widget.l10n.translate('accounting.opening_cash_balance'),

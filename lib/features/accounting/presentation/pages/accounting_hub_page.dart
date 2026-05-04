@@ -2232,7 +2232,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               const SizedBox(height: 6),
               if ((revenue.documentNumber ?? '').trim().isNotEmpty) ...[
                 Text(
-                  '${l10n.translate('document_number')}: ${revenue.documentNumber!.trim()}',
+                  '${l10n.translate('accounting.document_number')}: ${revenue.documentNumber!.trim()}',
                 ),
                 const SizedBox(height: 6),
               ],
@@ -2438,7 +2438,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               const SizedBox(height: 6),
               if ((cost.documentNumber ?? '').trim().isNotEmpty) ...[
                 Text(
-                  '${l10n.translate('document_number')}: ${cost.documentNumber!.trim()}',
+                  '${l10n.translate('accounting.document_number')}: ${cost.documentNumber!.trim()}',
                 ),
                 const SizedBox(height: 6),
               ],

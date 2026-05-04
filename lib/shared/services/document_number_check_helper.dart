@@ -36,10 +36,10 @@ Future<bool> checkDocumentNumberAndConfirm(
   await showDialog<void>(
     context: context,
     builder: (dialogCtx) => AlertDialog(
-      title: Text(l10n.translate('document_number.duplicate_title')),
+      title: Text(l10n.translate('document_number_check.duplicate_title')),
       content: Text(
         l10n
-            .translate('document_number.duplicate_message')
+            .translate('document_number_check.duplicate_message')
             .replaceAll('{number}', trimmed),
       ),
       actions: [

@@ -61,7 +61,14 @@ class _OrderCompletionConfirmationScreenState
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
             content: Text(
-              l10n.translate('order_create.confirm_continue_message'),
+              e.warnings.isNotEmpty
+                  ? e.warnings
+                      .map((w) =>
+                          l10n.translate('order_create.$w') ??
+                          l10n.translate(w) ??
+                          w)
+                      .join('\n\n')
+                  : l10n.translate('order_create.confirm_continue_message'),
             ),
             actions: [
               TextButton(
@@ -77,7 +84,9 @@ class _OrderCompletionConfirmationScreenState
         );
 
         if (confirm == true && mounted) {
-          await _completeOrder(confirmLowStock: true);
+          await _completeOrder(
+            confirmLowStock: e.requiresLowStockConfirmation || confirmLowStock,
+          );
         }
         return;
       }

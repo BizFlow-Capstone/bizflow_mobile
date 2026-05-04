@@ -302,16 +302,6 @@ class _DebtDetailPageState extends State<DebtDetailPage> {
   }
 
   void _showPaymentUpdateSheet(DebtorEntity detail) {
-    final state = context.read<DebtorBloc>().state;
-    final history = state.paymentHistory;
-    final paidTotal = history.fold<double>(
-      0,
-      (sum, item) =>
-          sum +
-          ((item.action == 'decrease_debt' || item.amount < 0)
-              ? item.amount.abs()
-              : 0),
-    );
     final currentDebt = detail.currentBalance > 0 ? detail.currentBalance : 0.0;
     final paymentMethods = _paymentMethodsFromReference();
 
@@ -322,8 +312,8 @@ class _DebtDetailPageState extends State<DebtDetailPage> {
       builder: (ctx) => PaymentUpdateSheet(
         customerName: detail.name,
         customerPhone: detail.phone,
-        totalDebt: currentDebt + paidTotal,
-        totalPaid: paidTotal,
+        totalDebt: currentDebt,
+        totalPaid: 0,
         remaining: currentDebt,
         paymentMethods: paymentMethods,
         onConfirm: (amount, action, paymentMethod, note) {

@@ -1417,7 +1417,7 @@
     "cost_amount": "Cost amount",
     "cost_amuont": "Cost amount"
   },
-  "document_number": {
+  "document_number_check": {
     "duplicate_title": "Duplicate Document Number",
     "duplicate_message": "Document number \"{number}\" already exists. Please adjust or leave empty."
   }

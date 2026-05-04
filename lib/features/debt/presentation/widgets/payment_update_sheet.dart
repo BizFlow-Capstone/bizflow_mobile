@@ -58,13 +58,9 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
       !_isSubmitting && _enteredAmount > 0 && _selectedPaymentMethod != null;
 
   _PaymentSummaryValues _buildSummaryValues() {
-    final double baseRemaining = widget.remaining > 0
-        ? widget.remaining
-      : (widget.totalDebt > 0 ? widget.totalDebt : 0.0);
-    final double baseTotalDebt = widget.totalDebt > 0
-        ? widget.totalDebt
-        : baseRemaining;
-    final double baseTotalPaid = widget.totalPaid > 0 ? widget.totalPaid : 0.0;
+    final double baseRemaining = widget.remaining;
+    final double baseTotalDebt = widget.totalDebt;
+    final double baseTotalPaid = widget.totalPaid;
     final double amount = _enteredAmount;
 
     if (amount <= 0) {

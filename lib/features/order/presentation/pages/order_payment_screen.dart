@@ -453,7 +453,14 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
           builder: (ctx) => AlertDialog(
             title: Text(l10n.translate('order_create.confirm_continue_title')),
             content: Text(
-              l10n.translate('order_create.confirm_continue_message'),
+              e.warnings.isNotEmpty
+                  ? e.warnings
+                      .map((w) =>
+                          l10n.translate('order_create.$w') ??
+                          l10n.translate(w) ??
+                          w)
+                      .join('\n\n')
+                  : l10n.translate('order_create.confirm_continue_message'),
             ),
             actions: [
               TextButton(
@@ -472,11 +479,9 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
           setState(() => _isSubmitting = false);
           await _submitPayment(
             confirmLowStock:
-                e.warnings.contains('LOW_STOCK_CONFIRM_REQUIRED') ||
-                confirmLowStock,
+                e.requiresLowStockConfirmation || confirmLowStock,
             confirmCreditLimit:
-                e.warnings.contains('CREDIT_LIMIT_CONFIRM_REQUIRED') ||
-                confirmCreditLimit,
+                e.requiresCreditLimitConfirmation || confirmCreditLimit,
           );
         }
         return;

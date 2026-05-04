@@ -854,6 +854,8 @@
     "transfer_account_holder": "Chủ tài khoản",
     "confirm_continue_title": "Xác nhận tiếp tục",
     "confirm_continue_message": "Đơn hàng có cảnh báo tồn kho hoặc công nợ. Bạn có muốn tiếp tục không?",
+    "LOW_STOCK_CONFIRM_REQUIRED": "Một số sản phẩm trong đơn hàng sắp hết hàng. Bạn có muốn tiếp tục không?",
+    "DEBTOR_CREDIT_LIMIT_EXCEEDED_CONFIRM_REQUIRED": "Khách hàng đã vượt quá hạn mức nợ cho phép. Bạn có muốn tiếp tục cho nợ không?",
     "barcode_add_tooltip": "Quét barcode để thêm sản phẩm",
     "sale_unit_label": "Đơn vị bán",
     "default_unit": "Mặc định",
@@ -1423,7 +1425,7 @@
     "cost_amount": "Số tiền chi phí",
     "cost_amuont": "Số tiền chi phí"
   },
-  "document_number": {
+  "document_number_check": {
     "duplicate_title": "Chứng từ trùng lặp",
     "duplicate_message": "Số chứng từ \"{number}\" đã tồn tại trong hệ thống. Vui lòng điều chỉnh hoặc để trống."
   }
