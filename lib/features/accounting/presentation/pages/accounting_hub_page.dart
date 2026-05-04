@@ -1778,7 +1778,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final documentNumberController = TextEditingController(
       text: item.documentNumber ?? item.referenceCode ?? '',
     );
-    DateTime selectedDate = item.date;
+    DateTime selectedDate = DateTime.now();
     DateTime? selectedDocumentDate = item.documentDate;
     String? selectedCostType = item.type;
     String? selectedPaymentMethod = item.paymentMethod;
@@ -1867,6 +1867,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   dialogCtx: dialogCtx,
                   value: selectedDate,
                   initialDate: selectedDate,
+                  readOnly: true,
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() => selectedDate = value);
@@ -2742,7 +2743,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final documentNumberController = TextEditingController(
       text: item.documentNumber ?? item.referenceCode ?? '',
     );
-    DateTime selectedDate = item.date;
+    DateTime selectedDate = DateTime.now();
     DateTime? selectedDocumentDate = item.documentDate;
 
     List<ReferenceItem> getMoneyChannels() {
@@ -2847,6 +2848,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   dialogCtx: dialogCtx,
                   value: selectedDate,
                   initialDate: selectedDate,
+                  readOnly: true,
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() => selectedDate = value);
