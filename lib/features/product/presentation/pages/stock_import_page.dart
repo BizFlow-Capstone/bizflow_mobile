@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -11,6 +10,9 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_error_message_parser.dart';
+import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
+import '../../../../core/reference/presentation/bloc/reference_event.dart';
+import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../core/services/connectivity_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -88,7 +90,10 @@ class _StockImportViewState extends State<_StockImportView> {
   bool _removeImage = false;
   bool _confirmAfterUpdate = false;
   bool _editingConfirmedImport = false;
+  bool _isConfirmDialogOpen = false;
+  bool _isDeleteDialogOpen = false;
   String? _replacementIdempotencyKey;
+  String? _selectedPaymentMethod;
   final ImagePicker _imagePicker = ImagePicker();
   final ActionGuard _saveDraftGuard = ActionGuard();
   final ActionGuard _confirmGuard = ActionGuard();
@@ -108,6 +113,10 @@ class _StockImportViewState extends State<_StockImportView> {
   @override
   void initState() {
     super.initState();
+    final refState = context.read<ReferenceBloc>().state;
+    if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
+      context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
+    }
     _noteController = TextEditingController();
     _supplierController = TextEditingController();
     _searchController = TextEditingController();
@@ -154,6 +163,43 @@ class _StockImportViewState extends State<_StockImportView> {
     return value == value.roundToDouble()
         ? value.toInt().toString()
         : value.toString();
+  }
+
+  List<ReferenceItem> _paymentMethodsFromReference() {
+    final state = context.read<ReferenceBloc>().state;
+    if (state is! ReferenceLoaded) {
+      return const <ReferenceItem>[];
+    }
+    final methods =
+        (state.references['paymentMethods'] ?? const <ReferenceItem>[])
+            .where((item) => item.code.trim().isNotEmpty)
+            .toSet()
+            .toList();
+    methods.sort(
+      (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()),
+    );
+    return methods;
+  }
+
+  String _paymentMethodPlaceholder() {
+    final languageCode = Localizations.localeOf(context).languageCode;
+    return languageCode == 'en' ? 'Not selected' : 'Chưa chọn';
+  }
+
+  String _resolvePaymentMethodLabel(String? code) {
+    final normalizedCode = code?.trim() ?? '';
+    if (normalizedCode.isEmpty) {
+      return _paymentMethodPlaceholder();
+    }
+
+    final matched = _paymentMethodsFromReference().where(
+      (item) => item.code == normalizedCode,
+    );
+    if (matched.isNotEmpty) {
+      final label = matched.first.label.trim();
+      if (label.isNotEmpty) return label;
+    }
+    return normalizedCode;
   }
 
   Future<ImageSource?> _selectImageSource() async {
@@ -240,7 +286,7 @@ class _StockImportViewState extends State<_StockImportView> {
                 minScale: 0.7,
                 maxScale: 4,
                 child: hasLocalImage
-                    ? Image.file(File(imagePath!), fit: BoxFit.contain)
+                  ? Image.file(File(imagePath), fit: BoxFit.contain)
                     : Image.network(
                         resolvedImageUrl ?? imageUrl!,
                         fit: BoxFit.contain,
@@ -577,6 +623,7 @@ class _StockImportViewState extends State<_StockImportView> {
           saveAsDraft: true,
           imagePath: _selectedImagePath,
           items: _selectedItems,
+          paymentMethod: _selectedPaymentMethod,
         );
         context.read<ImportActionBloc>().add(CreateImportEvent(req));
       } else {
@@ -592,6 +639,7 @@ class _StockImportViewState extends State<_StockImportView> {
           imagePath: _selectedImagePath,
           removeImage: _removeImage,
           items: _selectedItems,
+            paymentMethod: _selectedPaymentMethod,
           idempotencyKey: _editingConfirmedImport
               ? _replacementIdempotencyKey
               : null,
@@ -641,97 +689,103 @@ class _StockImportViewState extends State<_StockImportView> {
       setState(() => _isActionGuardLoading = false);
     }
 
+    _isConfirmDialogOpen = true;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) {
-        var isSubmitting = false;
-        return StatefulBuilder(
-          builder: (innerContext, setDialogState) => AlertDialog(
-            title: Text(l10n.translate('stock_import.confirm_title')),
-            content: Text(
-              l10n.translate(
-                'stock_import.confirm_message',
-                params: {'count': _selectedItems.length.toString()},
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: isSubmitting
-                    ? null
-                    : () => Navigator.pop(dialogContext),
-                child: Text(l10n.translate('common.cancel')),
-              ),
-              ElevatedButton(
-                onPressed: isSubmitting
-                    ? null
-                    : () async {
-                        setDialogState(() => isSubmitting = true);
-                        await _confirmGuard.run(() async {
-                          Navigator.pop(dialogContext);
-                          if (widget.importId == null) {
-                            final req = CreateImportRequest(
-                              importType: _hasInvoice
-                                  ? 'INVOICE'
-                                  : 'INVENTORY_ADJUSTMENT',
-                              businessLocationId: int.parse(widget.locationId),
-                              supplier: _supplierController.text,
-                              note: _noteController.text,
-                              receivedAt: DateTime.now(),
-                              documentDate: _documentDate,
-                              documentNumber:
-                                  _documentNumberController.text.isNotEmpty
-                                  ? _documentNumberController.text
-                                  : null,
-                              saveAsDraft: false,
-                              imagePath: _selectedImagePath,
-                              items: _selectedItems,
-                            );
-                            context.read<ImportActionBloc>().add(
-                              CreateImportEvent(req),
-                            );
-                          } else {
-                            _confirmAfterUpdate = !_editingConfirmedImport;
-                            final req = UpdateImportRequest(
-                              importType: _hasInvoice
-                                  ? 'INVOICE'
-                                  : 'INVENTORY_ADJUSTMENT',
-                              supplier: _supplierController.text,
-                              note: _noteController.text,
-                              receivedAt: null,
-                              documentDate: _documentDate,
-                              documentNumber:
-                                  _documentNumberController.text.isNotEmpty
-                                  ? _documentNumberController.text
-                                  : null,
-                              imagePath: _selectedImagePath,
-                              removeImage: _removeImage,
-                              items: _selectedItems,
-                              idempotencyKey: _editingConfirmedImport
-                                  ? _replacementIdempotencyKey
-                                  : null,
-                            );
-                            context.read<ImportActionBloc>().add(
-                              UpdateImportEvent(widget.importId!, req),
-                            );
-                          }
-                        });
-                        if (mounted) {
-                          setDialogState(() => isSubmitting = false);
-                        }
-                      },
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.translate('common.confirm')),
-              ),
-            ],
+        return BlocProvider.value(
+          value: context.read<ImportActionBloc>(),
+          child: BlocBuilder<ImportActionBloc, ImportActionState>(
+            builder: (context, state) {
+              final isSubmitting = state.status == ImportActionStatus.submitting;
+              return AlertDialog(
+                title: Text(l10n.translate('stock_import.confirm_title')),
+                content: Text(
+                  l10n.translate(
+                    'stock_import.confirm_message',
+                    params: {'count': _selectedItems.length.toString()},
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () => Navigator.pop(dialogContext),
+                    child: Text(l10n.translate('common.cancel')),
+                  ),
+                  ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            await _confirmGuard.run(() async {
+                              if (widget.importId == null) {
+                                final req = CreateImportRequest(
+                                  importType: _hasInvoice
+                                      ? 'INVOICE'
+                                      : 'INVENTORY_ADJUSTMENT',
+                                  businessLocationId: int.parse(widget.locationId),
+                                  supplier: _supplierController.text,
+                                  note: _noteController.text,
+                                  receivedAt: DateTime.now(),
+                                  documentDate: _documentDate,
+                                  documentNumber:
+                                      _documentNumberController.text.isNotEmpty
+                                      ? _documentNumberController.text
+                                      : null,
+                                  saveAsDraft: false,
+                                  imagePath: _selectedImagePath,
+                                  items: _selectedItems,
+                                  paymentMethod: _selectedPaymentMethod,
+                                );
+                                context.read<ImportActionBloc>().add(
+                                  CreateImportEvent(req),
+                                );
+                              } else {
+                                _confirmAfterUpdate = !_editingConfirmedImport;
+                                final req = UpdateImportRequest(
+                                  importType: _hasInvoice
+                                      ? 'INVOICE'
+                                      : 'INVENTORY_ADJUSTMENT',
+                                  supplier: _supplierController.text,
+                                  note: _noteController.text,
+                                  receivedAt: null,
+                                  documentDate: _documentDate,
+                                  documentNumber:
+                                      _documentNumberController.text.isNotEmpty
+                                      ? _documentNumberController.text
+                                      : null,
+                                  imagePath: _selectedImagePath,
+                                  removeImage: _removeImage,
+                                  items: _selectedItems,
+                                  paymentMethod: _selectedPaymentMethod,
+                                  idempotencyKey: _editingConfirmedImport
+                                      ? _replacementIdempotencyKey
+                                      : null,
+                                );
+                                context.read<ImportActionBloc>().add(
+                                  UpdateImportEvent(widget.importId!, req),
+                                );
+                              }
+                            });
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(l10n.translate('common.confirm')),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
-    );
+    ).then((_) {
+      _isConfirmDialogOpen = false;
+    });
   }
 
   void _onEditImport() {
@@ -791,60 +845,64 @@ class _StockImportViewState extends State<_StockImportView> {
       setState(() => _isActionGuardLoading = false);
     }
 
+    _isDeleteDialogOpen = true;
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (dialogContext) {
-        var isSubmitting = false;
-        return StatefulBuilder(
-          builder: (innerContext, setDialogState) => AlertDialog(
-            title: Text(
-              _status == 'DRAFT'
-                  ? l10n.translate('stock_import.delete_draft_title')
-                  : l10n.translate('stock_import.cancel_import_title'),
-            ),
-            content: Text(
-              l10n.translate('stock_import.confirm_action_message'),
-            ),
-            actions: [
-              TextButton(
-                onPressed: isSubmitting
-                    ? null
-                    : () => Navigator.pop(dialogContext),
-                child: Text(l10n.translate('common.cancel')),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.error,
+        return BlocProvider.value(
+          value: context.read<ImportActionBloc>(),
+          child: BlocBuilder<ImportActionBloc, ImportActionState>(
+            builder: (context, state) {
+              final isSubmitting = state.status == ImportActionStatus.submitting;
+              return AlertDialog(
+                title: Text(
+                  _status == 'DRAFT'
+                      ? l10n.translate('stock_import.delete_draft_title')
+                      : l10n.translate('stock_import.cancel_import_title'),
                 ),
-                onPressed: isSubmitting
-                    ? null
-                    : () async {
-                        setDialogState(() => isSubmitting = true);
-                        await _deleteGuard.run(() async {
-                          Navigator.pop(dialogContext);
-                          if (widget.importId != null) {
-                            context.read<ImportActionBloc>().add(
-                              DeleteImportEvent(widget.importId!),
-                            );
-                          }
-                        });
-                        if (mounted) {
-                          setDialogState(() => isSubmitting = false);
-                        }
-                      },
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.translate('common.confirm')),
-              ),
-            ],
+                content: Text(
+                  l10n.translate('stock_import.confirm_action_message'),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () => Navigator.pop(dialogContext),
+                    child: Text(l10n.translate('common.cancel')),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                    ),
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            await _deleteGuard.run(() async {
+                              if (widget.importId != null) {
+                                context.read<ImportActionBloc>().add(
+                                  DeleteImportEvent(widget.importId!),
+                                );
+                              }
+                            });
+                          },
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(l10n.translate('common.confirm')),
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
-    );
+    ).then((_) {
+      _isDeleteDialogOpen = false;
+    });
   }
 
   void _showErrorSnackBar(String message) {
@@ -1094,7 +1152,10 @@ class _StockImportViewState extends State<_StockImportView> {
                 featureCode: SubscriptionFeatureCodes.inventoryImport,
               );
               if (!allowed || !context.mounted) return;
-              final req = ConfirmImportRequest(receivedAt: DateTime.now());
+              final req = ConfirmImportRequest(
+                receivedAt: DateTime.now(),
+                paymentMethod: _selectedPaymentMethod,
+              );
               context.read<ImportActionBloc>().add(
                 ConfirmImportEvent(widget.importId!, req),
               );
@@ -1106,7 +1167,10 @@ class _StockImportViewState extends State<_StockImportView> {
             _showSuccessSnackBar(state.successMessage!);
           }
           if (isDeleteSuccess) {
-            Navigator.pop(context, true);
+            if (_isDeleteDialogOpen) {
+              Navigator.pop(context); // pop the delete dialog
+            }
+            Navigator.pop(context, true); // pop the page
             return;
           }
 
@@ -1114,9 +1178,15 @@ class _StockImportViewState extends State<_StockImportView> {
           if (!_hasInvoice &&
               state.importDetail != null &&
               state.actionType == ImportActionType.confirm) {
+            if (_isConfirmDialogOpen) {
+              Navigator.pop(context); // pop the confirm dialog
+            }
             _showReceiptDialog(state.importDetail!);
           } else {
-            Navigator.pop(context, true);
+            if (_isConfirmDialogOpen) {
+              Navigator.pop(context); // pop the confirm dialog
+            }
+            Navigator.pop(context, true); // pop the page
           }
         } else if (state.status == ImportActionStatus.failure) {
           _showErrorSnackBar(
@@ -1134,6 +1204,7 @@ class _StockImportViewState extends State<_StockImportView> {
             _selectedItems = List.from(detail.items);
             _existingImageUrl = detail.imageUrl;
             _removeImage = false;
+            _selectedPaymentMethod = detail.paymentMethod;
             _syncQuantityControllers();
           });
         }
@@ -1285,6 +1356,24 @@ class _StockImportViewState extends State<_StockImportView> {
 
   Widget _buildBody(NumberFormat formatCurrency) {
     final isEditable = _status == 'DRAFT' || widget.importId == null;
+    final paymentMethods = _paymentMethodsFromReference();
+    final hasSelectedPaymentMethod =
+        (_selectedPaymentMethod?.trim().isNotEmpty ?? false);
+    final selectedNotInReference =
+        hasSelectedPaymentMethod &&
+        !paymentMethods.any((m) => m.code == _selectedPaymentMethod);
+    final effectivePaymentMethods = selectedNotInReference
+        ? [
+            ...paymentMethods,
+            ReferenceItem(
+              code: _selectedPaymentMethod!.trim(),
+              label: _selectedPaymentMethod!.trim(),
+            ),
+          ]
+        : paymentMethods;
+    final selectedPaymentDropdownValue = hasSelectedPaymentMethod
+        ? _selectedPaymentMethod!.trim()
+        : '';
     final totalAmount = _selectedItems.fold<double>(
       0,
       (sum, item) => sum + (item.quantity * item.costPrice),
@@ -1600,6 +1689,60 @@ class _StockImportViewState extends State<_StockImportView> {
                     ),
                   ),
                 ),
+                SizedBox(height: AppSpacing.md),
+                if (isEditable)
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedPaymentDropdownValue,
+                    decoration: InputDecoration(
+                      labelText: l10n.translate('accounting.payment_method'),
+                      labelStyle: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: '',
+                        child: Text(_paymentMethodPlaceholder()),
+                      ),
+                      ...effectivePaymentMethods
+                          .where((method) => method.label.trim().isNotEmpty)
+                          .map(
+                            (method) => DropdownMenuItem<String>(
+                              value: method.code,
+                              child: Text(method.label),
+                            ),
+                          ),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedPaymentMethod =
+                            (value == null || value.trim().isEmpty)
+                            ? null
+                            : value;
+                      });
+                    },
+                  )
+                else
+                  InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: l10n.translate('accounting.payment_method'),
+                      labelStyle: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      _resolvePaymentMethodLabel(_selectedPaymentMethod),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

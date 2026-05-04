@@ -283,6 +283,12 @@ class ImportDetailModel extends ImportHistoryItemModel {
             json['image'] ??
             json['Image'],
       ),
+      paymentMethod: (() {
+        final raw = json['paymentMethod'] ?? json['PaymentMethod'];
+        if (raw is String && raw.trim().isNotEmpty) return raw.trim();
+        if (raw is Map) return (raw['code'] ?? raw['Code'])?.toString();
+        return null;
+      })(),
       items: itemsRaw
           .map((e) => ImportItemModel.fromJson(e as Map<String, dynamic>))
           .toList(),

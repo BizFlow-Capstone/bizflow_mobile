@@ -207,6 +207,7 @@ class RevenueDto extends Equatable {
       businessTypeName:
           referenceLabelFromDynamic(json['businessTypeId'] ?? json['BusinessTypeId']) ??
           asNullableString(json['businessTypeName'] ?? json['BusinessTypeName']),
+      documentNumber: documentNumber,
       statusCode: asNullableString(
         rawStatus['code'] ?? rawStatus['Code'] ?? json['statusCode'] ?? json['StatusCode'],
       ),

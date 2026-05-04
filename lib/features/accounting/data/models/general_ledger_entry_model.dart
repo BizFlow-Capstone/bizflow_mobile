@@ -20,6 +20,7 @@ class GeneralLedgerEntryModel {
   final String referenceType;
   final String? referenceTypeLabel;
   final int? referenceId;
+  final String? referenceCode;
   final String? entityType;
   final int? entityId;
   final String? createdAt;
@@ -44,6 +45,7 @@ class GeneralLedgerEntryModel {
     required this.referenceType,
     this.referenceTypeLabel,
     this.referenceId,
+    this.referenceCode,
     this.entityType,
     this.entityId,
     this.createdAt,
@@ -100,16 +102,16 @@ class GeneralLedgerEntryModel {
     );
     final entityId = asNullableInt(source['entityId'] ?? json['entityId']);
 
-    final fallbackDocument = refType.isNotEmpty && refId != null
-        ? '${refType.toUpperCase()}-$refId'
-        : (entityType.isNotEmpty && entityId != null
-              ? '${entityType.toUpperCase()}-$entityId'
-              : 'GL-${asInt(json['entryId'])}');
+    final fallbackDocument = 'GL-${asInt(json['entryId'])}';
+
+    final parsedReferenceCode = asString(
+      source['referenceCode'] ?? source['documentNumber'] ?? json['referenceCode'],
+    ).trim();
 
     return GeneralLedgerEntryModel(
       entryId: asInt(json['entryId']),
       documentNumber: asString(
-        json['documentNumber'] ?? source['referenceCode'],
+        json['documentNumber'] ?? source['documentNumber'],
         fallback: fallbackDocument,
       ),
       documentDate:
@@ -138,6 +140,7 @@ class GeneralLedgerEntryModel {
       referenceType: refType,
         referenceTypeLabel: referenceLabelFromDynamic(rawReferenceType),
       referenceId: refId,
+      referenceCode: parsedReferenceCode.isEmpty ? null : parsedReferenceCode,
       entityType: entityType.trim().isEmpty ? null : entityType.trim(),
       entityId: entityId,
       createdAt:
@@ -168,6 +171,7 @@ class GeneralLedgerEntryModel {
       'referenceType': referenceType,
       'referenceTypeLabel': referenceTypeLabel,
       'referenceId': referenceId,
+      'referenceCode': referenceCode,
       'entityType': entityType,
       'entityId': entityId,
       'createdAt': createdAt,

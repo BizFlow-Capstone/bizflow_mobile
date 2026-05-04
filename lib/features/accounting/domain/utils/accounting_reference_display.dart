@@ -57,15 +57,23 @@ class AccountingReferenceDisplay {
   static List<Map<String, dynamic>> normalizeRows(
     List<Map<String, dynamic>> rows, {
     String languageCode = 'vi',
+    bool preserveOriginalDocumentNumber = false,
   }) {
     return rows
-        .map((row) => normalizeRow(row, languageCode: languageCode))
+        .map(
+          (row) => normalizeRow(
+            row,
+            languageCode: languageCode,
+            preserveOriginalDocumentNumber: preserveOriginalDocumentNumber,
+          ),
+        )
         .toList(growable: false);
   }
 
   static Map<String, dynamic> normalizeRow(
     Map<String, dynamic> row, {
     String languageCode = 'vi',
+    bool preserveOriginalDocumentNumber = false,
   }) {
     final normalized = Map<String, dynamic>.from(row);
     final referenceType = _firstText(normalized, _typeKeys);
@@ -89,6 +97,7 @@ class AccountingReferenceDisplay {
       referenceId: referenceId,
       referenceCode: referenceCode,
       languageCode: languageCode,
+      preserveOriginalDocumentNumber: preserveOriginalDocumentNumber,
     );
     if (displayCode.isNotEmpty) {
       normalized['so_hieu'] = displayCode;
@@ -158,13 +167,19 @@ class AccountingReferenceDisplay {
     dynamic referenceId,
     String? referenceCode,
     String languageCode = 'vi',
+    bool preserveOriginalDocumentNumber = false,
   }) {
     final raw = (documentNumber ?? '').trim();
-    final lang = _normalizeLanguage(languageCode);
 
     if (raw.isEmpty) {
       return '';
     }
+
+    if (preserveOriginalDocumentNumber) {
+      return raw;
+    }
+
+    final lang = _normalizeLanguage(languageCode);
 
     final parsed = _parseReferenceToken(raw);
     if (parsed != null) {

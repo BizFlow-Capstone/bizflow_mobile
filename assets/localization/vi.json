@@ -34,7 +34,8 @@
     "search_hint": "Tìm kiếm...",
     "back_home": "Về trang chủ",
     "microphone_permission_required": "Cần cấp quyền micro để tiếp tục",
-    "reference_code": "Mã tham chiếu"
+    "reference_code": "Mã tham chiếu",
+    "notes": "Ghi chú"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -422,9 +423,12 @@
       "profit": "Lợi nhuận",
       "cost_history_title": "Lịch sử chỉnh giá vốn",
       "current_cost_price": "Giá vốn hiện tại",
+      "current_sale_price": "Giá bán hiện tại",
       "no_cost_history": "Chưa có lịch sử giá vốn",
       "cost_history_note": "Chỉ hiển thị các lần nhập kho đã xác nhận. Số lượng là theo từng lần nhập.",
       "cost_history_import_qty": "Số lượng nhập",
+      "price_history_title": "Lịch sử thay đổi giá bán",
+      "price_history_no_data": "Chưa có lịch sử điều chỉnh giá bán",
       "price_policy_title": "Lịch sử điều chỉnh giá bán",
       "price_policy_no_data": "Chưa có lịch sử điều chỉnh giá bán",
       "price_policy_effective_date": "Ngày hiệu lực",
@@ -432,13 +436,19 @@
       "price_policy_new_price": "Giá mới",
       "price_policy_unit": "Đơn vị",
       "stock_movement_title": "Lịch sử biến động kho",
+      "current_stock": "Tồn kho hiện tại",
       "stock_movement_no_data": "Chưa có lịch sử biến động kho",
       "movement_in": "Nhập kho",
       "movement_out": "Xuất kho",
       "movement_sale": "Bán hàng",
       "movement_adjustment_in": "Điều chỉnh tăng",
       "movement_adjustment_out": "Điều chỉnh giảm",
-      "balance": "Số dư"
+      "balance": "Tồn kho"
+    },
+    "price_policy": {
+      "default": "Mặc định",
+      "start_at": "Bắt đầu",
+      "end_at": "Kết thúc"
     },
     "bulk_adjust": {
       "title": "Điều chỉnh giá bán",
@@ -1006,7 +1016,7 @@
     "status_active": "Đang hoạt động",
     "status_inactive": "Ngừng hoạt động",
     "status_updated": "Cập nhật trạng thái thành công",
-    "total_owed": "Tổng nợ",
+    "total_owed": "Tổng",
     "total_paid": "Đã trả",
     "location": "Địa chỉ",
     "address": "Địa chỉ",
@@ -1139,6 +1149,7 @@
     "method_2": "Cách 2 (doanh thu - chi phí)",
     "opening_cash": "Số dư tiền đầu kỳ",
     "note": "Ghi chú",
+    "date": "Ngày",
     "all": "Tất cả",
     "add_manual_gl": "Thêm bút toán thủ công",
     "description": "Diễn giải",
@@ -1375,7 +1386,7 @@
     "gl_location_required": "Vui lòng chọn địa điểm kinh doanh để xem sổ nhật ký chung.",
     "general_ledger": "Sổ nhật ký chung",
     "gl_detail_title": "GL-{id}",
-    "gl_detail_document": "Chứng từ: {value}",
+    "gl_detail_document": "Tên giao dịch: {value}",
     "gl_detail_document_date": "Ngày chứng từ: {value}",
     "gl_detail_date": "Ngày: {value}",
     "gl_detail_note": "Nội dung: {value}",

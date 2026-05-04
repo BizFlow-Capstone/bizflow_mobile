@@ -33,7 +33,8 @@
     "search_hint": "Search...",
     "back_home": "Back to home",
     "microphone_permission_required": "Microphone permission is required to continue",
-    "reference_code": "Reference code"
+    "reference_code": "Reference code",
+    "notes": "Notes"
   },
   "auth": {
     "login": "Login",
@@ -421,9 +422,12 @@
       "profit": "Profit",
       "cost_history_title": "Cost Price Change History",
       "current_cost_price": "Current cost price",
+      "current_sale_price": "Current selling price",
       "no_cost_history": "No cost price history",
       "cost_history_note": "Only confirmed import events are shown. Quantity is per import event.",
       "cost_history_import_qty": "Imported quantity",
+      "price_history_title": "Selling Price Change History",
+      "price_history_no_data": "No selling price history",
       "price_policy_title": "Selling Price Change History",
       "price_policy_no_data": "No selling price history",
       "price_policy_effective_date": "Effective Date",
@@ -431,6 +435,7 @@
       "price_policy_new_price": "New Price",
       "price_policy_unit": "Unit",
       "stock_movement_title": "Stock Movement History",
+      "current_stock": "Current stock",
       "stock_movement_no_data": "No stock movement history yet",
       "movement_in": "Stock In",
       "movement_out": "Stock Out",
@@ -438,6 +443,11 @@
       "movement_adjustment_in": "Adjustment In",
       "movement_adjustment_out": "Adjustment Out",
       "balance": "Balance"
+    },
+    "price_policy": {
+      "default": "Default",
+      "start_at": "Start Date",
+      "end_at": "End Date"
     },
     "bulk_adjust": {
       "title": "Adjust selling prices",
@@ -1005,7 +1015,7 @@
     "status_active": "Active",
     "status_inactive": "Inactive",
     "status_updated": "Status updated successfully",
-    "total_owed": "Total Owed",
+    "total_owed": "Total",
     "total_paid": "Total Paid",
     "location": "Location",
     "address": "Address",
@@ -1138,6 +1148,7 @@
     "method_2": "Method 2 (revenue - cost)",
     "opening_cash": "Opening Cash",
     "note": "Note",
+    "date": "Date",
     "all": "All",
     "add_manual_gl": "Add Manual GL Entry",
     "description": "Description",

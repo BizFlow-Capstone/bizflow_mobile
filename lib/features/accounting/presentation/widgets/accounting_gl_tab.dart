@@ -150,6 +150,21 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     return DateFormatter.formatDate(parsed);
   }
 
+  String _buildRawReferenceCode(GeneralLedgerEntryModel entry) {
+    final explicitCode = (entry.referenceCode ?? '').trim();
+    if (explicitCode.isNotEmpty) {
+      return explicitCode;
+    }
+
+    final type = entry.referenceType.trim();
+    final id = entry.referenceId;
+    if (type.isNotEmpty && id != null) {
+      return '${type.toUpperCase()}-$id';
+    }
+
+    return '-';
+  }
+
   Future<void> _loadData({
     bool isLoadMore = false,
     int pageNumber = 1,
@@ -407,26 +422,16 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     final dateObj = _resolveDisplayDateTime(entry);
 
     final languageCode = Localizations.localeOf(context).languageCode;
-    final displayDocument = AccountingReferenceDisplay.displayDocument(
-      documentNumber: entry.documentNumber,
-      referenceType: entry.referenceType,
-      referenceId: entry.referenceId,
-      referenceCode: entry.documentNumber,
-      languageCode: languageCode,
-    );
+    final displayDocument = entry.documentNumber.trim().isNotEmpty
+        ? entry.documentNumber.trim()
+        : '-';
     final displayNote = AccountingReferenceDisplay.displayDescriptionValue(
       description: entry.note,
       referenceType: entry.referenceType,
       referenceId: entry.referenceId,
-      referenceCode: entry.documentNumber,
       languageCode: languageCode,
     );
-    final displayReference = AccountingReferenceDisplay.displayReference(
-      referenceType: entry.referenceType,
-      referenceId: entry.referenceId,
-      referenceCode: entry.documentNumber,
-      languageCode: languageCode,
-    );
+    final displayReference = _buildRawReferenceCode(entry);
 
     final dateStr = dateObj != null
         ? DateFormatter.formatDate(dateObj)
@@ -515,7 +520,6 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                         label: entry.transactionTypeLabel,
                         referenceType: entry.referenceType,
                         referenceId: entry.referenceId,
-                        referenceCode: entry.documentNumber,
                         languageCode: languageCode,
                       ),
                       style: const TextStyle(
@@ -820,6 +824,13 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
           value: revenue.id.toString(),
         ),
         _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.document_number'),
+          value: (() {
+            final doc = (revenue.documentNumber ?? '').trim();
+            return doc.isNotEmpty ? doc : '-';
+          })(),
+        ),
+        _LinkedEntityDetailRow(
           label: l10n.translate('accounting.amount'),
           value: _formatMoneyLabel(revenue.amount),
         ),
@@ -857,6 +868,13 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         _LinkedEntityDetailRow(
           label: l10n.translate('common.detail'),
           value: cost.id.toString(),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.document_number'),
+          value: (() {
+            final doc = (cost.documentNumber ?? '').trim();
+            return doc.isNotEmpty ? doc : '-';
+          })(),
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.amount'),
@@ -898,7 +916,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.description'),
-          value: entry.note ?? '-',
+          value: entry.note.trim().isNotEmpty ? entry.note : '-',
         ),
         if ((entry.moneyChannelLabel ?? entry.moneyChannel ?? '').isNotEmpty)
           _LinkedEntityDetailRow(
@@ -906,7 +924,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
             value: entry.moneyChannelLabel ?? entry.moneyChannel!,
           ),
         _LinkedEntityDetailRow(
-          label: l10n.translate('accounting.gl_detail_date'),
+          label: l10n.translate('accounting.date'),
           value: _formatLedgerDate(entry.date),
         ),
       ];
@@ -924,27 +942,16 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
 
   void _showEntryDetail(GeneralLedgerEntryModel entry) {
     final languageCode = Localizations.localeOf(context).languageCode;
-    final displayDocument = AccountingReferenceDisplay.displayDocument(
-      documentNumber: entry.documentNumber,
-      referenceType: entry.referenceType,
-      referenceId: entry.referenceId,
-      referenceCode: entry.documentNumber,
-      languageCode: languageCode,
-    );
+    final displayDocument = entry.documentNumber.trim().isNotEmpty
+        ? entry.documentNumber.trim()
+        : '-';
     final displayNote = AccountingReferenceDisplay.displayDescriptionValue(
       description: entry.note,
       referenceType: entry.referenceType,
       referenceId: entry.referenceId,
-      referenceCode: entry.documentNumber,
       languageCode: languageCode,
     );
-    final displayReference = AccountingReferenceDisplay.displayReference(
-      referenceType: entry.referenceType,
-      referenceId: entry.referenceId,
-      referenceCode: entry.documentNumber,
-      languageCode: languageCode,
-      fallback: '-',
-    );
+    final displayReference = _buildRawReferenceCode(entry);
 
     final entityId = entry.entityId ?? 0;
 
@@ -994,7 +1001,6 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                         label: entry.transactionTypeLabel,
                         referenceType: entry.referenceType,
                         referenceId: entry.referenceId,
-                        referenceCode: entry.documentNumber,
                         languageCode: languageCode,
                       ),
                     },

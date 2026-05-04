@@ -140,12 +140,14 @@ class AccountingCostRevenueTab extends StatelessWidget {
     final effectiveLanguageCode = languageCode;
 
     if (item is RevenueEntity) {
-      title = AccountingReferenceDisplay.displayReference(
-        referenceType: 'revenue',
-        referenceId: item.id,
-        languageCode: effectiveLanguageCode,
-        fallback: 'REV-${item.id}',
-      );
+      title = (item.documentNumber ?? '').trim().isNotEmpty
+          ? item.documentNumber!.trim()
+          : AccountingReferenceDisplay.displayReference(
+              referenceType: 'revenue',
+              referenceId: item.id,
+              languageCode: effectiveLanguageCode,
+              fallback: 'REV-${item.id}',
+            );
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'revenue',
@@ -157,12 +159,14 @@ class AccountingCostRevenueTab extends StatelessWidget {
       isReplaced = (item.statusCode ?? '').trim().toLowerCase() == 'replaced' || (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
       statusLabel = item.statusLabel;
     } else if (item is CostEntity) {
-      title = AccountingReferenceDisplay.displayReference(
-        referenceType: 'cost',
-        referenceId: item.id,
-        languageCode: effectiveLanguageCode,
-        fallback: 'COST-${item.id}',
-      );
+      title = (item.documentNumber ?? '').trim().isNotEmpty
+          ? item.documentNumber!.trim()
+          : AccountingReferenceDisplay.displayReference(
+              referenceType: 'cost',
+              referenceId: item.id,
+              languageCode: effectiveLanguageCode,
+              fallback: 'COST-${item.id}',
+            );
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'cost',

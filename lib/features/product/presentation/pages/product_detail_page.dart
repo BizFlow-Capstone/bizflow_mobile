@@ -13,6 +13,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/services/permission_service.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../domain/entities/product_history_entities.dart';
 import '../../data/product_repository.dart';
 import 'edit_product_page.dart';
 import '../bloc/product_bloc.dart';
@@ -1242,6 +1243,37 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         l10n?.translate('product.detail.price_history_title') ??
         'Lịch sử thay đổi giá bán';
 
+    DateTime policySortKey(ProductPricePolicyEntity policy) {
+      return policy.startAt ?? policy.endAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
+    final sortedSaleItems = state.priceHistory
+        .map(
+          (saleItem) => ProductSaleItemHistoryEntity(
+            saleItemId: saleItem.saleItemId,
+            unit: saleItem.unit,
+            quantity: saleItem.quantity,
+            pricePolicies: List<ProductPricePolicyEntity>.from(saleItem.pricePolicies)
+              ..sort((a, b) {
+                final timeCompare = policySortKey(b).compareTo(policySortKey(a));
+                if (timeCompare != 0) return timeCompare;
+                return b.id.compareTo(a.id);
+              }),
+          ),
+        )
+        .toList()
+      ..sort((a, b) {
+        final aKey = a.pricePolicies.isNotEmpty
+            ? policySortKey(a.pricePolicies.first)
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final bKey = b.pricePolicies.isNotEmpty
+            ? policySortKey(b.pricePolicies.first)
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final timeCompare = bKey.compareTo(aKey);
+        if (timeCompare != 0) return timeCompare;
+        return b.saleItemId.compareTo(a.saleItemId);
+      });
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -1266,6 +1298,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               fontWeight: FontWeight.w600,
             ),
           ),
+          subtitle: Text(
+            '${l10n?.translate('product.detail.current_sale_price') ?? 'Giá bán hiện tại'}: ${_formatPrice(_currentProduct.salePrice ?? 0)}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
           children: [
             if (state.isLoadingPriceHistory)
               const Padding(
@@ -1284,7 +1322,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 ),
               )
             else
-              ...state.priceHistory.map((saleItem) {
+              ...sortedSaleItems.map((saleItem) {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1404,6 +1442,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             style: AppTextStyles.titleMedium.copyWith(
               color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            '${l10n?.translate('product.detail.current_stock') ?? 'Tồn kho hiện tại'}: ${_formatStock(_currentProduct.quantity)} ${_currentProduct.unit ?? ''}'.trim(),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
           children: [

@@ -34,9 +34,9 @@ Future<void> showEditCostDialog({
   );
   final descriptionController = TextEditingController(text: item.description);
   final documentNumberController = TextEditingController(
-    text: item.documentNumber ?? item.referenceCode ?? '',
+    text: item.documentNumber ?? '',
   );
-  DateTime selectedDate = item.date;
+  DateTime selectedDate = DateTime.now();
   DateTime? selectedDocumentDate = item.documentDate;
   String? selectedCostType;
   String? selectedPaymentMethod;

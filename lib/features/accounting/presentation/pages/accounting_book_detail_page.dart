@@ -170,6 +170,7 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
           final normalizedDataRows = AccountingReferenceDisplay.normalizeRows(
             dataRows,
             languageCode: languageCode,
+            preserveOriginalDocumentNumber: true,
           );
           if (sectionsData == null) {
             return Center(
@@ -428,6 +429,7 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
       final rows = AccountingReferenceDisplay.normalizeRows(
         rawRows,
         languageCode: languageCode,
+        preserveOriginalDocumentNumber: true,
       );
       final headerInfo = _buildExportHeaderInfo(sectionsData);
       final files = await ExcelExportService.exportToExcelFiles(

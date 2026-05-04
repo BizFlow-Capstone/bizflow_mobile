@@ -1867,7 +1867,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   dialogCtx: dialogCtx,
                   value: selectedDate,
                   initialDate: selectedDate,
-                  readOnly: true,
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() => selectedDate = value);
@@ -2848,7 +2847,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   dialogCtx: dialogCtx,
                   value: selectedDate,
                   initialDate: selectedDate,
-                  readOnly: true,
                   onChanged: (value) {
                     if (value != null) {
                       setDialogState(() => selectedDate = value);
