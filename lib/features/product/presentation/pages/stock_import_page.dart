@@ -631,7 +631,7 @@ class _StockImportViewState extends State<_StockImportView> {
           importType: _hasInvoice ? 'INVOICE' : 'INVENTORY_ADJUSTMENT',
           supplier: _supplierController.text,
           note: _noteController.text,
-          receivedAt: null,
+          receivedAt: DateTime.now(),
           documentDate: _documentDate,
           documentNumber: _documentNumberController.text.isNotEmpty
               ? _documentNumberController.text
@@ -749,7 +749,7 @@ class _StockImportViewState extends State<_StockImportView> {
                                       : 'INVENTORY_ADJUSTMENT',
                                   supplier: _supplierController.text,
                                   note: _noteController.text,
-                                  receivedAt: null,
+                                  receivedAt: DateTime.now(),
                                   documentDate: _documentDate,
                                   documentNumber:
                                       _documentNumberController.text.isNotEmpty
