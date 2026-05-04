@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/template_field_definition.dart';
 
@@ -300,12 +301,15 @@ class AccountingBookTableWidget extends StatelessWidget {
         }
         return value.toString();
       case 'date':
+        if (value is DateTime) {
+          return DateFormatter.formatDate(value);
+        }
         if (value is String) {
-          try {
-            return DateTime.parse(value).toString().split(' ')[0];
-          } catch (_) {
-            return value;
+          final parsed = DateFormatter.parseApiDateTime(value);
+          if (parsed != null) {
+            return DateFormatter.formatDate(parsed);
           }
+          return value;
         }
         return value.toString();
       case 'auto_increment':

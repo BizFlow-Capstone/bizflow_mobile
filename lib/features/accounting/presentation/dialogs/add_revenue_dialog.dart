@@ -11,6 +11,7 @@ import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../shared/dialogs/app_dialog.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../product/data/models/business_type_model.dart';
 import '../../../product/presentation/bloc/product_bloc.dart';
@@ -177,9 +178,7 @@ Future<void> showAddRevenueDialog({
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(l10n.translate('accounting.revenue_date')),
-                subtitle: Text(
-                  '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
-                ),
+                subtitle: Text(DateFormatter.formatDate(selectedDate)),
                 trailing: const Icon(Icons.lock),
                 enabled: false,
                 onTap: null,

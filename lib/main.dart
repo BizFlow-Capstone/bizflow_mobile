@@ -76,6 +76,7 @@ import 'shared/context/business_context.dart';
 import 'shared/context/notification_context.dart';
 import 'shared/context/user_profile_context.dart';
 import 'shared/cache/cache_manager.dart';
+import 'shared/services/document_number_service.dart';
 import 'core/services/connectivity_service.dart';
 
 void main() async {
@@ -408,6 +409,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         Provider<ImportRepository>.value(value: _importRepository),
         Provider<AccountingRepository>.value(value: _accountingRepository),
         Provider<NotificationRepository>.value(value: _notificationRepository),
+        Provider<DocumentNumberService>(
+          create: (_) => DocumentNumberService(apiClient: _apiClient),
+        ),
         Provider<HomeDashboardApiService>.value(
           value: _homeDashboardApiService,
         ),

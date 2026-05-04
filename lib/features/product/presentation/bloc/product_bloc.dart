@@ -40,6 +40,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<LoadProductDetailRequested>(_onLoadProductDetailRequested);
     on<ProductDetailNetworkDataReceived>(_onProductDetailNetworkDataReceived);
     on<ApplyLocalPriceAdjustmentRequested>(_onApplyLocalPriceAdjustment);
+    on<LoadProductPriceHistoryRequested>(_onLoadProductPriceHistoryRequested);
+    on<LoadProductStockMovementsRequested>(
+      _onLoadProductStockMovementsRequested,
+    );
     on<ResetProducts>(_onResetProducts);
   }
 
@@ -1074,6 +1078,10 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       );
       final product = await repository.getProductDetail(event.productId);
       add(ProductDetailNetworkDataReceived(product: product));
+
+      // Also trigger history loads
+      add(LoadProductPriceHistoryRequested(productId: event.productId));
+      add(LoadProductStockMovementsRequested(productId: event.productId));
     } catch (e) {
       debugPrint('ProductBloc._onLoadProductDetailRequested error: $e');
       if (cachedProduct == null) {
@@ -1088,7 +1096,13 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     if (!isClosed) {
       if (event.product != null) {
-        emit(ProductDetailLoaded(product: event.product!));
+        if (state is ProductDetailLoaded) {
+          emit(
+            (state as ProductDetailLoaded).copyWith(product: event.product!),
+          );
+        } else {
+          emit(ProductDetailLoaded(product: event.product!));
+        }
       } else if (state is! ProductDetailLoaded) {
         emit(ProductFailure(message: 'Không tìm thấy chi tiết sản phẩm'));
       }
@@ -1147,6 +1161,71 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
       }),
     );
     emit(const ProductInitial());
+  }
+
+  Future<void> _onLoadProductPriceHistoryRequested(
+    LoadProductPriceHistoryRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (state is! ProductDetailLoaded) return;
+    final currentState = state as ProductDetailLoaded;
+
+    emit(currentState.copyWith(isLoadingPriceHistory: true));
+
+    try {
+      final history = await repository.getProductPricePolicies(event.productId);
+      if (!isClosed) {
+        emit(
+          (state as ProductDetailLoaded).copyWith(
+            priceHistory: history,
+            isLoadingPriceHistory: false,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ProductBloc._onLoadProductPriceHistoryRequested error: $e');
+      if (!isClosed) {
+        emit(
+          (state as ProductDetailLoaded).copyWith(isLoadingPriceHistory: false),
+        );
+      }
+    }
+  }
+
+  Future<void> _onLoadProductStockMovementsRequested(
+    LoadProductStockMovementsRequested event,
+    Emitter<ProductState> emit,
+  ) async {
+    if (state is! ProductDetailLoaded) return;
+    final currentState = state as ProductDetailLoaded;
+
+    emit(currentState.copyWith(isLoadingStockMovements: true));
+
+    try {
+      final result = await repository.getProductStockMovements(
+        event.productId,
+        pageNumber: event.pageNumber,
+        pageSize: event.pageSize,
+      );
+      if (!isClosed) {
+        emit(
+          (state as ProductDetailLoaded).copyWith(
+            stockMovements: result['items'] ?? [],
+            stockMovementsTotalCount: result['totalCount'] ?? 0,
+            isLoadingStockMovements: false,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('ProductBloc._onLoadProductStockMovementsRequested error: $e');
+      if (!isClosed) {
+        emit(
+          (state as ProductDetailLoaded).copyWith(
+            isLoadingStockMovements: false,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _updateProductCache(String locationId) async {

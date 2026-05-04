@@ -25,6 +25,7 @@ import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../../../shared/context/business_context.dart';
 import '../../../../core/reference/data/reference_item.dart';
+import '../../../../shared/services/document_number_check_helper.dart';
 
 // Extracted Cost AI Draft Dialog
 class AIDraftCostDialog extends StatefulWidget {
@@ -646,6 +647,16 @@ class _AIDraftCostDialogState extends State<AIDraftCostDialog> {
         l10n.translate('accounting.ai_draft_validation_failed'),
       );
       return;
+    }
+
+    // Document number duplicate check
+    final docNum = (draft.documentNumber ?? '').trim();
+    if (docNum.isNotEmpty) {
+      final canProceed = await checkDocumentNumberAndConfirm(
+        context,
+        documentNumber: docNum,
+      );
+      if (!canProceed || !mounted) return;
     }
 
     setState(() {

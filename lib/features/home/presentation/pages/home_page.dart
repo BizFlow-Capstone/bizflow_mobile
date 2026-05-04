@@ -174,6 +174,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
         await CacheManager().removeByPrefix('home_ai_bundle_');
       }
 
+      if (!mounted) return;
+
       context.read<LocationBloc>().add(
         const LoadLocationsRequested(useCache: false),
       );
@@ -181,7 +183,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
       if (businessContext.isOwner &&
           businessContext.currentBusinessId != null) {
         context.read<EmployeeBloc>().add(
-          LoadEmployeesRequested(businessId: businessContext.currentBusinessId!),
+          LoadEmployeesRequested(
+            businessId: businessContext.currentBusinessId!,
+          ),
         );
       }
 
@@ -480,7 +484,10 @@ class _HomePageState extends State<HomePage> with RouteAware {
                         item,
                       ) {
                         final key = item.productId.trim();
+                        // Hide items with missing product name (likely deleted/stale data)
                         if (key.isEmpty ||
+                            item.productName == null ||
+                            item.productName!.trim().isEmpty ||
                             seenInsightProductIds.contains(key)) {
                           return false;
                         }
@@ -623,7 +630,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
                                     Align(
                                       alignment: Alignment.centerLeft,
                                       child: Text(
-                                        'Bộ lọc insight',
+                                        l10n.translate(
+                                          'home.ai_insight_filter_title',
+                                        ),
                                         style: AppTextStyles.labelSmall
                                             .copyWith(
                                               color: AppColors.textSecondary,
@@ -763,7 +772,9 @@ class _HomePageState extends State<HomePage> with RouteAware {
                                       Align(
                                         alignment: Alignment.centerLeft,
                                         child: Text(
-                                          'Chưa có dữ liệu cho bộ lọc này.',
+                                          l10n.translate(
+                                            'home.ai_insight_no_data',
+                                          ),
                                           style: AppTextStyles.bodySmall
                                               .copyWith(
                                                 color: AppColors.textSecondary,
@@ -1025,6 +1036,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
                         AppRouter.navigateTo(AppRoutes.accounting);
                       },
                       showReport: PermissionService.canViewReports(isOwner),
+                      showDebt: PermissionService.canViewDebtors(isOwner),
                     );
                   },
                 ),
@@ -1205,24 +1217,26 @@ class _HomePageState extends State<HomePage> with RouteAware {
   }
 
   String _insightSectionTitle(_InsightTypeFilter filter) {
+    final l10n = AppLocalizations.of(context);
     switch (filter) {
       case _InsightTypeFilter.topSeller:
-        return 'Top sản phẩm bán chạy';
+        return l10n.translate('home.ai_insight_top_seller');
       case _InsightTypeFilter.growthTrend:
-        return 'Sản phẩm xu hướng tăng trưởng';
+        return l10n.translate('home.ai_insight_growth_trend');
       case _InsightTypeFilter.promoteCandidate:
-        return 'Sản phẩm nên đẩy bán';
+        return l10n.translate('home.ai_insight_promote_candidate');
     }
   }
 
   String _insightFilterLabel(_InsightTypeFilter filter) {
+    final l10n = AppLocalizations.of(context);
     switch (filter) {
       case _InsightTypeFilter.topSeller:
-        return 'Bán chạy';
+        return l10n.translate('home.ai_insight_filter_top_seller');
       case _InsightTypeFilter.growthTrend:
-        return 'Tăng trưởng';
+        return l10n.translate('home.ai_insight_filter_growth_trend');
       case _InsightTypeFilter.promoteCandidate:
-        return 'Đề xuất đẩy';
+        return l10n.translate('home.ai_insight_filter_promote_candidate');
     }
   }
 
@@ -1256,10 +1270,11 @@ class _HomePageState extends State<HomePage> with RouteAware {
         type: AppSnackBarType.error,
       );
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _acknowledgingAnomalyIds.remove(anomalyId);
-      });
+      if (mounted) {
+        setState(() {
+          _acknowledgingAnomalyIds.remove(anomalyId);
+        });
+      }
     }
   }
 
@@ -1340,15 +1355,17 @@ class _HomePageState extends State<HomePage> with RouteAware {
       case _SummaryPeriod.today:
         return _DateRange(from: today, to: today);
       case _SummaryPeriod.week:
+        final startOfWeek = today.subtract(
+          Duration(days: today.weekday - DateTime.monday),
+        );
         return _DateRange(
-          from: today.subtract(const Duration(days: 6)),
-          to: today,
+          from: startOfWeek,
+          to: startOfWeek.add(const Duration(days: 6)),
         );
       case _SummaryPeriod.month:
-        return _DateRange(
-          from: today.subtract(const Duration(days: 29)),
-          to: today,
-        );
+        final startOfMonth = DateTime(today.year, today.month, 1);
+        final endOfMonth = DateTime(today.year, today.month + 1, 0);
+        return _DateRange(from: startOfMonth, to: endOfMonth);
     }
   }
 

@@ -28,6 +28,7 @@ import '../../../subscription/presentation/utils/subscription_feature_guard.dart
 import '../../../../shared/context/business_context.dart';
 import '../../../../core/reference/data/reference_item.dart';
 import '../../../revenue/data/models/ai_draft_revenue_dto.dart';
+import '../../../../shared/services/document_number_check_helper.dart';
 
 // Extracted Revenue AI Draft Dialog
 class AIDraftRevenueDialog extends StatefulWidget {
@@ -664,6 +665,16 @@ class _AIDraftRevenueDialogState extends State<AIDraftRevenueDialog> {
         l10n.translate('accounting.ai_draft_validation_failed'),
       );
       return;
+    }
+
+    // Document number duplicate check
+    final docNum = (draft.documentNumber ?? '').trim();
+    if (docNum.isNotEmpty) {
+      final canProceed = await checkDocumentNumberAndConfirm(
+        context,
+        documentNumber: docNum,
+      );
+      if (!canProceed || !mounted) return;
     }
 
     setState(() {

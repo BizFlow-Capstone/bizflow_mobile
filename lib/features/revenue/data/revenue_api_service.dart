@@ -137,6 +137,8 @@ class RevenueApiService {
             'ReferenceType': body['referenceType'].toString(),
           if (body['referenceId'] != null)
             'ReferenceId': body['referenceId'].toString(),
+          if (body['removeImage'] != null)
+            'RemoveImage': body['removeImage'].toString(),
           if (trimmedIdempotencyKey != null && trimmedIdempotencyKey.isNotEmpty)
             'IdempotencyKey': trimmedIdempotencyKey,
         },

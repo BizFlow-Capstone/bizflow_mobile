@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
@@ -8,6 +7,7 @@ import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/widgets/app_button.dart';
 
 class GLFilterBottomSheet extends StatefulWidget {
@@ -188,7 +188,6 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final formatter = DateFormat('dd/MM/yyyy');
 
     return SafeArea(
       top: false,
@@ -338,7 +337,7 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
                                     children: [
                                       Text(
                                         _fromDate != null
-                                            ? formatter.format(_fromDate!)
+                                            ? DateFormatter.formatDate(_fromDate)
                                             : context.tr('accounting.from_date'),
                                         style: TextStyle(
                                           color: _fromDate != null
@@ -377,7 +376,7 @@ class _GLFilterBottomSheetState extends State<GLFilterBottomSheet> {
                                     children: [
                                       Text(
                                         _toDate != null
-                                            ? formatter.format(_toDate!)
+                                            ? DateFormatter.formatDate(_toDate)
                                             : context.tr('accounting.to_date'),
                                         style: TextStyle(
                                           color: _toDate != null

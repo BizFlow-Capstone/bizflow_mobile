@@ -43,9 +43,9 @@ class PermissionService {
   static bool canCreateDebtor(bool isOwner) => isOwner;
   static bool canEditDebtor(bool isOwner) => isOwner;
   static bool canDeleteDebtor(bool isOwner) => isOwner;
-  // Both roles can view debtors and record payments
-  static bool canViewDebtors(bool isOwner) => true;
-  static bool canRecordDebtPayment(bool isOwner) => true;
+  // Only owners can manage debt
+  static bool canViewDebtors(bool isOwner) => isOwner;
+  static bool canRecordDebtPayment(bool isOwner) => isOwner;
 
   // ── Reports & Analytics ────────────────────────────────────────────
   static bool canViewReports(bool isOwner) => isOwner;

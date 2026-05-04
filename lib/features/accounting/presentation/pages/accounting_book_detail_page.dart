@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/models/accounting_book.dart';
 import '../../presentation/widgets/accounting_book_table_widget.dart';
 import '../../presentation/widgets/s1a_book_widget.dart';
@@ -503,8 +504,7 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
       businessName = (businessContext.currentBusinessName ?? '').trim();
     }
 
-    final periodLabel =
-        '${sectionsData.lastCalculatedAt.month.toString().padLeft(2, '0')}/${sectionsData.lastCalculatedAt.year}';
+    final periodLabel = DateFormatter.formatDate(sectionsData.lastCalculatedAt);
 
     return ExcelExportHeaderInfo(
       businessName: businessName,

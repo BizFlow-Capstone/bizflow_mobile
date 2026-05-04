@@ -33,7 +33,8 @@
     "create": "Tạo",
     "search_hint": "Tìm kiếm...",
     "back_home": "Về trang chủ",
-    "microphone_permission_required": "Cần cấp quyền micro để tiếp tục"
+    "microphone_permission_required": "Cần cấp quyền micro để tiếp tục",
+    "reference_code": "Mã chứng từ"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -423,7 +424,21 @@
       "current_cost_price": "Giá vốn hiện tại",
       "no_cost_history": "Chưa có lịch sử giá vốn",
       "cost_history_note": "Chỉ hiển thị các lần nhập kho đã xác nhận. Số lượng là theo từng lần nhập.",
-      "cost_history_import_qty": "Số lượng nhập"
+      "cost_history_import_qty": "Số lượng nhập",
+      "price_policy_title": "Lịch sử điều chỉnh giá bán",
+      "price_policy_no_data": "Chưa có lịch sử điều chỉnh giá bán",
+      "price_policy_effective_date": "Ngày hiệu lực",
+      "price_policy_old_price": "Giá cũ",
+      "price_policy_new_price": "Giá mới",
+      "price_policy_unit": "Đơn vị",
+      "stock_movement_title": "Lịch sử biến động kho",
+      "stock_movement_no_data": "Chưa có lịch sử biến động kho",
+      "movement_in": "Nhập kho",
+      "movement_out": "Xuất kho",
+      "movement_sale": "Bán hàng",
+      "movement_adjustment_in": "Điều chỉnh tăng",
+      "movement_adjustment_out": "Điều chỉnh giảm",
+      "balance": "Số dư"
     },
     "bulk_adjust": {
       "title": "Điều chỉnh giá bán",
@@ -501,15 +516,20 @@
     "cost_price_label": "Giá vốn: ",
     "stock_label": "Tồn: ",
     "loading_products": "Đang tải sản phẩm...",
-    "no_products_found": "Không tìm thấy sản phẩm nào"
+    "no_products_found": "Không tìm thấy sản phẩm nào",
+    "payment_method": "Phương thức thanh toán",
+    "payment_method_hint": "Chọn phương thức (nếu có)",
+    "edit_import": "Sửa phiếu nhập",
+    "edit_confirmed_warning": "Phiếu nhập đã xác nhận. Sửa sẽ tạo phiếu mới thay thế.",
+    "edit_confirmed_continue": "Tiếp tục sửa"
   },
   "home": {
     "title": "Trang chủ",
     "welcome": "Chào mừng bạn",
     "greeting": "Xin chào",
     "todays_orders": "Đơn hàng hôm nay",
-    "todays_revenue": "Doanh thu hôm nay",
-    "todays_cost": "Chi phí hôm nay",
+    "todays_revenue": "Doanh thu hôm nay (đơn hàng + tạo thủ công)",
+    "todays_cost": "Chi phí hôm nay (nhập hàng + tạo thủ công)",
     "todays_debt": "Công nợ hôm nay",
     "period_today": "Hôm nay",
     "period_week": "Tuần",
@@ -538,7 +558,15 @@
     "ai_best_seller_title": "Sản phẩm bán chạy",
     "ai_reorder_title": "Gợi ý nhập hàng",
     "ai_anomalies_title": "Cảnh báo bất thường",
-    "ai_mark_read": "Đánh dấu đã đọc"
+    "ai_mark_read": "Đánh dấu đã đọc",
+    "ai_insight_filter_title": "Bộ lọc gợi ý",
+    "ai_insight_no_data": "Chưa có dữ liệu cho bộ lọc này.",
+    "ai_insight_top_seller": "Top sản phẩm bán chạy",
+    "ai_insight_growth_trend": "Sản phẩm xu hướng tăng trưởng",
+    "ai_insight_promote_candidate": "Sản phẩm nên đẩy bán",
+    "ai_insight_filter_top_seller": "Bán chạy",
+    "ai_insight_filter_growth_trend": "Tăng trưởng",
+    "ai_insight_filter_promote_candidate": "Đề xuất đẩy"
   },
   "subscription": {
     "appbar_title": "Gói Đăng Ký",
@@ -1002,6 +1030,9 @@
     "customer_info": "Khách hàng",
     "status": "Trạng thái",
     "status_balanced": "Cân bằng",
+    "status_owed": "Khách đang nợ",
+    "status_debit": "Khách đang nợ",
+    "status_credit": "Khách có dư",
     "payment_amount": "Số tiền thanh toán",
     "action": "Hành động",
     "action_decrease_debt": "Giảm nợ",
@@ -1216,6 +1247,11 @@
     "reference_order_id": "Mã đơn hàng (tùy chọn)",
     "reference_order_id_hint": "Ví dụ: 123",
     "linked_order_detail": "Chi tiết đơn hàng",
+    "linked_source_detail": "Chi tiết đối chiếu gốc",
+    "linked_import_detail": "Chi tiết phiếu nhập gốc",
+    "linked_debt_payment_detail": "Chi tiết thu nợ",
+    "linked_adjustment_detail": "Chi tiết điều chỉnh",
+    "linked_item_details": "Chi tiết hàng",
     "order_detail_unavailable": "Không tải được chi tiết đơn hàng",
     "books_empty": "Chưa có sổ kế toán nào",
     "unknown_template": "Mẫu sổ không xác định: {code}",
@@ -1375,5 +1411,9 @@
     "cost_description": "Mô tả chi phí",
     "cost_amount": "Số tiền chi phí",
     "cost_amuont": "Số tiền chi phí"
+  },
+  "document_number": {
+    "duplicate_title": "Chứng từ trùng lặp",
+    "duplicate_message": "Số chứng từ \"{number}\" đã tồn tại trong hệ thống. Vui lòng điều chỉnh hoặc để trống."
   }
 }

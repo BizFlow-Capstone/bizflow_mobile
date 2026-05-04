@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../domain/entities/product_history_entities.dart';
 import '../../data/models/business_type_model.dart';
 
 /// Product States
@@ -159,11 +160,51 @@ class ProductSaleItemsLoaded extends ProductState {
 /// Product detail loaded
 class ProductDetailLoaded extends ProductState {
   final ProductEntity product;
+  final List<ProductSaleItemHistoryEntity> priceHistory;
+  final List<ProductStockMovementEntity> stockMovements;
+  final int stockMovementsTotalCount;
+  final bool isLoadingPriceHistory;
+  final bool isLoadingStockMovements;
 
-  const ProductDetailLoaded({required this.product});
+  const ProductDetailLoaded({
+    required this.product,
+    this.priceHistory = const [],
+    this.stockMovements = const [],
+    this.stockMovementsTotalCount = 0,
+    this.isLoadingPriceHistory = false,
+    this.isLoadingStockMovements = false,
+  });
+
+  ProductDetailLoaded copyWith({
+    ProductEntity? product,
+    List<ProductSaleItemHistoryEntity>? priceHistory,
+    List<ProductStockMovementEntity>? stockMovements,
+    int? stockMovementsTotalCount,
+    bool? isLoadingPriceHistory,
+    bool? isLoadingStockMovements,
+  }) {
+    return ProductDetailLoaded(
+      product: product ?? this.product,
+      priceHistory: priceHistory ?? this.priceHistory,
+      stockMovements: stockMovements ?? this.stockMovements,
+      stockMovementsTotalCount:
+          stockMovementsTotalCount ?? this.stockMovementsTotalCount,
+      isLoadingPriceHistory:
+          isLoadingPriceHistory ?? this.isLoadingPriceHistory,
+      isLoadingStockMovements:
+          isLoadingStockMovements ?? this.isLoadingStockMovements,
+    );
+  }
 
   @override
-  List<Object?> get props => [product];
+  List<Object?> get props => [
+    product,
+    priceHistory,
+    stockMovements,
+    stockMovementsTotalCount,
+    isLoadingPriceHistory,
+    isLoadingStockMovements,
+  ];
 }
 
 /// Failure state

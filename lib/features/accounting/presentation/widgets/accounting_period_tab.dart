@@ -293,12 +293,19 @@ class _PeriodCard extends StatelessWidget {
     }
   }
 
+  String _formatPeriodDate(String value) {
+    final formatted = DateFormatter.formatDate(DateFormatter.parse(value));
+    return formatted.isNotEmpty ? formatted : value;
+  }
+
   @override
   Widget build(BuildContext context) {
     final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
     final isActionLoading = context.select(
       (AccountingPeriodBloc bloc) => bloc.state.isActionLoading,
     );
+    final startDate = _formatPeriodDate(period.startDate);
+    final endDate = _formatPeriodDate(period.endDate);
 
     return Card(
       elevation: 2,
@@ -345,7 +352,7 @@ class _PeriodCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                '${l10n.translate("accounting.start_date")}: ${period.startDate}  •  ${l10n.translate("accounting.end_date")}: ${period.endDate}',
+                '${l10n.translate("accounting.start_date")}: $startDate  •  ${l10n.translate("accounting.end_date")}: $endDate',
                 style: AppTextStyles.bodySmall.copyWith(
                   color: AppColors.textSecondary,
                 ),

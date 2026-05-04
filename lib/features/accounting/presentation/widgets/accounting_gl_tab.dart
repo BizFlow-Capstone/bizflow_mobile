@@ -132,6 +132,24 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     return primaryDate;
   }
 
+  String _formatLedgerDate(String? value) {
+    if (value == null) {
+      return '-';
+    }
+
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return '-';
+    }
+
+    final parsed = DateFormatter.parse(trimmed);
+    if (parsed == null) {
+      return trimmed;
+    }
+
+    return DateFormatter.formatDate(parsed);
+  }
+
   Future<void> _loadData({
     bool isLoadMore = false,
     int pageNumber = 1,
@@ -171,8 +189,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         referenceTypes ?? currentState?.referenceTypes;
     final effectiveMoneyChannels = moneyChannels ?? currentState?.moneyChannels;
     // If resetDates is true, use the passed dates (even if null); otherwise fallback to currentState
-    final effectiveFromDate = resetDates ? fromDate : (fromDate ?? currentState?.fromDate);
-    final effectiveToDate = resetDates ? toDate : (toDate ?? currentState?.toDate);
+    final effectiveFromDate = resetDates
+        ? fromDate
+        : (fromDate ?? currentState?.fromDate);
+    final effectiveToDate = resetDates
+        ? toDate
+        : (toDate ?? currentState?.toDate);
     final effectiveViewMode = viewMode ?? currentState?.viewMode ?? 'audit';
 
     context.read<GLBloc>().add(
@@ -407,8 +429,8 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     );
 
     final dateStr = dateObj != null
-        ? DateFormat('dd/MM/yyyy HH:mm').format(dateObj.toLocal())
-        : entry.date;
+        ? DateFormatter.formatDate(dateObj)
+        : _formatLedgerDate(entry.date);
     final formatter = NumberFormat.currency(locale: 'vi', symbol: 'đ');
 
     return Card(
@@ -446,9 +468,15 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: entry.amount >= 0
+                      color:
+                          AccountingReferenceDisplay.isDebtPaymentType(
+                            type: entry.transactionType,
+                            label: entry.transactionTypeLabel,
+                          )
                           ? AppColors.success
-                          : AppColors.error,
+                          : (entry.amount >= 0
+                                ? AppColors.success
+                                : AppColors.error),
                     ),
                   ),
                 ],
@@ -482,7 +510,14 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      entry.transactionTypeLabel ?? entry.transactionType,
+                      AccountingReferenceDisplay.displayTypeLabel(
+                        type: entry.transactionType,
+                        label: entry.transactionTypeLabel,
+                        referenceType: entry.referenceType,
+                        referenceId: entry.referenceId,
+                        referenceCode: entry.documentNumber,
+                        languageCode: languageCode,
+                      ),
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -624,7 +659,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       return dateValue.toString();
     }
 
-    return DateFormat('dd/MM/yyyy').format(dateTime.toLocal());
+    return DateFormatter.formatDate(dateTime);
   }
 
   String _formatImportItemLine(ImportItemModel item) {
@@ -764,7 +799,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
             .toList(growable: false);
 
         return _LinkedEntityDetail(
-          title: 'Chi tiết phiếu nhập gốc',
+          title: l10n.translate('accounting.linked_import_detail'),
           rows: rows,
           itemLines: itemLines,
         );
@@ -851,6 +886,39 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       );
     }
 
+    if (entityType == 'debtor_payment' || entityType == 'adjustment') {
+      final rows = <_LinkedEntityDetailRow>[
+        _LinkedEntityDetailRow(
+          label: l10n.translate('common.detail'),
+          value: entry.entryId.toString(),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.amount'),
+          value: _formatMoneyLabel(entry.amount.abs()),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.description'),
+          value: entry.note ?? '-',
+        ),
+        if ((entry.moneyChannelLabel ?? entry.moneyChannel ?? '').isNotEmpty)
+          _LinkedEntityDetailRow(
+            label: l10n.translate('accounting.channel'),
+            value: entry.moneyChannelLabel ?? entry.moneyChannel!,
+          ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.gl_detail_date'),
+          value: _formatLedgerDate(entry.date),
+        ),
+      ];
+
+      return _LinkedEntityDetail(
+        title: entityType == 'debtor_payment'
+            ? l10n.translate('accounting.linked_debt_payment_detail')
+            : l10n.translate('accounting.linked_adjustment_detail'),
+        rows: rows,
+      );
+    }
+
     return null;
   }
 
@@ -906,7 +974,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 Text(
                   context.tr(
                     'accounting.gl_detail_date',
-                    params: {'value': entry.date},
+                    params: {'value': _formatLedgerDate(entry.date)},
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -921,7 +989,14 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                   context.tr(
                     'accounting.gl_detail_transaction_type',
                     params: {
-                      'value': entry.transactionTypeLabel ?? entry.transactionType,
+                      'value': AccountingReferenceDisplay.displayTypeLabel(
+                        type: entry.transactionType,
+                        label: entry.transactionTypeLabel,
+                        referenceType: entry.referenceType,
+                        referenceId: entry.referenceId,
+                        referenceCode: entry.documentNumber,
+                        languageCode: languageCode,
+                      ),
                     },
                   ),
                 ),
@@ -937,13 +1012,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${context.tr('accounting.amount')}: ${_formatMoneyLabel(
-                    entry.debitAmount != 0
-                        ? entry.debitAmount
-                        : (entry.creditAmount != 0
-                            ? entry.creditAmount
-                            : entry.amount.abs()),
-                  )}',
+                  '${context.tr('accounting.amount')}: ${_formatMoneyLabel(entry.debitAmount != 0 ? entry.debitAmount : (entry.creditAmount != 0 ? entry.creditAmount : entry.amount.abs()))}',
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -967,7 +1036,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                   const Divider(),
                   const SizedBox(height: 8),
                   Text(
-                    'Chi tiết gốc đối chiếu',
+                    context.tr('accounting.linked_source_detail'),
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
@@ -1005,7 +1074,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                           if (linkedDetail.itemLines.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             Text(
-                              'Chi tiết hàng',
+                              context.tr('accounting.linked_item_details'),
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 4),

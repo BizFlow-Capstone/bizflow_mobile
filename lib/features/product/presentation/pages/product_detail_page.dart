@@ -43,6 +43,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   double _historyCurrentCostPrice = 0;
   List<_CostPriceHistoryItem> _costPriceHistory = const [];
 
+  // BLoC handles Price Policies and Stock Movements history now
+
+
   ProductRepository get _repository => context.read<ProductBloc>().repository;
 
   String _formatStock(double value) {
@@ -56,12 +59,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   void initState() {
     super.initState();
     _currentProduct = widget.product;
-    // Trigger loading full details
+    // Trigger loading full details and history
     context.read<ProductBloc>().add(
       LoadProductDetailRequested(productId: widget.product.id),
     );
     _loadCostPriceHistory();
   }
+
+
 
   Future<void> _loadCostPriceHistory() async {
     if (mounted) {
@@ -177,6 +182,12 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               context.read<ProductBloc>().add(
                 LoadProductDetailRequested(productId: widget.product.id),
               );
+              context.read<ProductBloc>().add(
+                LoadProductPriceHistoryRequested(productId: widget.product.id),
+              );
+              context.read<ProductBloc>().add(
+                LoadProductStockMovementsRequested(productId: widget.product.id),
+              );
               await _loadCostPriceHistory();
             },
             child: SingleChildScrollView(
@@ -215,6 +226,17 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
                   // Cost Price History Section
                   _buildCostPriceHistorySection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+                  
+                  if (state is ProductDetailLoaded) ...[
+                    // Price Policy History Section
+                    _buildPricePolicyHistorySection(context, l10n, state),
+                    SizedBox(height: AppSpacing.lg),
+
+                    // Stock Movement History Section
+                    _buildStockMovementHistorySection(context, l10n, state),
+                  ],
+                  
                   const SafeArea(
                     top: false,
                     child: SizedBox(height: AppSpacing.xl),
@@ -1168,38 +1190,313 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       Text(
                         '${l10n?.translate('product.cost_price') ?? 'Giá vốn'}: ${_formatPrice(item.costPrice)}',
                         style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       Text(
                         '${l10n?.translate('product.detail.cost_history_import_qty') ?? 'Số lượng nhập'}: ${item.quantity}',
                         style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       Text(
                         '${l10n?.translate('stock_import.receipt_total') ?? 'Tổng tiền'}: ${_formatPrice(item.totalPrice)}',
                         style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       if (item.supplier.isNotEmpty)
                         Text(
                           '${l10n?.translate('stock_import.receipt_supplier') ?? 'Nhà cung cấp'}: ${item.supplier}',
                           style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       Text(
                         '${l10n?.translate('stock_import.receipt_date') ?? 'Ngày nhập'}: ${formatDate(item.receivedAt ?? item.createdAt)}',
                         style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPricePolicyHistorySection(
+    BuildContext context,
+    AppLocalizations? l10n,
+    ProductDetailLoaded state,
+  ) {
+    String formatDate(DateTime? value) {
+      if (value == null) return '--';
+      return DateFormatter.formatDateTime(value);
+    }
+
+    final title =
+        l10n?.translate('product.detail.price_history_title') ??
+        'Lịch sử thay đổi giá bán';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          shape: const RoundedRectangleBorder(side: BorderSide.none),
+          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+          tilePadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          childrenPadding: EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: AppSpacing.md,
+          ),
+          title: Text(
+            title,
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          children: [
+            if (state.isLoadingPriceHistory)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (state.priceHistory.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.price_history_no_data') ??
+                      'Chưa có lịch sử điều chỉnh giá bán',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              )
+            else
+              ...state.priceHistory.map((saleItem) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      child: Text(
+                        '${l10n?.translate('product.unit') ?? 'Đơn vị'}: ${saleItem.unit} (x${saleItem.quantity})',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    ...saleItem.pricePolicies.map((policy) {
+                      return Container(
+                        width: double.infinity,
+                        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                        padding: EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _formatPrice(policy.price),
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (policy.isDefault)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      l10n?.translate('product.price_policy.default') ?? 'Mặc định',
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: AppSpacing.xs),
+                            Text(
+                              '${l10n?.translate('product.price_policy.start_at') ?? 'Bắt đầu'}: ${formatDate(policy.startAt)}',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            if (policy.endAt != null)
+                              Text(
+                                '${l10n?.translate('product.price_policy.end_at') ?? 'Kết thúc'}: ${formatDate(policy.endAt)}',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const Divider(),
+                  ],
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStockMovementHistorySection(
+    BuildContext context,
+    AppLocalizations? l10n,
+    ProductDetailLoaded state,
+  ) {
+    String formatDate(DateTime? value) {
+      if (value == null) return '--';
+      return DateFormatter.formatDateTime(value);
+    }
+
+    final title =
+        l10n?.translate('product.detail.stock_movement_title') ??
+        'Lịch sử xuất nhập kho';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          shape: const RoundedRectangleBorder(side: BorderSide.none),
+          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+          tilePadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          childrenPadding: EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: AppSpacing.md,
+          ),
+          title: Text(
+            title,
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          children: [
+            if (state.isLoadingStockMovements)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (state.stockMovements.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.stock_movement_no_data') ??
+                      'Chưa có lịch sử xuất nhập kho',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              )
+            else
+              ...state.stockMovements.map((movement) {
+                final isPositive = movement.quantityChange > 0;
+                final color = isPositive ? AppColors.success : AppColors.error;
+                final prefix = isPositive ? '+' : '';
+
+                return Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n?.translate(movement.actionLabel) ?? movement.actionLabel,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '$prefix${movement.quantityChange} ${movement.unit}',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: AppSpacing.xs),
+                      if (movement.referenceCode != null)
+                        Text(
+                          '${l10n?.translate('common.reference_code') ?? 'Mã chứng từ'}: ${movement.referenceCode}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      Text(
+                        '${l10n?.translate('product.detail.balance') ?? 'Số dư'}: ${movement.balanceAfter} ${movement.unit}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        formatDate(movement.createdAt),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (movement.notes != null && movement.notes!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '${l10n?.translate('common.notes') ?? 'Ghi chú'}: ${movement.notes}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textPrimary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }),
           ],
         ),
       ),
@@ -1276,3 +1573,7 @@ class _CostPriceHistoryItem {
     required this.createdAt,
   });
 }
+
+
+
+

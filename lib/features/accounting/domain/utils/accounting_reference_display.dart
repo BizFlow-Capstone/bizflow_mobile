@@ -1,4 +1,4 @@
- class AccountingReferenceDisplay {
+class AccountingReferenceDisplay {
   const AccountingReferenceDisplay._();
 
   static const List<String> _typeKeys = <String>[
@@ -59,9 +59,7 @@
     String languageCode = 'vi',
   }) {
     return rows
-        .map(
-          (row) => normalizeRow(row, languageCode: languageCode),
-        )
+        .map((row) => normalizeRow(row, languageCode: languageCode))
         .toList(growable: false);
   }
 
@@ -70,13 +68,20 @@
     String languageCode = 'vi',
   }) {
     final normalized = Map<String, dynamic>.from(row);
-
-    final referenceType = _firstText(row, _typeKeys);
-    final referenceId = _firstValue(row, _idKeys);
-    final referenceCode = _firstText(row, _referenceCodeKeys);
-
+    final referenceType = _firstText(normalized, _typeKeys);
+    final referenceId = _firstValue(normalized, _idKeys);
+    final referenceCode = _firstText(normalized, _referenceCodeKeys);
     final rawCode = _firstText(normalized, _documentKeys);
     final rawDescription = _firstText(normalized, _descriptionKeys);
+    final rawTransactionType = _firstText(normalized, const <String>[
+      'transactionType',
+      'TransactionType',
+      'transaction_type',
+    ]);
+    final rawTransactionTypeLabel = _firstText(normalized, const <String>[
+      'transactionTypeLabel',
+      'TransactionTypeLabel',
+    ]);
 
     final displayCode = displayDocument(
       documentNumber: rawCode,
@@ -85,7 +90,9 @@
       referenceCode: referenceCode,
       languageCode: languageCode,
     );
-    normalized['so_hieu'] = displayCode;
+    if (displayCode.isNotEmpty) {
+      normalized['so_hieu'] = displayCode;
+    }
 
     final displayDescription = displayDescriptionValue(
       description: rawDescription,
@@ -102,6 +109,18 @@
       if (_shouldReplaceText(note)) {
         normalized['note'] = displayDescription;
       }
+    }
+
+    final displayTransactionType = displayTypeLabel(
+      type: rawTransactionType,
+      label: rawTransactionTypeLabel,
+      referenceType: referenceType,
+      referenceId: referenceId,
+      referenceCode: referenceCode,
+      languageCode: languageCode,
+    );
+    if (displayTransactionType.isNotEmpty) {
+      normalized['transactionTypeLabel'] = displayTransactionType;
     }
 
     return normalized;
@@ -141,13 +160,77 @@
     String languageCode = 'vi',
   }) {
     final raw = (documentNumber ?? '').trim();
+    final lang = _normalizeLanguage(languageCode);
 
     if (raw.isEmpty) {
       return '';
     }
-    // Keep user-entered document numbers as-is (e.g. ORD-123456).
-    // Humanized labels are only used when documentNumber is missing.
+
+    final parsed = _parseReferenceToken(raw);
+    if (parsed != null) {
+      return '${_typeLabel(parsed.type, lang)} ${parsed.id}'.trim();
+    }
+
     return raw;
+  }
+
+  static String displayTypeLabel({
+    required String? type,
+    String? label,
+    String? referenceType,
+    dynamic referenceId,
+    String? referenceCode,
+    String languageCode = 'vi',
+    String fallback = '',
+  }) {
+    final lang = _normalizeLanguage(languageCode);
+    final rawLabel = (label ?? '').trim();
+    if (rawLabel.isNotEmpty) {
+      return rawLabel;
+    }
+
+    final rawType = (type ?? '').trim();
+    if (rawType.isEmpty) {
+      return fallback;
+    }
+
+    final normalizedTransactionType = _normalizeTransactionType(rawType);
+    if (normalizedTransactionType != null) {
+      return _transactionTypeLabel(normalizedTransactionType, lang);
+    }
+
+    final parsedToken = _parseReferenceToken(rawType);
+    if (parsedToken != null) {
+      final parsedType = _normalizeTransactionType(parsedToken.type);
+      if (parsedType != null) {
+        return _transactionTypeLabel(parsedType, lang);
+      }
+
+      return _typeLabel(parsedToken.type, lang);
+    }
+
+    final tokenLabel = _humanizeToken(
+      rawType,
+      referenceType: referenceType,
+      referenceId: referenceId,
+      languageCode: lang,
+    );
+    if (tokenLabel != null && tokenLabel.isNotEmpty) {
+      return tokenLabel;
+    }
+
+    return rawType.isNotEmpty ? rawType : fallback;
+  }
+
+  static bool isDebtPaymentType({required String? type, String? label}) {
+    final candidate = (label ?? '').trim().isNotEmpty
+        ? label!.trim()
+        : (type ?? '').trim();
+    if (candidate.isEmpty) {
+      return false;
+    }
+
+    return _normalizeTransactionType(candidate) == 'debtor_payment';
   }
 
   static String displayDescriptionValue({
@@ -185,13 +268,13 @@
     }
 
     if (_isNumeric(raw)) {
-      final type = _normalizeType(referenceType) ??
+      final type =
+          _normalizeType(referenceType) ??
           _resolveReference(
             referenceType: referenceType,
             referenceId: referenceId,
             referenceCode: referenceCode,
-          )
-              ?.type;
+          )?.type;
       if (type != null) {
         return '${_typeLabel(type, lang)} $raw';
       }
@@ -239,12 +322,18 @@
     switch (type) {
       case 'order':
         return languageCode == 'en' ? 'Order' : 'Đơn hàng';
+      case 'sale':
+        return languageCode == 'en' ? 'Sale' : 'Bán hàng';
       case 'revenue':
         return languageCode == 'en' ? 'Revenue' : 'Doanh thu';
       case 'cost':
         return languageCode == 'en' ? 'Cost' : 'Chi phí';
       case 'import':
         return languageCode == 'en' ? 'Import receipt' : 'Phiếu nhập';
+      case 'debtor_payment':
+        return languageCode == 'en' ? 'Debt payment' : 'Thu nợ';
+      case 'adjustment':
+        return languageCode == 'en' ? 'Adjustment' : 'Điều chỉnh';
       case 'manual':
         return languageCode == 'en' ? 'Manual entry' : 'Thủ công';
       case 'payment':
@@ -253,6 +342,103 @@
         return languageCode == 'en' ? 'Tax' : 'Thuế';
       default:
         return languageCode == 'en' ? 'Reference' : 'Chứng từ';
+    }
+  }
+
+  static String? _normalizeTransactionType(String? value) {
+    final raw = (value ?? '').trim().toLowerCase();
+    if (raw.isEmpty) return null;
+
+    final compact = raw.replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (compact.isEmpty) return null;
+
+    if (compact.contains('sale') || compact.contains('banhang')) {
+      return 'sale';
+    }
+    if (compact.contains('importcost') ||
+        (compact.contains('import') && compact.contains('cost'))) {
+      return 'import_cost';
+    }
+    if (compact.contains('manualcost') ||
+        (compact.contains('manual') && compact.contains('cost'))) {
+      return 'manual_cost';
+    }
+    if (compact.contains('debtorpayment') ||
+        compact.contains('debtpayment') ||
+        compact.contains('thuno')) {
+      return 'debtor_payment';
+    }
+    if (compact.contains('manualrevenue') ||
+        (compact.contains('manual') && compact.contains('revenue'))) {
+      return 'manual_revenue';
+    }
+    if (compact.contains('manualexpense') ||
+        (compact.contains('manual') &&
+            (compact.contains('expense') || compact.contains('chiphi')))) {
+      return 'manual_expense';
+    }
+    if (compact.contains('revenue') || compact.contains('doanhthu')) {
+      return 'revenue';
+    }
+    if (compact.contains('cost') ||
+        compact.contains('expense') ||
+        compact.contains('chiphi')) {
+      return 'cost';
+    }
+    if (compact.contains('import') ||
+        compact.contains('nhapkho') ||
+        compact.contains('receipt')) {
+      return 'import';
+    }
+    if (compact.contains('payment') || compact.contains('thanhtoan')) {
+      return 'payment';
+    }
+    if (compact.contains('adjustment') || compact.contains('dieuchinh')) {
+      return 'adjustment';
+    }
+    if (compact.contains('order') || compact.contains('donhang')) {
+      return 'order';
+    }
+    if (compact.contains('tax') || compact.contains('thue')) {
+      return 'tax';
+    }
+    if (compact.contains('manual') || compact.contains('thucong')) {
+      return 'manual';
+    }
+
+    return null;
+  }
+
+  static String _transactionTypeLabel(String type, String languageCode) {
+    switch (type) {
+      case 'sale':
+        return languageCode == 'en' ? 'Sale' : 'Bán hàng';
+      case 'import_cost':
+        return languageCode == 'en' ? 'Import cost' : 'Chi phí nhập kho';
+      case 'manual_cost':
+        return languageCode == 'en' ? 'Manual cost' : 'Chi phí thủ công';
+      case 'debtor_payment':
+        return languageCode == 'en' ? 'Debt payment' : 'Thanh toán nợ';
+      case 'manual_revenue':
+        return languageCode == 'en' ? 'Manual revenue' : 'Doanh thu thủ công';
+      case 'manual_expense':
+        return languageCode == 'en' ? 'Manual expense' : 'Chi phí thủ công';
+      case 'revenue':
+        return languageCode == 'en' ? 'Revenue' : 'Doanh thu';
+      case 'cost':
+        return languageCode == 'en' ? 'Cost' : 'Chi phí';
+      case 'import':
+        return languageCode == 'en' ? 'Import' : 'Nhập kho';
+      case 'payment':
+        return languageCode == 'en' ? 'Payment' : 'Thanh toán';
+      case 'adjustment':
+        return languageCode == 'en' ? 'Adjustment' : 'Điều chỉnh';
+      case 'manual':
+        return languageCode == 'en' ? 'Manual entry' : 'Thủ công';
+      case 'tax':
+        return languageCode == 'en' ? 'Tax' : 'Thuế';
+      default:
+        return type;
     }
   }
 
@@ -338,6 +524,12 @@
     if (compact.contains('payment') || compact.contains('thanhtoan')) {
       return 'payment';
     }
+    if (compact.contains('debtorpayment') || compact.contains('thuno')) {
+      return 'debtor_payment';
+    }
+    if (compact.contains('adjustment') || compact.contains('dieuchinh')) {
+      return 'adjustment';
+    }
     if (compact.contains('tax') || compact.contains('thue')) {
       return 'tax';
     }
@@ -374,10 +566,7 @@
   }
 
   static String _normalizeLoose(String value) {
-    return value
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return value.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
   }
 
   static String? _humanizeToken(
@@ -432,8 +621,5 @@ class _ResolvedReference {
   final String type;
   final String id;
 
-  const _ResolvedReference({
-    required this.type,
-    required this.id,
-  });
+  const _ResolvedReference({required this.type, required this.id});
 }

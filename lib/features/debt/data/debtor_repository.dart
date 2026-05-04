@@ -201,6 +201,8 @@ class DebtorRepository {
                   'paymentId': item.paymentId,
                   'amount': item.amount,
                   'paymentMethod': item.paymentMethod,
+                  'paymentMethodLabel': item.paymentMethodLabel,
+                  'action': item.action,
                   'notes': item.notes,
                   'createdAt': item.createdAt?.toIso8601String(),
                   'createdByName': item.createdByName,

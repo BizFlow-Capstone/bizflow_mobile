@@ -97,6 +97,7 @@ class ImportHistoryItemModel {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? imageUrl;
+  final String? paymentMethod;
 
   ImportHistoryItemModel({
     required this.importId,
@@ -113,6 +114,7 @@ class ImportHistoryItemModel {
     required this.createdAt,
     this.updatedAt,
     this.imageUrl,
+    this.paymentMethod,
   });
 
   factory ImportHistoryItemModel.fromJson(Map<String, dynamic> json) {
@@ -153,6 +155,12 @@ class ImportHistoryItemModel {
         (json['updatedAt'] ?? json['UpdatedAt']) as String?,
       ),
       imageUrl: (json['imageUrl'] ?? json['ImageUrl']) as String?,
+      paymentMethod: (() {
+        final raw = json['paymentMethod'] ?? json['PaymentMethod'];
+        if (raw is String && raw.trim().isNotEmpty) return raw.trim();
+        if (raw is Map) return (raw['code'] ?? raw['Code'])?.toString();
+        return null;
+      })(),
     );
   }
 
@@ -174,12 +182,14 @@ class ImportHistoryItemModel {
       if (updatedAt != null)
         'updatedAt': DateFormatter.toApiUtcIsoString(updatedAt!),
       if (imageUrl != null) 'imageUrl': imageUrl,
+      if (paymentMethod != null) 'paymentMethod': paymentMethod,
     };
   }
 }
 
 class ImportDetailModel extends ImportHistoryItemModel {
   final List<ImportItemModel> items;
+  final String? documentNumber;
 
   ImportDetailModel({
     required super.importId,
@@ -196,7 +206,9 @@ class ImportDetailModel extends ImportHistoryItemModel {
     required super.createdAt,
     super.updatedAt,
     super.imageUrl,
+    super.paymentMethod,
     required this.items,
+    this.documentNumber,
   });
 
   factory ImportDetailModel.fromJson(Map<String, dynamic> json) {
@@ -224,7 +236,10 @@ class ImportDetailModel extends ImportHistoryItemModel {
     }
 
     final itemsRaw =
-        (json['items'] ?? json['Items'] ?? json['importItems'] ?? json['ImportItems'])
+        (json['items'] ??
+                json['Items'] ??
+                json['importItems'] ??
+                json['ImportItems'])
             as List<dynamic>? ??
         [];
 
@@ -271,6 +286,9 @@ class ImportDetailModel extends ImportHistoryItemModel {
       items: itemsRaw
           .map((e) => ImportItemModel.fromJson(e as Map<String, dynamic>))
           .toList(),
+      documentNumber: parseNullableString(
+        json['documentNumber'] ?? json['DocumentNumber'],
+      ),
     );
   }
 
@@ -291,6 +309,7 @@ class CreateImportRequest {
   final bool saveAsDraft;
   final String? imagePath;
   final List<ImportItemModel> items;
+  final String? paymentMethod;
 
   CreateImportRequest({
     required this.importType,
@@ -303,6 +322,7 @@ class CreateImportRequest {
     required this.saveAsDraft,
     this.imagePath,
     required this.items,
+    this.paymentMethod,
   });
 
   Map<String, dynamic> toJson() {
@@ -320,6 +340,8 @@ class CreateImportRequest {
       'saveAsDraft': saveAsDraft,
       if (imagePath != null) 'imagePath': imagePath,
       'items': items.map((e) => e.toJson()).toList(),
+      if (paymentMethod != null && paymentMethod!.isNotEmpty)
+        'paymentMethod': paymentMethod,
     };
   }
 }
@@ -334,6 +356,8 @@ class UpdateImportRequest {
   final List<ImportItemModel> items;
   final String? imagePath;
   final bool removeImage;
+  final String? paymentMethod;
+  final String? idempotencyKey;
 
   UpdateImportRequest({
     required this.importType,
@@ -345,6 +369,8 @@ class UpdateImportRequest {
     required this.items,
     this.imagePath,
     this.removeImage = false,
+    this.paymentMethod,
+    this.idempotencyKey,
   });
 
   Map<String, dynamic> toJson() {
@@ -361,16 +387,30 @@ class UpdateImportRequest {
       'items': items.map((e) => e.toJson()).toList(),
       'removeImage': removeImage,
       if (imagePath != null) 'imagePath': imagePath,
+      if (paymentMethod != null && paymentMethod!.isNotEmpty)
+        'paymentMethod': paymentMethod,
     };
   }
 }
 
 class ConfirmImportRequest {
   final DateTime receivedAt;
+  final String? idempotencyKey;
+  final String? paymentMethod;
 
-  ConfirmImportRequest({required this.receivedAt});
+  ConfirmImportRequest({
+    required this.receivedAt,
+    this.idempotencyKey,
+    this.paymentMethod,
+  });
 
   Map<String, dynamic> toJson() {
-    return {'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt)};
+    return {
+      'receivedAt': DateFormatter.toApiUtcIsoString(receivedAt),
+      if (idempotencyKey != null && idempotencyKey!.isNotEmpty)
+        'idempotencyKey': idempotencyKey,
+      if (paymentMethod != null && paymentMethod!.isNotEmpty)
+        'paymentMethod': paymentMethod,
+    };
   }
 }

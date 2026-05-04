@@ -36,6 +36,8 @@ import '../bloc/order_bloc.dart';
 import '../../domain/entities/order_entity.dart';
 import '../../domain/entities/order_item_entity.dart';
 import 'order_payment_screen.dart';
+import '../../../../shared/services/permission_service.dart';
+import '../../../../shared/services/document_number_check_helper.dart';
 
 class OrderFormScreen extends StatefulWidget {
   final String inputType; // 'audio', 'voice', or 'manual'
@@ -1261,7 +1263,10 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                                   );
                                 },
                               ),
-                            if (_customerType == 'walkin') ...[
+                            if (_customerType == 'walkin' &&
+                                PermissionService.canCreateDebtor(
+                                  context.read<BusinessContext>().isOwner,
+                                )) ...[
                               const SizedBox(height: 12),
                               SizedBox(
                                 width: double.infinity,
@@ -1524,12 +1529,35 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                           return;
                         }
 
-                        final completedOrderId =
-                            widget.pendingOrderId == null &&
-                                widget.initialOrder?.status.toLowerCase() ==
-                                    'completed'
-                            ? widget.initialOrder!.id
-                            : null;
+                        // Document number duplicate check
+                        final docNum = _documentNumberController.text.trim();
+                        if (docNum.isNotEmpty) {
+                          final canProceed = await checkDocumentNumberAndConfirm(
+                            context,
+                            documentNumber: docNum,
+                          );
+                          if (!canProceed) {
+                            if (mounted) {
+                              setState(() => _isProceedingPayment = false);
+                            }
+                            return;
+                          }
+                        }
+
+                        if (!mounted) {
+                          setState(() => _isProceedingPayment = false);
+                          return;
+                        }
+
+                        final isEditingCompletedOrder =
+                          widget.initialOrder?.status.toLowerCase() ==
+                          'completed';
+                        final pendingOrderId = isEditingCompletedOrder
+                          ? null
+                          : widget.pendingOrderId?.trim();
+                        final completedOrderId = isEditingCompletedOrder
+                          ? widget.initialOrder!.id
+                          : null;
                         final editDraftId = widget.draftId ?? _draftId;
 
                         await Navigator.push(
@@ -1542,9 +1570,9 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
                               locationName:
                                   BusinessContext().currentBusinessName,
                                 localDraftId: editDraftId,
-                              pendingOrderId: widget.pendingOrderId,
-                                completedOrderId: completedOrderId,
-                                updateIdempotencyKey: completedOrderId == null
+                              pendingOrderId: pendingOrderId,
+                              completedOrderId: completedOrderId,
+                              updateIdempotencyKey: completedOrderId == null
                                   ? null
                                   : 'completed-edit-${completedOrderId}_$editDraftId',
                               initialDebtorId: _customerType == 'debtor'

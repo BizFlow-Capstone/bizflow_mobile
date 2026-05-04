@@ -11,6 +11,7 @@ class QuickActions extends StatelessWidget {
   final VoidCallback? onDebt;
   final VoidCallback? onReport;
   final bool showReport;
+  final bool showDebt;
 
   const QuickActions({
     super.key,
@@ -19,6 +20,7 @@ class QuickActions extends StatelessWidget {
     this.onDebt,
     this.onReport,
     this.showReport = true,
+    this.showDebt = true,
   });
 
   @override
@@ -35,12 +37,17 @@ class QuickActions extends StatelessWidget {
         label: l10n.translate('home.orders'),
         onTap: onOrders,
       ),
-      _QuickActionButton(
-        icon: Icons.credit_card_outlined,
-        label: l10n.translate('home.debt'),
-        onTap: onDebt,
-      ),
     ];
+
+    if (showDebt) {
+      actions.add(
+        _QuickActionButton(
+          icon: Icons.credit_card_outlined,
+          label: l10n.translate('home.debt'),
+          onTap: onDebt,
+        ),
+      );
+    }
 
     if (showReport) {
       actions.add(

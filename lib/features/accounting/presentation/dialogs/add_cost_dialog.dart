@@ -10,6 +10,7 @@ import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
 import '../../../../shared/context/business_context.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../cost/presentation/bloc/cost_bloc.dart';
@@ -152,8 +153,7 @@ Future<void> showAddCostDialog(BuildContext context) async {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(l10n.translate('accounting.cost_date')),
-                subtitle:
-                    Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                subtitle: Text(DateFormatter.formatDate(selectedDate)),
                 trailing: const Icon(Icons.lock),
                 enabled: false,
                 onTap: null,

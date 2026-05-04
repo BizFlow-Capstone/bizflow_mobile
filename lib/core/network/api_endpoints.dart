@@ -133,6 +133,10 @@ class ApiEndpoints {
       '/api/my-business/product/$productId/stock';
   static const String bulkAdjustSellingPrice =
       '/api/my-business/products/sale-items/selling-price';
+  static String getProductPricePolicies(String productId) =>
+      '/api/my-business/product/$productId/price-policies';
+  static String getProductStockMovements(String productId) =>
+      '/api/my-business/product/$productId/stock-movements';
 
   // Business Types
   static const String businessTypes = '/api/business-types';
@@ -208,6 +212,10 @@ class ApiEndpoints {
 
   // GL Entries
   static const String glEntries = '/api/my-business/accounting/gl-entries';
+
+  // Document Number
+  static const String documentNumberExists =
+      '/api/my-business/accounting/document-numbers/exists';
 
   // Subscription & Settings
   static const String adminFeatures = '/api/admin/features';

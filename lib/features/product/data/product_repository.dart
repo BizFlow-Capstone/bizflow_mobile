@@ -8,6 +8,7 @@ import 'datasources/product_local_datasource.dart';
 import 'product_api_service.dart';
 import 'models/business_type_model.dart';
 import 'models/product_dto.dart';
+import '../domain/entities/product_history_entities.dart';
 import '../../../shared/cache/local_api_cache_store.dart';
 import '../../../shared/context/business_context.dart';
 
@@ -602,6 +603,81 @@ class ProductRepository {
     await _localApiCache.removeByGroup('products');
     await _localApiCache.removeByGroup('product_sale_items');
     await _localApiCache.removeByGroup('product_business_types');
+    await _localApiCache.removeByGroup('product_price_policies');
     await clearCachedProducts();
+  }
+
+  /// Fetch selling price policies for a product with SWR caching.
+  Future<List<ProductSaleItemHistoryEntity>> getProductPricePolicies(
+    String productId,
+  ) async {
+    final cacheKey = 'cache_price_policies_$productId';
+
+    // Background fetch and cache update
+    unawaited(
+      _service.getProductPricePolicies(productId).then((response) async {
+        await _localApiCache.setMap(cacheKey, {'data': response});
+      }).catchError((_) {}),
+    );
+
+    // Return cached if available
+    final cached = await _localApiCache.getMap(cacheKey);
+    final rawData =
+        (cached != null && cached['data'] != null)
+            ? cached['data']
+            : await _service.getProductPricePolicies(productId);
+
+    if (rawData is List) {
+      return rawData
+          .map((e) => ProductSaleItemHistoryEntity.fromMap(e))
+          .toList();
+    } else if (rawData is Map<String, dynamic> && rawData['saleItems'] != null) {
+      return (rawData['saleItems'] as List)
+          .map((e) => ProductSaleItemHistoryEntity.fromMap(e))
+          .toList();
+    }
+    return [];
+  }
+
+  /// Fetch stock movement history for a product with SWR caching.
+  Future<Map<String, dynamic>> getProductStockMovements(
+    String productId, {
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    final cacheKey = 'cache_stock_movements_${productId}_${pageNumber}_$pageSize';
+
+    // Background fetch and cache update
+    unawaited(
+      _service
+          .getProductStockMovements(
+            productId,
+            pageNumber: pageNumber,
+            pageSize: pageSize,
+          )
+          .then((response) async {
+            await _localApiCache.setMap(cacheKey, response);
+          })
+          .catchError((_) {}),
+    );
+
+    // Return cached if available
+    final cached = await _localApiCache.getMap(cacheKey);
+    final rawData = cached ?? await _service.getProductStockMovements(
+      productId,
+      pageNumber: pageNumber,
+      pageSize: pageSize,
+    );
+
+    final items = (rawData['items'] as List<dynamic>?)
+            ?.map((e) => ProductStockMovementEntity.fromMap(e))
+            .toList() ??
+        [];
+
+    return {
+      'items': items,
+      'totalCount': rawData['totalCount'] ?? 0,
+      'totalPages': rawData['totalPages'] ?? 0,
+    };
   }
 }

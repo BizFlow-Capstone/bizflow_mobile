@@ -11,6 +11,7 @@ class RevenueEntity extends Equatable {
   final String? moneyChannel;
   final String? referenceType;
   final int? referenceId;
+  final String? documentNumber;
   final String? referenceCode;
   final String? businessTypeId;
   final String? businessTypeName;
@@ -30,6 +31,7 @@ class RevenueEntity extends Equatable {
     this.moneyChannel,
     this.referenceType,
     this.referenceId,
+    this.documentNumber,
     this.referenceCode,
     this.businessTypeId,
     this.businessTypeName,
@@ -51,6 +53,7 @@ class RevenueEntity extends Equatable {
     moneyChannel,
     referenceType,
     referenceId,
+    documentNumber,
     referenceCode,
     businessTypeId,
     businessTypeName,

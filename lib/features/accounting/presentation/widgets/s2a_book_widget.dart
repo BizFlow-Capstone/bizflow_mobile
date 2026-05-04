@@ -23,7 +23,11 @@ class S2aBookWidget extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [_buildHeader(context), _buildTable(context)],
+        children: [
+          _buildHeader(context),
+          _buildTable(context),
+          _buildBreakdowns(context),
+        ],
       ),
     );
   }
@@ -153,6 +157,152 @@ class S2aBookWidget extends StatelessWidget {
           ),
         ],
         rows: tableRows,
+      ),
+    );
+  }
+
+  Widget _buildBreakdowns(BuildContext context) {
+    final List<Map<String, dynamic>> revenueBreakdowns = [];
+    final List<Map<String, dynamic>> taxBreakdowns = [];
+
+    void extractBreakdowns(List<SectionRowDto> rows) {
+      for (final row in rows) {
+        final rb = row.values['revenueBreakdown'];
+        if (rb is List) {
+          for (final item in rb) {
+            if (item is Map) {
+              revenueBreakdowns.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+        final tb = row.values['taxBreakdown'];
+        if (tb is List) {
+          for (final item in tb) {
+            if (item is Map) {
+              taxBreakdowns.add(Map<String, dynamic>.from(item));
+            }
+          }
+        }
+      }
+    }
+
+    for (final section in sections.sections) {
+      extractBreakdowns(section.rows);
+    }
+    extractBreakdowns(sections.footerRows);
+
+    if (revenueBreakdowns.isEmpty && taxBreakdowns.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (revenueBreakdowns.isNotEmpty) ...[
+            Text(
+              'Chi tiết doanh thu theo ngành nghề',
+              style: AppTextStyles.titleSmall.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildBreakdownTable(
+              items: revenueBreakdowns,
+              nameKey: 'businessTypeName',
+              nameLabel: 'Ngành nghề',
+            ),
+            const SizedBox(height: 24),
+          ],
+          if (taxBreakdowns.isNotEmpty) ...[
+            Text(
+              'Chi tiết thuế',
+              style: AppTextStyles.titleSmall.copyWith(
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildBreakdownTable(
+              items: taxBreakdowns,
+              nameKey: 'taxType',
+              nameLabel: 'Loại thuế',
+              hasRate: true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  num? _parseAmountNum(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    if (value is String) {
+      return num.tryParse(value.replaceAll(',', '').trim());
+    }
+    return num.tryParse(value.toString());
+  }
+
+  Widget _buildBreakdownTable({
+    required List<Map<String, dynamic>> items,
+    required String nameKey,
+    required String nameLabel,
+    bool hasRate = false,
+  }) {
+    final aggregated = <String, Map<String, dynamic>>{};
+    for (final item in items) {
+      final name = item[nameKey]?.toString() ?? item['businessType']?.toString() ?? item['taxName']?.toString() ?? 'Khác';
+      final amount = _parseAmountNum(item['amount'] ?? item['taxAmount']) ?? 0;
+      final rate = item['rate'] ?? item['taxRate'];
+
+      final key = hasRate ? '${name}_$rate' : name;
+      
+      if (aggregated.containsKey(key)) {
+        aggregated[key]!['amount'] = (aggregated[key]!['amount'] as num) + amount;
+      } else {
+        aggregated[key] = {
+          'name': name,
+          'amount': amount,
+          if (hasRate) 'rate': rate,
+        };
+      }
+    }
+
+    final rows = aggregated.values.toList();
+    final headerStyle = AppTextStyles.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+      fontWeight: FontWeight.bold,
+    );
+    final cellStyle = AppTextStyles.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+    );
+    
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(Colors.grey[100]),
+          columns: [
+            DataColumn(label: Text(nameLabel, style: headerStyle)),
+            if (hasRate) DataColumn(label: Text('Thuế suất', style: headerStyle)),
+            DataColumn(label: Text('Số tiền', style: headerStyle), numeric: true),
+          ],
+          rows: rows.map((row) {
+            final rateText = row['rate'] != null ? '${row['rate']}%' : '';
+            return DataRow(
+              cells: [
+                DataCell(Text(row['name'].toString(), style: cellStyle)),
+                if (hasRate) DataCell(Text(rateText, style: cellStyle)),
+                DataCell(Text(_formatAmount(row['amount']), style: cellStyle)),
+              ],
+            );
+          }).toList(),
+        ),
       ),
     );
   }

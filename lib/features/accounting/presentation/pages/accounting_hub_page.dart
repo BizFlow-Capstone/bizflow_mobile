@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,7 +15,6 @@ import 'package:record/record.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_bloc.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_event.dart';
 import 'package:bizflow_mobile/core/reference/presentation/bloc/reference_state.dart';
-import 'package:bizflow_mobile/core/reference/data/reference_item.dart';
 import 'package:bizflow_mobile/features/order/presentation/bloc/order_bloc.dart';
 import 'package:bizflow_mobile/features/order/presentation/pages/order_detail_screen.dart';
 import 'package:bizflow_mobile/features/revenue/presentation/bloc/revenue_bloc.dart';
@@ -41,7 +40,6 @@ import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
-import '../../../../core/storage/secure_storage.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../bloc/accounting_period_bloc.dart';
 import '../bloc/gl_bloc/gl_bloc.dart';
@@ -57,6 +55,7 @@ import '../../../subscription/data/subscription_repository.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../shared/services/document_number_check_helper.dart';
 
 class AccountingHubPage extends StatefulWidget {
   const AccountingHubPage({super.key});
@@ -72,19 +71,19 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   static const String _featureAi = SubscriptionFeatureCodes.ai;
 
   late final TabController _tabController;
-  
+
   // Helper method: Check if date falls within a finalized period
   bool _isDateInFinalizedPeriod(DateTime date) {
     try {
       final periodBloc = context.read<AccountingPeriodBloc>();
       final periodState = periodBloc.state;
-      
+
       final periods = periodState.periods;
       for (final period in periods) {
         if (period.isFinalized) {
           final start = DateTime.parse(period.startDate);
           final end = DateTime.parse(period.endDate);
-          if (date.isAfter(start.subtract(const Duration(days: 1))) && 
+          if (date.isAfter(start.subtract(const Duration(days: 1))) &&
               date.isBefore(end.add(const Duration(days: 1)))) {
             return true;
           }
@@ -121,7 +120,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   bool _isVoiceRecording = false;
   String? _lastVoicePath;
   String? _lastVoiceTranscript;
-  String? _imageAccessToken;
   List<RevenueEntity> _cachedRevenues = const <RevenueEntity>[];
   List<CostEntity> _cachedCosts = const <CostEntity>[];
   bool _suppressNextRevenueError = false;
@@ -134,7 +132,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     _tabController = TabController(length: 4, vsync: this);
     SyncStatusController().clearError();
     SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
-    unawaited(_warmImageAuthToken());
 
     _tabController.addListener(_handleTabSelection);
 
@@ -249,14 +246,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     }
   }
 
-  Future<void> _warmImageAuthToken() async {
-    try {
-      final token = await SecureStorage().getAccessToken();
-      if (!mounted) return;
-      setState(() => _imageAccessToken = token);
-    } catch (_) {}
-  }
-
   @override
   void dispose() {
     SyncStatusController().setManualRefreshCallback(null);
@@ -355,34 +344,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     return double.tryParse(normalized);
   }
 
-  void _applyRevenueTranscript({
-    required String transcript,
-    required TextEditingController amountController,
-    required TextEditingController descriptionController,
-  }) {
-    final amount = _extractAmountFromTranscript(transcript);
-    if (amount != null && amount > 0) {
-      amountController.text = CurrencyFormatter.formatNumber(amount);
-    }
-    if (descriptionController.text.trim().isEmpty) {
-      descriptionController.text = transcript;
-    }
-  }
-
-  void _applyCostTranscript({
-    required String transcript,
-    required TextEditingController amountController,
-    required TextEditingController descriptionController,
-  }) {
-    final amount = _extractAmountFromTranscript(transcript);
-    if (amount != null && amount > 0) {
-      amountController.text = CurrencyFormatter.formatNumber(amount);
-    }
-    if (descriptionController.text.trim().isEmpty) {
-      descriptionController.text = transcript;
-    }
-  }
-
   String _formatIsoDate(DateTime? date, {String fallback = '-'}) {
     final formatted = DateFormatter.formatIso(date);
     return formatted.isEmpty ? fallback : formatted;
@@ -475,14 +436,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       onTap: readOnly
           ? null
           : () async {
-        final picked = await _pickDate(
-          context: dialogCtx,
-          initialDate: value ?? initialDate,
-        );
-        if (picked != null) {
-          onChanged(picked);
-        }
-      },
+              final picked = await _pickDate(
+                context: dialogCtx,
+                initialDate: value ?? initialDate,
+              );
+              if (picked != null) {
+                onChanged(picked);
+              }
+            },
       enabled: !readOnly,
     );
   }
@@ -834,7 +795,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       builder: (context, revenueState) {
                         // Watch both RevenueBloc and AccountingPeriodBloc for changes
                         context.watch<AccountingPeriodBloc>().state;
-                        
+
                         List<RevenueEntity> revenueEntities = _cachedRevenues;
                         if (revenueState is RevenuesLoaded) {
                           revenueEntities = revenueState.revenues;
@@ -857,7 +818,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
                           canModifyRevenue: _canModifyRevenueEntry,
-                          canModifyCost: (item) => false, // revenue tab doesn't show costs
+                          canModifyCost: (item) =>
+                              false, // revenue tab doesn't show costs
                         );
                       },
                     ),
@@ -865,7 +827,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       builder: (context, costState) {
                         // Watch both CostBloc and AccountingPeriodBloc for changes
                         context.watch<AccountingPeriodBloc>().state;
-                        
+
                         List<CostEntity> costEntities = _cachedCosts;
                         if (costState is CostsLoaded) {
                           costEntities = costState.costs;
@@ -887,7 +849,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onEditCost: _showEditCostDialog,
                           onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
-                          canModifyRevenue: (item) => false, // cost tab doesn't show revenues
+                          canModifyRevenue: (item) =>
+                              false, // cost tab doesn't show revenues
                           canModifyCost: _canModifyCostEntry,
                         );
                       },
@@ -1170,7 +1133,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     label: l10n.translate('accounting.reference_order_id'),
-                    hintText: l10n.translate('accounting.reference_order_id_hint'),
+                    hintText: l10n.translate(
+                      'accounting.reference_order_id_hint',
+                    ),
                     focusNode: referenceOrderFocusNode,
                     textInputAction: TextInputAction.done,
                     validator: (value) {
@@ -1304,6 +1269,22 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           ? null
                           : int.tryParse(referenceOrderRaw);
 
+                      // Document number duplicate check
+                      final docNum = documentNumberController.text.trim();
+                      if (docNum.isNotEmpty) {
+                        final canProceed = await checkDocumentNumberAndConfirm(
+                          context,
+                          documentNumber: docNum,
+                        );
+                        if (!canProceed) {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() => isSubmitting = false);
+                          }
+                          return;
+                        }
+                        if (!mounted || !dialogCtx.mounted) return;
+                      }
+
                       final ok = await _confirmAction(
                         title: l10n.translate('accounting.confirm_title'),
                         message: l10n.translate(
@@ -1338,31 +1319,34 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           .currentBusinessId;
 
                       try {
-                        await context.read<RevenueBloc>().repository
-                            .createManualRevenue(
-                          {
-                            'businessLocationId':
-                                int.tryParse(locationId ?? '') ?? 0,
-                            'amount': amount,
-                            'revenueDate': DateFormat(
-                              'yyyy-MM-dd',
-                            ).format(selectedDate),
-                            if (selectedDocumentDate != null)
-                              'documentDate': DateFormat(
+                        await context
+                            .read<RevenueBloc>()
+                            .repository
+                            .createManualRevenue({
+                              'businessLocationId':
+                                  int.tryParse(locationId ?? '') ?? 0,
+                              'amount': amount,
+                              'revenueDate': DateFormat(
                                 'yyyy-MM-dd',
-                              ).format(selectedDocumentDate!),
-                            'description': descriptionController.text.trim(),
-                            'moneyChannel': selectedMoneyChannel,
-                            'businessTypeId': selectedBusinessTypeId,
-                            if (documentNumberController.text.trim().isNotEmpty)
-                              'documentNumber': documentNumberController.text.trim(),
-                            if (referenceOrderId != null)
-                              'referenceType': 'order',
-                            if (referenceOrderId != null)
-                              'referenceId': referenceOrderId,
-                          },
-                          image: selectedImage,
-                        );
+                              ).format(selectedDate),
+                              if (selectedDocumentDate != null)
+                                'documentDate': DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(selectedDocumentDate!),
+                              'description': descriptionController.text.trim(),
+                              'moneyChannel': selectedMoneyChannel,
+                              if (documentNumberController.text
+                                  .trim()
+                                  .isNotEmpty)
+                                'documentNumber': documentNumberController.text
+                                    .trim(),
+                              if ((selectedBusinessTypeId ?? '').isNotEmpty)
+                                'businessTypeId': selectedBusinessTypeId,
+                              if (referenceOrderId != null)
+                                'referenceType': 'order',
+                              if (referenceOrderId != null)
+                                'referenceId': referenceOrderId,
+                            }, image: selectedImage);
                         if (!mounted || !dialogCtx.mounted) return;
                         Navigator.of(dialogCtx).pop();
                         _showSuccess(
@@ -1370,7 +1354,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         );
                         if (locationId != null) {
                           context.read<RevenueBloc>().add(
-                            LoadRevenuesRequested(businessLocationId: locationId),
+                            LoadRevenuesRequested(
+                              businessLocationId: locationId,
+                            ),
                           );
                         }
                       } catch (e) {
@@ -1676,31 +1662,49 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           (CurrencyFormatter.parse(amountController.text) ?? 0)
                               .toDouble();
 
+                      // Document number duplicate check
+                      final docNum = documentNumberController.text.trim();
+                      if (docNum.isNotEmpty) {
+                        final canProceed = await checkDocumentNumberAndConfirm(
+                          context,
+                          documentNumber: docNum,
+                        );
+                        if (!canProceed) {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() => isSubmitting = false);
+                          }
+                          return;
+                        }
+                        if (!mounted || !dialogCtx.mounted) return;
+                      }
+
                       final locationId = context
                           .read<BusinessContext>()
                           .currentBusinessId;
                       try {
-                        await context.read<CostBloc>().repository
-                            .createManualCost(
-                          {
-                            'businessLocationId':
-                                int.tryParse(locationId ?? '') ?? 0,
-                            'amount': amount,
-                            'costDate': DateFormat(
-                              'yyyy-MM-dd',
-                            ).format(selectedDate),
-                            if (selectedDocumentDate != null)
-                              'documentDate': DateFormat(
+                        await context
+                            .read<CostBloc>()
+                            .repository
+                            .createManualCost({
+                              'businessLocationId':
+                                  int.tryParse(locationId ?? '') ?? 0,
+                              'amount': amount,
+                              'costDate': DateFormat(
                                 'yyyy-MM-dd',
-                              ).format(selectedDocumentDate!),
-                            'description': descriptionController.text.trim(),
-                            'costType': selectedCostType,
-                            'paymentMethod': selectedPaymentMethod,
-                            if (documentNumberController.text.trim().isNotEmpty)
-                              'documentNumber': documentNumberController.text.trim(),
-                          },
-                          image: selectedImage,
-                        );
+                              ).format(selectedDate),
+                              if (selectedDocumentDate != null)
+                                'documentDate': DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(selectedDocumentDate!),
+                              'description': descriptionController.text.trim(),
+                              'costType': selectedCostType,
+                              'paymentMethod': selectedPaymentMethod,
+                              if (documentNumberController.text
+                                  .trim()
+                                  .isNotEmpty)
+                                'documentNumber': documentNumberController.text
+                                    .trim(),
+                            }, image: selectedImage);
                         if (!mounted || !dialogCtx.mounted) return;
                         Navigator.pop(dialogCtx);
                         _showSuccess(
@@ -1708,9 +1712,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         );
                         if (locationId != null) {
                           context.read<CostBloc>().add(
-                            LoadCostsRequested(
-                              businessLocationId: locationId,
-                            ),
+                            LoadCostsRequested(businessLocationId: locationId),
                           );
                         }
                       } catch (e) {
@@ -1774,7 +1776,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
     final descriptionController = TextEditingController(text: item.description);
     final documentNumberController = TextEditingController(
-      text: item.referenceCode ?? '',
+      text: item.documentNumber ?? item.referenceCode ?? '',
     );
     DateTime selectedDate = item.date;
     DateTime? selectedDocumentDate = item.documentDate;
@@ -1804,21 +1806,24 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final costTypeOptions = getCostTypes()
         .where((c) => c.code.toLowerCase() != 'import')
         .toList();
-    if ((selectedCostType ?? '').isNotEmpty &&
+    if (selectedCostType != null &&
+        selectedCostType.isNotEmpty &&
         !costTypeOptions.any((c) => c.code == selectedCostType)) {
       selectedCostType = null;
     }
 
     final paymentOptions = getPaymentMethods();
-    if ((selectedPaymentMethod ?? '').isNotEmpty &&
+    if (selectedPaymentMethod != null &&
+        selectedPaymentMethod.isNotEmpty &&
         !paymentOptions.any((p) => p.code == selectedPaymentMethod)) {
       selectedPaymentMethod = null;
     }
 
     bool isSubmitting = false;
-    File? selectedImage = _resolveImageSource(item.imagePath)?.isNetwork == true
-      ? null
-      : (item.imagePath != null ? File(item.imagePath!) : null);
+    bool removeImage = false;
+    File? selectedImage;
+    // We don't initialize selectedImage from item.imagePath if it's a network URL
+    // since File() won't work on URLs. We handle network display separately.
 
     await showDialog(
       context: context,
@@ -1877,28 +1882,58 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 // Image upload section
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
+                Row(
                   children: [
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.photo_library),
-                      label: Text(l10n.translate('accounting.select_image')),
-                      onPressed: () => _pickImage(
-                        ImageSource.gallery,
-                        setDialogState,
-                        (file) => selectedImage = file,
+                    Expanded(
+                      child: Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.photo_library),
+                            label: Text(
+                              l10n.translate('accounting.select_image'),
+                            ),
+                            onPressed: () => _pickImage(
+                              ImageSource.gallery,
+                              setDialogState,
+                              (file) {
+                                selectedImage = file;
+                                removeImage = false;
+                              },
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.camera_alt),
+                            label: Text(
+                              l10n.translate('accounting.take_photo'),
+                            ),
+                            onPressed: () => _pickImage(
+                              ImageSource.camera,
+                              setDialogState,
+                              (file) {
+                                selectedImage = file;
+                                removeImage = false;
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.camera_alt),
-                      label: Text(l10n.translate('accounting.take_photo')),
-                      onPressed: () => _pickImage(
-                        ImageSource.camera,
-                        setDialogState,
-                        (file) => selectedImage = file,
+                    if (selectedImage != null ||
+                        ((item.imagePath?.isNotEmpty == true ||
+                                item.documentUrl?.isNotEmpty == true) &&
+                            !removeImage))
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: AppColors.error,
+                        ),
+                        onPressed: () => setDialogState(() {
+                          selectedImage = null;
+                          removeImage = true;
+                        }),
                       ),
-                    ),
                   ],
                 ),
                 if (selectedImage != null) ...[
@@ -1907,8 +1942,34 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     child: Image.file(
                       selectedImage!,
-                      height: 100,
+                      height: 120,
                       fit: BoxFit.cover,
+                    ),
+                  ),
+                ] else if ((item.imagePath?.isNotEmpty == true ||
+                        item.documentUrl?.isNotEmpty == true) &&
+                    !removeImage) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    child: Builder(
+                      builder: (context) {
+                        final imageSource = _resolveImageSource(
+                          item.documentUrl ?? item.imagePath,
+                        );
+                        if (imageSource == null) {
+                          return const SizedBox(
+                            height: 120,
+                            child: Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          );
+                        }
+                        return _buildDetailImage(imageSource, height: 120);
+                      },
                     ),
                   ),
                 ],
@@ -1984,17 +2045,20 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         return;
                       }
 
-                      final ok = await _confirmAction(
-                        title: l10n.translate('accounting.confirm_title'),
-                        message: l10n.translate(
-                          'accounting.confirm_update_item',
-                        ),
-                      );
-                      if (!ok) {
-                        if (dialogCtx.mounted) {
-                          setDialogState(() => isSubmitting = false);
+                      // Document number duplicate check
+                      final docNum = documentNumberController.text.trim();
+                      if (docNum.isNotEmpty) {
+                        final canProceed = await checkDocumentNumberAndConfirm(
+                          context,
+                          documentNumber: docNum,
+                          excludeCostId: item.id,
+                        );
+                        if (!canProceed) {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() => isSubmitting = false);
+                          }
+                          return;
                         }
-                        return;
                       }
 
                       if (!mounted || !dialogCtx.mounted) {
@@ -2005,7 +2069,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                       context.read<CostBloc>().add(
                         UpdateManualCostRequested(
                           costId: item.id,
-                                                    idempotencyKey: const Uuid().v4(),
+                          idempotencyKey: const Uuid().v4(),
                           body: {
                             'amount': amount,
                             'costDate': DateFormat(
@@ -2021,8 +2085,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             'paymentMethod':
                                 selectedPaymentMethod ?? item.paymentMethod,
                             if (documentNumberController.text.trim().isNotEmpty)
-                              'documentNumber': documentNumberController.text.trim(),
-                            'removeDocument': false,
+                              'documentNumber': documentNumberController.text
+                                  .trim(),
+                            'removeDocument': removeImage,
                           },
                           image: selectedImage,
                         ),
@@ -2117,7 +2182,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                   padding: const EdgeInsets.only(bottom: 12),
                   child: GestureDetector(
                     onTap: () {
-                      final imageSource = _resolveImageSource(revenue.imagePath);
+                      final imageSource = _resolveImageSource(
+                        revenue.imagePath,
+                      );
                       if (imageSource == null) {
                         return;
                       }
@@ -2143,7 +2210,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                               child: Center(
                                 child: Icon(
                                   Icons.broken_image_outlined,
-                                  color: AppColors.textSecondary,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             );
@@ -2159,9 +2226,19 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 '${l10n.translate('accounting.amount')}: ${CurrencyFormatter.formatVND(revenue.amount)}',
               ),
               const SizedBox(height: 6),
-              Text('${l10n.translate('accounting.description')}: $displayDescription'),
+              Text(
+                '${l10n.translate('accounting.description')}: $displayDescription',
+              ),
               const SizedBox(height: 6),
-              Text('${l10n.translate('accounting.channel')}: ${revenue.moneyChannel ?? '-'}'),
+              if ((revenue.documentNumber ?? '').trim().isNotEmpty) ...[
+                Text(
+                  '${l10n.translate('document_number')}: ${revenue.documentNumber!.trim()}',
+                ),
+                const SizedBox(height: 6),
+              ],
+              Text(
+                '${l10n.translate('accounting.channel')}: ${revenue.moneyChannel ?? '-'}',
+              ),
               const SizedBox(height: 6),
               Text(
                 '${l10n.translate('accounting.revenue_business_type')}: ${revenue.businessTypeName ?? '-'}',
@@ -2209,13 +2286,13 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         const SizedBox(height: 4),
                         Text(
                           '${l10n.translate('order.detail_status')}: ${order.statusLabel ?? (() {
-                            final refState = context.read<ReferenceBloc>().state;
-                            if (refState is ReferenceLoaded) {
-                              final orderStatuses = refState.references['orderStatuses'] ?? <ReferenceItem>[];
-                              return orderStatuses.getLabelByCode(order.status);
-                            }
-                            return order.status;
-                          })()}',
+                                final refState = context.read<ReferenceBloc>().state;
+                                if (refState is ReferenceLoaded) {
+                                  final orderStatuses = refState.references['orderStatuses'] ?? <ReferenceItem>[];
+                                  return orderStatuses.getLabelByCode(order.status);
+                                }
+                                return order.status;
+                              })()}',
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -2340,7 +2417,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                               child: Center(
                                 child: Icon(
                                   Icons.broken_image_outlined,
-                                  color: AppColors.textSecondary,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             );
@@ -2355,13 +2432,27 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 '${l10n.translate('accounting.amount')}: ${CurrencyFormatter.formatVND(cost.amount)}',
               ),
               const SizedBox(height: 6),
-              Text('${l10n.translate('accounting.description')}: $displayDescription'),
+              Text(
+                '${l10n.translate('accounting.description')}: $displayDescription',
+              ),
               const SizedBox(height: 6),
-              Text('${l10n.translate('accounting.channel')}: ${cost.paymentMethod ?? '-'}'),
+              if ((cost.documentNumber ?? '').trim().isNotEmpty) ...[
+                Text(
+                  '${l10n.translate('document_number')}: ${cost.documentNumber!.trim()}',
+                ),
+                const SizedBox(height: 6),
+              ],
+              Text(
+                '${l10n.translate('accounting.channel')}: ${cost.paymentMethod ?? '-'}',
+              ),
               const SizedBox(height: 6),
-              Text('${l10n.translate('accounting.cost_date')}: ${_formatIsoDate(cost.date)}'),
+              Text(
+                '${l10n.translate('accounting.cost_date')}: ${_formatIsoDate(cost.date)}',
+              ),
               const SizedBox(height: 6),
-              Text('${l10n.translate('accounting.ai_cost_type')}: ${cost.type}'),
+              Text(
+                '${l10n.translate('accounting.ai_cost_type')}: ${cost.type}',
+              ),
               const SizedBox(height: 6),
               Text(
                 l10n.translate(
@@ -2394,10 +2485,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final normalizedCode = (referenceCode ?? '').trim().toLowerCase();
     return normalizedType.contains('import') ||
         normalizedType.contains('inventory') ||
-      normalizedType.contains('stockin') ||
+        normalizedType.contains('stockin') ||
         normalizedCode.startsWith('imp') ||
-      normalizedCode.contains('pnk') ||
-      normalizedCode.startsWith('pnk') ||
+        normalizedCode.contains('pnk') ||
+        normalizedCode.startsWith('pnk') ||
         normalizedCode.startsWith('import');
   }
 
@@ -2442,8 +2533,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       return int.tryParse(code) ?? 0;
     }
 
-    final pnkMatch = RegExp(r'pnk[\-_/:#]*\d+[\-_/:#]*(\d+)$', caseSensitive: false)
-        .firstMatch(code);
+    final pnkMatch = RegExp(
+      r'pnk[\-_/:#]*\d+[\-_/:#]*(\d+)$',
+      caseSensitive: false,
+    ).firstMatch(code);
     if (pnkMatch != null) {
       return int.tryParse(pnkMatch.group(1) ?? '') ?? 0;
     }
@@ -2451,10 +2544,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     // Only infer id from explicit id-like prefixes to avoid guessing from
     // document serials such as PNK-2026-007.
     final match =
-        RegExp(r'(?:import|imp|order|ord|id)[^0-9]*(\d+)$', caseSensitive: false)
-            .firstMatch(code) ??
-        RegExp(r'\b(id|importid|orderid)\s*[:=#-]\s*(\d+)\b', caseSensitive: false)
-            .firstMatch(code);
+        RegExp(
+          r'(?:import|imp|order|ord|id)[^0-9]*(\d+)$',
+          caseSensitive: false,
+        ).firstMatch(code) ??
+        RegExp(
+          r'\b(id|importid|orderid)\s*[:=#-]\s*(\d+)\b',
+          caseSensitive: false,
+        ).firstMatch(code);
     if (match == null) {
       return 0;
     }
@@ -2495,8 +2592,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           continue;
         }
 
-        final importCode =
-            (raw['importCode'] ?? raw['ImportCode'] ?? '').toString();
+        final importCode = (raw['importCode'] ?? raw['ImportCode'] ?? '')
+            .toString();
         if (importCode.trim().isEmpty) {
           continue;
         }
@@ -2529,7 +2626,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     }
 
     if (value.startsWith('http://') || value.startsWith('https://')) {
-      return _ImageSource.network(Uri.encodeFull(value));
+      return _ImageSource.network(Uri.parse(value).toString());
     }
 
     if (value.startsWith('file://')) {
@@ -2548,33 +2645,33 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final normalizedPath = slashNormalized.startsWith('/')
         ? slashNormalized
         : '/$slashNormalized';
-    return _ImageSource.network(Uri.encodeFull('$normalizedBase$normalizedPath'));
+    return _ImageSource.network(
+      Uri.parse('$normalizedBase$normalizedPath').toString(),
+    );
   }
 
   Widget _buildDetailImage(_ImageSource imageSource, {double? height}) {
     if (imageSource.isNetwork) {
-      final token = _imageAccessToken?.trim();
-      final headers = (token != null && token.isNotEmpty)
-          ? <String, String>{'Authorization': 'Bearer $token'}
-          : null;
+      final resolvedImageUrl =
+          Uri.tryParse(imageSource.value)?.toString() ?? imageSource.value;
 
       return CachedNetworkImage(
-        imageUrl: imageSource.value,
-        httpHeaders: headers,
+        imageUrl: resolvedImageUrl,
         height: height,
         fit: height == null ? BoxFit.contain : BoxFit.cover,
         placeholder: (context, url) => SizedBox(
           height: height ?? 220,
           child: const Center(child: CircularProgressIndicator()),
         ),
-        errorWidget: (context, url, error) {
-          return SizedBox(
-            height: height ?? 220,
-            child: const Center(
-              child: Icon(Icons.broken_image_outlined, color: AppColors.textSecondary),
+        errorWidget: (context, url, error) => SizedBox(
+          height: height ?? 220,
+          child: const Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: AppColors.textPrimary,
             ),
-          );
-        },
+          ),
+        ),
       );
     }
 
@@ -2586,7 +2683,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         return SizedBox(
           height: height ?? 220,
           child: const Center(
-            child: Icon(Icons.broken_image_outlined, color: AppColors.textSecondary),
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: AppColors.textPrimary,
+            ),
           ),
         );
       },
@@ -2641,7 +2741,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
     final descriptionController = TextEditingController(text: item.description);
     final documentNumberController = TextEditingController(
-      text: item.referenceCode ?? '',
+      text: item.documentNumber ?? item.referenceCode ?? '',
     );
     DateTime selectedDate = item.date;
     DateTime? selectedDocumentDate = item.documentDate;
@@ -2682,9 +2782,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     }
 
     bool isSubmitting = false;
-    File? selectedImage = _resolveImageSource(item.imagePath)?.isNetwork == true
-      ? null
-      : (item.imagePath != null ? File(item.imagePath!) : null);
+    bool removeImage = false;
+    File? selectedImage;
 
     await showDialog(
       context: context,
@@ -2764,28 +2863,56 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 ),
                 const SizedBox(height: AppSpacing.md),
                 // Image upload section
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
+                Row(
                   children: [
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.photo_library),
-                      label: Text(l10n.translate('accounting.select_image')),
-                      onPressed: () => _pickImage(
-                        ImageSource.gallery,
-                        setDialogState,
-                        (file) => selectedImage = file,
+                    Expanded(
+                      child: Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.photo_library),
+                            label: Text(
+                              l10n.translate('accounting.select_image'),
+                            ),
+                            onPressed: () => _pickImage(
+                              ImageSource.gallery,
+                              setDialogState,
+                              (file) {
+                                selectedImage = file;
+                                removeImage = false;
+                              },
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.camera_alt),
+                            label: Text(
+                              l10n.translate('accounting.take_photo'),
+                            ),
+                            onPressed: () => _pickImage(
+                              ImageSource.camera,
+                              setDialogState,
+                              (file) {
+                                selectedImage = file;
+                                removeImage = false;
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.camera_alt),
-                      label: Text(l10n.translate('accounting.take_photo')),
-                      onPressed: () => _pickImage(
-                        ImageSource.camera,
-                        setDialogState,
-                        (file) => selectedImage = file,
+                    if (selectedImage != null ||
+                        (item.imagePath?.isNotEmpty == true && !removeImage))
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: AppColors.error,
+                        ),
+                        onPressed: () => setDialogState(() {
+                          selectedImage = null;
+                          removeImage = true;
+                        }),
                       ),
-                    ),
                   ],
                 ),
                 if (selectedImage != null) ...[
@@ -2794,8 +2921,31 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                     borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                     child: Image.file(
                       selectedImage!,
-                      height: 100,
+                      height: 120,
                       fit: BoxFit.cover,
+                    ),
+                  ),
+                ] else if (item.imagePath?.isNotEmpty == true &&
+                    !removeImage) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                    child: Builder(
+                      builder: (context) {
+                        final imageSource = _resolveImageSource(item.imagePath);
+                        if (imageSource == null) {
+                          return const SizedBox(
+                            height: 120,
+                            child: Center(
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          );
+                        }
+                        return _buildDetailImage(imageSource, height: 120);
+                      },
                     ),
                   ),
                 ],
@@ -2820,27 +2970,20 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         return;
                       }
 
-                      final ok = await _confirmAction(
-                        title: l10n.translate('accounting.confirm_title'),
-                        message: l10n.translate(
-                          'accounting.confirm_update_revenue',
-                        ),
-                      );
-                      if (!ok) {
-                        if (dialogCtx.mounted) {
-                          setDialogState(() => isSubmitting = false);
+                      // Document number duplicate check
+                      final docNum = documentNumberController.text.trim();
+                      if (docNum.isNotEmpty) {
+                        final canProceed = await checkDocumentNumberAndConfirm(
+                          context,
+                          documentNumber: docNum,
+                          excludeRevenueId: item.id,
+                        );
+                        if (!canProceed) {
+                          if (dialogCtx.mounted) {
+                            setDialogState(() => isSubmitting = false);
+                          }
+                          return;
                         }
-                        return;
-                      }
-
-                      final allowed = await _checkFeatureAccess(
-                        _featureManualRevenue,
-                      );
-                      if (!allowed) {
-                        if (dialogCtx.mounted) {
-                          setDialogState(() => isSubmitting = false);
-                        }
-                        return;
                       }
 
                       if (!mounted || !dialogCtx.mounted) {
@@ -2852,7 +2995,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           .currentBusinessId;
                       context.read<RevenueBloc>().add(
                         UpdateManualRevenueRequested(
-                                                    idempotencyKey: const Uuid().v4(),
+                          idempotencyKey: const Uuid().v4(),
                           revenueId: item.id,
                           body: {
                             'businessLocationId':
@@ -2870,7 +3013,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             'description': descriptionController.text.trim(),
                             'moneyChannel': selectedMoneyChannel,
                             if (documentNumberController.text.trim().isNotEmpty)
-                              'documentNumber': documentNumberController.text.trim(),
+                              'documentNumber': documentNumberController.text
+                                  .trim(),
+                            'removeImage': removeImage,
                             if ((selectedBusinessTypeId ?? '').isNotEmpty)
                               'businessTypeId': selectedBusinessTypeId,
                           },

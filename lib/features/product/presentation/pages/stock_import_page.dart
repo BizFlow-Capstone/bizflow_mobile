@@ -4,8 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:io';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_error_message_parser.dart';
@@ -85,6 +87,8 @@ class _StockImportViewState extends State<_StockImportView> {
   String? _existingImageUrl;
   bool _removeImage = false;
   bool _confirmAfterUpdate = false;
+  bool _editingConfirmedImport = false;
+  String? _replacementIdempotencyKey;
   final ImagePicker _imagePicker = ImagePicker();
   final ActionGuard _saveDraftGuard = ActionGuard();
   final ActionGuard _confirmGuard = ActionGuard();
@@ -123,7 +127,9 @@ class _StockImportViewState extends State<_StockImportView> {
   }
 
   void _syncQuantityControllers() {
-    final activeProductIds = _selectedItems.map((item) => item.productId).toSet();
+    final activeProductIds = _selectedItems
+        .map((item) => item.productId)
+        .toSet();
 
     final staleKeys = _quantityControllers.keys
         .where((productId) => !activeProductIds.contains(productId))
@@ -214,10 +220,14 @@ class _StockImportViewState extends State<_StockImportView> {
   }
 
   void _showImagePreview({String? imagePath, String? imageUrl}) {
-    if ((imagePath == null || imagePath.isEmpty) &&
-        (imageUrl == null || imageUrl.isEmpty)) {
+    final hasLocalImage = imagePath != null && imagePath.isNotEmpty;
+    final hasNetworkImage = imageUrl != null && imageUrl.isNotEmpty;
+
+    if (!hasLocalImage && !hasNetworkImage) {
       return;
     }
+
+    final resolvedImageUrl = _resolveImageUrl(imageUrl);
 
     showDialog<void>(
       context: context,
@@ -229,19 +239,22 @@ class _StockImportViewState extends State<_StockImportView> {
               child: InteractiveViewer(
                 minScale: 0.7,
                 maxScale: 4,
-                child: imagePath != null && imagePath.isNotEmpty
-                    ? Image.file(File(imagePath), fit: BoxFit.contain)
-                    : CachedNetworkImage(
-                        imageUrl: imageUrl!,
+                child: hasLocalImage
+                    ? Image.file(File(imagePath!), fit: BoxFit.contain)
+                    : Image.network(
+                        resolvedImageUrl ?? imageUrl!,
                         fit: BoxFit.contain,
-                        placeholder: (_, __) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
-                        errorWidget: (_, __, ___) => Center(
+                        loadingBuilder: (_, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        },
+                        errorBuilder: (_, __, ___) => Center(
                           child: Text(
                             l10n.translate('common.error_occurred'),
                             style: AppTextStyles.bodyMedium.copyWith(
-                              color: Colors.white,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -249,11 +262,11 @@ class _StockImportViewState extends State<_StockImportView> {
               ),
             ),
             Positioned(
-              right: 12,
-              top: 12,
+              top: 16,
+              right: 16,
               child: IconButton(
-                onPressed: () => Navigator.of(dialogCtx).pop(),
                 icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(dialogCtx),
               ),
             ),
           ],
@@ -453,7 +466,6 @@ class _StockImportViewState extends State<_StockImportView> {
     }
 
     final supplierName = result.supplierName?.trim() ?? '';
-    final invoiceDate = result.invoiceDate?.trim() ?? '';
     final totalAmount = result.totalAmount;
 
     return Container(
@@ -580,6 +592,9 @@ class _StockImportViewState extends State<_StockImportView> {
           imagePath: _selectedImagePath,
           removeImage: _removeImage,
           items: _selectedItems,
+          idempotencyKey: _editingConfirmedImport
+              ? _replacementIdempotencyKey
+              : null,
         );
         context.read<ImportActionBloc>().add(
           UpdateImportEvent(widget.importId!, req),
@@ -671,11 +686,11 @@ class _StockImportViewState extends State<_StockImportView> {
                               imagePath: _selectedImagePath,
                               items: _selectedItems,
                             );
-                            this.context.read<ImportActionBloc>().add(
+                            context.read<ImportActionBloc>().add(
                               CreateImportEvent(req),
                             );
                           } else {
-                            _confirmAfterUpdate = true;
+                            _confirmAfterUpdate = !_editingConfirmedImport;
                             final req = UpdateImportRequest(
                               importType: _hasInvoice
                                   ? 'INVOICE'
@@ -691,8 +706,11 @@ class _StockImportViewState extends State<_StockImportView> {
                               imagePath: _selectedImagePath,
                               removeImage: _removeImage,
                               items: _selectedItems,
+                              idempotencyKey: _editingConfirmedImport
+                                  ? _replacementIdempotencyKey
+                                  : null,
                             );
-                            this.context.read<ImportActionBloc>().add(
+                            context.read<ImportActionBloc>().add(
                               UpdateImportEvent(widget.importId!, req),
                             );
                           }
@@ -714,6 +732,41 @@ class _StockImportViewState extends State<_StockImportView> {
         );
       },
     );
+  }
+
+  void _onEditImport() {
+    if (_status == 'CONFIRMED') {
+      showDialog(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: Text(l10n.translate('stock_import.edit_import')),
+          content: Text(l10n.translate('stock_import.edit_confirmed_warning')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: Text(l10n.translate('common.cancel')),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                setState(() {
+                  _status = 'DRAFT';
+                  _editingConfirmedImport = true;
+                  _replacementIdempotencyKey ??= const Uuid().v4();
+                });
+              },
+              child: Text(
+                l10n.translate('stock_import.edit_confirmed_continue'),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      setState(() {
+        _status = 'DRAFT';
+      });
+    }
   }
 
   Future<void> _onCancelDelete() async {
@@ -770,7 +823,7 @@ class _StockImportViewState extends State<_StockImportView> {
                         await _deleteGuard.run(() async {
                           Navigator.pop(dialogContext);
                           if (widget.importId != null) {
-                            this.context.read<ImportActionBloc>().add(
+                            context.read<ImportActionBloc>().add(
                               DeleteImportEvent(widget.importId!),
                             );
                           }
@@ -974,6 +1027,21 @@ class _StockImportViewState extends State<_StockImportView> {
         ],
       ),
     );
+  }
+
+  String? _resolveImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return null;
+
+    final value = rawUrl.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+
+    final normalizedBase = AppConfig.baseUrl.endsWith('/')
+        ? AppConfig.baseUrl.substring(0, AppConfig.baseUrl.length - 1)
+        : AppConfig.baseUrl;
+    final normalizedPath = value.startsWith('/') ? value : '/$value';
+    return '$normalizedBase$normalizedPath';
   }
 
   void _openProductSelector() {
@@ -1181,6 +1249,13 @@ class _StockImportViewState extends State<_StockImportView> {
               ),
             ),
             actions: [
+              if (widget.importId != null &&
+                  _status == 'CONFIRMED' &&
+                  !isSubmitting)
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: AppColors.black),
+                  onPressed: _onEditImport,
+                ),
               if (widget.importId != null && _status != 'CANCELLED')
                 IconButton(
                   icon: const Icon(
@@ -1305,16 +1380,25 @@ class _StockImportViewState extends State<_StockImportView> {
                                             File(_selectedImagePath!),
                                             fit: BoxFit.cover,
                                           )
-                                        : CachedNetworkImage(
-                                            imageUrl: _existingImageUrl!,
+                                        : Image.network(
+                                            _resolveImageUrl(
+                                                  _existingImageUrl!,
+                                                ) ??
+                                                _existingImageUrl!,
                                             fit: BoxFit.cover,
-                                            placeholder: (_, __) => Container(
-                                              color: AppColors.background,
-                                              child: const Center(
-                                                child: CircularProgressIndicator(),
-                                              ),
-                                            ),
-                                            errorWidget: (_, __, ___) =>
+                                            loadingBuilder:
+                                                (_, child, loadingProgress) {
+                                                  if (loadingProgress == null)
+                                                    return child;
+                                                  return Container(
+                                                    color: AppColors.background,
+                                                    child: const Center(
+                                                      child:
+                                                          CircularProgressIndicator(),
+                                                    ),
+                                                  );
+                                                },
+                                            errorBuilder: (_, __, ___) =>
                                                 Container(
                                                   color: AppColors.background,
                                                 ),
@@ -1424,22 +1508,26 @@ class _StockImportViewState extends State<_StockImportView> {
                       child: (_existingImageUrl?.isNotEmpty == true)
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(8),
-                              child: CachedNetworkImage(
-                                imageUrl: _existingImageUrl!,
+                              child: Image.network(
+                                _resolveImageUrl(_existingImageUrl!) ??
+                                    _existingImageUrl!,
                                 fit: BoxFit.cover,
-                                placeholder: (_, __) => Container(
-                                  color: AppColors.background,
-                                  child: const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                ),
-                                errorWidget: (_, __, ___) => Center(
+                                loadingBuilder: (_, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    color: AppColors.background,
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (_, __, ___) => Center(
                                   child: Text(
                                     l10n.translate(
                                       'stock_import.upload_invoice',
                                     ),
                                     style: AppTextStyles.bodySmall.copyWith(
-                                      color: AppColors.textSecondary,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ),
@@ -1449,7 +1537,7 @@ class _StockImportViewState extends State<_StockImportView> {
                               child: Text(
                                 l10n.translate('stock_import.upload_invoice'),
                                 style: AppTextStyles.bodySmall.copyWith(
-                                  color: AppColors.textSecondary,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ),
@@ -1459,9 +1547,15 @@ class _StockImportViewState extends State<_StockImportView> {
                 ],
                 TextField(
                   controller: _supplierController,
-                  enabled: isEditable,
+                  readOnly: !isEditable,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('stock_import.receipt_supplier'),
+                    labelStyle: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -1470,10 +1564,16 @@ class _StockImportViewState extends State<_StockImportView> {
                 SizedBox(height: AppSpacing.md),
                 TextField(
                   controller: _noteController,
-                  enabled: isEditable,
+                  readOnly: !isEditable,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                   maxLines: 2,
                   decoration: InputDecoration(
                     labelText: l10n.translate('stock_import.note'),
+                    labelStyle: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -1483,9 +1583,15 @@ class _StockImportViewState extends State<_StockImportView> {
                 // Document Number
                 TextField(
                   controller: _documentNumberController,
-                  enabled: isEditable,
+                  readOnly: !isEditable,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                   decoration: InputDecoration(
                     labelText: l10n.translate('stock_import.document_number'),
+                    labelStyle: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                     hintText: l10n.translate(
                       'stock_import.document_number_hint',
                     ),
@@ -1551,12 +1657,13 @@ class _StockImportViewState extends State<_StockImportView> {
                       final cost = item.costPrice;
                       final total = item.quantity * cost;
                       final baseUnit = (item.baseUnit ?? '').trim();
-                      final quantityController = _quantityControllers.putIfAbsent(
-                        item.productId,
-                        () => TextEditingController(
-                          text: _formatQuantity(item.quantity),
-                        ),
-                      );
+                      final quantityController = _quantityControllers
+                          .putIfAbsent(
+                            item.productId,
+                            () => TextEditingController(
+                              text: _formatQuantity(item.quantity),
+                            ),
+                          );
 
                       return Padding(
                         padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -1754,9 +1861,9 @@ class _StockImportViewState extends State<_StockImportView> {
                                     color: AppColors.error,
                                     onPressed: () {
                                       setState(() {
-                                        _quantityControllers.remove(
-                                          item.productId,
-                                        )?.dispose();
+                                        _quantityControllers
+                                            .remove(item.productId)
+                                            ?.dispose();
                                         _selectedItems.removeAt(index);
                                       });
                                     },
@@ -1902,7 +2009,7 @@ class _StockImportViewState extends State<_StockImportView> {
                     : Text(
                         l10n.translate('stock_import.save_draft'),
                         style: AppTextStyles.labelLarge.copyWith(
-                          color: AppColors.secondary,
+                          color: AppColors.textPrimary,
                         ),
                       ),
               ),
@@ -2101,14 +2208,15 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     }
 
     String? parseUnit(Map<String, dynamic> item) {
-      final unit = (item['baseUnit'] ??
-              item['BaseUnit'] ??
-              item['unitName'] ??
-              item['UnitName'] ??
-              item['unit'] ??
-              item['Unit'])
-          ?.toString()
-          .trim();
+      final unit =
+          (item['baseUnit'] ??
+                  item['BaseUnit'] ??
+                  item['unitName'] ??
+                  item['UnitName'] ??
+                  item['unit'] ??
+                  item['Unit'])
+              ?.toString()
+              .trim();
       if (unit == null || unit.isEmpty) return null;
       return unit;
     }
@@ -2179,7 +2287,10 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
         );
       }
 
-      _quantityControllers.putIfAbsent(product.id, () => TextEditingController());
+      _quantityControllers.putIfAbsent(
+        product.id,
+        () => TextEditingController(),
+      );
       _quantityControllers[product.id]!.text = _formatQuantity(quantity);
     });
   }
@@ -2193,7 +2304,9 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
     setState(() {
       if (_items[idx].quantity > 1) {
         final existing = _items[idx];
-        final newQty = (existing.quantity - 1.0) > 0 ? existing.quantity - 1.0 : 0.0;
+        final newQty = (existing.quantity - 1.0) > 0
+            ? existing.quantity - 1.0
+            : 0.0;
         _items[idx] = ImportItemModel(
           productId: existing.productId,
           productName: existing.productName,
@@ -2201,7 +2314,10 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
           costPrice: existing.costPrice,
           baseUnit: existing.baseUnit,
         );
-        _quantityControllers.putIfAbsent(product.id, () => TextEditingController());
+        _quantityControllers.putIfAbsent(
+          product.id,
+          () => TextEditingController(),
+        );
         _quantityControllers[product.id]!.text = _formatQuantity(newQty);
       } else {
         _items.removeAt(idx);
@@ -2428,12 +2544,15 @@ class _ProductSelectorSheetState extends State<_ProductSelectorSheet> {
                                           key: ValueKey(
                                             'selector_qty_${product.id}',
                                           ),
-                                          controller: _quantityControllers.putIfAbsent(
-                                            product.id,
-                                            () => TextEditingController(
-                                              text: qty > 0 ? _formatQuantity(qty) : '',
-                                            ),
-                                          ),
+                                          controller: _quantityControllers
+                                              .putIfAbsent(
+                                                product.id,
+                                                () => TextEditingController(
+                                                  text: qty > 0
+                                                      ? _formatQuantity(qty)
+                                                      : '',
+                                                ),
+                                              ),
                                           textAlign: TextAlign.center,
                                           keyboardType:
                                               const TextInputType.numberWithOptions(

@@ -751,4 +751,52 @@ class ProductApiService {
       rethrow;
     }
   }
+
+  /// Fetch selling price policy history for a product.
+  Future<List<dynamic>> getProductPricePolicies(String productId) async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiEndpoints.getProductPricePolicies(productId),
+      );
+
+      final data = response.data;
+      if (data != null && data['data'] != null) {
+        final dataNode = data['data'];
+        if (dataNode is List) return dataNode;
+        if (dataNode is Map<String, dynamic>) {
+          final saleItems = dataNode['saleItems'] ?? dataNode['items'];
+          if (saleItems is List) {
+            return saleItems;
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      debugPrint('ProductApiService.getProductPricePolicies error: $e');
+      rethrow;
+    }
+  }
+  /// Fetch stock movement history for a product.
+  Future<Map<String, dynamic>> getProductStockMovements(
+    String productId, {
+    int pageNumber = 1,
+    int pageSize = 10,
+  }) async {
+    try {
+      final queryParams = {'PageNumber': pageNumber, 'PageSize': pageSize};
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiEndpoints.getProductStockMovements(productId),
+        queryParams: queryParams,
+      );
+
+      final data = response.data;
+      if (data != null && data['data'] != null) {
+        return data['data'] as Map<String, dynamic>;
+      }
+      return {'items': [], 'totalCount': 0};
+    } catch (e) {
+      debugPrint('ProductApiService.getProductStockMovements error: $e');
+      rethrow;
+    }
+  }
 }

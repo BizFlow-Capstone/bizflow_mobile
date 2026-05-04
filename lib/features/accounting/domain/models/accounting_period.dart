@@ -135,7 +135,15 @@ class AccountingPeriod {
       return '$year';
     } else {
       // custom
-      return '$startDate – $endDate';
+      final formattedStart = DateFormatter.formatDate(
+        DateFormatter.parse(startDate),
+      );
+      final formattedEnd = DateFormatter.formatDate(
+        DateFormatter.parse(endDate),
+      );
+      final displayStart = formattedStart.isNotEmpty ? formattedStart : startDate;
+      final displayEnd = formattedEnd.isNotEmpty ? formattedEnd : endDate;
+      return '$displayStart – $displayEnd';
     }
   }
 

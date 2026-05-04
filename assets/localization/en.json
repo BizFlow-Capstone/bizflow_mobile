@@ -32,7 +32,8 @@
     "create": "Create",
     "search_hint": "Search...",
     "back_home": "Back to home",
-    "microphone_permission_required": "Microphone permission is required to continue"
+    "microphone_permission_required": "Microphone permission is required to continue",
+    "reference_code": "Reference code"
   },
   "auth": {
     "login": "Login",
@@ -422,7 +423,21 @@
       "current_cost_price": "Current cost price",
       "no_cost_history": "No cost price history",
       "cost_history_note": "Only confirmed import events are shown. Quantity is per import event.",
-      "cost_history_import_qty": "Imported quantity"
+      "cost_history_import_qty": "Imported quantity",
+      "price_policy_title": "Selling Price Change History",
+      "price_policy_no_data": "No selling price history",
+      "price_policy_effective_date": "Effective Date",
+      "price_policy_old_price": "Old Price",
+      "price_policy_new_price": "New Price",
+      "price_policy_unit": "Unit",
+      "stock_movement_title": "Stock Movement History",
+      "stock_movement_no_data": "No stock movement history yet",
+      "movement_in": "Stock In",
+      "movement_out": "Stock Out",
+      "movement_sale": "Sale",
+      "movement_adjustment_in": "Adjustment In",
+      "movement_adjustment_out": "Adjustment Out",
+      "balance": "Balance"
     },
     "bulk_adjust": {
       "title": "Adjust selling prices",
@@ -500,15 +515,20 @@
     "cost_price_label": "Cost Price: ",
     "stock_label": " • Stock: ",
     "loading_products": "Loading products...",
-    "no_products_found": "No products found"
+    "no_products_found": "No products found",
+    "payment_method": "Payment Method",
+    "payment_method_hint": "Select method (optional)",
+    "edit_import": "Edit Import",
+    "edit_confirmed_warning": "This import is confirmed. Editing will create a new replacement import.",
+    "edit_confirmed_continue": "Continue Editing"
   },
   "home": {
     "title": "Home",
     "welcome": "Welcome",
     "greeting": "Hello",
     "todays_orders": "Today's Orders",
-    "todays_revenue": "Today's Revenue",
-    "todays_cost": "Today's Cost",
+    "todays_revenue": "Today's Revenue (orders + manual)",
+    "todays_cost": "Today's Cost (imports + manual)",
     "todays_debt": "Today's Debt",
     "period_today": "Today",
     "period_week": "Week",
@@ -537,7 +557,15 @@
     "ai_best_seller_title": "Best Sellers",
     "ai_reorder_title": "Reorder Suggestions",
     "ai_anomalies_title": "Anomaly Alerts",
-    "ai_mark_read": "Mark as read"
+    "ai_mark_read": "Mark as read",
+    "ai_insight_filter_title": "Insight Filter",
+    "ai_insight_no_data": "No data available for this filter.",
+    "ai_insight_top_seller": "Top Selling Products",
+    "ai_insight_growth_trend": "Growth Trend Products",
+    "ai_insight_promote_candidate": "Promote Candidate Products",
+    "ai_insight_filter_top_seller": "Top Seller",
+    "ai_insight_filter_growth_trend": "Growth",
+    "ai_insight_filter_promote_candidate": "Promote"
   },
   "subscription": {
     "appbar_title": "Subscription",
@@ -1001,6 +1029,9 @@
     "customer_info": "Customer",
     "status": "Status",
     "status_balanced": "Balanced",
+    "status_owed": "Customer owes money",
+    "status_debit": "Customer has debt",
+    "status_credit": "Customer has credit",
     "payment_amount": "Payment amount",
     "action": "Action",
     "action_decrease_debt": "Decrease debt",
@@ -1215,6 +1246,11 @@
     "reference_order_id": "Order ID (optional)",
     "reference_order_id_hint": "Example: 123",
     "linked_order_detail": "Order detail",
+    "linked_source_detail": "Source detail",
+    "linked_import_detail": "Original import detail",
+    "linked_debt_payment_detail": "Debt payment detail",
+    "linked_adjustment_detail": "Adjustment detail",
+    "linked_item_details": "Item details",
     "order_detail_unavailable": "Unable to load order detail",
     "books_empty": "No accounting books yet",
     "unknown_template": "Unknown template: {code}",
@@ -1369,5 +1405,9 @@
     "cost_description": "Cost description",
     "cost_amount": "Cost amount",
     "cost_amuont": "Cost amount"
+  },
+  "document_number": {
+    "duplicate_title": "Duplicate Document Number",
+    "duplicate_message": "Document number \"{number}\" already exists. Please adjust or leave empty."
   }
 }

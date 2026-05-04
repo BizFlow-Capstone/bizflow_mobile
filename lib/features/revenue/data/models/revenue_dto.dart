@@ -15,6 +15,7 @@ class RevenueDto extends Equatable {
   final String? moneyChannelLabel;
   final String? referenceType;
   final int? referenceId;
+  final String? documentNumber;
   final String? referenceCode;
   final String? businessTypeId;
   final String? businessTypeName;
@@ -36,6 +37,7 @@ class RevenueDto extends Equatable {
     this.moneyChannelLabel,
     this.referenceType,
     this.referenceId,
+    this.documentNumber,
     this.referenceCode,
     this.businessTypeId,
     this.businessTypeName,
@@ -108,6 +110,17 @@ class RevenueDto extends Equatable {
             : source['status'] is Map<String, dynamic>
             ? source['status'] as Map<String, dynamic>
             : const <String, dynamic>{};
+
+    final documentNumber = asNullableString(
+      json['documentNumber'] ??
+          json['DocumentNumber'] ??
+          json['voucherNo'] ??
+          json['VoucherNo'] ??
+          source['documentNumber'] ??
+          source['DocumentNumber'] ??
+          source['voucherNo'] ??
+          source['VoucherNo'],
+    );
 
     return RevenueDto(
       revenueId: asInt(json['revenueId'] ?? json['id']),
@@ -241,6 +254,7 @@ class RevenueDto extends Equatable {
       'moneyChannel': moneyChannel,
       'referenceType': referenceType,
       'referenceId': referenceId,
+      'documentNumber': documentNumber,
       'referenceCode': referenceCode,
       'businessTypeId': businessTypeId,
       'businessTypeName': businessTypeName,
@@ -264,6 +278,7 @@ class RevenueDto extends Equatable {
     moneyChannel,
     referenceType,
     referenceId,
+    documentNumber,
     referenceCode,
     businessTypeId,
     businessTypeName,

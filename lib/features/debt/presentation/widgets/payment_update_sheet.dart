@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -14,7 +17,14 @@ class PaymentUpdateSheet extends StatefulWidget {
   final double totalDebt;
   final double totalPaid;
   final double remaining;
-  final Function(double amount, String action, String? note) onConfirm;
+  final List<ReferenceItem> paymentMethods;
+  final FutureOr<void> Function(
+    double amount,
+    String action,
+    String paymentMethod,
+    String? note,
+  )
+  onConfirm;
 
   const PaymentUpdateSheet({
     super.key,
@@ -23,6 +33,7 @@ class PaymentUpdateSheet extends StatefulWidget {
     required this.totalDebt,
     required this.totalPaid,
     required this.remaining,
+    required this.paymentMethods,
     required this.onConfirm,
   });
 
@@ -33,7 +44,65 @@ class PaymentUpdateSheet extends StatefulWidget {
 class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
-  String _selectedAction = 'decrease_debt'; // 'decrease_debt' or 'increase_debt'
+  String _selectedAction =
+      'decrease_debt'; // 'decrease_debt' or 'increase_debt'
+  String? _selectedPaymentMethod;
+  bool _isSubmitting = false;
+
+  double get _enteredAmount {
+    final amountText = _amountController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    return double.tryParse(amountText) ?? 0;
+  }
+
+  bool get _canSubmit =>
+      !_isSubmitting && _enteredAmount > 0 && _selectedPaymentMethod != null;
+
+  _PaymentSummaryValues _buildSummaryValues() {
+    final double baseRemaining = widget.remaining > 0
+        ? widget.remaining
+      : (widget.totalDebt > 0 ? widget.totalDebt : 0.0);
+    final double baseTotalDebt = widget.totalDebt > 0
+        ? widget.totalDebt
+        : baseRemaining;
+    final double baseTotalPaid = widget.totalPaid > 0 ? widget.totalPaid : 0.0;
+    final double amount = _enteredAmount;
+
+    if (amount <= 0) {
+      return _PaymentSummaryValues(
+        totalDebt: baseTotalDebt,
+        totalPaid: baseTotalPaid,
+        remaining: baseRemaining,
+      );
+    }
+
+    if (_selectedAction == 'increase_debt') {
+      return _PaymentSummaryValues(
+        totalDebt: baseTotalDebt + amount,
+        totalPaid: baseTotalPaid,
+        remaining: baseRemaining + amount,
+      );
+    }
+
+    final nextRemaining = (baseRemaining - amount)
+        .clamp(0, double.infinity)
+        .toDouble();
+    final nextDebt = (baseTotalDebt - amount)
+        .clamp(0, double.infinity)
+        .toDouble();
+    return _PaymentSummaryValues(
+      totalDebt: nextDebt,
+      totalPaid: baseTotalPaid + amount,
+      remaining: nextRemaining,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.paymentMethods.isNotEmpty) {
+      _selectedPaymentMethod = widget.paymentMethods.first.code;
+    }
+  }
 
   @override
   void dispose() {
@@ -42,9 +111,33 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
     super.dispose();
   }
 
+  Future<void> _handleConfirm() async {
+    if (!_canSubmit) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await widget.onConfirm(
+        _enteredAmount,
+        _selectedAction,
+        _selectedPaymentMethod!,
+        _noteController.text.isEmpty ? null : _noteController.text,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final summary = _buildSummaryValues();
 
     return SafeArea(
       child: Container(
@@ -156,19 +249,19 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
                     children: [
                       _buildSummaryRow(
                         l10n.translate('debt.total_owed'),
-                        CurrencyFormatter.formatVND(widget.totalDebt),
+                        CurrencyFormatter.formatVND(summary.totalDebt),
                         AppColors.textPrimary,
                       ),
                       const SizedBox(height: 8),
                       _buildSummaryRow(
                         l10n.translate('debt.paid_amount'),
-                        CurrencyFormatter.formatVND(widget.totalPaid),
+                        CurrencyFormatter.formatVND(summary.totalPaid),
                         AppColors.success,
                       ),
                       const Divider(height: 16),
                       _buildSummaryRow(
                         l10n.translate('debt.remaining'),
-                        CurrencyFormatter.formatVND(widget.remaining),
+                        CurrencyFormatter.formatVND(summary.remaining),
                         AppColors.danger,
                         isBold: true,
                       ),
@@ -261,6 +354,41 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
+                // Payment Method
+                Text(
+                  '${l10n.translate('debt.payment_method')} *',
+                  style: AppTextStyles.labelMedium.copyWith(
+                    color: AppColors.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                DropdownButtonFormField<String>(
+                  value: _selectedPaymentMethod,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: 14,
+                    ),
+                  ),
+                  items: widget.paymentMethods.map((method) {
+                    return DropdownMenuItem<String>(
+                      value: method.code,
+                      child: Text(method.label),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedPaymentMethod = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: AppSpacing.md),
+
                 // Note
                 Text(
                   l10n.translate('debt.note'),
@@ -320,22 +448,7 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {
-                          final amountText = _amountController.text.replaceAll(
-                            RegExp(r'[^0-9]'),
-                            '',
-                          );
-                          final amount = double.tryParse(amountText) ?? 0;
-                          if (amount > 0) {
-                            widget.onConfirm(
-                              amount,
-                              _selectedAction,
-                              _noteController.text.isEmpty
-                                  ? null
-                                  : _noteController.text,
-                            );
-                          }
-                        },
+                        onPressed: _canSubmit ? _handleConfirm : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
@@ -346,12 +459,43 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
                             ),
                           ),
                         ),
-                        child: Text(
-                          l10n.translate('common.confirm'),
-                          style: AppTextStyles.titleSmall.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 150),
+                          child: _isSubmitting
+                              ? Row(
+                                  key: const ValueKey('loading'),
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      l10n.translate('common.loading'),
+                                      style: AppTextStyles.titleSmall.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  l10n.translate('common.confirm'),
+                                  key: const ValueKey('confirm'),
+                                  style: AppTextStyles.titleSmall.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
@@ -440,4 +584,16 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
       ),
     );
   }
+}
+
+class _PaymentSummaryValues {
+  final double totalDebt;
+  final double totalPaid;
+  final double remaining;
+
+  const _PaymentSummaryValues({
+    required this.totalDebt,
+    required this.totalPaid,
+    required this.remaining,
+  });
 }

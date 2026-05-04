@@ -8,7 +8,6 @@ import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
-import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -60,9 +59,10 @@ class _DebtListPageState extends State<DebtListPage> {
   List<ReferenceItem> _paymentMethodsFromReference() {
     final state = context.read<ReferenceBloc>().state;
     if (state is ReferenceLoaded) {
-      final methods = (state.references['paymentMethods'] ?? const <ReferenceItem>[])
-          .where((m) => m.code.trim().isNotEmpty)
-          .toList();
+      final methods =
+          (state.references['paymentMethods'] ?? const <ReferenceItem>[])
+              .where((m) => m.code.trim().isNotEmpty)
+              .toList();
       if (methods.isNotEmpty) return methods;
     }
     return const [
@@ -749,12 +749,17 @@ class _DebtListPageState extends State<DebtListPage> {
                       Expanded(
                         child: _buildDebtColumn(
                           l10n.translate('debt.total_owed'),
-                          CurrencyFormatter.formatVND(customer.currentBalance.abs()),
+                          CurrencyFormatter.formatVND(
+                            customer.currentBalance.abs(),
+                          ),
                           _getBalanceStatusColor(customer.currentBalance),
                         ),
                       ),
                       Expanded(
-                        child: _buildBalanceStatusBadge(customer.currentBalance, l10n),
+                        child: _buildBalanceStatusBadge(
+                          customer.currentBalance,
+                          l10n,
+                        ),
                       ),
                       Expanded(
                         child: _buildDebtColumn(
@@ -996,14 +1001,17 @@ class _DebtListPageState extends State<DebtListPage> {
 
   Color _getBalanceStatusColor(double currentBalance) {
     if (currentBalance > 0) {
-      return AppColors.danger;  // Khách đang nợ
+      return AppColors.danger; // Khách đang nợ
     } else if (currentBalance < 0) {
-      return AppColors.success;  // Khách có credit
+      return AppColors.success; // Khách có credit
     }
-    return AppColors.textSecondary;  // Bằng 0
+    return AppColors.textSecondary; // Bằng 0
   }
 
-  Widget _buildBalanceStatusBadge(double currentBalance, AppLocalizations l10n) {
+  Widget _buildBalanceStatusBadge(
+    double currentBalance,
+    AppLocalizations l10n,
+  ) {
     String statusLabel;
     Color statusBgColor;
     Color statusTextColor;
@@ -1199,8 +1207,9 @@ class _DebtListPageState extends State<DebtListPage> {
                             errorText: nameError,
                           ),
                           onChanged: (_) {
-                            if (nameError != null)
+                            if (nameError != null) {
                               setState(() => nameError = null);
+                            }
                           },
                         ),
                         const SizedBox(height: AppSpacing.sm),
@@ -1214,8 +1223,9 @@ class _DebtListPageState extends State<DebtListPage> {
                             errorText: phoneError,
                           ),
                           onChanged: (_) {
-                            if (phoneError != null)
+                            if (phoneError != null) {
                               setState(() => phoneError = null);
+                            }
                           },
                         ),
                         const SizedBox(height: AppSpacing.sm),
@@ -1364,64 +1374,83 @@ class _DebtListPageState extends State<DebtListPage> {
   Future<void> _showDebtAdjustmentDialog(DebtorEntity customer) async {
     final l10n = AppLocalizations.of(context);
     final paymentMethods = _paymentMethodsFromReference();
+    final currentDebt = customer.currentBalance > 0
+        ? customer.currentBalance
+      : 0.0;
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => PaymentUpdateSheet(
+      builder: (sheetContext) => PaymentUpdateSheet(
         customerName: customer.name,
         customerPhone: customer.phone,
-        totalDebt: 0,
+        totalDebt: currentDebt,
         totalPaid: 0,
-        remaining: customer.currentBalance.abs(),
-        onConfirm: (amount, action, note) async {
-          Navigator.pop(context);
-
+        remaining: currentDebt,
+        paymentMethods: paymentMethods,
+        onConfirm: (amount, action, paymentMethod, note) async {
           _setPermissionChecking(true);
-          final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-            context,
-            featureCode: SubscriptionFeatureCodes.debtManagement,
-          );
-          _setPermissionChecking(false);
-          if (!allowed) return;
-
-          // Check if debt increase exceeds credit limit
-          if (action == 'increase_debt' &&
-              customer.creditLimit > 0 &&
-              (customer.currentBalance + amount) > customer.creditLimit) {
-            final confirmExceed = await showDialog<bool>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(l10n.translate('debt.credit_limit_warning_title')),
-                content: Text(l10n.translate('debt.credit_limit_warning_message')),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(l10n.translate('common.cancel')),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(l10n.translate('common.confirm')),
-                  ),
-                ],
-              ),
+          try {
+            final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+              context,
+              featureCode: SubscriptionFeatureCodes.debtManagement,
             );
-            if (confirmExceed != true || !mounted) return;
+            if (!allowed) return;
+
+            // Check if debt increase exceeds credit limit
+            if (action == 'increase_debt' &&
+                customer.creditLimit > 0 &&
+                (customer.currentBalance + amount) > customer.creditLimit) {
+              if (!mounted) return;
+
+              final confirmExceed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(
+                    l10n.translate('debt.credit_limit_warning_title'),
+                  ),
+                  content: Text(
+                    l10n.translate('debt.credit_limit_warning_message'),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(l10n.translate('common.cancel')),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: Text(l10n.translate('common.confirm')),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmExceed != true || !mounted) return;
+            }
+
+            await _runDebtorAction(() {
+              context.read<DebtorBloc>().add(
+                RecordDebtAdjustmentRequested(
+                  debtorId: customer.debtorId,
+                  amount: amount,
+                  action: action,
+                  paymentMethod: paymentMethod,
+                  notes: note,
+                ),
+              );
+            });
+
+            if (!mounted || !sheetContext.mounted) return;
+
+            final state = context.read<DebtorBloc>().state;
+            final succeeded =
+                state.status == DebtorStatus.success &&
+                state.lastMessageCode == 'DEBT_ADJUSTMENT_RECORDED';
+            if (succeeded && Navigator.of(sheetContext).canPop()) {
+              Navigator.of(sheetContext).pop();
+            }
+          } finally {
+            _setPermissionChecking(false);
           }
-
-          final paymentMethod = paymentMethods.first.code;
-
-          await _runDebtorAction(() {
-            context.read<DebtorBloc>().add(
-              RecordDebtAdjustmentRequested(
-                debtorId: customer.debtorId,
-                amount: amount,
-                action: action,
-                paymentMethod: paymentMethod,
-                notes: note,
-              ),
-            );
-          });
         },
       ),
     );

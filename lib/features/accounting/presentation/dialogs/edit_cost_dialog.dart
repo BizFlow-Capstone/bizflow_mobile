@@ -9,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../cost/domain/entities/cost_entity.dart';
@@ -33,7 +34,7 @@ Future<void> showEditCostDialog({
   );
   final descriptionController = TextEditingController(text: item.description);
   final documentNumberController = TextEditingController(
-    text: item.referenceCode ?? '',
+    text: item.documentNumber ?? item.referenceCode ?? '',
   );
   DateTime selectedDate = item.date;
   DateTime? selectedDocumentDate = item.documentDate;
@@ -163,8 +164,7 @@ Future<void> showEditCostDialog({
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(l10n.translate('accounting.cost_date')),
-                subtitle:
-                    Text(DateFormat('yyyy-MM-dd').format(selectedDate)),
+                subtitle: Text(DateFormatter.formatDate(selectedDate)),
                 trailing: const Icon(Icons.lock),
                 enabled: false,
                 onTap: null,

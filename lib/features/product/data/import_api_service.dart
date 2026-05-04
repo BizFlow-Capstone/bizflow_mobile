@@ -82,6 +82,9 @@ class ImportApiService {
         'Items': jsonEncode(
           request.items.map(_buildImportItemPayload).toList(),
         ),
+        if (request.paymentMethod != null &&
+            request.paymentMethod!.isNotEmpty)
+          'PaymentMethod': request.paymentMethod!,
       };
 
       final Map<String, File> files = {};
@@ -117,6 +120,9 @@ class ImportApiService {
         'Supplier': request.supplier,
         'Note': request.note,
         'RemoveImage': request.removeImage.toString(),
+        if (request.idempotencyKey != null &&
+            request.idempotencyKey!.isNotEmpty)
+          'IdempotencyKey': request.idempotencyKey!,
         if (request.documentDate != null)
           'DocumentDate': DateFormatter.toApiDateOnly(request.documentDate!),
         if (request.documentNumber != null &&
@@ -127,6 +133,9 @@ class ImportApiService {
         'Items': jsonEncode(
           request.items.map(_buildImportItemPayload).toList(),
         ),
+        if (request.paymentMethod != null &&
+            request.paymentMethod!.isNotEmpty)
+          'PaymentMethod': request.paymentMethod!,
       };
 
       final Map<String, File> files = {};

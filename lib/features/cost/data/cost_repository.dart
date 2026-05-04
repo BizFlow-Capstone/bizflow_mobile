@@ -35,6 +35,7 @@ class CostRepository {
       referenceCode: dto.referenceCode,
       statusCode: dto.statusCode,
       statusLabel: dto.statusLabel,
+      documentNumber: dto.documentNumber,
       imagePath: dto.imagePath,
       createdAt: dto.createdAt,
     );

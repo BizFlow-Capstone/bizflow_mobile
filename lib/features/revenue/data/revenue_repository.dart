@@ -34,6 +34,7 @@ class RevenueRepository {
       referenceCode: dto.referenceCode,
       businessTypeId: dto.businessTypeId,
       businessTypeName: dto.businessTypeName,
+      documentNumber: dto.documentNumber,
       statusCode: dto.statusCode,
       statusLabel: dto.statusLabel,
       imagePath: dto.imagePath,

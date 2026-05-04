@@ -184,7 +184,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
       final query = search.trim().toLowerCase();
       result = result.where((d) {
         final name = d.name.toLowerCase();
-        final phone = (d.phone ?? '').toLowerCase();
+        final phone = d.phone.toLowerCase();
         return name.contains(query) || phone.contains(query);
       }).toList();
     }
@@ -236,6 +236,9 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
           lastMessageCode: event.isActive
               ? 'DEBTOR_STATUS_ACTIVATED'
               : 'DEBTOR_STATUS_DEACTIVATED',
+          successMessage: event.isActive
+              ? 'Đã kích hoạt khách nợ'
+              : 'Đã tạm ngưng khách nợ',
           errorMessage: null,
         ),
       );
@@ -275,6 +278,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
           debtors: filtered,
           totalCount: _debtors.length,
           lastMessageCode: 'DEBTOR_DELETED',
+          successMessage: 'Xóa khách nợ thành công',
           errorMessage: null,
         ),
       );
@@ -322,6 +326,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
           totalCount: _debtors.length,
           isSubmitting: false,
           lastMessageCode: 'DEBTOR_CREATED',
+          successMessage: 'Tạo khách nợ thành công',
           errorMessage: null,
         ),
       );
@@ -375,6 +380,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
               : state.debtorDetail,
           isSubmitting: false,
           lastMessageCode: 'DEBTOR_UPDATED',
+          successMessage: 'Cập nhật thông tin thành công',
           errorMessage: null,
         ),
       );
@@ -423,6 +429,7 @@ class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
           paymentHistory: history,
           isSubmitting: false,
           lastMessageCode: 'DEBT_ADJUSTMENT_RECORDED',
+          successMessage: 'Đã ghi nhận thay đổi công nợ',
           errorMessage: null,
         ),
       );

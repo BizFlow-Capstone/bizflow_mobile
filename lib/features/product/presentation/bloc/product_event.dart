@@ -346,7 +346,7 @@ class ProductSaleItemsNetworkDataReceived extends ProductEvent {
   List<Object?> get props => [saleItems];
 }
 
-/// Event untuk handle product detail dari network sync (SWR background update)
+/// Event cho handle product detail từ network sync (SWR background update)
 class ProductDetailNetworkDataReceived extends ProductEvent {
   final ProductEntity? product;
 
@@ -355,3 +355,30 @@ class ProductDetailNetworkDataReceived extends ProductEvent {
   @override
   List<Object?> get props => [product];
 }
+
+/// Load selling price policy history for a product
+class LoadProductPriceHistoryRequested extends ProductEvent {
+  final String productId;
+
+  const LoadProductPriceHistoryRequested({required this.productId});
+
+  @override
+  List<Object?> get props => [productId];
+}
+
+/// Load stock movement history for a product
+class LoadProductStockMovementsRequested extends ProductEvent {
+  final String productId;
+  final int pageNumber;
+  final int pageSize;
+
+  const LoadProductStockMovementsRequested({
+    required this.productId,
+    this.pageNumber = 1,
+    this.pageSize = 10,
+  });
+
+  @override
+  List<Object?> get props => [productId, pageNumber, pageSize];
+}
+

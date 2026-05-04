@@ -17,6 +17,7 @@ class CostDto extends Equatable {
   final String? documentUrl;
   final String? referenceType;
   final int? referenceId;
+  final String? documentNumber;
   final String? referenceCode;
   final String? statusCode;
   final String? statusLabel;
@@ -38,6 +39,7 @@ class CostDto extends Equatable {
     this.documentUrl,
     this.referenceType,
     this.referenceId,
+    this.documentNumber,
     this.referenceCode,
     this.statusCode,
     this.statusLabel,
@@ -108,6 +110,17 @@ class CostDto extends Equatable {
             : source['status'] is Map<String, dynamic>
             ? source['status'] as Map<String, dynamic>
             : const <String, dynamic>{};
+
+    final documentNumber = asNullableString(
+      json['documentNumber'] ??
+          json['DocumentNumber'] ??
+          json['voucherNo'] ??
+          json['VoucherNo'] ??
+          source['documentNumber'] ??
+          source['DocumentNumber'] ??
+          source['voucherNo'] ??
+          source['VoucherNo'],
+    );
 
     return CostDto(
       costId: asInt(json['costId'] ?? json['id']),
@@ -196,6 +209,7 @@ class CostDto extends Equatable {
             source['orderCode'] ??
             source['OrderCode'],
       ),
+      documentNumber: documentNumber,
       statusCode: asNullableString(
         rawStatus['code'] ?? rawStatus['Code'] ?? json['statusCode'] ?? json['StatusCode'],
       ),
@@ -245,6 +259,7 @@ class CostDto extends Equatable {
       'referenceType': referenceType,
       'referenceId': referenceId,
       'referenceCode': referenceCode,
+      'documentNumber': documentNumber,
       'statusCode': statusCode,
       'statusLabel': statusLabel,
       'imagePath': imagePath,
@@ -266,6 +281,7 @@ class CostDto extends Equatable {
     documentUrl,
     referenceType,
     referenceId,
+    documentNumber,
     referenceCode,
     statusCode,
     statusLabel,

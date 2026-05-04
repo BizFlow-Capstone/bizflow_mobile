@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/models/accounting_book.dart';
 
@@ -249,10 +250,16 @@ class S3aBookWidget extends StatelessWidget {
 
   static String _fmtDate(dynamic value) {
     if (value == null) return '';
+    if (value is DateTime) {
+      return DateFormatter.formatDate(value);
+    }
     if (value is String && value.isNotEmpty) {
       try {
-        final date = DateTime.parse(value);
-        return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+        final date = DateFormatter.parseApiDateTime(value);
+        if (date != null) {
+          return DateFormatter.formatDate(date);
+        }
+        return value;
       } catch (_) {
         return value;
       }
