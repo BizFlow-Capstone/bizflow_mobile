@@ -62,7 +62,16 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   bool _isLocationUnavailable = false;
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
@@ -361,7 +370,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
-        itemCount: entries.length + (hasReachedMax ? 0 : 1),
+        itemCount: entries.length + (isLoadMore && !hasReachedMax ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= entries.length) {
             return const Padding(
