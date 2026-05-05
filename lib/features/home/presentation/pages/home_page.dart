@@ -409,7 +409,7 @@ class _HomePageState extends State<HomePage> with RouteAware {
                         summary?.totalCost ?? 0,
                       ),
                       todaysDebt: CurrencyFormatter.formatVND(
-                        summary?.OutstandingDebtNetChangeInPeriod ?? 0,
+                        summary?.outstandingDebtNetChangeInPeriod ?? 0,
                       ),
                       isRefreshing: isFetching,
                     );
