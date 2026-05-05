@@ -643,6 +643,15 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
     return CurrencyFormatter.formatVND(amount);
   }
 
+  String _formatQuantity(num quantity) {
+    return quantity % 1 == 0 ? quantity.toStringAsFixed(1) : quantity.toString();
+  }
+
+  String _formatUnitSuffix(String? unitName) {
+    final unit = unitName?.trim() ?? '';
+    return unit.isNotEmpty ? ' $unit' : '';
+  }
+
   String _formatIsoDate(dynamic dateValue) {
     if (dateValue == null) {
       return '-';
@@ -736,8 +745,8 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
 
       final itemLines = order.items
           .map(
-            (item) =>
-                '${item.productName} x${item.quantity} - ${_formatMoneyLabel(item.price * item.quantity)}',
+          (item) =>
+            '${item.productName} x${_formatQuantity(item.quantity)}${_formatUnitSuffix(item.unitName)} - ${_formatMoneyLabel(item.price * item.quantity)}',
           )
           .toList(growable: false);
 

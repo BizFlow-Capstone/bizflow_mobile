@@ -1506,14 +1506,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                         ],
                       ),
                       SizedBox(height: AppSpacing.xs),
-                      if (movement.referenceCode != null)
-                        Text(
-                          '${l10n?.translate('common.reference_code') ?? 'Mã chứng từ'}: ${movement.referenceCode}',
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
                       Text(
                         '${l10n?.translate('product.detail.balance') ?? 'Số dư'}: ${movement.balanceAfter} ${movement.unit}',
                         style: AppTextStyles.bodySmall.copyWith(

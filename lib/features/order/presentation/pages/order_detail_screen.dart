@@ -409,6 +409,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   String _formatMoney(num? amount) => CurrencyFormatter.formatVND(amount);
   String _pdfCurrency(num? amount) => _formatMoney(amount).replaceAll('đ', ' VND');
 
+  String _formatQuantityWithUnit(double quantity, String? unitName) {
+    final unit = unitName?.trim() ?? '';
+    final quantityText = quantity % 1 == 0 ? quantity.toStringAsFixed(1) : quantity.toString();
+    return unit.isNotEmpty ? '$quantityText $unit' : quantityText;
+  }
+
   String _translateOrFallback(AppLocalizations l10n, String key, String fallback) {
     final t = l10n.translate(key);
     if (t.trim().isEmpty || t == key) return fallback;
@@ -1053,7 +1059,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           child: ListTile(
                             title: Text(item.productName),
                             subtitle: Text(
-                              '${l10n.translate('order.detail_qty_label')}: ${item.quantity} | ${l10n.translate('order.detail_unit_price_label')}: ${_formatMoney(item.price)}',
+                                '${l10n.translate('order.detail_qty_label')}: ${_formatQuantityWithUnit(item.quantity, item.unitName)} | ${l10n.translate('order.detail_unit_price_label')}: ${_formatMoney(item.price)}',
                             ),
                             trailing: Text(
                               _formatMoney(
