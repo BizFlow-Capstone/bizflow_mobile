@@ -71,6 +71,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   static const String _featureAi = SubscriptionFeatureCodes.ai;
 
   late final TabController _tabController;
+  StreamSubscription? _periodSubscription;
 
   // Helper method: Check if date falls within a finalized period
   bool _isDateInFinalizedPeriod(DateTime date) {
@@ -124,12 +125,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   List<CostEntity> _cachedCosts = const <CostEntity>[];
   bool _suppressNextRevenueError = false;
   // Pagination trackers for revenue & cost tabs
-  int _revenueTotalCount = 0;
   int _revenuePageNumber = 0;
   int _revenuePageSize = 20;
   bool _isLoadingMoreRevenue = false;
 
-  int _costTotalCount = 0;
   int _costPageNumber = 0;
   int _costPageSize = 20;
   bool _isLoadingMoreCost = false;
@@ -144,6 +143,49 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
 
     _tabController.addListener(_handleTabSelection);
+
+    // Listen for accounting period detail changes so revenue/cost tabs reload
+    // automatically when the selected period changes.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final periodBloc = context.read<AccountingPeriodBloc>();
+        _periodSubscription = periodBloc.stream.listen((state) {
+          if (!mounted) return;
+          final periodDetail = state.periodDetail;
+          if (periodDetail == null) return;
+
+          final locationId = context.read<BusinessContext>().currentBusinessId;
+          if (locationId == null) return;
+
+          // If user is viewing revenue or cost tab, reload with period date range
+          if (_tabController.index == 2) {
+            try {
+              final fromDate = DateTime.parse(periodDetail.startDate);
+              final toDate = DateTime.parse(periodDetail.endDate);
+              context.read<RevenueBloc>().add(
+                LoadRevenuesRequested(
+                  businessLocationId: locationId,
+                  fromDate: fromDate,
+                  toDate: toDate,
+                ),
+              );
+            } catch (_) {}
+          } else if (_tabController.index == 3) {
+            try {
+              final fromDate = DateTime.parse(periodDetail.startDate);
+              final toDate = DateTime.parse(periodDetail.endDate);
+              context.read<CostBloc>().add(
+                LoadCostsRequested(
+                  businessLocationId: locationId,
+                  fromDate: fromDate,
+                  toDate: toDate,
+                ),
+              );
+            } catch (_) {}
+          }
+        });
+      } catch (_) {}
+    });
 
     // Initial load of first tab and references only
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -202,7 +244,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       case 2: // Doanh thu
         setState(() {
           _revenuePageNumber = 0; // Reset to initial state
-          _revenueTotalCount = 0;
           _isLoadingMoreRevenue = false;
         });
         context.read<RevenueBloc>().add(
@@ -212,7 +253,6 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       case 3: // Chi phí
         setState(() {
           _costPageNumber = 0; // Reset to initial state
-          _costTotalCount = 0;
           _isLoadingMoreCost = false;
         });
         if (context.mounted) {
@@ -243,21 +283,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     try {
       _loadReferences();
 
-      // Force SWR revalidate for manual refresh.
-      switch (_tabController.index) {
-        case 1:
-          await CacheManager().removeByPrefix('gl_entries_');
-          await LocalApiCacheStore().removeByGroup('gl_entries');
-          break;
-        case 2:
-          await CacheManager().removeByPrefix('revenues_');
-          await LocalApiCacheStore().removeByGroup('revenues');
-          break;
-        case 3:
-          await CacheManager().removeByPrefix('costs_');
-          await LocalApiCacheStore().removeByGroup('costs');
-          break;
-      }
+      // Force SWR revalidate for manual refresh — clear caches for all accounting
+      // related lists so user-initiated refresh always reloads latest data.
+      await CacheManager().removeByPrefix('gl_entries_');
+      await LocalApiCacheStore().removeByGroup('gl_entries');
+      await CacheManager().removeByPrefix('revenues_');
+      await LocalApiCacheStore().removeByGroup('revenues');
+      await CacheManager().removeByPrefix('costs_');
+      await LocalApiCacheStore().removeByGroup('costs');
 
       _loadTab(_tabController.index);
       SyncStatusController().endSync(updatedAt: DateTime.now());
@@ -296,6 +329,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     _voiceRecorder.dispose();
     _voicePlayer.dispose();
     _tabController.dispose();
+    try {
+      _periodSubscription?.cancel();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -844,9 +880,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         if (revenueState is RevenuesLoaded) {
                           revenueEntities = revenueState.revenues;
                           _cachedRevenues = revenueEntities;
-                          _revenueTotalCount = revenueState.totalCount;
                           _revenuePageNumber = revenueState.pageNumber;
                           _revenuePageSize = revenueState.pageSize;
+                          // Sync local loading flag with bloc state after frame
+                          if (_isLoadingMoreRevenue != revenueState.isLoadMore) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              setState(() => _isLoadingMoreRevenue = revenueState.isLoadMore);
+                            });
+                          }
                         }
 
                         return AccountingCostRevenueTab(
@@ -866,10 +908,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onDeleteCost: _onDeleteCost,
                           canModifyRevenue: _canModifyRevenueEntry,
                           canModifyCost: (item) => false,
-                          hasReachedMaxRevenue: _revenueTotalCount > 0
-                              ? _cachedRevenues.length >= _revenueTotalCount
+                          hasReachedMaxRevenue: revenueState is RevenuesLoaded
+                              ? revenueState.hasReachedMax
                               : false,
-                          isLoadingMoreRevenue: revenueState is RevenuesLoaded ? revenueState.isLoadMore : _isLoadingMoreRevenue,
+                          isLoadingMoreRevenue: revenueState is RevenuesLoaded ? revenueState.isLoadMore : false,
                           onLoadMoreRevenue: _loadMoreRevenues,
                         );
                       },
@@ -883,9 +925,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         if (costState is CostsLoaded) {
                           costEntities = costState.costs;
                           _cachedCosts = costEntities;
-                          _costTotalCount = costState.totalCount;
                           _costPageNumber = costState.pageNumber;
                           _costPageSize = costState.pageSize;
+                          // Sync local loading flag with bloc state after frame
+                          if (_isLoadingMoreCost != costState.isLoadMore) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (!mounted) return;
+                              setState(() => _isLoadingMoreCost = costState.isLoadMore);
+                            });
+                          }
                         }
 
                         return AccountingCostRevenueTab(
@@ -905,10 +953,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onDeleteCost: _onDeleteCost,
                           canModifyRevenue: (item) => false,
                           canModifyCost: _canModifyCostEntry,
-                          hasReachedMaxCost: _costTotalCount > 0
-                              ? _cachedCosts.length >= _costTotalCount
+                          hasReachedMaxCost: costState is CostsLoaded
+                              ? costState.hasReachedMax
                               : false,
-                          isLoadingMoreCost: costState is CostsLoaded ? costState.isLoadMore : _isLoadingMoreCost,
+                          isLoadingMoreCost: costState is CostsLoaded ? costState.isLoadMore : false,
                           onLoadMoreCost: _loadMoreCosts,
                         );
                       },

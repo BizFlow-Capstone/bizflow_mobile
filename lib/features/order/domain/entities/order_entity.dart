@@ -28,6 +28,7 @@ class OrderEntity extends Equatable {
   final DateTime? cancelledAt;
   final String? cancelReason;
   final String? invoiceNumber;
+  final String? documentNumber;
   final DateTime? invoicedAt;
   final String? createdByProfileId;
   final String? createdByProfileFullName;
@@ -58,6 +59,7 @@ class OrderEntity extends Equatable {
     this.cancelledAt,
     this.cancelReason,
     this.invoiceNumber,
+    this.documentNumber,
     this.invoicedAt,
     this.createdByProfileId,
     this.createdByProfileFullName,
@@ -94,6 +96,7 @@ class OrderEntity extends Equatable {
     DateTime? cancelledAt,
     String? cancelReason,
     String? invoiceNumber,
+    String? documentNumber,
     DateTime? invoicedAt,
     String? createdByProfileId,
     String? createdByProfileFullName,
@@ -124,6 +127,7 @@ class OrderEntity extends Equatable {
       cancelledAt: cancelledAt ?? this.cancelledAt,
       cancelReason: cancelReason ?? this.cancelReason,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      documentNumber: documentNumber ?? this.documentNumber,
       invoicedAt: invoicedAt ?? this.invoicedAt,
       createdByProfileId: createdByProfileId ?? this.createdByProfileId,
       createdByProfileFullName:
@@ -158,6 +162,7 @@ class OrderEntity extends Equatable {
     cancelledAt,
     cancelReason,
     invoiceNumber,
+    documentNumber,
     invoicedAt,
     createdByProfileId,
     createdByProfileFullName,

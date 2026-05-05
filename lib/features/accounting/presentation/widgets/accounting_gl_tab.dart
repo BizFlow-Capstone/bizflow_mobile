@@ -46,6 +46,7 @@ class _LinkedEntityDetail {
     required this.rows,
     this.itemLines = const <String>[],
   });
+  
 }
 
 class AccountingGlTab extends StatefulWidget {
@@ -61,21 +62,6 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   bool _isLocationUnavailable = false;
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final refState = context.read<ReferenceBloc>().state;
-      if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
-        context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
-      }
-      _loadData();
-    });
-  }
-
-  @override
   void dispose() {
     _scrollController.dispose();
     _searchController.dispose();
@@ -708,6 +694,13 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
           value: order.orderCode.trim().isNotEmpty
               ? order.orderCode.trim()
               : order.id.toString(),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.document_number'),
+          value: (() {
+            final doc = (order.documentNumber ?? '').trim();
+            return doc.isNotEmpty ? doc : '-';
+          })(),
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('order.detail_status'),

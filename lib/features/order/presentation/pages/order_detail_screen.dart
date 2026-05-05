@@ -958,6 +958,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               Text(
+                                '${l10n.translate('accounting.document_number')}: ${detail.documentNumber?.trim().isNotEmpty == true ? detail.documentNumber!.trim() : ''}',
+                              ),
+                              Text(
                                 '${l10n.translate('order.detail_status')}: ${detail.statusLabel ?? (() {
                                   final refState = context.read<ReferenceBloc>().state;
                                   if (refState is ReferenceLoaded) {
