@@ -349,4 +349,21 @@ class AccountingApiService {
       throw Exception(_genericError);
     }
   }
+
+  /// DELETE /api/locations/{locationId}/accounting/books/{bookId}
+  Future<void> deleteBook(String locationId, String bookId) async {
+    try {
+      final response = await _apiClient.delete(
+        ApiEndpoints.accountingBooksDetail(locationId, bookId),
+      );
+      if (!response.isSuccess) {
+        throw Exception(_genericError);
+      }
+    } on ApiException catch (e) {
+      throw Exception(ApiErrorMessageParser.parse(e));
+    } catch (e) {
+      debugPrint('AccountingApiService.deleteBook error: $e');
+      throw Exception(_genericError);
+    }
+  }
 }

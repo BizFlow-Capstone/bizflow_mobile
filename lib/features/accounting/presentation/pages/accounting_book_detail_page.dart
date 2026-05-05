@@ -49,6 +49,7 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
   late Future<List<Map<String, dynamic>>> _rowsFuture;
   bool _isShowingLoadErrorDialog = false;
   bool _isExporting = false;
+  bool _isDeleting = false;
 
   @override
   void initState() {
@@ -107,6 +108,49 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
     });
   }
 
+  Future<void> _deleteBook() async {
+    if (_isDeleting) return;
+
+    final l10n = AppLocalizations.of(context);
+    final bookName = widget.book.displayName;
+
+    final confirmed = await AppDialog.delete(
+      context,
+      title: l10n.translate('accounting.book_delete_confirm_title'),
+      message: l10n.translate(
+        'accounting.book_delete_confirm_message',
+        params: {'name': bookName},
+      ),
+      confirmText: l10n.translate('common.delete'),
+      cancelText: l10n.translate('common.cancel'),
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _isDeleting = true);
+    try {
+      await context.read<AccountingRepository>().deleteBook(
+        locationId: widget.locationId,
+        bookId: widget.book.bookId.toString(),
+      );
+      if (!mounted) return;
+      AppSnackBar.success(
+        context,
+        l10n.translate('accounting.book_delete_success'),
+      );
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.error(context, ApiErrorMessageParser.parse(e));
+    } finally {
+      if (mounted) {
+        setState(() => _isDeleting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -124,6 +168,19 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
         iconTheme: const IconThemeData(color: Colors.black),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _isDeleting ? null : _deleteBook,
+            icon: _isDeleting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_outline),
+            tooltip: l10n.translate('common.delete'),
+          ),
+        ],
       ),
       body: FutureBuilder<List<Object?>>(
         future: Future.wait([_sectionsFuture, _rowsFuture]),
@@ -416,6 +473,8 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
       return;
     }
 
+    final languageCode = Localizations.localeOf(context).languageCode;
+
     AppSnackBar.info(
       context,
       shareAfterExport
@@ -425,7 +484,6 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
 
     try {
       final rawRows = await _rowsFuture;
-      final languageCode = Localizations.localeOf(context).languageCode;
       final rows = AccountingReferenceDisplay.normalizeRows(
         rawRows,
         languageCode: languageCode,
