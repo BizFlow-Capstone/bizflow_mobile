@@ -11,7 +11,7 @@ import '../../../accounting/domain/utils/accounting_reference_display.dart';
 
 enum AccountingCostRevenueMode { revenue, cost, both }
 
-class AccountingCostRevenueTab extends StatelessWidget {
+class AccountingCostRevenueTab extends StatefulWidget {
   final List<RevenueEntity> revenues;
   final List<CostEntity> costs;
   final AccountingCostRevenueMode mode;
@@ -26,6 +26,13 @@ class AccountingCostRevenueTab extends StatelessWidget {
   final ValueChanged<CostEntity> onDeleteCost;
   final bool Function(RevenueEntity) canModifyRevenue;
   final bool Function(CostEntity) canModifyCost;
+  // Pagination callbacks/state (optional)
+  final bool hasReachedMaxRevenue;
+  final bool hasReachedMaxCost;
+  final bool isLoadingMoreRevenue;
+  final bool isLoadingMoreCost;
+  final VoidCallback? onLoadMoreRevenue;
+  final VoidCallback? onLoadMoreCost;
 
   const AccountingCostRevenueTab({
     super.key,
@@ -43,70 +50,132 @@ class AccountingCostRevenueTab extends StatelessWidget {
     required this.onDeleteCost,
     required this.canModifyRevenue,
     required this.canModifyCost,
+    this.hasReachedMaxRevenue = true,
+    this.hasReachedMaxCost = true,
+    this.isLoadingMoreRevenue = false,
+    this.isLoadingMoreCost = false,
+    this.onLoadMoreRevenue,
+    this.onLoadMoreCost,
   });
+
+  @override
+  State<AccountingCostRevenueTab> createState() => _AccountingCostRevenueTabState();
+}
+
+class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final current = _scrollController.offset;
+    if (current < (maxScroll * 0.9)) return;
+
+    final showRevenue =
+        widget.mode == AccountingCostRevenueMode.both ||
+        widget.mode == AccountingCostRevenueMode.revenue;
+    final showCost =
+        widget.mode == AccountingCostRevenueMode.both ||
+        widget.mode == AccountingCostRevenueMode.cost;
+
+    // Try to load cost first (cost section is rendered after revenue).
+    if (showCost && widget.onLoadMoreCost != null && !widget.hasReachedMaxCost && !widget.isLoadingMoreCost) {
+      widget.onLoadMoreCost!();
+      return;
+    }
+
+    if (showRevenue && widget.onLoadMoreRevenue != null && !widget.hasReachedMaxRevenue && !widget.isLoadingMoreRevenue) {
+      widget.onLoadMoreRevenue!();
+      return;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final showRevenue =
-        mode == AccountingCostRevenueMode.both ||
-        mode == AccountingCostRevenueMode.revenue;
+        widget.mode == AccountingCostRevenueMode.both ||
+        widget.mode == AccountingCostRevenueMode.revenue;
     final showCost =
-        mode == AccountingCostRevenueMode.both ||
-        mode == AccountingCostRevenueMode.cost;
+        widget.mode == AccountingCostRevenueMode.both ||
+        widget.mode == AccountingCostRevenueMode.cost;
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
         if (showRevenue)
           _card(
             title: l10n.translate('accounting.revenue_list'),
-            onAdd: onAddRevenue,
-            child: revenues.isEmpty
+            onAdd: widget.onAddRevenue,
+            child: widget.revenues.isEmpty
                 ? _buildEmptyState(
                     context,
                     l10n.translate('accounting.revenue_list'),
                   )
                 : Column(
-                    children: revenues
-                        .map(
-                          (item) => _itemTile(
-                            context,
-                            item: item,
-                            isRevenue: true,
-                            onTap: () => onTapRevenue(item),
-                            onEdit: () => onEditRevenue(item),
-                            onDelete: () => onDeleteRevenue(item),
-                            isModifiable: canModifyRevenue(item),
-                          ),
-                        )
-                        .toList(),
+                    children: [
+                      ...widget.revenues.map(
+                        (item) => _itemTile(
+                          context,
+                          item: item,
+                          isRevenue: true,
+                          onTap: () => widget.onTapRevenue(item),
+                          onEdit: () => widget.onEditRevenue(item),
+                          onDelete: () => widget.onDeleteRevenue(item),
+                          isModifiable: widget.canModifyRevenue(item),
+                        ),
+                      ),
+                      if (!widget.hasReachedMaxRevenue)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                    ],
                   ),
           ),
         if (showRevenue && showCost) const SizedBox(height: AppSpacing.md),
         if (showCost)
           _card(
             title: l10n.translate('accounting.cost_list'),
-            onAdd: onAddCost,
-            child: costs.isEmpty
+            onAdd: widget.onAddCost,
+            child: widget.costs.isEmpty
                 ? _buildEmptyState(
                     context,
                     l10n.translate('accounting.cost_list'),
                   )
                 : Column(
-                    children: costs
-                        .map(
-                          (item) => _itemTile(
-                            context,
-                            item: item,
-                            isRevenue: false,
-                            onTap: () => onTapCost(item),
-                            onEdit: () => onEditCost(item),
-                            onDelete: () => onDeleteCost(item),
-                            isModifiable: canModifyCost(item),
-                          ),
-                        )
-                        .toList(),
+                    children: [
+                      ...widget.costs.map(
+                        (item) => _itemTile(
+                          context,
+                          item: item,
+                          isRevenue: false,
+                          onTap: () => widget.onTapCost(item),
+                          onEdit: () => widget.onEditCost(item),
+                          onDelete: () => widget.onDeleteCost(item),
+                          isModifiable: widget.canModifyCost(item),
+                        ),
+                      ),
+                      if (!widget.hasReachedMaxCost)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                    ],
                   ),
           ),
       ],
@@ -137,7 +206,7 @@ class AccountingCostRevenueTab extends StatelessWidget {
     double amount = 0;
     bool isReplaced = false;
     String? statusLabel;
-    final effectiveLanguageCode = languageCode;
+    final effectiveLanguageCode = widget.languageCode;
 
     if (item is RevenueEntity) {
       title = (item.documentNumber ?? '').trim().isNotEmpty

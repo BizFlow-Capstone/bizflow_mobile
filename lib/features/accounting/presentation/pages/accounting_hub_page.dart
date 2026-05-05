@@ -123,6 +123,16 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   List<RevenueEntity> _cachedRevenues = const <RevenueEntity>[];
   List<CostEntity> _cachedCosts = const <CostEntity>[];
   bool _suppressNextRevenueError = false;
+  // Pagination trackers for revenue & cost tabs
+  int _revenueTotalCount = 0;
+  int _revenuePageNumber = 0;
+  int _revenuePageSize = 20;
+  bool _isLoadingMoreRevenue = false;
+
+  int _costTotalCount = 0;
+  int _costPageNumber = 0;
+  int _costPageSize = 20;
+  bool _isLoadingMoreCost = false;
 
   AppLocalizations get l10n => AppLocalizations.of(context);
 
@@ -244,6 +254,30 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     } catch (_) {
       SyncStatusController().endSync(hasError: true);
     }
+  }
+
+  void _loadMoreRevenues() {
+    if (_isLoadingMoreRevenue) return;
+    final nextPage = (_revenuePageNumber <= 0) ? 2 : _revenuePageNumber + 1;
+    setState(() => _isLoadingMoreRevenue = true);
+    context.read<RevenueBloc>().add(LoadRevenuesRequested(
+      pageNumber: nextPage,
+      pageSize: _revenuePageSize,
+      businessLocationId: context.read<BusinessContext>().currentBusinessId,
+      isLoadMore: true,
+    ));
+  }
+
+  void _loadMoreCosts() {
+    if (_isLoadingMoreCost) return;
+    final nextPage = (_costPageNumber <= 0) ? 2 : _costPageNumber + 1;
+    setState(() => _isLoadingMoreCost = true);
+    context.read<CostBloc>().add(LoadCostsRequested(
+      pageNumber: nextPage,
+      pageSize: _costPageSize,
+      businessLocationId: context.read<BusinessContext>().currentBusinessId,
+      isLoadMore: true,
+    ));
   }
 
   @override
@@ -800,6 +834,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         if (revenueState is RevenuesLoaded) {
                           revenueEntities = revenueState.revenues;
                           _cachedRevenues = revenueEntities;
+                          _revenueTotalCount = revenueState.totalCount;
+                          _revenuePageNumber = revenueState.pageNumber;
+                          _revenuePageSize = revenueState.pageSize;
                         }
 
                         return AccountingCostRevenueTab(
@@ -818,8 +855,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
                           canModifyRevenue: _canModifyRevenueEntry,
-                          canModifyCost: (item) =>
-                              false, // revenue tab doesn't show costs
+                          canModifyCost: (item) => false,
+                          hasReachedMaxRevenue: _cachedRevenues.length >= _revenueTotalCount,
+                          isLoadingMoreRevenue: revenueState is RevenuesLoaded ? revenueState.isLoadMore : _isLoadingMoreRevenue,
+                          onLoadMoreRevenue: _loadMoreRevenues,
                         );
                       },
                     ),
@@ -832,6 +871,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                         if (costState is CostsLoaded) {
                           costEntities = costState.costs;
                           _cachedCosts = costEntities;
+                          _costTotalCount = costState.totalCount;
+                          _costPageNumber = costState.pageNumber;
+                          _costPageSize = costState.pageSize;
                         }
 
                         return AccountingCostRevenueTab(
@@ -849,9 +891,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onEditCost: _showEditCostDialog,
                           onTapCost: _showCostDetailDialog,
                           onDeleteCost: _onDeleteCost,
-                          canModifyRevenue: (item) =>
-                              false, // cost tab doesn't show revenues
+                          canModifyRevenue: (item) => false,
                           canModifyCost: _canModifyCostEntry,
+                          hasReachedMaxCost: _cachedCosts.length >= _costTotalCount,
+                          isLoadingMoreCost: costState is CostsLoaded ? costState.isLoadMore : _isLoadingMoreCost,
+                          onLoadMoreCost: _loadMoreCosts,
                         );
                       },
                     ),

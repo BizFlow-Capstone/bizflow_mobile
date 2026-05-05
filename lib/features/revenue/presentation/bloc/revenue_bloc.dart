@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/network/api_error_message_parser.dart';
 import '../../data/revenue_repository.dart';
+import '../../domain/entities/revenue_entity.dart';
 import 'revenue_event.dart';
 import 'revenue_state.dart';
 
@@ -26,7 +27,27 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
     LoadRevenuesRequested event,
     Emitter<RevenueState> emit,
   ) async {
-    emit(const RevenuesLoading());
+    final currentState = state;
+
+    // Only emit standard loading when not paginating
+    if (!event.isLoadMore) {
+      emit(const RevenuesLoading());
+    }
+
+    // If this is a load-more request, mark current state as loading more
+    if (event.isLoadMore && currentState is RevenuesLoaded) {
+      emit(RevenuesLoaded(
+        revenues: currentState.revenues,
+        allRevenues: currentState.allRevenues,
+        totalCount: currentState.totalCount,
+        pageNumber: currentState.pageNumber,
+        pageSize: currentState.pageSize,
+        isFromCache: currentState.isFromCache,
+        isLoadMore: true,
+        hasReachedMax: currentState.hasReachedMax,
+      ));
+    }
+
     var hasDeliveredData = false;
     try {
       final locationIdInt = event.businessLocationId != null
@@ -40,15 +61,27 @@ class RevenueBloc extends Bloc<RevenueEvent, RevenueState> {
         fromDate: event.fromDate,
         toDate: event.toDate,
         onData: (revenues, totalCount, isFromCache) {
-          hasDeliveredData = true;
+          // Append if load more
+          List<RevenueEntity> master = revenues;
+          if (event.isLoadMore && currentState is RevenuesLoaded) {
+            master = List.of(currentState.allRevenues)..addAll(revenues);
+            final ids = <int>{};
+            master.retainWhere((x) => ids.add(x.id));
+          }
+
+          final hasReachedMax = master.length >= totalCount || revenues.length < event.pageSize;
+
           if (!emit.isDone) {
             emit(
               RevenuesLoaded(
-                revenues: revenues,
+                revenues: master,
+                allRevenues: master,
                 totalCount: totalCount,
                 pageNumber: event.pageNumber,
                 pageSize: event.pageSize,
                 isFromCache: isFromCache,
+                isLoadMore: false,
+                hasReachedMax: hasReachedMax,
               ),
             );
           }

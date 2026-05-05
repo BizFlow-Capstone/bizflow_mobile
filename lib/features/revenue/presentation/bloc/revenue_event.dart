@@ -14,6 +14,7 @@ class LoadRevenuesRequested extends RevenueEvent {
   final String? businessLocationId;
   final DateTime? fromDate;
   final DateTime? toDate;
+  final bool isLoadMore;
 
   const LoadRevenuesRequested({
     this.pageNumber = 1,
@@ -21,6 +22,7 @@ class LoadRevenuesRequested extends RevenueEvent {
     this.businessLocationId,
     this.fromDate,
     this.toDate,
+    this.isLoadMore = false,
   });
 
   @override
@@ -30,6 +32,7 @@ class LoadRevenuesRequested extends RevenueEvent {
     businessLocationId,
     fromDate,
     toDate,
+    isLoadMore,
   ];
 }
 

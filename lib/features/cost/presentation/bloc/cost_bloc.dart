@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/cost_repository.dart';
+import '../../domain/entities/cost_entity.dart';
 import 'cost_event.dart';
 import 'cost_state.dart';
 
@@ -25,7 +26,25 @@ class CostBloc extends Bloc<CostEvent, CostState> {
     LoadCostsRequested event,
     Emitter<CostState> emit,
   ) async {
-    emit(const CostsLoading());
+    final currentState = state;
+
+    if (!event.isLoadMore) {
+      emit(const CostsLoading());
+    }
+
+    if (event.isLoadMore && currentState is CostsLoaded) {
+      emit(CostsLoaded(
+        costs: currentState.costs,
+        allCosts: currentState.allCosts,
+        totalCount: currentState.totalCount,
+        pageNumber: currentState.pageNumber,
+        pageSize: currentState.pageSize,
+        isFromCache: currentState.isFromCache,
+        isLoadMore: true,
+        hasReachedMax: currentState.hasReachedMax,
+      ));
+    }
+
     var hasDeliveredData = false;
     try {
       final locationIdInt = event.businessLocationId != null
@@ -40,13 +59,26 @@ class CostBloc extends Bloc<CostEvent, CostState> {
         toDate: event.toDate,
         onData: (costs, totalCount, isFromCache) {
           hasDeliveredData = true;
+          // Append if load more
+          List<CostEntity> master = costs;
+          if (event.isLoadMore && currentState is CostsLoaded) {
+            master = List.of(currentState.allCosts)..addAll(costs);
+            final ids = <int>{};
+            master.retainWhere((x) => ids.add(x.id));
+          }
+
+          final hasReachedMax = master.length >= totalCount || costs.length < event.pageSize;
+
           emit(
             CostsLoaded(
-              costs: costs,
+              costs: master,
+              allCosts: master,
               totalCount: totalCount,
               pageNumber: event.pageNumber,
               pageSize: event.pageSize,
               isFromCache: isFromCache,
+              isLoadMore: false,
+              hasReachedMax: hasReachedMax,
             ),
           );
         },

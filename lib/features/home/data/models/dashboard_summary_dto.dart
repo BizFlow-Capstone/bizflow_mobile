@@ -6,7 +6,7 @@ class DashboardSummaryDto {
   final double totalRevenue;
   final double totalCost;
   final int totalCompletedOrders;
-  final double totalOutstandingDebt;
+  final double OutstandingDebtNetChangeInPeriod;
   final String? outstandingDebtAsOfUtc;
 
   const DashboardSummaryDto({
@@ -17,7 +17,7 @@ class DashboardSummaryDto {
     required this.totalRevenue,
     required this.totalCost,
     required this.totalCompletedOrders,
-    required this.totalOutstandingDebt,
+    required this.OutstandingDebtNetChangeInPeriod,
     required this.outstandingDebtAsOfUtc,
   });
 
@@ -30,7 +30,7 @@ class DashboardSummaryDto {
       totalRevenue: _parseDouble(json['totalRevenue']) ?? 0,
       totalCost: _parseDouble(json['totalCost']) ?? 0,
       totalCompletedOrders: _parseInt(json['totalCompletedOrders']) ?? 0,
-      totalOutstandingDebt: _parseDouble(json['totalOutstandingDebt']) ?? 0,
+      OutstandingDebtNetChangeInPeriod: _parseDouble(json['OutstandingDebtNetChangeInPeriod']) ?? 0,
       outstandingDebtAsOfUtc: json['outstandingDebtAsOfUtc']?.toString(),
     );
   }
@@ -44,7 +44,7 @@ class DashboardSummaryDto {
       'totalRevenue': totalRevenue,
       'totalCost': totalCost,
       'totalCompletedOrders': totalCompletedOrders,
-      'totalOutstandingDebt': totalOutstandingDebt,
+      'OutstandingDebtNetChangeInPeriod': OutstandingDebtNetChangeInPeriod,
       'outstandingDebtAsOfUtc': outstandingDebtAsOfUtc,
     };
   }

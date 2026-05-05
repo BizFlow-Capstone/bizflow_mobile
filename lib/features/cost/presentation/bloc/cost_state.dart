@@ -18,21 +18,27 @@ class CostsLoading extends CostState {
 
 class CostsLoaded extends CostState {
   final List<CostEntity> costs;
+  final List<CostEntity> allCosts;
   final int totalCount;
   final int pageNumber;
   final int pageSize;
   final bool isFromCache;
+  final bool isLoadMore;
+  final bool hasReachedMax;
 
   const CostsLoaded({
     required this.costs,
+    required this.allCosts,
     required this.totalCount,
     required this.pageNumber,
     required this.pageSize,
     this.isFromCache = false,
+    this.isLoadMore = false,
+    this.hasReachedMax = true,
   });
 
   @override
-  List<Object?> get props => [costs, totalCount, pageNumber, pageSize, isFromCache];
+  List<Object?> get props => [costs, allCosts, totalCount, pageNumber, pageSize, isFromCache, isLoadMore, hasReachedMax];
 }
 
 class CostError extends CostState {

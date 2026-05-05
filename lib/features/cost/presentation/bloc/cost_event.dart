@@ -14,6 +14,7 @@ class LoadCostsRequested extends CostEvent {
   final String? businessLocationId;
   final DateTime? fromDate;
   final DateTime? toDate;
+  final bool isLoadMore;
 
   const LoadCostsRequested({
     this.pageNumber = 1,
@@ -21,10 +22,11 @@ class LoadCostsRequested extends CostEvent {
     this.businessLocationId,
     this.fromDate,
     this.toDate,
+    this.isLoadMore = false,
   });
 
   @override
-  List<Object?> get props => [pageNumber, pageSize, businessLocationId, fromDate, toDate];
+  List<Object?> get props => [pageNumber, pageSize, businessLocationId, fromDate, toDate, isLoadMore];
 }
 
 class CreateManualCostRequested extends CostEvent {
