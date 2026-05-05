@@ -1834,7 +1834,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
     final descriptionController = TextEditingController(text: item.description);
     final documentNumberController = TextEditingController(
-      text: item.documentNumber ?? item.referenceCode ?? '',
+      text: item.documentNumber ?? '',
     );
     DateTime selectedDate = DateTime.now();
     DateTime? selectedDocumentDate = item.documentDate;
@@ -2799,7 +2799,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     );
     final descriptionController = TextEditingController(text: item.description);
     final documentNumberController = TextEditingController(
-      text: item.documentNumber ?? item.referenceCode ?? '',
+      text: item.documentNumber ?? '',
     );
     DateTime selectedDate = DateTime.now();
     DateTime? selectedDocumentDate = item.documentDate;

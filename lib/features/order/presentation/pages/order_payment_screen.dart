@@ -380,19 +380,6 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
 
         await _removeLocalDraftById(widget.localDraftId);
 
-        if (_debtAmount > 0 && _selectedDebtor != null) {
-          final debtorRepo = context.read<DebtorBloc>().repository;
-          await debtorRepo.recordDebtAdjustment(
-            debtorId: _selectedDebtor!.debtorId,
-            amount: _debtAmount,
-            action: 'increase_debt',
-            paymentMethod: _cashAmount > 0
-                ? 'cash'
-                : (_bankAmount > 0 ? 'bank' : 'cash'),
-            notes: widget.note,
-          );
-        }
-
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -422,19 +409,6 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
         final order = await repository.createOrder(body);
 
         await _removeLocalDraftById(widget.localDraftId);
-
-        if (_debtAmount > 0 && _selectedDebtor != null) {
-          final debtorRepo = context.read<DebtorBloc>().repository;
-          await debtorRepo.recordDebtAdjustment(
-            debtorId: _selectedDebtor!.debtorId,
-            amount: _debtAmount,
-            action: 'increase_debt',
-            paymentMethod: _cashAmount > 0
-                ? 'cash'
-                : (_bankAmount > 0 ? 'bank' : 'cash'),
-            notes: widget.note,
-          );
-        }
 
         if (mounted) {
           Navigator.pushReplacement(
