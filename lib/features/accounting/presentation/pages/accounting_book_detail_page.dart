@@ -18,6 +18,7 @@ import '../../presentation/widgets/s2e_book_widget.dart';
 import '../../presentation/widgets/s3a_book_widget.dart';
 import '../../data/repositories/accounting_repository.dart';
 import '../../data/services/excel_export_service.dart';
+import '../bloc/accounting_period_bloc.dart';
 import '../../domain/utils/accounting_reference_display.dart';
 import '../../../location/presentation/bloc/location_bloc.dart';
 import '../../../location/presentation/bloc/location_state.dart';
@@ -140,7 +141,20 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
         context,
         l10n.translate('accounting.book_delete_success'),
       );
-      Navigator.of(context).pop(true);
+      // Reload books in period tab before popping
+      if (context.mounted) {
+        context.read<AccountingPeriodBloc>().add(
+          LoadBooksForPeriodRequested(
+            locationId: widget.locationId,
+            periodId: widget.book.periodId,
+          ),
+        );
+      }
+      // Pop twice: detail page, then modal sheet to return to period tab main view
+      Navigator.of(context).pop();
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       if (!mounted) return;
       AppSnackBar.error(context, ApiErrorMessageParser.parse(e));
