@@ -99,114 +99,49 @@ class S3aBookWidget extends StatelessWidget {
         headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
         border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
         columnSpacing: 16,
-        columns: [
-          DataColumn(
-            label: Text(
-              'STT',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            numeric: true,
-          ),
-          DataColumn(
-            label: Text(
-              'Tên tài sản',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Số CT',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Ngày ghi nhận',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Giá trị tăng',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            numeric: true,
-          ),
-          DataColumn(
-            label: Text(
-              'Giá trị giảm',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            numeric: true,
-          ),
-          DataColumn(
-            label: Text(
-              'Giá trị còn lại',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            numeric: true,
-          ),
-          DataColumn(
-            label: Text(
-              'Ghi chú',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+        columns: _buildColumns(),
         rows: tableRows,
       ),
     );
   }
 
+  List<BookColumnDto> _effectiveColumns() {
+    if (sections.columns.isNotEmpty) {
+      return sections.columns;
+    }
+    return const [
+      BookColumnDto(fieldCode: 'stt', label: 'STT', fieldType: 'number'),
+      BookColumnDto(fieldCode: 'asset_name', label: 'Tên tài sản', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'voucher_no', label: 'Số CT', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'recorded_date', label: 'Ngày ghi nhận', fieldType: 'date'),
+      BookColumnDto(fieldCode: 'increase_amount', label: 'Giá trị tăng', fieldType: 'money'),
+      BookColumnDto(fieldCode: 'decrease_amount', label: 'Giá trị giảm', fieldType: 'money'),
+      BookColumnDto(fieldCode: 'remaining_amount', label: 'Giá trị còn lại', fieldType: 'money'),
+      BookColumnDto(fieldCode: 'note', label: 'Ghi chú', fieldType: 'text'),
+    ];
+  }
+
+  List<DataColumn> _buildColumns() {
+    final style = AppTextStyles.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+      fontSize: 15,
+      fontWeight: FontWeight.bold,
+    );
+    return _effectiveColumns().map((column) {
+      return DataColumn(
+        label: Text(column.label, style: style),
+        numeric: _isNumericColumn(column),
+      );
+    }).toList();
+  }
+
   DataRow _buildDataRow(SectionRowDto row, int stt) {
-    final v = row.values;
     final style = AppTextStyles.bodyMedium.copyWith(
       color: AppColors.textPrimary,
       fontSize: 15,
     );
     return DataRow(
-      cells: [
-        DataCell(Text('$stt', style: style)),
-        DataCell(Text(_str(v, const ['asset_name', 'assetName', 'name', 'title', 'tenTaiSan']), style: style)),
-        DataCell(Text(_str(v, const ['voucher_no', 'voucherNo', 'so_hieu', 'documentNumber', 'DocumentNumber', 'so_chung_tu', 'documentNo', 'DocumentNo']), style: style)),
-        DataCell(Text(_fmtDate(_pick(v, const ['recorded_date', 'recordedDate', 'date', 'ngay_ghi_nhan', 'receivedAt', 'createdAt'])), style: style)),
-        DataCell(Text(_fmtAmount(_pick(v, const ['increase_amount', 'increaseAmount', 'amountIn', 'tang', 'gia_tri_tang', 'revenue'])), style: style)),
-        DataCell(Text(_fmtAmount(_pick(v, const ['decrease_amount', 'decreaseAmount', 'amountOut', 'giam', 'gia_tri_giam', 'cost'])), style: style)),
-        DataCell(Text(_fmtAmount(_pick(v, const ['remaining_amount', 'remainingAmount', 'conLai', 'gia_tri_con_lai', 'remainValue', 'finalAmount', 'totalAmount'])), style: style)),
-        DataCell(Text(_str(v, const ['note', 'ghi_chu', 'description', 'remark']), style: style)),
-      ],
+      cells: _buildRowCells(row.values, style, stt: stt),
     );
   }
 
@@ -219,20 +154,81 @@ class S3aBookWidget extends StatelessWidget {
     );
     return DataRow(
       color: WidgetStateProperty.all(Colors.grey[100]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(
-          _str(v, const ['asset_name', 'assetName', 'dien_giai', 'description', 'name']),
-          style: style,
-        )),
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(_fmtAmount(_pick(v, const ['increase_amount', 'increaseAmount', 'amountIn', 'tang', 'revenue'])), style: style)),
-        DataCell(Text(_fmtAmount(_pick(v, const ['decrease_amount', 'decreaseAmount', 'amountOut', 'giam', 'cost'])), style: style)),
-        DataCell(Text(_fmtAmount(_pick(v, const ['remaining_amount', 'remainingAmount', 'conLai', 'finalAmount', 'totalAmount'])), style: style)),
-        const DataCell(SizedBox.shrink()),
-      ],
+      cells: _buildRowCells(v, style),
     );
+  }
+
+  List<DataCell> _buildRowCells(Map<String, dynamic> values, TextStyle style, {int? stt}) {
+    return _effectiveColumns().map((column) {
+      final value = _resolveCellValue(values, column.fieldCode, stt: stt);
+      return DataCell(Text(_formatCellValue(value, column.fieldCode), style: style));
+    }).toList();
+  }
+
+  bool _isNumericColumn(BookColumnDto column) {
+    final code = column.fieldCode.trim().toLowerCase();
+    final type = column.fieldType.trim().toLowerCase();
+    final label = column.label.trim().toLowerCase();
+    return type == 'number' ||
+        type == 'money' ||
+        code == 'stt' ||
+        code.contains('amount') ||
+        label.contains('giá trị');
+  }
+
+  dynamic _resolveCellValue(Map<String, dynamic> values, String fieldCode, {int? stt}) {
+    if (values.containsKey(fieldCode)) return values[fieldCode];
+    final code = fieldCode.trim().toLowerCase();
+
+    if (code == 'stt' || code == 'index' || code == 'serial') {
+      return stt;
+    }
+
+    if (code.contains('asset') || code.contains('tai_san') || code.contains('name')) {
+      return _pick(values, const ['asset_name', 'assetName', 'name', 'title', 'tenTaiSan', 'dien_giai', 'description']);
+    }
+
+    if (code.contains('voucher') || code.contains('so_hieu') || code.contains('document')) {
+      return _pick(values, const ['voucher_no', 'voucherNo', 'so_hieu', 'documentNumber', 'DocumentNumber', 'so_chung_tu', 'documentNo', 'DocumentNo']);
+    }
+
+    if (code.contains('date') || code.contains('ngay')) {
+      return _pick(values, const ['recorded_date', 'recordedDate', 'date', 'ngay_ghi_nhan', 'receivedAt', 'createdAt']);
+    }
+
+    if (code.contains('increase') || code.contains('tang') || (code.contains('amount') && code.contains('in'))) {
+      return _pick(values, const ['increase_amount', 'increaseAmount', 'amountIn', 'tang', 'gia_tri_tang', 'revenue']);
+    }
+
+    if (code.contains('decrease') || code.contains('giam') || (code.contains('amount') && code.contains('out'))) {
+      return _pick(values, const ['decrease_amount', 'decreaseAmount', 'amountOut', 'giam', 'gia_tri_giam', 'cost']);
+    }
+
+    if (code.contains('remaining') || code.contains('con_lai') || code.contains('remain')) {
+      return _pick(values, const ['remaining_amount', 'remainingAmount', 'conLai', 'gia_tri_con_lai', 'remainValue', 'finalAmount', 'totalAmount']);
+    }
+
+    if (code.contains('note') || code.contains('ghi_chu') || code.contains('remark') || code.contains('description')) {
+      return _pick(values, const ['note', 'ghi_chu', 'description', 'remark']);
+    }
+
+    return values.entries
+        .firstWhere((e) => e.key.trim().toLowerCase() == code, orElse: () => const MapEntry('', null))
+        .value;
+  }
+
+  String _formatCellValue(dynamic value, String fieldCode) {
+    final code = fieldCode.trim().toLowerCase();
+    if (code.contains('date') || code.contains('ngay')) {
+      return _fmtDate(value);
+    }
+    if (code == 'stt' || code == 'index' || code == 'serial') {
+      return value?.toString() ?? '';
+    }
+    if (code.contains('amount') || code.contains('gia_tri') || code.contains('tang') || code.contains('giam') || code.contains('remain')) {
+      return _fmtAmount(value);
+    }
+    return value?.toString() ?? '';
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -244,9 +240,6 @@ class S3aBookWidget extends StatelessWidget {
     }
     return null;
   }
-
-  static String _str(Map<String, dynamic> v, List<String> aliases) =>
-      _pick(v, aliases)?.toString() ?? '';
 
   static String _fmtDate(dynamic value) {
     if (value == null) return '';

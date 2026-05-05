@@ -125,15 +125,31 @@ class S2bBookWidget extends StatelessWidget {
         headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
         border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
         columnSpacing: 20,
-        columns: [
-          DataColumn(label: Text('Số hiệu CT', style: _headerStyle())),
-          DataColumn(label: Text('Ngày, tháng', style: _headerStyle())),
-          DataColumn(label: Text('Diễn giải', style: _headerStyle())),
-          DataColumn(label: Text('Số tiền', style: _headerStyle()), numeric: true),
-        ],
+        columns: _buildColumns(),
         rows: tableRows,
       ),
     );
+  }
+
+  List<BookColumnDto> _effectiveColumns() {
+    if (sections.columns.isNotEmpty) {
+      return sections.columns;
+    }
+    return const [
+      BookColumnDto(fieldCode: 'so_hieu', label: 'Số hiệu CT', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'ngay_thang', label: 'Ngày, tháng', fieldType: 'date'),
+      BookColumnDto(fieldCode: 'dien_giai', label: 'Diễn giải', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'so_tien', label: 'Số tiền', fieldType: 'money'),
+    ];
+  }
+
+  List<DataColumn> _buildColumns() {
+    return _effectiveColumns().map((column) {
+      return DataColumn(
+        label: Text(column.label, style: _headerStyle()),
+        numeric: _isNumericColumn(column),
+      );
+    }).toList();
   }
 
   Widget _buildBreakdowns(BuildContext context) {
@@ -284,25 +300,14 @@ class S2bBookWidget extends StatelessWidget {
     final label = '${section.groupIndex}. ${section.businessTypeName ?? 'Ngành nghề'}';
     return DataRow(
       color: WidgetStateProperty.all(Colors.amber[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-
-        DataCell(Text(label, style: _boldItalicStyle())),
-        const DataCell(SizedBox.shrink()),
-      ],
+      cells: _buildRowCells({'dien_giai': label}, _boldItalicStyle()),
     );
   }
 
   DataRow _buildDataRow(SectionRowDto row) {
     final v = row.values;
     return DataRow(
-      cells: [
-        DataCell(Text(_pick(v, _soHieuAliases), style: _normalStyle())),
-        DataCell(Text(_fmtDate(_pickDyn(v, _dateAliases)), style: _normalStyle())),
-        DataCell(Text(_pick(v, _descAliases), style: _normalStyle())),
-        DataCell(Text(_fmtAmount(_pickDyn(v, _soTienAliases)), style: _normalStyle())),
-      ],
+      cells: _buildRowCells(v, _normalStyle()),
     );
   }
 
@@ -310,12 +315,7 @@ class S2bBookWidget extends StatelessWidget {
     final v = row.values;
     return DataRow(
       color: WidgetStateProperty.all(Colors.grey[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(_pick(v, _descAliases), style: _boldStyle())),
-        DataCell(Text(_fmtAmount(_pickDyn(v, _soTienAliases)), style: _boldStyle())),
-      ],
+      cells: _buildRowCells(v, _boldStyle()),
     );
   }
 
@@ -324,12 +324,7 @@ class S2bBookWidget extends StatelessWidget {
     final label = v['dien_giai']?.toString() ?? row.taxType ?? 'Thuế';
     return DataRow(
       color: WidgetStateProperty.all(Colors.orange[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(label, style: _boldItalicStyle())),
-        DataCell(Text(_fmtAmount(_pickDyn(v, _soTienAliases)), style: _boldItalicStyle())),
-      ],
+      cells: _buildRowCells({...v, 'dien_giai': label}, _boldItalicStyle()),
     );
   }
 
@@ -337,13 +332,57 @@ class S2bBookWidget extends StatelessWidget {
     final v = row.values;
     return DataRow(
       color: WidgetStateProperty.all(Colors.blue[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(_pick(v, _descAliases), style: _boldStyle())),
-        DataCell(Text(_fmtAmount(_pickDyn(v, _soTienAliases)), style: _boldStyle())),
-      ],
+      cells: _buildRowCells(v, _boldStyle()),
     );
+  }
+
+  List<DataCell> _buildRowCells(Map<String, dynamic> values, TextStyle style) {
+    return _effectiveColumns().map((column) {
+      final value = _resolveCellValue(values, column.fieldCode);
+      return DataCell(Text(_formatCellValue(value, column.fieldCode), style: style));
+    }).toList();
+  }
+
+  bool _isNumericColumn(BookColumnDto column) {
+    final code = column.fieldCode.trim().toLowerCase();
+    final type = column.fieldType.trim().toLowerCase();
+    final label = column.label.trim().toLowerCase();
+    return type == 'number' ||
+        type == 'money' ||
+        code.contains('amount') ||
+        code.contains('tien') ||
+        label.contains('số tiền');
+  }
+
+  dynamic _resolveCellValue(Map<String, dynamic> values, String fieldCode) {
+    if (values.containsKey(fieldCode)) return values[fieldCode];
+    final code = fieldCode.trim().toLowerCase();
+    if (code.contains('so_hieu') || code.contains('voucher') || code.contains('document')) {
+      return _pickDyn(values, _soHieuAliases);
+    }
+    if (code.contains('ngay') || code.contains('date')) {
+      return _pickDyn(values, _dateAliases);
+    }
+    if (code.contains('dien_giai') || code.contains('description')) {
+      return _pickDyn(values, _descAliases);
+    }
+    if (code.contains('tien') || code.contains('amount') || code.contains('revenue')) {
+      return _pickDyn(values, _soTienAliases);
+    }
+    return values.entries
+        .firstWhere((e) => e.key.trim().toLowerCase() == code, orElse: () => const MapEntry('', null))
+        .value;
+  }
+
+  String _formatCellValue(dynamic value, String fieldCode) {
+    final code = fieldCode.trim().toLowerCase();
+    if (code.contains('ngay') || code.contains('date')) {
+      return _fmtDate(value);
+    }
+    if (code.contains('tien') || code.contains('amount') || code.contains('revenue')) {
+      return _fmtAmount(value);
+    }
+    return value?.toString() ?? '';
   }
 
   // ─── Style helpers ────────────────────────────────────────────────────────
@@ -381,9 +420,6 @@ class S2bBookWidget extends StatelessWidget {
     }
     return null;
   }
-
-  static String _pick(Map<String, dynamic> v, List<String> aliases) =>
-      _pickDyn(v, aliases)?.toString() ?? '';
 
   static String _fmtDate(dynamic value) {
     if (value == null) return '';

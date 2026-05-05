@@ -311,32 +311,39 @@ class S2dBookWidget extends StatelessWidget {
         headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
         border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
         columnSpacing: 12,
-        columns: [
-          DataColumn(label: Text('Số hiệu CT', style: headerStyle)),
-          DataColumn(label: Text('Ngày', style: headerStyle)),
-          DataColumn(label: Text('Tên sản phẩm', style: headerStyle)),
-          DataColumn(label: Text('Diễn giải', style: headerStyle)),
-          DataColumn(label: Text('ĐVT', style: headerStyle)),
-          DataColumn(label: Text('Đơn giá', style: headerStyle), numeric: true),
-          DataColumn(label: Text('SL nhập', style: headerStyle), numeric: true),
-          DataColumn(
-            label: Text('Tiền nhập', style: headerStyle),
-            numeric: true,
-          ),
-          DataColumn(label: Text('SL xuất', style: headerStyle), numeric: true),
-          DataColumn(
-            label: Text('Tiền xuất', style: headerStyle),
-            numeric: true,
-          ),
-          DataColumn(label: Text('SL tồn', style: headerStyle), numeric: true),
-          DataColumn(
-            label: Text('Tiền tồn', style: headerStyle),
-            numeric: true,
-          ),
-        ],
+        columns: _buildColumns(headerStyle),
         rows: tableRows,
       ),
     );
+  }
+
+  List<BookColumnDto> _effectiveColumns() {
+    if (sections.columns.isNotEmpty) {
+      return sections.columns;
+    }
+    return const [
+      BookColumnDto(fieldCode: 'so_hieu', label: 'Số hiệu CT', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'ngay', label: 'Ngày', fieldType: 'date'),
+      BookColumnDto(fieldCode: 'ten_san_pham', label: 'Tên sản phẩm', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'dien_giai', label: 'Diễn giải', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'dvt', label: 'ĐVT', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'don_gia', label: 'Đơn giá', fieldType: 'money'),
+      BookColumnDto(fieldCode: 'sl_nhap', label: 'SL nhập', fieldType: 'number'),
+      BookColumnDto(fieldCode: 'tien_nhap', label: 'Tiền nhập', fieldType: 'money'),
+      BookColumnDto(fieldCode: 'sl_xuat', label: 'SL xuất', fieldType: 'number'),
+      BookColumnDto(fieldCode: 'tien_xuat', label: 'Tiền xuất', fieldType: 'money'),
+      BookColumnDto(fieldCode: 'sl_ton', label: 'SL tồn', fieldType: 'number'),
+      BookColumnDto(fieldCode: 'tien_ton', label: 'Tiền tồn', fieldType: 'money'),
+    ];
+  }
+
+  List<DataColumn> _buildColumns(TextStyle headerStyle) {
+    return _effectiveColumns().map((column) {
+      return DataColumn(
+        label: Text(column.label, style: headerStyle),
+        numeric: _isNumericColumn(column),
+      );
+    }).toList();
   }
 
   Widget _buildBreakdowns(BuildContext context) {
@@ -513,58 +520,8 @@ class S2dBookWidget extends StatelessWidget {
       color: AppColors.textPrimary,
       fontSize: 13,
     );
-    final values = row.values;
     return DataRow(
-      cells: [
-        DataCell(
-          Text(
-            _pick(values, _soHieuAliases)?.toString() ?? '',
-            style: cellStyle,
-          ),
-        ),
-        DataCell(
-          Text(_formatDate(_pick(values, _dateAliases)), style: cellStyle),
-        ),
-        DataCell(
-          Text(
-            _pick(values, _productNameAliases)?.toString() ?? '',
-            style: cellStyle,
-          ),
-        ),
-        DataCell(
-          Text(_pick(values, _descAliases)?.toString() ?? '', style: cellStyle),
-        ),
-        DataCell(
-          Text(_pick(values, _dvtAliases)?.toString() ?? '', style: cellStyle),
-        ),
-        DataCell(
-          Text(_formatAmount(_pick(values, _donGiaAliases)), style: cellStyle),
-        ),
-        DataCell(
-          Text(_formatQty(_pick(values, _slNhapAliases)), style: cellStyle),
-        ),
-        DataCell(
-          Text(
-            _formatAmount(_pick(values, _tienNhapAliases)),
-            style: cellStyle,
-          ),
-        ),
-        DataCell(
-          Text(_formatQty(_pick(values, _slXuatAliases)), style: cellStyle),
-        ),
-        DataCell(
-          Text(
-            _formatAmount(_pick(values, _tienXuatAliases)),
-            style: cellStyle,
-          ),
-        ),
-        DataCell(
-          Text(_formatQty(_pick(values, _slTonAliases)), style: cellStyle),
-        ),
-        DataCell(
-          Text(_formatAmount(_pick(values, _tienTonAliases)), style: cellStyle),
-        ),
-      ],
+      cells: _buildRowCells(row.values, cellStyle),
     );
   }
 
@@ -632,32 +589,16 @@ class S2dBookWidget extends StatelessWidget {
       fontSize: 13,
       fontWeight: FontWeight.bold,
     );
+
+    final values = {
+      ...row.values,
+      'ten_san_pham': _pick(row.values, _productNameAliases)?.toString() ?? '',
+      'dien_giai': row.values['dien_giai']?.toString() ?? 'Tổng cộng',
+    };
+
     return DataRow(
       color: WidgetStateProperty.all(Colors.grey[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            _pick(row.values, _productNameAliases)?.toString() ?? '',
-            style: style,
-          ),
-        ),
-        DataCell(
-          Text(
-            row.values['dien_giai']?.toString() ?? 'Tổng cộng',
-            style: style,
-          ),
-        ),
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(_formatQty(row.values['sl_nhap']), style: style)),
-        DataCell(Text(_formatAmount(row.values['tien_nhap']), style: style)),
-        DataCell(Text(_formatQty(row.values['sl_xuat']), style: style)),
-        DataCell(Text(_formatAmount(row.values['tien_xuat']), style: style)),
-        DataCell(Text(_formatQty(row.values['sl_ton']), style: style)),
-        DataCell(Text(_formatAmount(row.values['tien_ton']), style: style)),
-      ],
+      cells: _buildRowCells(values, style),
     );
   }
 
@@ -669,25 +610,10 @@ class S2dBookWidget extends StatelessWidget {
     );
     return DataRow(
       color: WidgetStateProperty.all(Colors.blue[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            row.values['dien_giai']?.toString() ?? 'Tổng cộng XNT',
-            style: style,
-          ),
-        ),
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(_formatQty(row.values['sl_nhap']), style: style)),
-        DataCell(Text(_formatAmount(row.values['tien_nhap']), style: style)),
-        DataCell(Text(_formatQty(row.values['sl_xuat']), style: style)),
-        DataCell(Text(_formatAmount(row.values['tien_xuat']), style: style)),
-        DataCell(Text(_formatQty(row.values['sl_ton']), style: style)),
-        DataCell(Text(_formatAmount(row.values['tien_ton']), style: style)),
-      ],
+      cells: _buildRowCells(
+        {...row.values, 'dien_giai': row.values['dien_giai']?.toString() ?? 'Tổng cộng XNT'},
+        style,
+      ),
     );
   }
 
@@ -707,49 +633,99 @@ class S2dBookWidget extends StatelessWidget {
 
     return DataRow(
       color: WidgetStateProperty.all(Colors.indigo[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            _pick(row.values, _productNameAliases)?.toString() ?? '',
-            style: style,
-          ),
-        ),
-        DataCell(Text(label, style: style)),
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(_formatQty(_pick(row.values, _slNhapAliases)), style: style),
-        ),
-        DataCell(
-          Text(
-            _formatAmount(_pick(row.values, _tienNhapAliases)),
-            style: style,
-          ),
-        ),
-        DataCell(
-          Text(_formatQty(_pick(row.values, _slXuatAliases)), style: style),
-        ),
-        DataCell(
-          Text(
-            _formatAmount(_pick(row.values, _tienXuatAliases)),
-            style: style,
-          ),
-        ),
-        DataCell(
-          Text(_formatQty(_pick(row.values, _slTonAliases)), style: style),
-        ),
-        DataCell(
-          Text(
-            _formatAmount(
-              _pick(row.values, _tienTonAliases) ?? row.values['so_tien'],
-            ),
-            style: style,
-          ),
-        ),
-      ],
+      cells: _buildRowCells(
+        {
+          ...row.values,
+          'ten_san_pham': _pick(row.values, _productNameAliases)?.toString() ?? '',
+          'dien_giai': label,
+          'tien_ton': _pick(row.values, _tienTonAliases) ?? row.values['so_tien'],
+        },
+        style,
+      ),
     );
+  }
+
+  List<DataCell> _buildRowCells(Map<String, dynamic> values, TextStyle style) {
+    return _effectiveColumns().map((column) {
+      final value = _resolveCellValue(values, column.fieldCode);
+      return DataCell(Text(_formatCellValue(value, column.fieldCode), style: style));
+    }).toList();
+  }
+
+  bool _isNumericColumn(BookColumnDto column) {
+    final code = column.fieldCode.trim().toLowerCase();
+    final type = column.fieldType.trim().toLowerCase();
+    final label = column.label.trim().toLowerCase();
+    return type == 'number' ||
+        type == 'money' ||
+        code.contains('amount') ||
+        code.contains('sl_') ||
+        code.contains('so_luong') ||
+        code.contains('don_gia') ||
+        code.contains('tien') ||
+        label.contains('sl') ||
+        label.contains('tiền') ||
+        label.contains('đơn giá');
+  }
+
+  dynamic _resolveCellValue(Map<String, dynamic> values, String fieldCode) {
+    if (values.containsKey(fieldCode)) return values[fieldCode];
+    final code = fieldCode.trim().toLowerCase();
+
+    if (code.contains('so_hieu') || code.contains('voucher') || code.contains('document')) {
+      return _pick(values, _soHieuAliases);
+    }
+    if (code == 'ngay' || code.contains('date') || code.contains('ngay_thang')) {
+      return _pick(values, _dateAliases);
+    }
+    if (code.contains('ten_san_pham') || code.contains('product') || code.contains('item')) {
+      return _pick(values, _productNameAliases);
+    }
+    if (code.contains('dien_giai') || code.contains('description') || code.contains('note')) {
+      return _pick(values, _descAliases);
+    }
+    if (code == 'dvt' || code.contains('unit')) {
+      return _pick(values, _dvtAliases);
+    }
+    if (code.contains('don_gia') || code.contains('unitprice') || code.contains('price')) {
+      return _pick(values, _donGiaAliases);
+    }
+    if (code.contains('sl_nhap') || code.contains('quantityin') || code.contains('importquantity')) {
+      return _pick(values, _slNhapAliases);
+    }
+    if (code.contains('tien_nhap') || code.contains('amountin') || code.contains('importamount')) {
+      return _pick(values, _tienNhapAliases);
+    }
+    if (code.contains('sl_xuat') || code.contains('quantityout') || code.contains('exportquantity')) {
+      return _pick(values, _slXuatAliases);
+    }
+    if (code.contains('tien_xuat') || code.contains('amountout') || code.contains('exportamount')) {
+      return _pick(values, _tienXuatAliases);
+    }
+    if (code.contains('sl_ton') || code.contains('stockquantity') || code.contains('remainingquantity')) {
+      return _pick(values, _slTonAliases);
+    }
+    if (code.contains('tien_ton') || code.contains('stockamount') || code.contains('remainingamount')) {
+      return _pick(values, _tienTonAliases) ?? values['so_tien'];
+    }
+
+    return values.entries
+        .firstWhere((e) => e.key.trim().toLowerCase() == code, orElse: () => const MapEntry('', null))
+        .value;
+  }
+
+  String _formatCellValue(dynamic value, String fieldCode) {
+    final code = fieldCode.trim().toLowerCase();
+    if (code == 'ngay' || code.contains('date') || code.contains('ngay_thang')) {
+      return _formatDate(value);
+    }
+    if (code.contains('sl_') || code.contains('quantity')) {
+      return _formatQty(value);
+    }
+    if (code.contains('tien') || code.contains('amount') || code.contains('don_gia') || code.contains('price')) {
+      return _formatAmount(value);
+    }
+    return value?.toString() ?? '';
   }
 
   String _formatDate(dynamic value) {

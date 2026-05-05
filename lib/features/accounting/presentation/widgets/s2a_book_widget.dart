@@ -113,52 +113,36 @@ class S2aBookWidget extends StatelessWidget {
         headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
         border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
         columnSpacing: 20,
-        columns: [
-          DataColumn(
-            label: Text(
-              'Số hiệu CT',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Ngày, tháng',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Diễn giải',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Số tiền',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            numeric: true,
-          ),
-        ],
+        columns: _buildColumns(),
         rows: tableRows,
       ),
     );
+  }
+
+  List<BookColumnDto> _effectiveColumns() {
+    if (sections.columns.isNotEmpty) {
+      return sections.columns;
+    }
+    return const [
+      BookColumnDto(fieldCode: 'so_hieu', label: 'Số hiệu CT', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'ngay_thang', label: 'Ngày, tháng', fieldType: 'date'),
+      BookColumnDto(fieldCode: 'dien_giai', label: 'Diễn giải', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'so_tien', label: 'Số tiền', fieldType: 'money'),
+    ];
+  }
+
+  List<DataColumn> _buildColumns() {
+    final style = AppTextStyles.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+      fontSize: 15,
+      fontWeight: FontWeight.bold,
+    );
+    return _effectiveColumns().map((column) {
+      return DataColumn(
+        label: Text(column.label, style: style),
+        numeric: _isNumericColumn(column),
+      );
+    }).toList();
   }
 
   Widget _buildBreakdowns(BuildContext context) {
@@ -315,67 +299,25 @@ class S2aBookWidget extends StatelessWidget {
   DataRow _buildSectionHeaderRow(BookSectionResponseDto section) {
     final label =
         '${section.groupIndex}. ${section.businessTypeName ?? 'Ngành nghề'}';
+    final values = <String, dynamic>{'dien_giai': label};
     return DataRow(
       color: WidgetStateProperty.all(Colors.amber[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            label,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-        const DataCell(SizedBox.shrink()),
-      ],
+      cells: _buildRowCells(values, AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textPrimary,
+        fontSize: 15,
+        fontWeight: FontWeight.bold,
+        fontStyle: FontStyle.italic,
+      )),
     );
   }
 
   DataRow _buildDataRow(SectionRowDto row) {
+    final style = AppTextStyles.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+      fontSize: 15,
+    );
     return DataRow(
-      cells: [
-        DataCell(
-          Text(
-            row.values['so_hieu']?.toString() ?? '',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-            ),
-          ),
-        ),
-        DataCell(
-          Text(
-            _formatDate(row.values['ngay_thang']),
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-            ),
-          ),
-        ),
-        DataCell(
-          Text(
-            row.values['dien_giai']?.toString() ?? '',
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-            ),
-          ),
-        ),
-        DataCell(
-          Text(
-            _formatAmount(_pickAmount(row.values)),
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-            ),
-          ),
-        ),
-      ],
+      cells: _buildRowCells(row.values, style),
     );
   }
 
@@ -387,17 +329,7 @@ class S2aBookWidget extends StatelessWidget {
     );
     return DataRow(
       color: WidgetStateProperty.all(Colors.grey[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            row.values['dien_giai']?.toString() ?? 'Tổng cộng',
-            style: style,
-          ),
-        ),
-        DataCell(Text(_formatAmount(_pickAmount(row.values)), style: style)),
-      ],
+      cells: _buildRowCells(row.values, style),
     );
   }
 
@@ -406,32 +338,15 @@ class S2aBookWidget extends StatelessWidget {
         row.values['dien_giai']?.toString() ?? row.taxType ?? 'Thuế';
     return DataRow(
       color: WidgetStateProperty.all(Colors.orange[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            taxLabel,
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
+      cells: _buildRowCells(
+        {...row.values, 'dien_giai': taxLabel},
+        AppTextStyles.bodyMedium.copyWith(
+          color: AppColors.textPrimary,
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          fontStyle: FontStyle.italic,
         ),
-        DataCell(
-          Text(
-            _formatAmount(_pickAmount(row.values)),
-            style: AppTextStyles.bodyMedium.copyWith(
-              color: AppColors.textPrimary,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -443,13 +358,57 @@ class S2aBookWidget extends StatelessWidget {
     );
     return DataRow(
       color: WidgetStateProperty.all(Colors.blue[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(Text(row.values['dien_giai']?.toString() ?? '', style: style)),
-        DataCell(Text(_formatAmount(_pickAmount(row.values)), style: style)),
-      ],
+      cells: _buildRowCells(row.values, style),
     );
+  }
+
+  List<DataCell> _buildRowCells(Map<String, dynamic> values, TextStyle style) {
+    return _effectiveColumns().map((column) {
+      final value = _resolveCellValue(values, column.fieldCode);
+      return DataCell(Text(_formatCellValue(value, column.fieldCode), style: style));
+    }).toList();
+  }
+
+  bool _isNumericColumn(BookColumnDto column) {
+    final code = column.fieldCode.trim().toLowerCase();
+    final type = column.fieldType.trim().toLowerCase();
+    final label = column.label.trim().toLowerCase();
+    return type == 'number' ||
+        type == 'money' ||
+        code.contains('amount') ||
+        code.contains('tien') ||
+        label.contains('số tiền');
+  }
+
+  dynamic _resolveCellValue(Map<String, dynamic> values, String fieldCode) {
+    if (values.containsKey(fieldCode)) return values[fieldCode];
+    final code = fieldCode.trim().toLowerCase();
+    if (code.contains('so_hieu') || code.contains('voucher') || code.contains('document')) {
+      return values['so_hieu'] ?? values['documentNumber'] ?? values['DocumentNumber'];
+    }
+    if (code.contains('ngay') || code.contains('date')) {
+      return values['ngay_thang'] ?? values['date'] ?? values['documentDate'] ?? values['DocumentDate'];
+    }
+    if (code.contains('dien_giai') || code.contains('description')) {
+      return values['dien_giai'] ?? values['description'];
+    }
+    if (code.contains('tien') || code.contains('amount') || code.contains('revenue')) {
+      return _pickAmount(values);
+    }
+    return values.entries
+        .firstWhere((e) => e.key.trim().toLowerCase() == code, orElse: () => const MapEntry('', null))
+        .value;
+  }
+
+  String _formatCellValue(dynamic value, String fieldCode) {
+    final code = fieldCode.trim().toLowerCase();
+    if (code.contains('ngay') || code.contains('date')) {
+      return _formatDate(value);
+    }
+    if (code.contains('tien') || code.contains('amount') || code.contains('revenue')) {
+      return _formatAmount(value);
+    }
+    return value?.toString() ?? '';
   }
 
   static const _amountAliases = [

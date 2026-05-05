@@ -163,15 +163,31 @@ class S2cBookWidget extends StatelessWidget {
         headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
         border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
         columnSpacing: 20,
-        columns: [
-          DataColumn(label: Text('Số hiệu', style: _headerStyle())),
-          DataColumn(label: Text('Ngày, tháng', style: _headerStyle())),
-          DataColumn(label: Text('Diễn giải', style: _headerStyle())),
-          DataColumn(label: Text('Số tiền', style: _headerStyle()), numeric: true),
-        ],
+        columns: _buildColumns(),
         rows: tableRows,
       ),
     );
+  }
+
+  List<BookColumnDto> _effectiveColumns() {
+    if (sections.columns.isNotEmpty) {
+      return sections.columns;
+    }
+    return const [
+      BookColumnDto(fieldCode: 'so_hieu', label: 'Số hiệu', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'ngay_thang', label: 'Ngày, tháng', fieldType: 'date'),
+      BookColumnDto(fieldCode: 'dien_giai', label: 'Diễn giải', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'so_tien', label: 'Số tiền', fieldType: 'money'),
+    ];
+  }
+
+  List<DataColumn> _buildColumns() {
+    return _effectiveColumns().map((column) {
+      return DataColumn(
+        label: Text(column.label, style: _headerStyle()),
+        numeric: _isNumericColumn(column),
+      );
+    }).toList();
   }
 
   Widget _buildBreakdowns(BuildContext context) {
@@ -387,19 +403,10 @@ class S2cBookWidget extends StatelessWidget {
   }
 
   DataRow _buildIndustryHeaderRow(String label) {
+    final values = <String, dynamic>{'dien_giai': label};
     return DataRow(
       color: WidgetStateProperty.all(Colors.amber[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            label,
-            style: _boldItalicStyle(),
-          ),
-        ),
-        const DataCell(SizedBox.shrink()),
-      ],
+      cells: _buildRowCells(values, _boldItalicStyle()),
     );
   }
 
@@ -411,59 +418,75 @@ class S2cBookWidget extends StatelessWidget {
     bool emphasized = false,
     bool taxLike = false,
   }) {
+    final values = <String, dynamic>{
+      'so_hieu': code,
+      'ngay_thang': date,
+      'dien_giai': label,
+      'so_tien': amount,
+      'amount': amount,
+    };
+    final style = taxLike
+        ? _boldItalicStyle()
+        : (emphasized ? _boldStyle() : _normalStyle());
     return DataRow(
       color: WidgetStateProperty.all(
         taxLike ? Colors.orange[50] : (emphasized ? Colors.grey[50] : null),
       ),
-      cells: [
-        DataCell(
-          SizedBox(
-            width: 120,
-            child: Text(
-              code,
-              style: taxLike
-                  ? _boldItalicStyle()
-                  : (emphasized ? _boldStyle() : _normalStyle()),
-            ),
-          ),
-        ),
-        DataCell(
-          SizedBox(
-            width: 110,
-            child: Text(
-              _fmtDate(date),
-              textAlign: TextAlign.center,
-              style: taxLike
-                  ? _boldItalicStyle()
-                  : (emphasized ? _boldStyle() : _normalStyle()),
-            ),
-          ),
-        ),
-        DataCell(
-          ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 480, maxWidth: 680),
-            child: Text(
-              label,
-              style: taxLike
-                  ? _boldItalicStyle()
-                  : (emphasized ? _boldStyle() : _normalStyle()),
-            ),
-          ),
-        ),
-        DataCell(
-          SizedBox(
-            width: 180,
-            child: Text(
-              amount,
-              textAlign: TextAlign.right,
-              style: taxLike
-                  ? _boldItalicStyle()
-                  : (emphasized ? _boldStyle() : _normalStyle()),
-            ),
-          ),
-        ),
-      ],
+      cells: _buildRowCells(values, style),
     );
+  }
+
+  List<DataCell> _buildRowCells(Map<String, dynamic> values, TextStyle style) {
+    return _effectiveColumns().map((column) {
+      final value = _resolveCellValue(values, column.fieldCode);
+      return DataCell(Text(_formatCellValue(value, column.fieldCode), style: style));
+    }).toList();
+  }
+
+  bool _isNumericColumn(BookColumnDto column) {
+    final code = column.fieldCode.trim().toLowerCase();
+    final type = column.fieldType.trim().toLowerCase();
+    final label = column.label.trim().toLowerCase();
+    return type == 'number' ||
+        type == 'money' ||
+        code.contains('amount') ||
+        code.contains('tien') ||
+        label.contains('số tiền');
+  }
+
+  dynamic _resolveCellValue(Map<String, dynamic> values, String fieldCode) {
+    if (values.containsKey(fieldCode)) return values[fieldCode];
+    final code = fieldCode.trim().toLowerCase();
+    if (code.contains('so_hieu') || code.contains('voucher') || code.contains('document')) {
+      return values['so_hieu'] ?? values['code'];
+    }
+    if (code.contains('ngay') || code.contains('date')) {
+      return values['ngay_thang'] ?? values['date'];
+    }
+    if (code.contains('dien_giai') || code.contains('description') || code.contains('note')) {
+      return values['dien_giai'] ?? values['description'] ?? values['note'];
+    }
+    if (code.contains('tien') || code.contains('amount') || code.contains('revenue') || code.contains('cost')) {
+      return values['so_tien'] ?? values['amount'] ?? values['revenue'] ?? values['cost'];
+    }
+    return values.entries
+        .firstWhere((e) => e.key.trim().toLowerCase() == code, orElse: () => const MapEntry('', null))
+        .value;
+  }
+
+  String _formatCellValue(dynamic value, String fieldCode) {
+    final code = fieldCode.trim().toLowerCase();
+    if (code.contains('ngay') || code.contains('date')) {
+      if (value is DateTime) {
+        return _fmtDate(value);
+      }
+      return _fmtDate(DateTime.tryParse(value?.toString() ?? ''));
+    }
+    if (code.contains('tien') || code.contains('amount') || code.contains('revenue') || code.contains('cost')) {
+      final parsed = _toNum(value);
+      return _fmtAmount(parsed ?? value);
+    }
+    return value?.toString() ?? '';
   }
 
   // ─── Style helpers ────────────────────────────────────────────────────────

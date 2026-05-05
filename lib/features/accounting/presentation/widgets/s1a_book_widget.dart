@@ -87,45 +87,39 @@ class S1aBookWidget extends StatelessWidget {
         headingRowColor: WidgetStateProperty.all(Colors.grey[200]),
         border: TableBorder.all(color: Colors.grey.shade300, width: 0.8),
         columnSpacing: 24,
-        columns: [
-          DataColumn(
-            label: Text(
-              'Ngày tháng',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Diễn giải',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          DataColumn(
-            label: Text(
-              'Số tiền',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textPrimary,
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            numeric: true,
-          ),
-        ],
+        columns: _buildColumns(),
         rows: [
           ...allRows.map((row) => _buildDataRow(row)),
           ...sections.footerRows.map((row) => _buildFooterRow(row)),
         ],
       ),
     );
+  }
+
+  List<BookColumnDto> _effectiveColumns() {
+    if (sections.columns.isNotEmpty) {
+      return sections.columns;
+    }
+    return const [
+      BookColumnDto(fieldCode: 'ngay_thang', label: 'Ngày tháng', fieldType: 'date'),
+      BookColumnDto(fieldCode: 'dien_giai', label: 'Diễn giải', fieldType: 'text'),
+      BookColumnDto(fieldCode: 'so_tien', label: 'Số tiền', fieldType: 'money'),
+    ];
+  }
+
+  List<DataColumn> _buildColumns() {
+    final headerStyle = AppTextStyles.bodyMedium.copyWith(
+      color: AppColors.textPrimary,
+      fontSize: 15,
+      fontWeight: FontWeight.bold,
+    );
+
+    return _effectiveColumns().map((column) {
+      return DataColumn(
+        label: Text(column.label, style: headerStyle),
+        numeric: _isNumericColumn(column),
+      );
+    }).toList();
   }
 
   Widget _buildBreakdowns(BuildContext context) {
@@ -309,15 +303,15 @@ class S1aBookWidget extends StatelessWidget {
             fontSize: 15,
           );
 
+    final cells = _effectiveColumns().map((column) {
+      final value = _resolveCellValue(row.values, column.fieldCode);
+      final text = _formatCellValue(value, column.fieldCode);
+      return DataCell(Text(text, style: style));
+    }).toList();
+
     return DataRow(
       color: isSubtotal ? WidgetStateProperty.all(Colors.grey[50]) : null,
-      cells: [
-        DataCell(Text(_formatDate(row.values['ngay_thang'] ?? row.values['date']), style: style)),
-        DataCell(
-          Text(row.values['dien_giai']?.toString() ?? row.values['description']?.toString() ?? '', style: style),
-        ),
-        DataCell(Text(_formatAmount(row.values['so_tien'] ?? row.values['revenue']), style: style)),
-      ],
+      cells: cells,
     );
   }
 
@@ -327,26 +321,85 @@ class S1aBookWidget extends StatelessWidget {
       fontSize: 15,
       fontWeight: FontWeight.bold,
     );
+
+    final cells = _effectiveColumns().map((column) {
+      final value = _resolveCellValue(row.values, column.fieldCode);
+      final text = _formatCellValue(value, column.fieldCode);
+      return DataCell(Text(text, style: style));
+    }).toList();
+
     return DataRow(
       color: WidgetStateProperty.all(Colors.blue[50]),
-      cells: [
-        const DataCell(SizedBox.shrink()),
-        DataCell(
-          Text(
-            row.values['dien_giai']?.toString() ??
-                row.values['description']?.toString() ??
-                'Tổng cộng',
-            style: style,
-          ),
-        ),
-        DataCell(
-          Text(
-            _formatAmount(row.values['revenue'] ?? row.values['so_tien']),
-            style: style,
-          ),
-        ),
-      ],
+      cells: cells,
     );
+  }
+
+  bool _isNumericColumn(BookColumnDto column) {
+    final code = column.fieldCode.trim().toLowerCase();
+    final type = column.fieldType.trim().toLowerCase();
+    final label = column.label.trim().toLowerCase();
+
+    return type == 'number' ||
+        type == 'money' ||
+        code.contains('amount') ||
+        code.contains('tien') ||
+        label.contains('số tiền');
+  }
+
+  dynamic _resolveCellValue(Map<String, dynamic> values, String fieldCode) {
+    if (values.containsKey(fieldCode)) {
+      return values[fieldCode];
+    }
+
+    final normalizedField = fieldCode.trim().toLowerCase();
+
+    if (_isDateField(normalizedField)) {
+      return values['ngay_thang'] ??
+          values['date'] ??
+          values['documentDate'] ??
+          values['DocumentDate'];
+    }
+
+    if (_isDescriptionField(normalizedField)) {
+      return values['dien_giai'] ?? values['description'];
+    }
+
+    if (_isAmountField(normalizedField)) {
+      return values['so_tien'] ?? values['revenue'] ?? values['amount'];
+    }
+
+    final entry = values.entries.firstWhere(
+      (e) => e.key.trim().toLowerCase() == normalizedField,
+      orElse: () => const MapEntry('', null),
+    );
+
+    return entry.value;
+  }
+
+  String _formatCellValue(dynamic value, String fieldCode) {
+    final normalizedField = fieldCode.trim().toLowerCase();
+    if (_isDateField(normalizedField)) {
+      return _formatDate(value);
+    }
+    if (_isAmountField(normalizedField)) {
+      return _formatAmount(value);
+    }
+    return value?.toString() ?? '';
+  }
+
+  bool _isDateField(String fieldCode) {
+    return fieldCode.contains('date') || fieldCode.contains('ngay');
+  }
+
+  bool _isDescriptionField(String fieldCode) {
+    return fieldCode.contains('dien_giai') || fieldCode.contains('description');
+  }
+
+  bool _isAmountField(String fieldCode) {
+    return fieldCode.contains('so_tien') ||
+        fieldCode.contains('revenue') ||
+        fieldCode.contains('amount') ||
+        fieldCode.contains('tien');
   }
 
   String _formatDate(dynamic value) {
