@@ -17,6 +17,7 @@ class RevenueDto extends Equatable {
   final int? referenceId;
   final String? documentNumber;
   final String? referenceCode;
+  final String? revenueCode;
   final String? businessTypeId;
   final String? businessTypeName;
   final String? statusCode;
@@ -39,6 +40,7 @@ class RevenueDto extends Equatable {
     this.referenceId,
     this.documentNumber,
     this.referenceCode,
+    this.revenueCode,
     this.businessTypeId,
     this.businessTypeName,
     this.statusCode,
@@ -194,7 +196,17 @@ class RevenueDto extends Equatable {
             source['importCode'] ??
             source['ImportCode'] ??
             source['orderCode'] ??
-            source['OrderCode'],
+            source['OrderCode'] ??
+            json['revenueCode'] ??
+            json['RevenueCode'] ??
+            source['revenueCode'] ??
+            source['RevenueCode'],
+      ),
+      revenueCode: asNullableString(
+        json['revenueCode'] ??
+            json['RevenueCode'] ??
+            source['revenueCode'] ??
+            source['RevenueCode'],
       ),
       businessTypeId:
           referenceCodeFromDynamic(json['businessTypeId'] ?? json['BusinessTypeId'])
@@ -257,6 +269,7 @@ class RevenueDto extends Equatable {
       'referenceId': referenceId,
       'documentNumber': documentNumber,
       'referenceCode': referenceCode,
+      'revenueCode': revenueCode,
       'businessTypeId': businessTypeId,
       'businessTypeName': businessTypeName,
       'statusCode': statusCode,
@@ -281,6 +294,7 @@ class RevenueDto extends Equatable {
     referenceId,
     documentNumber,
     referenceCode,
+    revenueCode,
     businessTypeId,
     businessTypeName,
     statusCode,

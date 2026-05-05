@@ -835,7 +835,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.document_number'),
           value: (() {
-            final doc = (revenue.documentNumber ?? revenue.referenceCode ?? '').trim();
+            final doc = (revenue.documentNumber ?? revenue.revenueCode ?? revenue.referenceCode ?? '').trim();
             return doc.isNotEmpty ? doc : '-';
           })(),
         ),
@@ -881,7 +881,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.document_number'),
           value: (() {
-            final doc = (cost.documentNumber ?? cost.referenceCode ?? '').trim();
+            final doc = (cost.documentNumber ?? cost.costCode ?? cost.referenceCode ?? '').trim();
             return doc.isNotEmpty ? doc : '-';
           })(),
         ),

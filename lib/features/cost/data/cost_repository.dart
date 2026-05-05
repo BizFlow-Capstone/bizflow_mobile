@@ -33,6 +33,7 @@ class CostRepository {
       referenceType: dto.referenceType,
       referenceId: dto.referenceId,
       referenceCode: dto.referenceCode,
+      costCode: dto.costCode,
       statusCode: dto.statusCode,
       statusLabel: dto.statusLabel,
       documentNumber: dto.documentNumber,

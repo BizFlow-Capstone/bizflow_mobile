@@ -866,7 +866,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onDeleteCost: _onDeleteCost,
                           canModifyRevenue: _canModifyRevenueEntry,
                           canModifyCost: (item) => false,
-                          hasReachedMaxRevenue: _cachedRevenues.length >= _revenueTotalCount,
+                          hasReachedMaxRevenue: _revenueTotalCount > 0
+                              ? _cachedRevenues.length >= _revenueTotalCount
+                              : false,
                           isLoadingMoreRevenue: revenueState is RevenuesLoaded ? revenueState.isLoadMore : _isLoadingMoreRevenue,
                           onLoadMoreRevenue: _loadMoreRevenues,
                         );
@@ -903,7 +905,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           onDeleteCost: _onDeleteCost,
                           canModifyRevenue: (item) => false,
                           canModifyCost: _canModifyCostEntry,
-                          hasReachedMaxCost: _cachedCosts.length >= _costTotalCount,
+                          hasReachedMaxCost: _costTotalCount > 0
+                              ? _cachedCosts.length >= _costTotalCount
+                              : false,
                           isLoadingMoreCost: costState is CostsLoaded ? costState.isLoadMore : _isLoadingMoreCost,
                           onLoadMoreCost: _loadMoreCosts,
                         );
@@ -2172,7 +2176,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final referenceLabel = AccountingReferenceDisplay.displayReference(
       referenceType: revenue.referenceType,
       referenceId: revenue.referenceId,
-      referenceCode: revenue.referenceCode,
+      referenceCode: revenue.referenceCode ?? revenue.revenueCode,
       languageCode: languageCode,
       fallback: '-',
     );
@@ -2181,7 +2185,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           description: revenue.description,
           referenceType: revenue.referenceType,
           referenceId: revenue.referenceId,
-          referenceCode: revenue.referenceCode,
+          referenceCode: revenue.referenceCode ?? revenue.revenueCode,
           languageCode: languageCode,
         );
 
@@ -2379,7 +2383,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     final referenceLabel = AccountingReferenceDisplay.displayReference(
       referenceType: cost.referenceType,
       referenceId: cost.referenceId,
-      referenceCode: cost.referenceCode,
+      referenceCode: cost.referenceCode ?? cost.costCode,
       languageCode: languageCode,
       fallback: '-',
     );
@@ -2388,7 +2392,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           description: cost.description,
           referenceType: cost.referenceType,
           referenceId: cost.referenceId,
-          referenceCode: cost.referenceCode,
+          referenceCode: cost.referenceCode ?? cost.costCode,
           languageCode: languageCode,
         );
 

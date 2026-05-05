@@ -211,17 +211,19 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
     if (item is RevenueEntity) {
       title = (item.documentNumber ?? '').trim().isNotEmpty
           ? item.documentNumber!.trim()
-          : AccountingReferenceDisplay.displayReference(
-              referenceType: 'revenue',
-              referenceId: item.id,
-              languageCode: effectiveLanguageCode,
-              fallback: 'REV-${item.id}',
-            );
+          : (item.revenueCode ?? '').trim().isNotEmpty
+              ? item.revenueCode!.trim()
+              : AccountingReferenceDisplay.displayReference(
+                  referenceType: 'revenue',
+                  referenceId: item.id,
+                  languageCode: effectiveLanguageCode,
+                  fallback: 'REV-${item.id}',
+                );
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'revenue',
         referenceId: item.referenceId ?? item.id,
-        referenceCode: item.referenceCode,
+        referenceCode: item.referenceCode ?? item.revenueCode,
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;
@@ -230,17 +232,19 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
     } else if (item is CostEntity) {
       title = (item.documentNumber ?? '').trim().isNotEmpty
           ? item.documentNumber!.trim()
-          : AccountingReferenceDisplay.displayReference(
-              referenceType: 'cost',
-              referenceId: item.id,
-              languageCode: effectiveLanguageCode,
-              fallback: 'COST-${item.id}',
-            );
+          : (item.costCode ?? '').trim().isNotEmpty
+              ? item.costCode!.trim()
+              : AccountingReferenceDisplay.displayReference(
+                  referenceType: 'cost',
+                  referenceId: item.id,
+                  languageCode: effectiveLanguageCode,
+                  fallback: 'COST-${item.id}',
+                );
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'cost',
         referenceId: item.referenceId ?? item.id,
-        referenceCode: item.referenceCode,
+        referenceCode: item.referenceCode ?? item.costCode,
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;

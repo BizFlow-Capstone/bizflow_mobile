@@ -105,7 +105,17 @@ class GeneralLedgerEntryModel {
     final fallbackDocument = 'GL-${asInt(json['entryId'])}';
 
     final parsedReferenceCode = asString(
-      source['referenceCode'] ?? source['documentNumber'] ?? json['referenceCode'],
+      source['referenceCode'] ??
+          source['documentNumber'] ??
+          source['revenueCode'] ??
+          source['RevenueCode'] ??
+          source['costCode'] ??
+          source['CostCode'] ??
+          json['referenceCode'] ??
+          json['revenueCode'] ??
+          json['RevenueCode'] ??
+          json['costCode'] ??
+          json['CostCode'],
     ).trim();
 
     return GeneralLedgerEntryModel(

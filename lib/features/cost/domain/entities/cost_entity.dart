@@ -14,6 +14,7 @@ class CostEntity extends Equatable {
   final int? referenceId;
   final String? documentNumber;
   final String? referenceCode;
+  final String? costCode;
   final String? statusCode;
   final String? statusLabel;
   final String? imagePath;
@@ -33,6 +34,7 @@ class CostEntity extends Equatable {
     this.referenceId,
     this.documentNumber,
     this.referenceCode,
+    this.costCode,
     this.statusCode,
     this.statusLabel,
     this.imagePath,
@@ -54,6 +56,7 @@ class CostEntity extends Equatable {
     referenceId,
     documentNumber,
     referenceCode,
+    costCode,
     statusCode,
     statusLabel,
     imagePath,

@@ -32,6 +32,7 @@ class RevenueRepository {
       referenceType: dto.referenceType,
       referenceId: dto.referenceId,
       referenceCode: dto.referenceCode,
+      revenueCode: dto.revenueCode,
       businessTypeId: dto.businessTypeId,
       businessTypeName: dto.businessTypeName,
       documentNumber: dto.documentNumber,
