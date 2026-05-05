@@ -1325,7 +1325,7 @@
     "period_guide_row_4_vat": "2%",
     "period_guide_row_4_tncn": "1%",
     "period_guide_legal_title": "Lưu ý về tính pháp lý",
-    "period_guide_legal_body": "Giá trị chứng cứ: Mọi thay đổi đều được ghi lịch sử hệ thống. Theo Luật Giao dịch điện tử 2023, dữ liệu này có giá trị làm chứng cứ thay thế chứng từ giấy và chữ ký số.\nSửa lỗi: Hệ thống sử dụng bút toán đảo (ghi số âm) để điều chỉnh sai sót, đảm bảo dữ liệu minh bạch và không bị tẩy xóa theo Luật Kế toán.\nThời gian lưu trữ: Toàn bộ sổ sách và nhật ký được BizFlow lưu trữ an toàn trong 05 năm.",
+    "period_guide_legal_body": "Giá trị chứng cứ: Mọi thay đổi đều được ghi lịch sử hệ thống. Theo Luật Giao dịch điện tử 2023, dữ liệu này có giá trị làm chứng cứ thay thế chứng từ và chữ ký số.\nSửa lỗi: Hệ thống sử dụng bút toán đảo (ghi số âm) để điều chỉnh sai sót, đảm bảo dữ liệu minh bạch và không bị tẩy xóa theo Luật Kế toán.\nThời gian lưu trữ: Toàn bộ sổ sách và nhật ký được BizFlow lưu trữ an toàn trong 05 năm.",
     "period_quarter": "Theo quý",
     "period_year": "Theo năm",
     "period_custom": "Tùy chỉnh",

@@ -1317,7 +1317,7 @@
     "period_guide_row_6_vat": "No VAT",
     "period_guide_row_6_tncn": "5%",
     "period_guide_legal_title": "Legal notes",
-    "period_guide_legal_body": "Evidence value: Every change is recorded in the system history. Under the 2023 Electronic Transactions Law, this data may serve as evidence in place of paper documents and digital signatures.\nCorrection: The system uses reversal entries (negative postings) to adjust mistakes, ensuring transparent data with no erasure under accounting law.\nRetention period: All books and logs are stored safely by BizFlow for 05 years.",
+    "period_guide_legal_body": "Evidence value: Every change is recorded in the system history. Under the 2023 Electronic Transactions Law, this data may serve as evidence in place of documents and digital signatures.\nCorrection: The system uses reversal entries (negative postings) to adjust mistakes, ensuring transparent data with no erasure under accounting law.\nRetention period: All books and logs are stored safely by BizFlow for 05 years.",
     "period_quarter": "Quarterly",
     "period_year": "Yearly",
     "period_custom": "Custom",

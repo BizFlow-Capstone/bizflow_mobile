@@ -82,9 +82,9 @@ class _PaymentUpdateSheetState extends State<PaymentUpdateSheet> {
     final nextRemaining = (baseRemaining - amount)
         .clamp(0, double.infinity)
         .toDouble();
-    final nextDebt = (baseTotalDebt - amount)
-        .clamp(0, double.infinity)
-        .toDouble();
+    // When recording a payment (decrease_debt), the total debt should
+    // remain the same. Only `totalPaid` increases and `remaining` decreases.
+    final nextDebt = baseTotalDebt;
     return _PaymentSummaryValues(
       totalDebt: nextDebt,
       totalPaid: baseTotalPaid + amount,

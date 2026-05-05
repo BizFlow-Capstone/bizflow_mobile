@@ -25,6 +25,11 @@ class GLBloc extends Bloc<GLEvent, GLState> {
       emit(GLLoading());
     }
 
+    // If this is a load-more request, mark current state as loading more
+    if (event.isLoadMore && currentState is GLLoaded) {
+      emit(currentState.copyWith(isLoadMore: true));
+    }
+
     try {
       await repository.fetchGLEntriesSWR(
         businessLocationId: event.businessLocationId,
@@ -56,7 +61,8 @@ class GLBloc extends Bloc<GLEvent, GLState> {
             allEntries: masterEntries,
             totalCount: totalCount,
             isFromCache: isFromCache,
-            isLoadMore: event.isLoadMore,
+            // loading has finished, reset load-more flag
+            isLoadMore: false,
             pageNumber: event.pageNumber,
             pageSize: event.pageSize,
             hasReachedMax: hasReachedMax,
