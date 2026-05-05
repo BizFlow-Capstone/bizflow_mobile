@@ -200,11 +200,21 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         }
         break;
       case 2: // Doanh thu
+        setState(() {
+          _revenuePageNumber = 0; // Reset to initial state
+          _revenueTotalCount = 0;
+          _isLoadingMoreRevenue = false;
+        });
         context.read<RevenueBloc>().add(
           LoadRevenuesRequested(businessLocationId: locationId),
         );
         break;
       case 3: // Chi phí
+        setState(() {
+          _costPageNumber = 0; // Reset to initial state
+          _costTotalCount = 0;
+          _isLoadingMoreCost = false;
+        });
         if (context.mounted) {
           context.read<CostBloc>().add(
             LoadCostsRequested(businessLocationId: locationId),

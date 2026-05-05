@@ -139,7 +139,7 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
                           isModifiable: widget.canModifyRevenue(item),
                         ),
                       ),
-                      if (!widget.hasReachedMaxRevenue)
+                      if (widget.isLoadingMoreRevenue)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
                           child: Center(child: CircularProgressIndicator()),
@@ -170,7 +170,7 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
                           isModifiable: widget.canModifyCost(item),
                         ),
                       ),
-                      if (!widget.hasReachedMaxCost)
+                      if (widget.isLoadingMoreCost)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
                           child: Center(child: CircularProgressIndicator()),
