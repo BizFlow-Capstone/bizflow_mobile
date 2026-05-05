@@ -310,7 +310,6 @@ class S2eBookWidget extends StatelessWidget {
       final rate = item['rate'] ?? item['taxRate'];
 
       final key = hasRate ? '${name}_$rate' : name;
-      
       if (aggregated.containsKey(key)) {
         aggregated[key]!['amount'] = (aggregated[key]!['amount'] as num) + amount;
       } else {
@@ -339,7 +338,7 @@ class S2eBookWidget extends StatelessWidget {
             DataColumn(label: Text('Số tiền', style: _headerStyle()), numeric: true),
           ],
           rows: rows.map((row) {
-            final rateText = row['rate'] != null ? '${row['rate']}%' : '';
+            final rateText = _toPercentageText(row['rate']);
             return DataRow(
               cells: [
                 DataCell(Text(row['name'].toString(), style: _normalStyle())),
@@ -351,6 +350,12 @@ class S2eBookWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _toPercentageText(dynamic value) {
+    final parsed = _parseAmountNum(value);
+    if (parsed == null) return '';
+    return '${(parsed * 1000).toStringAsFixed(4)} %';
   }
 
   // ─── Row Builders ───────────────────────────────────────────────────

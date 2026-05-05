@@ -208,6 +208,8 @@ class S2cBookWidget extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final hasMultiTaxBreakdown = taxBreakdowns.length > 1;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Column(
@@ -236,12 +238,15 @@ class S2cBookWidget extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            _buildBreakdownTable(
-              items: taxBreakdowns,
-              nameKey: 'taxType',
-              nameLabel: 'Loại thuế',
-              hasRate: true,
-            ),
+            if (hasMultiTaxBreakdown)
+              _buildTaxExplanationTable(taxBreakdowns)
+            else
+              _buildBreakdownTable(
+                items: taxBreakdowns,
+                nameKey: 'taxType',
+                nameLabel: 'Loại thuế',
+                hasRate: true,
+              ),
           ],
         ],
       ),
@@ -306,6 +311,60 @@ class S2cBookWidget extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildTaxExplanationTable(List<Map<String, dynamic>> items) {
+    final rows = items.map((item) {
+      final businessTypeName =
+          item['businessTypeName']?.toString().trim().isNotEmpty == true
+              ? item['businessTypeName'].toString().trim()
+              : 'Khác';
+      final taxRate = _toPercentageText(item['taxRate']);
+      final taxAmount = _toNum(item['taxAmount']) ?? 0;
+      final explanation = item['explanation']?.toString().trim() ?? '';
+
+      return DataRow(
+        cells: [
+          DataCell(Text(businessTypeName, style: _cellStyle())),
+          DataCell(Text(taxRate, style: _cellStyle())),
+          DataCell(Text(_fmtAmount(taxAmount), style: _cellStyle())),
+          DataCell(
+            SizedBox(
+              width: 320,
+              child: Text(
+                explanation,
+                style: _cellStyle(),
+                softWrap: true,
+              ),
+            ),
+          ),
+        ],
+      );
+    }).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(Colors.grey[100]),
+          columns: [
+            DataColumn(label: Text('Ngành nghề', style: _headerStyle())),
+            DataColumn(label: Text('Thuế suất', style: _headerStyle())),
+            DataColumn(label: Text('Số tiền thuế', style: _headerStyle()), numeric: true),
+            DataColumn(label: Text('Giải thích', style: _headerStyle())),
+          ],
+          rows: rows,
+        ),
+      ),
+    );
+  }
+
+  TextStyle _cellStyle() => AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textPrimary,
+      );
 
   List<DataRow> _buildIndustryRows(List<_S2cIndustryGroup> groups) {
     final rows = <DataRow>[];
@@ -810,6 +869,12 @@ class S2cBookWidget extends StatelessWidget {
       return value;
     }
     return value.toString();
+  }
+
+  static String _toPercentageText(dynamic value) {
+    final numValue = _toNum(value);
+    if (numValue == null) return '';
+    return '${(numValue * 1000).toStringAsFixed(4)} %';
   }
 
   static String _fmtDate(DateTime? value) {

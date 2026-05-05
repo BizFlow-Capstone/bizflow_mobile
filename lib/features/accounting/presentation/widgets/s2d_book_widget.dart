@@ -488,7 +488,7 @@ class S2dBookWidget extends StatelessWidget {
             ),
           ],
           rows: rows.map((row) {
-            final rateText = row['rate'] != null ? '${row['rate']}%' : '';
+            final rateText = _toPercentageText(row['rate']);
             return DataRow(
               cells: [
                 DataCell(Text(row['name'].toString(), style: cellStyle)),
@@ -500,6 +500,12 @@ class S2dBookWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _toPercentageText(dynamic value) {
+    final parsed = _parseAmountNum(value);
+    if (parsed == null) return '';
+    return '${(parsed * 1000).toStringAsFixed(4)} %';
   }
 
   DataRow _buildDataRow(SectionRowDto row) {
