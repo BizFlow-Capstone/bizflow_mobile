@@ -107,6 +107,11 @@ class StorageKeys {
   static const String refreshToken = 'refresh_token';
   static const String userId = 'user_id';
   static const String userProfile = 'user_profile';
+  static const String currentUserFullName = 'current_user_full_name';
+  static const String currentUserAvatarUrl = 'current_user_avatar_url';
+  static const String currentUserEmail = 'current_user_email';
+  static const String currentUserPhone = 'current_user_phone';
+  static const String currentUserTaxCode = 'current_user_tax_code';
 
   // Settings
   static const String locale = 'locale';
@@ -114,8 +119,16 @@ class StorageKeys {
   static const String isFirstLaunch = 'is_first_launch';
   static const String notificationEnabled = 'notification_enabled';
 
+  // Business Context
+  static const String currentBusinessId = 'current_business_id';
+  static const String currentBusinessName = 'current_business_name';
+  static const String isOwnerOfCurrentLocation = 'is_owner_of_current_location';
+  static const String currentOwnerProfileId = 'current_owner_profile_id';
+
+
   // Cache
   static const String lastSyncTime = 'last_sync_time';
+  static const String orderLocalDrafts = 'order_local_drafts';
 
   // Add more keys here...
 }

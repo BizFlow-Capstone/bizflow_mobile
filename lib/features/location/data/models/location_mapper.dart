@@ -16,6 +16,7 @@ class LocationMapper {
       phone: dto.phone,
       isActive: dto.isActive,
       ownerName: dto.ownerName,
+      ownerProfileId: dto.ownerProfileId,
       taxCode: dto.taxCode,
       employeeIds: dto.employeeIds,
     );
@@ -37,6 +38,7 @@ class LocationMapper {
       phone: entity.phone,
       isActive: entity.isActive,
       ownerName: entity.ownerName,
+      ownerProfileId: entity.ownerProfileId,
       taxCode: entity.taxCode,
       employeeIds: entity.employeeIds,
     );

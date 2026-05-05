@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../core/localization/app_localizations.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -8,14 +9,18 @@ import '../../core/theme/app_text_styles.dart';
 class LocationItem {
   final String id;
   final String name;
+  final String? ownerProfileId;
   final String? logoUrl;
   final bool isActive;
+  final bool isOwner; // true = current user owns this location
 
   LocationItem({
     required this.id,
     required this.name,
+    this.ownerProfileId,
     this.logoUrl,
     this.isActive = true,
+    this.isOwner = false,
   });
 }
 
@@ -32,6 +37,7 @@ class SidebarWidget extends StatefulWidget {
   final VoidCallback? onPackage;
   final Function(LocationItem)? onLocationSelected;
   final String? userLogo;
+  final bool isOwner; // gates the Add Location (+) button
 
   const SidebarWidget({
     super.key,
@@ -44,6 +50,7 @@ class SidebarWidget extends StatefulWidget {
     this.onLocationSelected,
     this.onPackage,
     this.userLogo,
+    this.isOwner = false,
   });
 
   @override
@@ -93,13 +100,17 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                               bottom: AppSpacing.sm,
                             ),
                             child: GestureDetector(
-                              onTap: () {
-                                widget.onLocationSelected?.call(location);
-                                Navigator.pop(context);
-                              },
+                              onTap: location.isActive
+                                  ? () {
+                                      Navigator.pop(context);
+                                      widget.onLocationSelected?.call(location);
+                                    }
+                                  : null,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: isSelected
+                                  color: !location.isActive
+                                      ? AppColors.background
+                                      : isSelected
                                       ? AppColors.secondary.withValues(
                                           alpha: 0.1,
                                         )
@@ -142,7 +153,9 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                                     Text(
                                       location.name,
                                       style: AppTextStyles.labelSmall.copyWith(
-                                        color: isSelected
+                                        color: !location.isActive
+                                            ? AppColors.textDisabled
+                                            : isSelected
                                             ? AppColors.secondary
                                             : AppColors.textPrimary,
                                         fontWeight: isSelected
@@ -152,6 +165,21 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    if (!location.isActive)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: AppSpacing.xs,
+                                        ),
+                                        child: Text(
+                                          l10n.translate(
+                                            'location.inactive_status',
+                                          ),
+                                          style: AppTextStyles.labelSmall
+                                              .copyWith(
+                                                color: AppColors.textDisabled,
+                                              ),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -161,27 +189,24 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                       ),
                     ),
 
-                    // Add Location Button
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: widget.onAddLocation,
-                          icon: const Icon(Icons.add),
-                          label: Text(l10n.translate('sidebar.add_location')),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondary,
-                            foregroundColor: AppColors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                AppSpacing.radiusXs,
-                              ),
+                    // Add Location Button — visible only for owners
+                    if (widget.isOwner)
+                      Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: InkWell(
+                          onTap: widget.onAddLocation,
+                          borderRadius: BorderRadius.circular(30),
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary,
+                              shape: BoxShape.circle,
                             ),
+                            child: Icon(Icons.add, color: AppColors.white),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -253,30 +278,30 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                     ),
                   ),
 
-                  // Logout Button
+                  // App Version
                   Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onLogout();
-                        },
-                        icon: const Icon(Icons.logout),
-                        label: Text(l10n.translate('sidebar.logout')),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.danger,
-                          foregroundColor: AppColors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppSpacing.radiusXs,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
+                    child: Center(
+                      child: FutureBuilder<PackageInfo>(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, snapshot) {
+                          final version = snapshot.hasData
+                              ? snapshot.data!.version
+                              : '1.0.0';
+                          return Text(
+                            'BizFlow v$version',
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: AppColors.textHint,
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: AppSpacing.md),
                 ],
               ),
             ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../core/database/app_database.dart';
 import '../../employee/domain/entities/employee_entity.dart';
 import '../domain/entities/location_entity.dart';
+import 'datasources/location_local_datasource.dart';
 import 'location_api_service.dart';
 import 'models/location_dto.dart';
 import 'models/location_mapper.dart';
@@ -18,9 +20,59 @@ import 'models/location_mapper.dart';
 /// 5. Return domain entities to BLoC
 class LocationRepository {
   final LocationApiService _service;
+  final LocationLocalDataSource _localDataSource;
 
-  LocationRepository({required LocationApiService service})
-    : _service = service;
+  static const String _locationsScopeKey = '__all_locations__';
+  static const String _locationsSyncResourceKey = 'locations_all';
+
+  LocationRepository({
+    required LocationApiService service,
+    LocationLocalDataSource? localDataSource,
+  })  : _service = service,
+        _localDataSource = localDataSource ?? LocationLocalDataSource();
+
+  Future<List<LocationEntity>> getCachedLocations() {
+    return _localDataSource.getByBusinessId(_locationsScopeKey);
+  }
+
+  Future<void> saveCachedLocations(List<LocationEntity> locations) {
+    return _localDataSource.replaceForBusiness(_locationsScopeKey, locations);
+  }
+
+  Future<void> clearCachedLocations() {
+    return _localDataSource.clearAll();
+  }
+
+  Future<List<LocationEntity>> refreshAndCacheAllLocations() async {
+    final owned = await getMyOwnedLocations();
+    final hired = await getWorkAtLocations();
+
+    final ownedTagged = owned.map((loc) => loc.copyWith(isOwner: true)).toList();
+    final ownedIds = ownedTagged.map((l) => l.id).toSet();
+
+    final combined = <LocationEntity>[...ownedTagged];
+    for (final loc in hired) {
+      if (!ownedIds.contains(loc.id)) {
+        combined.add(loc.copyWith(isOwner: false));
+      }
+    }
+
+    await saveCachedLocations(combined);
+    await AppDatabase().syncStateDao.upsert(
+      resourceKey: _locationsSyncResourceKey,
+      businessId: _locationsScopeKey,
+      lastSyncedAtEpoch: DateTime.now().millisecondsSinceEpoch,
+    );
+    return combined;
+  }
+
+  Future<int?> getLocationsLastSyncedAtEpoch() async {
+    final state = await AppDatabase().syncStateDao.getState(
+      resourceKey: _locationsSyncResourceKey,
+      businessId: _locationsScopeKey,
+    );
+    return state?.lastSyncedAtEpoch;
+  }
 
   /// Get business locations owned by current user
   ///
@@ -131,7 +183,7 @@ class LocationRepository {
       return dtos
           .map(
             (dto) => EmployeeEntity(
-              id: dto.userId,
+              id: dto.profileId,
               name: dto.userName,
               phone: dto.phone,
             ),
@@ -139,6 +191,32 @@ class LocationRepository {
           .toList();
     } catch (e) {
       debugPrint('LocationRepository.getLocationEmployees error: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete a business location
+  Future<String> deleteLocation(String locationId) async {
+    try {
+      return await _service.deleteLocation(locationId);
+    } catch (e) {
+      debugPrint('LocationRepository.deleteLocation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Remove an employee from a location
+  Future<String> removeEmployeeFromLocation({
+    required String locationId,
+    required String employeeId,
+  }) async {
+    try {
+      return await _service.removeEmployeeFromLocation(
+        locationId: locationId,
+        employeeId: employeeId,
+      );
+    } catch (e) {
+      debugPrint('LocationRepository.removeEmployeeFromLocation error: $e');
       rethrow;
     }
   }

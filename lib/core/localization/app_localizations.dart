@@ -79,6 +79,13 @@ class AppLocalizations {
   /// Shorthand method
   String tr(String key, {Map<String, String>? params}) =>
       translate(key, params: params);
+
+  /// Resolve a localization key if it exists, otherwise return the original text.
+  /// Useful when backend may return plain-text messages while app emits i18n keys.
+  String translateOrRaw(String keyOrMessage, {Map<String, String>? params}) {
+    final translated = translate(keyOrMessage, params: params);
+    return translated == keyOrMessage ? keyOrMessage : translated;
+  }
 }
 
 /// Delegate

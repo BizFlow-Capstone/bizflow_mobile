@@ -1,26 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../domain/entities/product_entity.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../pages/edit_product_page.dart';
 import '../pages/product_detail_page.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Product Card Widget
 /// Hiển thị thông tin sản phẩm dưới dạng card
 class ProductCardWidget extends StatelessWidget {
   final ProductEntity product;
   final String locationId;
+  final VoidCallback? onQuickAdjustStock;
+  final bool canManageActions;
+  final ActionGuard _deleteGuard = ActionGuard();
+  final ActionGuard _detailGuard = ActionGuard();
+  final ActionGuard _editGuard = ActionGuard();
 
-  const ProductCardWidget({
+  ProductCardWidget({
     super.key,
     required this.product,
     required this.locationId,
+    this.onQuickAdjustStock,
+    this.canManageActions = true,
   });
 
   String _getStatusBadgeText(BuildContext context) {
@@ -36,6 +47,59 @@ class ProductCardWidget extends StatelessWidget {
       return AppColors.success;
     }
     return AppColors.error;
+  }
+
+  String _buildInventoryText(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (!product.trackInventory) {
+      return l10n.translate('product.no_inventory_management');
+    }
+
+    final resolvedUnit = _resolveBaseUnit();
+    final stockText = _formatStock(product.quantity);
+    if (resolvedUnit.isEmpty) {
+      return stockText;
+    }
+    return '$stockText $resolvedUnit';
+  }
+
+  String _formatStock(double value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+    return value.toString();
+  }
+
+  String _resolveBaseUnit() {
+    final directUnit = (product.unit ?? '').trim();
+    if (directUnit.isNotEmpty) {
+      return directUnit;
+    }
+
+    if (product.saleItems.isEmpty) {
+      return '';
+    }
+
+    final candidate = product.saleItems.firstWhere(
+      (item) => _tryParseNum(item['quantity'] ?? item['Quantity']) == 1,
+      orElse: () => product.saleItems.first,
+    );
+
+    return ((candidate['baseUnit'] ??
+                candidate['BaseUnit'] ??
+                candidate['unitName'] ??
+                candidate['UnitName'] ??
+                candidate['unit'] ??
+                candidate['Unit'])
+            ?.toString() ??
+        '')
+        .trim();
+  }
+
+  num? _tryParseNum(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value;
+    return num.tryParse(value.toString().trim());
   }
 
   @override
@@ -69,15 +133,21 @@ class ProductCardWidget extends StatelessWidget {
                   child: product.imageUrl != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            product.imageUrl!,
+                          child: CachedNetworkImage(
+                            imageUrl: product.imageUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                Icons.image_not_supported_outlined,
-                                color: AppColors.textSecondary,
-                              );
-                            },
+                            placeholder: (context, url) => Container(
+                              color: AppColors.background,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Icon(
+                              Icons.image_not_supported_outlined,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         )
                       : Icon(
@@ -169,11 +239,32 @@ class ProductCardWidget extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '${product.quantity} ${product.unit ?? 'cái'}',
-                      style: AppTextStyles.titleSmall.copyWith(
-                        color: AppColors.textPrimary,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _buildInventoryText(context),
+                          style: AppTextStyles.titleSmall.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        if (onQuickAdjustStock != null &&
+                            product.trackInventory) ...[
+                          SizedBox(width: AppSpacing.xs),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(6),
+                            onTap: onQuickAdjustStock,
+                            child: Padding(
+                              padding: EdgeInsets.all(AppSpacing.xs),
+                              child: Icon(
+                                Icons.tune,
+                                size: 18,
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -189,22 +280,24 @@ class ProductCardWidget extends StatelessWidget {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      final result = await Navigator.push<bool>(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ProductDetailPage(
-                            product: product,
-                            locationId: locationId,
-                          ),
-                        ),
-                      );
-                      if (result == true && context.mounted) {
-                        context.read<ProductBloc>().add(
-                          LoadProductsByLocationRequested(
-                            locationId: locationId,
+                      await _detailGuard.run(() async {
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProductDetailPage(
+                              product: product,
+                              locationId: locationId,
+                            ),
                           ),
                         );
-                      }
+                        if (result == true && context.mounted) {
+                          context.read<ProductBloc>().add(
+                            LoadProductsByLocationRequested(
+                              locationId: locationId,
+                            ),
+                          );
+                        }
+                      });
                     },
                     icon: const Icon(Icons.info_outline, size: 18),
                     label: Text(l10n.translate('product.detail_title')),
@@ -214,102 +307,122 @@ class ProductCardWidget extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: AppSpacing.sm),
-                // Edit and Delete Buttons - Side by Side
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final result = await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EditProductPage(
-                                productId: product.id,
-                                locationId: locationId,
-                                productName: product.name,
-                                barcode: product.barcode,
-                                category: product.category,
-                                costPrice: product.costPrice,
-                                salePrice: product.salePrice,
-                                quantity: product.quantity,
-                                unit: product.unit,
-                                description: product.description,
-                                isActive: product.isActive,
-                                businessTypeId: product.businessTypeId,
-                                manufacturer: product.manufacturer,
-                              ),
-                            ),
-                          );
-                          if (result == true && context.mounted) {
-                            context.read<ProductBloc>().add(
-                              LoadProductsByLocationRequested(
-                                locationId: locationId,
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.edit, size: 18),
-                        label: Text(
-                          l10n.translate('product.edit_button_label'),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.secondary,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          // Show confirmation dialog for delete
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text(
-                                l10n.translate('product.confirm_delete_title'),
-                              ),
-                              content: Text(
-                                l10n.translate(
-                                  'product.confirm_delete_message',
-                                ),
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: Text(l10n.translate('common.cancel')),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(context);
-                                    context.read<ProductBloc>().add(
-                                      DeleteProductRequested(
-                                        locationId: locationId,
-                                        productId: product.id,
-                                      ),
-                                    );
-                                  },
-                                  child: Text(
-                                    l10n.translate(
-                                      'product.delete_button_label',
-                                    ),
-                                    style: const TextStyle(color: Colors.red),
+                if (canManageActions)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            await _editGuard.run(() async {
+                              final result = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => EditProductPage(
+                                    productId: product.id,
+                                    locationId: locationId,
+                                    productName: product.name,
+                                    barcode: product.barcode,
+                                    category: product.category,
+                                    costPrice: product.costPrice,
+                                    salePrice: product.salePrice,
+                                    quantity: product.quantity,
+                                    unit: product.unit,
+                                    description: product.description,
+                                    isActive: product.isActive,
+                                    trackInventory: product.trackInventory,
+                                    businessTypeId: product.businessTypeId,
+                                    manufacturer: product.manufacturer,
+                                    imageUrl: product.imageUrl,
                                   ),
                                 ),
-                              ],
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        label: Text(
-                          l10n.translate('product.delete_button_label'),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.error,
+                              );
+                              if (result == true && context.mounted) {
+                                context.read<ProductBloc>().add(
+                                  LoadProductsByLocationRequested(
+                                    locationId: locationId,
+                                  ),
+                                );
+                              }
+                            });
+                          },
+                          icon: const Icon(Icons.edit, size: 18),
+                          label: Text(
+                            l10n.translate('product.edit_button_label'),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.secondary,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                      SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // Show confirmation dialog for delete
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text(
+                                  l10n.translate(
+                                    'product.confirm_delete_title',
+                                  ),
+                                ),
+                                content: Text(
+                                  l10n.translate(
+                                    'product.confirm_delete_message',
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: Text(
+                                      l10n.translate('common.cancel'),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      await _deleteGuard.run(() async {
+                                        final allowed =
+                                            await SubscriptionFeatureGuard.ensureAllowed(
+                                              context,
+                                              featureCode:
+                                                  SubscriptionFeatureCodes
+                                                      .productManagement,
+                                            );
+                                        if (!allowed || !context.mounted)
+                                          return;
+
+                                        Navigator.pop(context);
+                                        context.read<ProductBloc>().add(
+                                          DeleteProductRequested(
+                                            locationId: locationId,
+                                            productId: product.id,
+                                          ),
+                                        );
+                                      });
+                                    },
+                                    child: Text(
+                                      l10n.translate(
+                                        'product.delete_button_label',
+                                      ),
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: Text(
+                            l10n.translate('product.delete_button_label'),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ],

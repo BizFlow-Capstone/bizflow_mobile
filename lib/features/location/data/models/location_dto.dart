@@ -39,6 +39,7 @@ class LocationDto {
   final String phone;
   final bool isActive;
   final String ownerName;
+  final String? ownerProfileId;
   final String? taxCode; // Optional - for create/update
   final List<String> employeeIds; // Employee IDs assigned to this location
 
@@ -51,6 +52,7 @@ class LocationDto {
     required this.phone,
     required this.isActive,
     required this.ownerName,
+    this.ownerProfileId,
     this.taxCode,
     this.employeeIds = const [],
   });
@@ -87,6 +89,7 @@ class LocationDto {
       phone: json['phone'] as String? ?? '',
       isActive: json['isActive'] as bool? ?? false,
       ownerName: json['ownerName'] as String? ?? '',
+      ownerProfileId: (json['ownerProfileId'] ?? json['ownerId'])?.toString(),
       taxCode: json['taxCode'] as String?,
       employeeIds: employeeIds,
     );
@@ -103,6 +106,7 @@ class LocationDto {
       'phone': phone,
       'isActive': isActive,
       'ownerName': ownerName,
+      if (ownerProfileId != null) 'ownerProfileId': ownerProfileId,
       if (taxCode != null) 'taxCode': taxCode,
       'employeeIds': employeeIds,
     };

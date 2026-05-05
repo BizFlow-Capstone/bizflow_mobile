@@ -4,6 +4,11 @@ import 'package:intl/intl.dart';
 class DateFormatter {
   DateFormatter._();
 
+  static final RegExp _hasTimeZoneInfoRegExp = RegExp(
+    r'(Z|[+-]\d{2}:\d{2}|[+-]\d{4})$',
+    caseSensitive: false,
+  );
+
   // Date formats
   static final DateFormat _dateFormat = DateFormat('dd/MM/yyyy');
   static final DateFormat _timeFormat = DateFormat('HH:mm');
@@ -16,43 +21,87 @@ class DateFormatter {
   /// Format to date string (dd/MM/yyyy)
   static String formatDate(DateTime? date) {
     if (date == null) return '';
-    return _dateFormat.format(date);
+    return _dateFormat.format(date.toLocal());
   }
 
   /// Format to time string (HH:mm)
   static String formatTime(DateTime? date) {
     if (date == null) return '';
-    return _timeFormat.format(date);
+    return _timeFormat.format(date.toLocal());
   }
 
   /// Format to date time string (dd/MM/yyyy HH:mm)
   static String formatDateTime(DateTime? date) {
     if (date == null) return '';
-    return _dateTimeFormat.format(date);
+    return _dateTimeFormat.format(date.toLocal());
   }
 
   /// Format to full date string (Monday, 01 January 2024)
   static String formatFullDate(DateTime? date) {
     if (date == null) return '';
-    return _fullDateFormat.format(date);
+    return _fullDateFormat.format(date.toLocal());
   }
 
   /// Format to month year string (January 2024)
   static String formatMonthYear(DateTime? date) {
     if (date == null) return '';
-    return _monthYearFormat.format(date);
+    return _monthYearFormat.format(date.toLocal());
   }
 
   /// Format to short date string (01 Jan)
   static String formatShortDate(DateTime? date) {
     if (date == null) return '';
-    return _shortDateFormat.format(date);
+    return _shortDateFormat.format(date.toLocal());
   }
 
   /// Format to ISO string (yyyy-MM-dd)
   static String formatIso(DateTime? date) {
     if (date == null) return '';
-    return _isoFormat.format(date);
+    return _isoFormat.format(date.toLocal());
+  }
+
+  /// Parse API datetime string to UTC.
+  ///
+  /// - If input already has timezone info (`Z`, `+07:00`, ...), it is
+  ///   normalized to UTC.
+  /// - If input has no timezone info, it is treated as UTC by convention.
+  static DateTime? parseApiDateTime(
+    String? raw, {
+    DateTime? fallback,
+  }) {
+    if (raw == null) return fallback;
+    final value = raw.trim();
+    if (value.isEmpty) return fallback;
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return fallback;
+
+    if (_hasTimeZoneInfoRegExp.hasMatch(value)) {
+      return parsed.toUtc();
+    }
+
+    return DateTime.utc(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    );
+  }
+
+  /// Serialize datetime to UTC ISO-8601 string for API requests.
+  static String toApiUtcIsoString(DateTime dateTime) {
+    return dateTime.toUtc().toIso8601String();
+  }
+
+  /// Serialize datetime to date-only string (yyyy-MM-dd) for API requests.
+  static String toApiDateOnly(DateTime dateTime) {
+    return '${dateTime.year.toString().padLeft(4, '0')}-'
+        '${dateTime.month.toString().padLeft(2, '0')}-'
+        '${dateTime.day.toString().padLeft(2, '0')}';
   }
 
   /// Parse date from string

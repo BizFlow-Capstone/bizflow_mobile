@@ -1,150 +1,354 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../domain/entities/order_item_entity.dart';
+import '../bloc/order_bloc.dart';
+import 'order_completion_confirmation_screen.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 class OrderPayNowScreen extends StatefulWidget {
   final double totalAmount;
+  final List<OrderItemEntity> items;
+  final String? locationId;
+  final String pendingOrderId;
+  final int? debtorId;
+  final String? note;
 
-  const OrderPayNowScreen({Key? key, required this.totalAmount})
-    : super(key: key);
+  const OrderPayNowScreen({
+    super.key,
+    required this.totalAmount,
+    required this.items,
+    this.locationId,
+    required this.pendingOrderId,
+    this.debtorId,
+    this.note,
+  });
 
   @override
   State<OrderPayNowScreen> createState() => _OrderPayNowScreenState();
 }
 
 class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
-  String _selectedMethod = 'cash'; // 'cash' or 'transfer'
+  String _selectedMethod = 'cash'; // cash | transfer
+  bool _isSubmitting = false;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.textPrimary,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         title: Text(l10n.translate('order_create.pay_now')),
         elevation: 0,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.withOpacity(0.2)),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    l10n.translate('order_create.total'),
-                    style: const TextStyle(fontSize: 16, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${widget.totalAmount.toInt()}đ',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Payment Methods
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMethodButton(
-                    icon: Icons.money,
-                    title: l10n.translate('order_create.pay_method_cash'),
-                    isSelected: _selectedMethod == 'cash',
-                    onTap: () {
-                      setState(() {
-                        _selectedMethod = 'cash';
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildMethodButton(
-                    icon: Icons.qr_code,
-                    title: l10n.translate('order_create.pay_method_transfer'),
-                    isSelected: _selectedMethod == 'transfer',
-                    onTap: () {
-                      setState(() {
-                        _selectedMethod = 'transfer';
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            if (_selectedMethod == 'transfer')
-              Container(
-                padding: const EdgeInsets.all(24),
-                alignment: Alignment.center,
-                child: Column(
-                  children: [
-                    const Icon(Icons.qr_code_2, size: 150),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "Ngân hàng Vietcombank\nSTK: 0123456789\nNGUYEN VAN A",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-              ),
-
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  backgroundColor: Colors.green,
-                ),
-                onPressed: () {
-                  // Show success dialog
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text("Thành công"),
-                      content: const Text(
-                        "Đã thanh toán và tạo đơn hàng thành công!",
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pop(context); // close dialog
-                            Navigator.popUntil(
-                              context,
-                              ModalRoute.withName('/home'),
-                            );
-                          },
-                          child: const Text("Về trang chủ"),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                child: Text(
-                  l10n.translate('order_create.proceed_payment'),
-                  style: const TextStyle(fontSize: 16, color: Colors.white),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          color: AppColors.black,
+          onPressed: () => Navigator.pop(context),
         ),
+        bottom: const AppSyncStatusText(),
+      ),
+      body: BlocListener<OrderBloc, OrderState>(
+        listener: (context, state) {
+          if (state is OrderPublished) {
+            if (!mounted) return;
+            setState(() {
+              _isSubmitting = false;
+            });
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    OrderCompletionConfirmationScreen(order: state.order),
+              ),
+            );
+          } else if (state is OrderUpdated) {
+            if (!mounted) return;
+            setState(() {
+              _isSubmitting = false;
+            });
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    l10n.translate('order_payment.success_update_pending'),
+                  ),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            // Pop back to OrderDetailScreen or Accounting Hub
+            Navigator.of(context).popUntil(
+              (route) =>
+                  route.isFirst || route.settings.name == '/order_detail',
+            );
+          } else if (state is OrderError) {
+            if (!mounted) return;
+            setState(() {
+              _isSubmitting = false;
+            });
+            ScaffoldMessenger.of(context)
+              ..removeCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+          }
+        },
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                  AppSpacing.md + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                          border: Border.all(
+                            color: AppColors.success.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              l10n.translate('order_create.total'),
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              CurrencyFormatter.formatVND(widget.totalAmount),
+                              style: AppTextStyles.displaySmall.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildMethodButton(
+                              icon: Icons.money,
+                              title: l10n.translate(
+                                'order_create.pay_method_cash',
+                              ),
+                              isSelected: _selectedMethod == 'cash',
+                              onTap: () {
+                                setState(() {
+                                  _selectedMethod = 'cash';
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: _buildMethodButton(
+                              icon: Icons.qr_code,
+                              title: l10n.translate(
+                                'order_create.pay_method_transfer',
+                              ),
+                              isSelected: _selectedMethod == 'transfer',
+                              onTap: () {
+                                setState(() {
+                                  _selectedMethod = 'transfer';
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: AppSpacing.lg),
+
+                      if (_selectedMethod == 'transfer')
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppSpacing.xl),
+                          decoration: BoxDecoration(
+                            color: AppColors.white,
+                            borderRadius: BorderRadius.circular(
+                              AppSpacing.radiusMd,
+                            ),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          alignment: Alignment.center,
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.qr_code_2,
+                                size: 132,
+                                color: AppColors.textPrimary,
+                              ),
+                              const SizedBox(height: AppSpacing.md),
+                              Text(
+                                '${l10n.translate('order_create.transfer_bank_name')}: Vietcombank\n'
+                                '${l10n.translate('order_create.transfer_account')}: 0123456789\n'
+                                '${l10n.translate('order_create.transfer_account_holder')}: NGUYEN VAN A',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      const SizedBox(height: AppSpacing.md),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMd,
+                          ),
+                          border: Border.all(
+                            color: AppColors.primary.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Text(
+                          l10n.translate(
+                            'order_payment.pending_order_hint',
+                            params: {'id': widget.pendingOrderId},
+                          ),
+                          style: AppTextStyles.bodyMedium,
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.xl),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.md,
+                            ),
+                            backgroundColor: AppColors.success,
+                            foregroundColor: AppColors.white,
+                          ),
+                          onPressed: _isSubmitting ? null : _submit,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.white,
+                                  ),
+                                )
+                              : Text(
+                                  l10n.translate(
+                                    'order_create.proceed_payment',
+                                  ),
+                                  style: AppTextStyles.labelLarge.copyWith(
+                                    color: AppColors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+
+    final l10n = AppLocalizations.of(context);
+    final locationIdText = widget.locationId?.trim();
+    final businessLocationId = int.tryParse(locationIdText ?? '');
+    if (businessLocationId == null || businessLocationId <= 0) {
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(l10n.translate('debt.location_required'))),
+        );
+      return;
+    }
+
+    final pendingOrderId = widget.pendingOrderId.trim();
+    if (pendingOrderId.isEmpty) {
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(l10n.translate('order.pending_required'))),
+        );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+      context,
+      featureCode: SubscriptionFeatureCodes.orderManagement,
+    );
+    if (!allowed) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+      return;
+    }
+
+    final cashAmount = _selectedMethod == 'cash'
+        ? widget.totalAmount.roundToDouble()
+        : 0.0;
+    final bankAmount = _selectedMethod == 'transfer'
+        ? widget.totalAmount.roundToDouble()
+        : 0.0;
+
+    context.read<OrderBloc>().add(
+      UpdateOrderRequested(
+        orderId: pendingOrderId,
+        businessLocationId: businessLocationId.toString(),
+        items: widget.items,
+        cashAmount: cashAmount,
+        bankAmount: bankAmount,
+        debtAmount: 0,
+        debtorId: widget.debtorId,
+        note: widget.note,
       ),
     );
   }
@@ -157,16 +361,16 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 24),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
         decoration: BoxDecoration(
           color: isSelected
-              ? Colors.green.withOpacity(0.1)
+              ? AppColors.success.withValues(alpha: 0.1)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
           border: Border.all(
-            color: isSelected ? Colors.green : Colors.grey[300]!,
+            color: isSelected ? AppColors.success : AppColors.divider,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -175,14 +379,14 @@ class _OrderPayNowScreenState extends State<OrderPayNowScreen> {
             Icon(
               icon,
               size: 40,
-              color: isSelected ? Colors.green : Colors.grey,
+              color: isSelected ? AppColors.success : AppColors.textSecondary,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               title,
-              style: TextStyle(
+              style: AppTextStyles.labelLarge.copyWith(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.green : Colors.black87,
+                color: isSelected ? AppColors.success : AppColors.textPrimary,
               ),
             ),
           ],

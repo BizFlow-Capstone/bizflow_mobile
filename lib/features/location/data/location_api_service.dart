@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/api_error_message_parser.dart';
 import '../../employee/data/models/employee_dto.dart';
 import 'models/location_dto.dart';
 
@@ -51,35 +52,18 @@ class LocationApiService {
     } on ApiException catch (e) {
       // Transform ApiException to domain exception with user-friendly messages
       if (e.statusCode == -1) {
-        throw Exception(
-          'No network connection\n\n'
-          'Check:\n'
-          '• Is backend running?\n'
-          '• Port: 7270\n'
-          '• URL: https://10.0.2.2:7270',
-        );
+        throw Exception('Không có kết nối mạng, vui lòng kiểm tra lại');
       } else if (e.statusCode == -2) {
-        throw Exception(
-          'Connection timeout\n\n'
-          'Backend did not respond within 30 seconds',
-        );
+        throw Exception('Kết nối máy chủ bị gián đoạn (Timeout)');
       } else if (e.statusCode == -3) {
         // HttpException or connection error
-        throw Exception(
-          'Backend connection error\n\n'
-          '${e.message}\n\n'
-          'Solutions:\n'
-          '1. Check backend is running: dotnet run\n'
-          '2. Ensure port 7270 is not blocked\n'
-          '3. Hot restart app (press R)\n'
-          '4. Check URL: https://10.0.2.2:7270',
-        );
+        throw Exception('Lỗi kết nối máy chủ');
       } else if (e.statusCode == 401) {
-        throw Exception('Session expired\n\nPlease login again');
+        throw Exception('Phiên đăng nhập đã hết hạn\n\nVui lòng đăng nhập lại');
       } else if (e.statusCode == 404) {
-        throw Exception('Data not found');
+        throw Exception('Không tìm thấy dữ liệu');
       }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('LocationApiService.getMyOwnedLocations error: $e');
       rethrow;
@@ -105,7 +89,7 @@ class LocationApiService {
       if (e.statusCode == 401) {
         throw Exception('Session expired');
       }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('LocationApiService.getWorkAtLocations error: $e');
       rethrow;
@@ -131,7 +115,22 @@ class LocationApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 400) {
-        throw Exception('Invalid data');
+        String detail = e.message;
+        final data = e.data;
+        if (data is Map<String, dynamic>) {
+          final errors = data['errors'];
+          if (errors is Map<String, dynamic>) {
+            final errorMessage = errors['message']?.toString();
+            final errorException = errors['exception']?.toString();
+            if (errorMessage != null && errorMessage.isNotEmpty) {
+              detail = '$detail | $errorMessage';
+            }
+            if (errorException != null && errorException.isNotEmpty) {
+              detail = '$detail ($errorException)';
+            }
+          }
+        }
+        throw Exception('Invalid data: $detail');
       }
       throw Exception('Error creating location: ${e.message}');
     } catch (e) {
@@ -150,24 +149,24 @@ class LocationApiService {
     required bool isActive,
   }) async {
     try {
-      debugPrint('=== UPDATE STATUS REQUEST ===');
-      debugPrint('LocationId: $locationId (Type: ${locationId.runtimeType})');
-      debugPrint('isActive: $isActive');
-      debugPrint('URL: ${ApiEndpoints.updateLocationStatus(locationId)}');
+      if (kDebugMode) {
+        debugPrint(
+          '[Location] update status request: locationId=$locationId, isActive=$isActive',
+        );
+      }
 
       final body = UpdateStatusRequestDto(isActive: isActive).toJson();
-      debugPrint('Request Body: $body');
 
-      final response = await _apiClient.put(
+      final response = await _apiClient.patch(
         ApiEndpoints.updateLocationStatus(locationId),
         body: body,
       );
 
-      debugPrint('=== UPDATE STATUS RESPONSE ===');
-      debugPrint('Status Code: ${response.statusCode}');
-      debugPrint('Response Success: ${response.isSuccess}');
-      debugPrint('Response Message: ${response.message}');
-      debugPrint('Response Data: ${response.data}');
+      if (kDebugMode) {
+        debugPrint(
+          '[Location] update status response: code=${response.statusCode}, success=${response.isSuccess}',
+        );
+      }
 
       if (response.isSuccess) {
         return true;
@@ -342,11 +341,79 @@ class LocationApiService {
       }
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
-        throw Exception('🔒 Session expired');
+        throw Exception('Session expired');
       }
-      throw Exception('API Error: ${e.message}');
+      throw Exception(ApiErrorMessageParser.parse(e));
     } catch (e) {
       debugPrint('LocationApiService.getLocationEmployees error: $e');
+      rethrow;
+    }
+  }
+
+  /// Delete a business location
+  ///
+  /// API: DELETE /api/location/me/owned/{id}
+  /// Returns: String (message from server)
+  Future<String> deleteLocation(String locationId) async {
+    try {
+      final response = await _apiClient.delete(
+        ApiEndpoints.deleteLocation(locationId),
+      );
+
+      if (response.isSuccess) {
+        return response.message ?? 'Location deleted successfully';
+      } else {
+        throw Exception(response.message ?? 'Failed to delete location');
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: You are not the owner');
+      } else if (e.statusCode == 404) {
+        throw Exception('Location not found');
+      } else if (e.statusCode == 400) {
+        final raw = (e.message ?? '').toLowerCase();
+        if (raw.contains('fk_book_location') ||
+            raw.contains('accountingbooks') ||
+            raw.contains('foreign key constraint fails')) {
+          throw Exception(
+            'Không thể xóa địa điểm vì đang có dữ liệu sổ kế toán liên quan. Vui lòng xử lý hoặc xóa dữ liệu kế toán trước.',
+          );
+        }
+      }
+      throw Exception('Error deleting location: ${e.message}');
+    } catch (e) {
+      debugPrint('LocationApiService.deleteLocation error: $e');
+      rethrow;
+    }
+  }
+
+  /// Remove an employee from a location
+  ///
+  /// API: DELETE /api/location/{locationId}/employees/{employeeId}
+  /// Returns: String (message from server)
+  Future<String> removeEmployeeFromLocation({
+    required String locationId,
+    required String employeeId,
+  }) async {
+    try {
+      final response = await _apiClient.delete(
+        ApiEndpoints.removeEmployeeFromLocation(locationId, employeeId),
+      );
+
+      if (response.isSuccess) {
+        return response.message ?? 'Employee removed successfully';
+      } else {
+        throw Exception(response.message ?? 'Failed to remove employee');
+      }
+    } on ApiException catch (e) {
+      if (e.statusCode == 403) {
+        throw Exception('Permission denied: You are not the owner');
+      } else if (e.statusCode == 404) {
+        throw Exception('Location or employee not found');
+      }
+      throw Exception('Error removing employee: ${e.message}');
+    } catch (e) {
+      debugPrint('LocationApiService.removeEmployeeFromLocation error: $e');
       rethrow;
     }
   }

@@ -10,7 +10,17 @@ abstract class LocationEvent extends Equatable {
 
 /// Load all locations
 class LoadLocationsRequested extends LocationEvent {
-  const LoadLocationsRequested();
+  final bool useCache;
+
+  const LoadLocationsRequested({this.useCache = true});
+
+  @override
+  List<Object?> get props => [useCache];
+}
+
+/// Reset locations state (on logout)
+class ResetLocations extends LocationEvent {
+  const ResetLocations();
 }
 
 /// Restore cached locations (no API call - for instant back navigation)
@@ -155,6 +165,20 @@ class RemoveEmployeeFromTabRequested extends LocationEvent {
   final String employeeId;
 
   const RemoveEmployeeFromTabRequested({
+    required this.locationId,
+    required this.employeeId,
+  });
+
+  @override
+  List<Object?> get props => [locationId, employeeId];
+}
+
+/// Remove employee from location (API call)
+class RemoveEmployeeFromLocationRequested extends LocationEvent {
+  final String locationId;
+  final String employeeId;
+
+  const RemoveEmployeeFromLocationRequested({
     required this.locationId,
     required this.employeeId,
   });

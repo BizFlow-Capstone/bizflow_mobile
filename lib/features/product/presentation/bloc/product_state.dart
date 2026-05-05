@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../domain/entities/product_history_entities.dart';
 import '../../data/models/business_type_model.dart';
 
 /// Product States
@@ -26,7 +27,7 @@ class ProductsLoaded extends ProductState {
   final String locationId;
   final String? searchQuery;
   final String? filterStatus;
-  final String? filterCategory;
+  final String? filterBusinessTypeId;
   final String? sortBy;
   final bool hasReachedMax;
   final int currentPage;
@@ -37,7 +38,7 @@ class ProductsLoaded extends ProductState {
     required this.locationId,
     this.searchQuery,
     this.filterStatus,
-    this.filterCategory,
+    this.filterBusinessTypeId,
     this.sortBy,
     this.hasReachedMax = false,
     this.currentPage = 1,
@@ -49,7 +50,7 @@ class ProductsLoaded extends ProductState {
     String? locationId,
     String? searchQuery,
     String? filterStatus,
-    String? filterCategory,
+    String? filterBusinessTypeId,
     String? sortBy,
     bool? hasReachedMax,
     int? currentPage,
@@ -60,7 +61,7 @@ class ProductsLoaded extends ProductState {
       locationId: locationId ?? this.locationId,
       searchQuery: searchQuery ?? this.searchQuery,
       filterStatus: filterStatus ?? this.filterStatus,
-      filterCategory: filterCategory ?? this.filterCategory,
+      filterBusinessTypeId: filterBusinessTypeId ?? this.filterBusinessTypeId,
       sortBy: sortBy ?? this.sortBy,
       hasReachedMax: hasReachedMax ?? this.hasReachedMax,
       currentPage: currentPage ?? this.currentPage,
@@ -74,7 +75,7 @@ class ProductsLoaded extends ProductState {
     locationId,
     searchQuery,
     filterStatus,
-    filterCategory,
+    filterBusinessTypeId,
     sortBy,
     hasReachedMax,
     currentPage,
@@ -154,6 +155,56 @@ class ProductSaleItemsLoaded extends ProductState {
 
   @override
   List<Object?> get props => [saleItems];
+}
+
+/// Product detail loaded
+class ProductDetailLoaded extends ProductState {
+  final ProductEntity product;
+  final List<ProductSaleItemHistoryEntity> priceHistory;
+  final List<ProductStockMovementEntity> stockMovements;
+  final int stockMovementsTotalCount;
+  final bool isLoadingPriceHistory;
+  final bool isLoadingStockMovements;
+
+  const ProductDetailLoaded({
+    required this.product,
+    this.priceHistory = const [],
+    this.stockMovements = const [],
+    this.stockMovementsTotalCount = 0,
+    this.isLoadingPriceHistory = false,
+    this.isLoadingStockMovements = false,
+  });
+
+  ProductDetailLoaded copyWith({
+    ProductEntity? product,
+    List<ProductSaleItemHistoryEntity>? priceHistory,
+    List<ProductStockMovementEntity>? stockMovements,
+    int? stockMovementsTotalCount,
+    bool? isLoadingPriceHistory,
+    bool? isLoadingStockMovements,
+  }) {
+    return ProductDetailLoaded(
+      product: product ?? this.product,
+      priceHistory: priceHistory ?? this.priceHistory,
+      stockMovements: stockMovements ?? this.stockMovements,
+      stockMovementsTotalCount:
+          stockMovementsTotalCount ?? this.stockMovementsTotalCount,
+      isLoadingPriceHistory:
+          isLoadingPriceHistory ?? this.isLoadingPriceHistory,
+      isLoadingStockMovements:
+          isLoadingStockMovements ?? this.isLoadingStockMovements,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    product,
+    priceHistory,
+    stockMovements,
+    stockMovementsTotalCount,
+    isLoadingPriceHistory,
+    isLoadingStockMovements,
+  ];
 }
 
 /// Failure state

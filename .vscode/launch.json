@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "BizFlow (dev)",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": ["--dart-define-from-file", "config/dev.json"]
+    },
+    {
+      "name": "BizFlow (dev - profile)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "toolArgs": ["--dart-define-from-file", "config/dev.json"]
+    },
+    {
+      "name": "BizFlow (release)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "toolArgs": ["--dart-define-from-file", "config/dev.json"]
+    }
+  ]
+}

@@ -11,8 +11,10 @@ class LocationEntity {
   final String phone;
   final bool isActive;
   final String ownerName;
+  final String? ownerProfileId;
   final String? taxCode; // Optional
   final List<String> employeeIds; // Employee IDs assigned to this location
+  final bool isOwner; // true = current user owns this location
 
   LocationEntity({
     required this.id,
@@ -23,8 +25,10 @@ class LocationEntity {
     required this.phone,
     required this.isActive,
     required this.ownerName,
+    this.ownerProfileId,
     this.taxCode,
     this.employeeIds = const [],
+    this.isOwner = false,
   });
 
   /// Full address (combined)
@@ -39,8 +43,10 @@ class LocationEntity {
     String? phone,
     bool? isActive,
     String? ownerName,
+    String? ownerProfileId,
     String? taxCode,
     List<String>? employeeIds,
+    bool? isOwner,
   }) {
     return LocationEntity(
       id: id ?? this.id,
@@ -51,8 +57,44 @@ class LocationEntity {
       phone: phone ?? this.phone,
       isActive: isActive ?? this.isActive,
       ownerName: ownerName ?? this.ownerName,
+      ownerProfileId: ownerProfileId ?? this.ownerProfileId,
       taxCode: taxCode ?? this.taxCode,
       employeeIds: employeeIds ?? this.employeeIds,
+      isOwner: isOwner ?? this.isOwner,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'address': address,
+      'district': district,
+      'city': city,
+      'phone': phone,
+      'isActive': isActive,
+      'ownerName': ownerName,
+      'ownerProfileId': ownerProfileId,
+      'taxCode': taxCode,
+      'employeeIds': employeeIds,
+      'isOwner': isOwner,
+    };
+  }
+
+  factory LocationEntity.fromMap(Map<String, dynamic> map) {
+    return LocationEntity(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      address: map['address'] ?? '',
+      district: map['district'] ?? '',
+      city: map['city'] ?? '',
+      phone: map['phone'] ?? '',
+      isActive: map['isActive'] ?? false,
+      ownerName: map['ownerName'] ?? '',
+      ownerProfileId: map['ownerProfileId'],
+      taxCode: map['taxCode'],
+      employeeIds: List<String>.from(map['employeeIds'] ?? []),
+      isOwner: map['isOwner'] ?? false,
     );
   }
 }

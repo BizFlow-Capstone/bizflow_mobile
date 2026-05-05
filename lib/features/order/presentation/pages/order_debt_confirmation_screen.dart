@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/formatters.dart';
 
 class OrderDebtConfirmationScreen extends StatelessWidget {
   final double totalAmount;
   final double paidAmount;
   final double debtAmount;
+  final String customerName;
+  final String? customerPhone;
+  final String? locationName;
+  final int? debtorId;
 
   const OrderDebtConfirmationScreen({
-    Key? key,
+    super.key,
     required this.totalAmount,
     required this.paidAmount,
     required this.debtAmount,
-  }) : super(key: key);
+    required this.customerName,
+    this.customerPhone,
+    this.locationName,
+    this.debtorId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -20,93 +32,71 @@ class OrderDebtConfirmationScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.translate('order_create.debt_confirm')),
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 80),
-            const SizedBox(height: 16),
-            const Text(
-              "Tạo đơn hàng thành công",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 32),
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey[300]!),
+            const Center(
+              child: Icon(
+                Icons.check_circle_outline,
+                color: AppColors.success,
+                size: 80,
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    _buildRow(
-                      l10n.translate('order_create.customer_name'),
-                      "Tạp hóa chị Nga",
-                    ),
-                    const Divider(height: 24),
-                    _buildRow(
-                      l10n.translate('order_create.total'),
-                      '${totalAmount.toInt()}đ',
-                    ),
-                    const SizedBox(height: 8),
-                    _buildRow(
-                      l10n.translate('order_create.amount_paid'),
-                      '${paidAmount.toInt()}đ',
-                    ),
-                    const Divider(height: 24),
-                    _buildRow(
-                      l10n.translate('order_create.amount_debt'),
-                      '${debtAmount.toInt()}đ',
-                      isHighlight: true,
-                    ),
-                  ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Center(
+              child: Text(
+                l10n.translate('order_create.debt_confirm_success'),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.success,
                 ),
               ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _buildInfoRow(l10n.translate('order.detail_customer_name'), customerName),
+            _buildInfoRow(
+              l10n.translate('order_payment.order_total'),
+              CurrencyFormatter.formatVND(totalAmount),
+            ),
+            _buildInfoRow(
+              l10n.translate('order_payment.paid_amount'),
+              CurrencyFormatter.formatVND(paidAmount),
+            ),
+            _buildInfoRow(
+              l10n.translate('order_create.amount_debt'),
+              CurrencyFormatter.formatVND(debtAmount),
             ),
             const Spacer(),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                onPressed: () {
-                  Navigator.popUntil(context, ModalRoute.withName('/home'));
-                },
-                child: Text(
-                  l10n.translate('order_create.back_to_list'),
-                  style: const TextStyle(fontSize: 16),
-                ),
+                onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst),
+                child: Text(l10n.translate('common.back_home')),
               ),
             ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRow(String label, String value, {bool isHighlight = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, color: Colors.black54),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isHighlight ? 18 : 16,
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.w500,
-            color: isHighlight ? Colors.red : Colors.black87,
-          ),
-        ),
-      ],
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: AppTextStyles.bodyMedium),
+          Text(value, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }

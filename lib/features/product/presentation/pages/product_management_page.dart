@@ -1,19 +1,36 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../../../shared/services/permission_service.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
+import '../../data/models/business_type_model.dart';
 import '../widgets/product_card_widget.dart';
 import '../widgets/product_fab_menu_widget.dart';
+import '../../../../shared/widgets/app_barcode_scanner.dart';
+import '../../../../shared/cache/sync_status_controller.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
+import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/utils/action_guard.dart';
+import '../../../../shared/utils/formatters.dart';
+
+import '../../domain/entities/product_entity.dart';
 import '../widgets/product_filter_dialog.dart';
-import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
 import 'add_product_page.dart';
+import 'bulk_adjust_selling_price_page.dart';
 import 'import_history_page.dart';
+import '../../../../core/network/api_error_message_parser.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Product Management by Location Page
 /// SC-INV-03.1: Quản lý sản phẩm theo địa điểm kinh doanh
@@ -37,19 +54,33 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   late TextEditingController _searchController;
   late ScrollController _scrollController;
   bool _showFabMenu = false;
+  List<BusinessTypeDto> _businessTypes = [];
+  String? _lastApiMessage;
+  Timer? _searchDebounce;
+  final ActionGuard _openFabActionGuard = ActionGuard();
 
   @override
   void initState() {
     super.initState();
+    SyncStatusController().setManualRefreshCallback(_refreshFromSyncBar);
     _searchController = TextEditingController();
     _scrollController = ScrollController()..addListener(_onScroll);
+    context.read<ProductBloc>().add(const LoadBusinessTypesRequested());
     _loadProducts();
+  }
+
+  void _refreshFromSyncBar() {
+    context.read<ProductBloc>().add(
+      RefreshProductsRequested(locationId: widget.locationId),
+    );
   }
 
   @override
   void dispose() {
+    SyncStatusController().setManualRefreshCallback(null);
     _searchController.dispose();
     _scrollController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -75,19 +106,43 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   }
 
   void _searchProducts(String query) {
-    context.read<ProductBloc>().add(
-      SearchProductsRequested(locationId: widget.locationId, query: query),
-    );
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        context.read<ProductBloc>().add(
+          SearchProductsRequested(locationId: widget.locationId, query: query),
+        );
+      }
+    });
   }
 
-  void _openAddProductPage() {
-    _toggleFabMenu();
-    Navigator.push<bool>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddProductPage(locationId: widget.locationId),
-      ),
-    ).then((result) {
+  Future<void> _openAddProductPage() async {
+    await _openFabActionGuard.run(() async {
+      _toggleFabMenu();
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.products,
+      );
+      if (!allowed || !mounted) return;
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddProductPage(locationId: widget.locationId),
+        ),
+      );
+      if (result == true && mounted) {
+        _loadProducts();
+      }
+    });
+  }
+
+  Future<void> _openImportHistoryPage() async {
+    await _openFabActionGuard.run(() async {
+      _toggleFabMenu();
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
+      );
       if (result == true && mounted) {
         _loadProducts();
       }
@@ -101,11 +156,8 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
   }
 
   void _openFilterDialog(ProductsLoaded state) async {
-    final categories = state.products
-        .map((p) => p.category)
-        .where((c) => c != null && c.isNotEmpty)
-        .cast<String>()
-        .toSet()
+    final businessTypeOptions = _businessTypes
+        .map((type) => {'id': type.businessTypeId, 'name': type.name})
         .toList();
 
     final result = await showModalBottomSheet<Map<String, String?>>(
@@ -114,20 +166,20 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => ProductFilterSortDialog(
         initialStatus: state.filterStatus,
-        initialCategory: state.filterCategory,
+        initialBusinessTypeId: state.filterBusinessTypeId,
         initialSort: state.sortBy,
-        categories: categories,
+        businessTypeOptions: businessTypeOptions,
       ),
     );
 
     if (result != null && mounted) {
       if (result['status'] != state.filterStatus ||
-          result['category'] != state.filterCategory) {
+          result['businessTypeId'] != state.filterBusinessTypeId) {
         context.read<ProductBloc>().add(
           FilterProductsRequested(
             locationId: widget.locationId,
             status: result['status'],
-            category: result['category'],
+            businessTypeId: result['businessTypeId'],
           ),
         );
       }
@@ -142,9 +194,59 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
     }
   }
 
+  Future<void> _showQuickAdjustStockDialog(ProductEntity product) async {
+    final l10n = AppLocalizations.of(context);
+    final productBloc = context.read<ProductBloc>();
+
+    final formData = await showDialog<_QuickAdjustStockFormData>(
+      context: context,
+      builder: (dialogContext) => _QuickAdjustStockDialog(
+        initialStock: product.quantity,
+        initialCostPrice: product.costPrice,
+      ),
+    );
+
+    if (!mounted || formData == null) return;
+
+    try {
+      await productBloc.repository.adjustProductStock(
+        productId: product.id,
+        stock: formData.stock,
+        memo: formData.memo,
+        costPrice: formData.costPrice,
+      );
+
+      if (!mounted) return;
+      AppSnackBar.show(
+        context,
+        message: l10n.translate('product.stock_adjust.success'),
+        type: AppSnackBarType.success,
+      );
+
+      if (mounted) {
+        productBloc.add(
+          RefreshProductsRequested(locationId: widget.locationId),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackBar.show(
+        context,
+        message: ApiErrorMessageParser.parse(e),
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final canManageProducts = PermissionService.canEditProduct(
+      context.watch<BusinessContext>().isOwner,
+    );
+    final canAdjustStock = PermissionService.canAdjustStock(
+      context.watch<BusinessContext>().isOwner,
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -164,7 +266,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             Text(
               widget.locationName,
               style: AppTextStyles.titleLarge.copyWith(
-                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
               ),
             ),
             Text(
@@ -177,24 +279,60 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
         ),
         centerTitle: false,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Lịch sử nhập kho',
-            color: AppColors.textPrimary,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ImportHistoryPage(),
-                ),
-              ).then((result) {
-                if (result == true && mounted) {
-                  _loadProducts();
-                }
-              });
+          Consumer<BusinessContext>(
+            builder: (context, bCtx, _) {
+              final isOwner = PermissionService.canEditProduct(bCtx.isOwner);
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isOwner) ...[
+                    IconButton(
+                      icon: const Icon(Icons.price_change_outlined),
+                      tooltip: l10n.translate('product.bulk_adjust.title'),
+                      color: AppColors.textPrimary,
+                      onPressed: () {
+                        Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => BulkAdjustSellingPricePage(
+                              locationId: widget.locationId,
+                            ),
+                          ),
+                        ).then((updated) {
+                          if (updated == true && mounted) {
+                            context.read<ProductBloc>().add(
+                              RefreshProductsRequested(
+                                locationId: widget.locationId,
+                              ),
+                            );
+                          }
+                        });
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.history),
+                      tooltip: 'Lịch sử nhập kho',
+                      color: AppColors.textPrimary,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ImportHistoryPage(),
+                          ),
+                        ).then((result) {
+                          if (result == true && mounted) {
+                            _loadProducts();
+                          }
+                        });
+                      },
+                    ),
+                  ],
+                ],
+              );
             },
           ),
         ],
+        bottom: const AppSyncStatusText(),
       ),
       body: Column(
         children: [
@@ -264,6 +402,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     color: AppColors.textSecondary,
                   ),
                 ),
+                SizedBox(width: AppSpacing.sm),
                 // Barcode Scanner Button
                 Container(
                   decoration: BoxDecoration(
@@ -273,21 +412,14 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                   child: IconButton(
                     icon: const Icon(Icons.qr_code_scanner),
                     onPressed: () async {
-                      var res = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const SimpleBarcodeScannerPage(),
-                        ),
-                      );
-                      if (res is String &&
-                          res != '-1' &&
-                          res.isNotEmpty &&
-                          mounted) {
+                      final res = await AppBarcodeScanner.scan(context);
+                      if (res != null && mounted) {
                         setState(() {
                           _searchController.text = res;
                         });
-                        _searchProducts(res);
+                        if (mounted) {
+                          _searchProducts(res);
+                        }
                       }
                     },
                     color: AppColors.textSecondary,
@@ -301,7 +433,7 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
             builder: (context, state) {
               if (state is ProductsLoaded &&
                   (state.filterStatus != null ||
-                      state.filterCategory != null ||
+                      state.filterBusinessTypeId != null ||
                       state.sortBy != null)) {
                 return Padding(
                   padding: EdgeInsets.symmetric(
@@ -355,33 +487,40 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
           Expanded(
             child: BlocConsumer<ProductBloc, ProductState>(
               listener: (context, state) {
-                if (state is ProductDeleteSuccess) {
+                if (state is BusinessTypesLoaded) {
+                  setState(() {
+                    _businessTypes = state.businessTypes;
+                  });
+                } else if (state is ProductFailure) {
+                  AppSnackBar.show(
+                    context,
+                    message: state.message,
+                    type: AppSnackBarType.error,
+                  );
+                } else if (state is ProductDeleteSuccess) {
                   // Reload the product list after a successful deletion
                   context.read<ProductBloc>().add(
                     LoadProductsByLocationRequested(
                       locationId: widget.locationId,
                     ),
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(l10n.translate('product.delete_success')),
-                      backgroundColor: AppColors.success,
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                  AppSnackBar.show(
+                    context,
+                    message: l10n.translate('product.delete_success'),
+                    type: AppSnackBarType.success,
                   );
                 } else if (state is ProductsLoaded &&
                     state.apiMessage != null &&
                     state.apiMessage!.isNotEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(state.apiMessage!),
-                      backgroundColor: AppColors.primary,
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-                      behavior: SnackBarBehavior.floating,
+                  if (_lastApiMessage != state.apiMessage) {
+                    _lastApiMessage = state.apiMessage;
+                    AppSnackBar.show(
+                      context,
+                      message: state.apiMessage!,
+                      type: AppSnackBarType.info,
                       duration: const Duration(seconds: 2),
-                    ),
-                  );
+                    );
+                  }
                 }
               },
               builder: (context, state) {
@@ -393,154 +532,264 @@ class _ProductManagementPageState extends State<ProductManagementPage> {
                     ),
                   );
                 } else if (state is ProductsLoaded) {
-                  if (state.products.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.shopping_bag_outlined,
-                            size: 64,
-                            color: AppColors.textSecondary,
-                          ),
-                          SizedBox(height: AppSpacing.lg),
-                          Text(
-                            l10n.translate('location.manage_products'),
-                            style: AppTextStyles.titleSmall.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          SizedBox(height: AppSpacing.md),
-                          Text(
-                            l10n.translate('common.no_data'),
-                            style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      context.read<ProductBloc>().add(
-                        RefreshProductsRequested(locationId: widget.locationId),
-                      );
-                    },
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: AppSpacing.sm,
-                        bottom: 80,
-                      ),
-                      itemCount: state.hasReachedMax
-                          ? state.products.length
-                          : state.products.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index >= state.products.length) {
-                          return const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24.0),
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-                        }
-                        final product = state.products[index];
-                        return ProductCardWidget(
-                          product: product,
-                          locationId: widget.locationId,
-                        );
-                      },
-                    ),
-                  );
-                } else if (state is ProductFailure) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error_outline,
-                          size: 64,
-                          color: AppColors.error,
-                        ),
-                        SizedBox(height: AppSpacing.lg),
-                        Text(
-                          l10n.translate('common.error'),
-                          style: AppTextStyles.titleSmall.copyWith(
-                            color: AppColors.error,
-                          ),
-                        ),
-                        SizedBox(height: AppSpacing.md),
-                        Text(
-                          state.message,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
+                  return _buildProductList(
+                    state.products,
+                    state.hasReachedMax,
+                    canManageProducts,
+                    canAdjustStock,
                   );
                 }
 
+                // If state is BusinessTypesLoaded or any other non-loading state,
+                // fallback to the current cached list in the Bloc
                 final currentProducts = context
                     .read<ProductBloc>()
                     .currentProducts;
-
-                if (currentProducts.isNotEmpty &&
-                    state is! ProductLoading &&
-                    state is! ProductDeleteInProgress) {
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      context.read<ProductBloc>().add(
-                        RefreshProductsRequested(locationId: widget.locationId),
-                      );
-                    },
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        top: AppSpacing.sm,
-                        bottom: 80,
-                      ),
-                      itemCount: currentProducts
-                          .length, // Don't show loading indicator at bottom for fallback
-                      itemBuilder: (context, index) {
-                        return ProductCardWidget(
-                          product: currentProducts[index],
-                          locationId: widget.locationId,
-                        );
-                      },
-                    ),
+                if (currentProducts.isNotEmpty) {
+                  return _buildProductList(
+                    currentProducts,
+                    true,
+                    canManageProducts,
+                    canAdjustStock,
                   );
                 }
 
-                return const SizedBox.shrink();
+                return _buildEmptyState(l10n);
               },
             ),
           ),
         ],
       ),
-      floatingActionButton: ProductFabMenuWidget(
-        isOpen: _showFabMenu,
-        onToggle: _toggleFabMenu,
-        onAddProduct: _openAddProductPage,
-        onImportInventory: () {
-          _toggleFabMenu();
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ImportHistoryPage()),
-          ).then((result) {
-            if (result == true && mounted) {
-              _loadProducts();
-            }
-          });
+      floatingActionButton: canManageProducts
+          ? Consumer<BusinessContext>(
+              builder: (context, bCtx, _) {
+                if (!PermissionService.canCreateProduct(bCtx.isOwner)) {
+                  return const SizedBox.shrink();
+                }
+                return ProductFabMenuWidget(
+                  isOpen: _showFabMenu,
+                  onToggle: _toggleFabMenu,
+                  onAddProduct: _openAddProductPage,
+                  onImportInventory: _openImportHistoryPage,
+                );
+              },
+            )
+          : null,
+    );
+  }
+
+  Widget _buildProductList(
+    List<ProductEntity> products,
+    bool hasReachedMax,
+    bool canManageProducts,
+    bool canAdjustStock,
+  ) {
+    if (products.isEmpty) {
+      return _buildEmptyState(AppLocalizations.of(context));
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<ProductBloc>().add(
+          RefreshProductsRequested(locationId: widget.locationId),
+        );
+      },
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: EdgeInsets.only(
+          left: AppSpacing.md,
+          right: AppSpacing.md,
+          top: AppSpacing.sm,
+          bottom: 120,
+        ),
+        itemCount: hasReachedMax ? products.length : products.length + 1,
+        itemBuilder: (context, index) {
+          if (index >= products.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24.0),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+          final product = products[index];
+          return ProductCardWidget(
+            product: product,
+            locationId: widget.locationId,
+            canManageActions: canManageProducts,
+            onQuickAdjustStock: canAdjustStock && product.trackInventory
+                ? () => _showQuickAdjustStockDialog(product)
+                : null,
+          );
         },
       ),
+    );
+  }
+
+  Widget _buildEmptyState(AppLocalizations l10n) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.shopping_bag_outlined,
+            size: 64,
+            color: AppColors.textSecondary,
+          ),
+          SizedBox(height: AppSpacing.lg),
+          Text(
+            l10n.translate('location.manage_products'),
+            style: AppTextStyles.titleSmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.translate('common.no_data'),
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickAdjustStockFormData {
+  final double stock;
+  final String memo;
+  final double? costPrice;
+
+  const _QuickAdjustStockFormData({
+    required this.stock,
+    required this.memo,
+    required this.costPrice,
+  });
+}
+
+class _QuickAdjustStockDialog extends StatefulWidget {
+  final double initialStock;
+  final double? initialCostPrice;
+
+  const _QuickAdjustStockDialog({
+    required this.initialStock,
+    required this.initialCostPrice,
+  });
+
+  @override
+  State<_QuickAdjustStockDialog> createState() =>
+      _QuickAdjustStockDialogState();
+}
+
+class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
+  late final TextEditingController _stockController;
+  late final TextEditingController _memoController;
+  late final TextEditingController _costPriceController;
+
+  @override
+  void initState() {
+    super.initState();
+    _stockController = TextEditingController(
+      text: widget.initialStock.toString(),
+    );
+    _memoController = TextEditingController();
+    _costPriceController = TextEditingController(
+      text: widget.initialCostPrice != null
+          ? CurrencyFormatter.formatNumber(widget.initialCostPrice!)
+          : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _stockController.dispose();
+    _memoController.dispose();
+    _costPriceController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
+    return AlertDialog(
+      title: Text(l10n.translate('product.stock_adjust.title')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _stockController,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                ],
+              ),
+              decoration: InputDecoration(
+                labelText: l10n.translate('product.stock_adjust.stock'),
+              ),
+            ),
+            AppSpacing.gapVerticalMd,
+            TextField(
+              controller: _costPriceController,
+              keyboardType: TextInputType.number,
+              inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                inputFormatters: [CurrencyInputFormatter()],
+              ),
+              decoration: InputDecoration(
+                labelText: l10n.translate('product.stock_adjust.cost_price'),
+              ),
+            ),
+            SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _memoController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: l10n.translate('product.stock_adjust.memo'),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(l10n.translate('common.cancel')),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            final stock = double.tryParse(
+              _stockController.text.trim().replaceAll(',', '.'),
+            );
+            final parsedCostPrice = CurrencyFormatter.parse(
+              _costPriceController.text,
+            );
+
+            if (stock == null || stock < 0) {
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('product.stock_adjust.invalid_stock'),
+                type: AppSnackBarType.error,
+              );
+              return;
+            }
+
+            Navigator.pop(
+              context,
+              _QuickAdjustStockFormData(
+                stock: stock,
+                memo: _memoController.text,
+                costPrice: parsedCostPrice?.toDouble(),
+              ),
+            );
+          },
+          child: Text(l10n.translate('product.stock_adjust.apply_button')),
+        ),
+      ],
     );
   }
 }

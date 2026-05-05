@@ -1,0 +1,584 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/network/api_error_message_parser.dart';
+
+import '../../../../shared/cache/cache_manager.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../data/debtor_repository.dart';
+import '../../data/models/debtor_models.dart';
+import '../../domain/entities/debtor_entity.dart';
+import 'debtor_event.dart';
+import 'debtor_state.dart';
+
+class DebtorBloc extends Bloc<DebtorEvent, DebtorState> {
+  final DebtorRepository repository;
+
+  DebtorBloc({required this.repository}) : super(const DebtorState()) {
+    on<LoadDebtorsRequested>(_onLoadDebtorsRequested);
+    on<DebtorsNetworkDataReceived>(_onDebtorsNetworkDataReceived);
+    on<DebtorsNetworkErrorOccurred>(_onDebtorsNetworkErrorOccurred);
+    on<RefreshDebtorsRequested>(_onRefreshDebtorsRequested);
+    on<SearchDebtorsRequested>(_onSearchDebtorsRequested);
+    on<FilterDebtorsRequested>(_onFilterDebtorsRequested);
+    on<ToggleDebtorStatusRequested>(_onToggleDebtorStatusRequested);
+    on<DeleteDebtorRequested>(_onDeleteDebtorRequested);
+    on<LoadActiveDebtorsByLocationRequested>(_onLoadActiveDebtorsByLocation);
+    on<ActiveDebtorsByLocationNetworkDataReceived>(
+      _onActiveDebtorsByLocationNetworkDataReceived,
+    );
+    on<CreateDebtorRequested>(_onCreateDebtorRequested);
+    on<UpdateDebtorRequested>(_onUpdateDebtorRequested);
+    on<RecordDebtAdjustmentRequested>(_onRecordDebtAdjustmentRequested);
+    on<LoadDebtorDetailRequested>(_onLoadDebtorDetailRequested);
+    on<LoadDebtPaymentHistoryRequested>(_onLoadDebtPaymentHistoryRequested);
+    on<ResetDebtors>(_onResetDebtors);
+  }
+
+  List<DebtorEntity> _debtors = <DebtorEntity>[];
+
+  String _buildDebtorCacheKey({
+    required List<int>? locationIds,
+    required bool? isActive,
+  }) {
+    final businessId = BusinessContext().currentBusinessId ?? 'all';
+    final locationKey = (locationIds == null || locationIds.isEmpty)
+        ? 'all'
+        : locationIds.join('-');
+    final activeKey = isActive == null ? 'all' : (isActive ? '1' : '0');
+    return 'cache_debtors_v2_${businessId}_${locationKey}_$activeKey';
+  }
+
+  Future<void> _onLoadDebtorsRequested(
+    LoadDebtorsRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    // If businessLocationIds change, we need to clear local master list to avoid mixing locations incorrectly
+    final bool locationChanged =
+        !listEquals(event.businessLocationIds, state.businessLocationIds);
+
+    emit(
+      state.copyWith(
+        status: DebtorStatus.loading,
+        errorMessage: null,
+        // We keep the filters, but the data will be reloaded
+        isActive: event.isActive,
+        businessLocationIds: event.businessLocationIds,
+        debtors: locationChanged ? [] : state.debtors,
+      ),
+    );
+
+    final resolvedLocationIds = _resolveBusinessLocationIds(
+      explicit: event.businessLocationIds,
+    );
+
+    final cacheKey = _buildDebtorCacheKey(
+      locationIds: resolvedLocationIds,
+      isActive: event.isActive,
+    );
+
+    await CacheManager().fetchWithSWR<DebtorListResult>(
+      key: cacheKey,
+      fetcher: ({cancelToken}) {
+        return repository.getDebtors(
+          businessLocationIds: resolvedLocationIds,
+          search: null, // Always fetch full list
+          isActive: event.isActive,
+          pageNumber: 1, // Start with page 1
+          pageSize: 200, // Load more for local search
+        );
+      },
+      fromJson: DebtorListResult.fromCacheMap,
+      toJson: (result) => result.toCacheMap(),
+      onData: (result, _) {
+        _debtors = result.items;
+        add(DebtorsNetworkDataReceived(result: result));
+      },
+      onError: (error) {
+        add(DebtorsNetworkErrorOccurred(error: error));
+      },
+    );
+  }
+
+  Future<void> _onRefreshDebtorsRequested(
+    RefreshDebtorsRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    add(
+      LoadDebtorsRequested(
+        businessLocationIds: state.businessLocationIds,
+        search: state.search,
+        isActive: state.isActive,
+        pageNumber: 1,
+      ),
+    );
+  }
+
+  Future<void> _onDebtorsNetworkDataReceived(
+    DebtorsNetworkDataReceived event,
+    Emitter<DebtorState> emit,
+  ) async {
+    if (!isClosed) {
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+      emit(
+        state.copyWith(
+          status: DebtorStatus.success,
+          debtors: filtered,
+          hasReachedMax: true, // Local filtering usually covers current set
+          currentPage: event.result.pageNumber,
+          totalCount: event.result.totalCount,
+          errorMessage: null,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onSearchDebtorsRequested(
+    SearchDebtorsRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    final filtered = _applyLocalFilters(_debtors, event.query, state.isActive);
+    emit(
+      state.copyWith(
+        search: event.query,
+        debtors: filtered,
+        status: DebtorStatus.success,
+      ),
+    );
+  }
+
+  Future<void> _onFilterDebtorsRequested(
+    FilterDebtorsRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    // Some filters (like isActive) might be handled by server and cached,
+    // but we can also handle them locally if master list is broad.
+    // Given current UX needs, if we have local data, we just filter it.
+    final filtered = _applyLocalFilters(_debtors, state.search, event.isActive);
+    emit(
+      state.copyWith(
+        isActive: event.isActive,
+        debtors: filtered,
+        status: DebtorStatus.success,
+      ),
+    );
+  }
+
+  List<DebtorEntity> _applyLocalFilters(
+    List<DebtorEntity> all,
+    String? search,
+    bool? isActive,
+  ) {
+    var result = List<DebtorEntity>.from(all);
+
+    // Filter by isActive
+    if (isActive != null) {
+      result = result.where((d) => d.isActive == isActive).toList();
+    }
+
+    // Filter by search
+    if (search != null && search.trim().isNotEmpty) {
+      final query = search.trim().toLowerCase();
+      result = result.where((d) {
+        final name = d.name.toLowerCase();
+        final phone = d.phone.toLowerCase();
+        return name.contains(query) || phone.contains(query);
+      }).toList();
+    }
+
+    return result;
+  }
+
+  Future<void> _onDebtorsNetworkErrorOccurred(
+    DebtorsNetworkErrorOccurred event,
+    Emitter<DebtorState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.failure,
+          errorMessage: _parseErrorMessage(event.error),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onToggleDebtorStatusRequested(
+    ToggleDebtorStatusRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    try {
+      await repository.updateDebtorStatus(
+        debtorId: event.debtorId,
+        isActive: event.isActive,
+      );
+
+      _debtors = _debtors.map((debtor) {
+        if (debtor.debtorId == event.debtorId) {
+          return debtor.copyWith(isActive: event.isActive);
+        }
+        return debtor;
+      }).toList();
+
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
+      emit(
+        state.copyWith(
+          status: DebtorStatus.success,
+          debtors: filtered,
+          lastMessageCode: event.isActive
+              ? 'DEBTOR_STATUS_ACTIVATED'
+              : 'DEBTOR_STATUS_DEACTIVATED',
+          successMessage: event.isActive
+              ? 'Đã kích hoạt khách nợ'
+              : 'Đã tạm ngưng khách nợ',
+          errorMessage: null,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.failure,
+          errorMessage: _parseErrorMessage(e),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onDeleteDebtorRequested(
+    DeleteDebtorRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    try {
+      await repository.deleteDebtor(
+        debtorId: event.debtorId,
+        force: event.force,
+      );
+
+      _debtors = _debtors
+          .where((debtor) => debtor.debtorId != event.debtorId)
+          .toList();
+
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
+      emit(
+        state.copyWith(
+          status: DebtorStatus.success,
+          debtors: filtered,
+          totalCount: _debtors.length,
+          lastMessageCode: 'DEBTOR_DELETED',
+          successMessage: 'Xóa khách nợ thành công',
+          errorMessage: null,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.failure,
+          errorMessage: _parseErrorMessage(e),
+          lastMessageCode: 'DEBTOR_DELETE_FAILED',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onCreateDebtorRequested(
+    CreateDebtorRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    emit(state.copyWith(isSubmitting: true, errorMessage: null));
+    try {
+      final created = await repository.createDebtor(
+        businessLocationId: event.businessLocationId,
+        name: event.name,
+        phone: event.phone,
+        address: event.address,
+        notes: event.notes,
+        creditLimit: event.creditLimit,
+      );
+
+      if (created != null) {
+        _debtors = [created, ..._debtors];
+      }
+
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
+      emit(
+        state.copyWith(
+          status: DebtorStatus.success,
+          debtors: filtered,
+          debtorDetail: created ?? state.debtorDetail,
+          totalCount: _debtors.length,
+          isSubmitting: false,
+          lastMessageCode: 'DEBTOR_CREATED',
+          successMessage: 'Tạo khách nợ thành công',
+          errorMessage: null,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.failure,
+          isSubmitting: false,
+          errorMessage: _parseErrorMessage(e),
+          lastMessageCode: 'DEBTOR_CREATE_FAILED',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onUpdateDebtorRequested(
+    UpdateDebtorRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    emit(state.copyWith(isSubmitting: true, errorMessage: null));
+    try {
+      final updated = await repository.updateDebtor(
+        debtorId: event.debtorId,
+        name: event.name,
+        phone: event.phone,
+        address: event.address,
+        notes: event.notes,
+        creditLimit: event.creditLimit,
+      );
+
+      if (updated != null) {
+        _debtors = _debtors
+            .map(
+              (debtor) => debtor.debtorId == event.debtorId ? updated : debtor,
+            )
+            .toList();
+      }
+
+      final filtered = _applyLocalFilters(
+        _debtors,
+        state.search,
+        state.isActive,
+      );
+
+      emit(
+        state.copyWith(
+          status: DebtorStatus.success,
+          debtors: filtered,
+          debtorDetail: updated?.debtorId == state.debtorDetail?.debtorId
+              ? updated
+              : state.debtorDetail,
+          isSubmitting: false,
+          lastMessageCode: 'DEBTOR_UPDATED',
+          successMessage: 'Cập nhật thông tin thành công',
+          errorMessage: null,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.failure,
+          isSubmitting: false,
+          errorMessage: _parseErrorMessage(e),
+          lastMessageCode: 'DEBTOR_UPDATE_FAILED',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onRecordDebtAdjustmentRequested(
+    RecordDebtAdjustmentRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    emit(state.copyWith(isSubmitting: true, errorMessage: null));
+    try {
+      await repository.recordDebtAdjustment(
+        debtorId: event.debtorId,
+        amount: event.amount,
+        action: event.action,
+        paymentMethod: event.paymentMethod,
+        notes: event.notes,
+      );
+
+      final detail = await repository.getDebtorDetail(event.debtorId);
+      final history = await repository.getDebtPaymentHistory(event.debtorId);
+
+      if (detail != null) {
+        _debtors = _debtors
+            .map(
+              (debtor) => debtor.debtorId == detail.debtorId ? detail : debtor,
+            )
+            .toList();
+      }
+
+      emit(
+        state.copyWith(
+          status: DebtorStatus.success,
+          debtors: _debtors,
+          debtorDetail: detail ?? state.debtorDetail,
+          paymentHistory: history,
+          isSubmitting: false,
+          lastMessageCode: 'DEBT_ADJUSTMENT_RECORDED',
+          successMessage: 'Đã ghi nhận thay đổi công nợ',
+          errorMessage: null,
+        ),
+      );
+    } catch (e) {
+      emit(
+        state.copyWith(
+          status: DebtorStatus.failure,
+          isSubmitting: false,
+          errorMessage: _parseErrorMessage(e),
+          lastMessageCode: 'DEBT_ADJUSTMENT_FAILED',
+        ),
+      );
+    }
+  }
+
+  Future<void> _onLoadDebtorDetailRequested(
+    LoadDebtorDetailRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    await repository.getDebtorDetailSWR(
+      debtorId: event.debtorId,
+      onData: (detail, _) {
+        if (emit.isDone) return;
+        if (detail != null) {
+          _debtors = _debtors
+              .map(
+                (debtor) =>
+                    debtor.debtorId == detail.debtorId ? detail : debtor,
+              )
+              .toList();
+        }
+        emit(
+          state.copyWith(
+            debtors: _debtors,
+            debtorDetail: detail,
+            errorMessage: null,
+          ),
+        );
+      },
+      onError: (error) {
+        if (emit.isDone) return;
+        emit(state.copyWith(errorMessage: _parseErrorMessage(error)));
+      },
+    );
+  }
+
+  Future<void> _onLoadDebtPaymentHistoryRequested(
+    LoadDebtPaymentHistoryRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    await repository.getDebtPaymentHistorySWR(
+      debtorId: event.debtorId,
+      onData: (history, _) {
+        if (emit.isDone) return;
+        emit(state.copyWith(paymentHistory: history, errorMessage: null));
+      },
+      onError: (error) {
+        if (emit.isDone) return;
+        emit(state.copyWith(errorMessage: _parseErrorMessage(error)));
+      },
+    );
+  }
+
+  Future<void> _onLoadActiveDebtorsByLocation(
+    LoadActiveDebtorsByLocationRequested event,
+    Emitter<DebtorState> emit,
+  ) async {
+    final cacheKey =
+        'cache_debtors_active_location_${BusinessContext().currentBusinessId ?? 'all'}_${event.locationId}';
+
+    await CacheManager().fetchWithSWR<List<DebtorEntity>>(
+      key: cacheKey,
+      fetcher: ({cancelToken}) =>
+          repository.getActiveDebtorsByLocation(event.locationId),
+      fromJson: (json) {
+        // BE returns { "data": [...] } — a direct list, not paginated
+        // DebtorMinimalDto is missing isActive & businessLocationId,
+        // so we inject them after parsing since this endpoint only returns
+        // active debtors for a specific location.
+        final raw = json['data'];
+        List? list;
+        if (raw is List) {
+          list = raw;
+        } else if (raw is Map<String, dynamic> && raw['items'] is List) {
+          list = raw['items'] as List;
+        }
+        if (list == null) return <DebtorEntity>[];
+        return list.whereType<Map<String, dynamic>>().map((m) {
+          // Inject missing fields from the minimal DTO
+          final patched = Map<String, dynamic>.from(m)
+            ..putIfAbsent('isActive', () => true)
+            ..putIfAbsent('businessLocationId', () => event.locationId)
+            ..putIfAbsent('businessLocationName', () => '');
+          return DebtorEntity.fromMap(patched);
+        }).toList();
+      },
+      toJson: (data) {
+        return {'data': data.map((e) => e.toMap()).toList()};
+      },
+      onData: (data, _) {
+        debugPrint(
+          'DebtorBloc._onLoadActiveDebtorsByLocation: loaded ${data.length} debtors for location ${event.locationId}',
+        );
+        // Add event instead of direct emit to avoid BLoC timing issues
+        add(
+          ActiveDebtorsByLocationNetworkDataReceived(
+            debtors: data,
+            locationId: event.locationId,
+          ),
+        );
+      },
+      onError: (error) {
+        debugPrint('DebtorBloc._onLoadActiveDebtorsByLocation error: $error');
+      },
+    );
+  }
+
+  Future<void> _onActiveDebtorsByLocationNetworkDataReceived(
+    ActiveDebtorsByLocationNetworkDataReceived event,
+    Emitter<DebtorState> emit,
+  ) async {
+    if (!isClosed) {
+      emit(
+        state.copyWith(
+          activeDebtorsByLocation: event.debtors,
+          errorMessage: null,
+        ),
+      );
+    }
+  }
+
+  List<int>? _resolveBusinessLocationIds({List<int>? explicit}) {
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    final businessContext = BusinessContext();
+    if (!businessContext.isOwner) {
+      final locationId = int.tryParse(businessContext.currentBusinessId ?? '');
+      if (locationId != null && locationId > 0) {
+        return [locationId];
+      }
+    }
+    return null;
+  }
+
+  String _parseErrorMessage(dynamic error) {
+    return ApiErrorMessageParser.parse(error);
+  }
+
+  void _onResetDebtors(ResetDebtors event, Emitter<DebtorState> emit) {
+    _debtors = [];
+    emit(const DebtorState());
+  }
+}

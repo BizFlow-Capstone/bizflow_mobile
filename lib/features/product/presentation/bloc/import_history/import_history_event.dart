@@ -43,3 +43,12 @@ class UpdateFilters extends ImportHistoryEvent {
     toDate,
   ];
 }
+
+class SearchImportHistory extends ImportHistoryEvent {
+  final String keyword;
+
+  const SearchImportHistory(this.keyword);
+
+  @override
+  List<Object?> get props => [keyword];
+}

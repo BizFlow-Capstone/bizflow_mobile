@@ -46,3 +46,13 @@ app.*.map.json
 
 # Old report files (consolidated to 6 files)
 /report/
+
+# Environment / secret config files
+/config/dev.json
+/config/prod.json
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist
+
+# Documentation files (local only)
+bizflow_screen_description.md
+UI_instructions

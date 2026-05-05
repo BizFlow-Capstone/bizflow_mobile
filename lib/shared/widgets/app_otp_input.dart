@@ -86,7 +86,7 @@ class _AppOtpInputState extends State<AppOtpInput> {
   Widget _buildOtpBox(int index) {
     return Container(
       width: 50,
-      height: 60,
+      height: 76,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         border: Border.all(color: AppColors.divider, width: 2),
@@ -102,9 +102,10 @@ class _AppOtpInputState extends State<AppOtpInput> {
         decoration: const InputDecoration(
           counterText: '',
           border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
+          contentPadding: EdgeInsets.symmetric(vertical: 0),
+          isCollapsed: true,
         ),
-        style: AppTextStyles.headlineMedium.copyWith(
+        style: AppTextStyles.titleLarge.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,
         ),

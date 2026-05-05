@@ -11,8 +11,19 @@ enum ImportActionStatus {
   failure,
 }
 
+enum ImportActionType {
+  none,
+  create,
+  update,
+  confirm,
+  delete,
+  loadDetail,
+  loadTemplate,
+}
+
 class ImportActionState extends Equatable {
   final ImportActionStatus status;
+  final ImportActionType actionType;
   final ImportDetailModel? importDetail;
   final String? templateJson;
   final String? successMessage;
@@ -20,6 +31,7 @@ class ImportActionState extends Equatable {
 
   const ImportActionState({
     this.status = ImportActionStatus.initial,
+    this.actionType = ImportActionType.none,
     this.importDetail,
     this.templateJson,
     this.successMessage,
@@ -28,6 +40,7 @@ class ImportActionState extends Equatable {
 
   ImportActionState copyWith({
     ImportActionStatus? status,
+    ImportActionType? actionType,
     ImportDetailModel? importDetail,
     String? templateJson,
     String? successMessage,
@@ -35,6 +48,7 @@ class ImportActionState extends Equatable {
   }) {
     return ImportActionState(
       status: status ?? this.status,
+      actionType: actionType ?? this.actionType,
       importDetail: importDetail ?? this.importDetail,
       templateJson: templateJson ?? this.templateJson,
       successMessage: successMessage, // deliberate, can be null
@@ -45,6 +59,7 @@ class ImportActionState extends Equatable {
   @override
   List<Object?> get props => [
     status,
+    actionType,
     importDetail,
     templateJson,
     successMessage,

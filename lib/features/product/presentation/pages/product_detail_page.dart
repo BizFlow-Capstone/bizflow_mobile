@@ -1,16 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../../../shared/services/permission_service.dart';
 import '../../domain/entities/product_entity.dart';
+import '../../domain/entities/product_history_entities.dart';
+import '../../data/product_repository.dart';
 import 'edit_product_page.dart';
+import '../bloc/product_bloc.dart';
+import '../bloc/product_event.dart';
+import '../bloc/product_state.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 
 /// Product Detail Page
 /// Displays detailed information about a product
-class ProductDetailPage extends StatelessWidget {
+class ProductDetailPage extends StatefulWidget {
   final ProductEntity product;
   final String locationId;
 
@@ -21,41 +34,274 @@ class ProductDetailPage extends StatelessWidget {
   });
 
   @override
+  State<ProductDetailPage> createState() => _ProductDetailPageState();
+}
+
+class _ProductDetailPageState extends State<ProductDetailPage> {
+  late ProductEntity _currentProduct;
+  bool _isCostHistoryLoading = false;
+  String? _costHistoryError;
+  double _historyCurrentCostPrice = 0;
+  List<_CostPriceHistoryItem> _costPriceHistory = const [];
+
+  // BLoC handles Price Policies and Stock Movements history now
+
+
+  ProductRepository get _repository => context.read<ProductBloc>().repository;
+
+  String _formatStock(double value) {
+    if (value % 1 == 0) {
+      return value.toInt().toString();
+    }
+    return value.toString();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _currentProduct = widget.product;
+    // Trigger loading full details and history
+    context.read<ProductBloc>().add(
+      LoadProductDetailRequested(productId: widget.product.id),
+    );
+    _loadCostPriceHistory();
+  }
+
+
+
+  Future<void> _loadCostPriceHistory() async {
+    if (mounted) {
+      setState(() {
+        _isCostHistoryLoading = true;
+        _costHistoryError = null;
+      });
+    }
+
+    try {
+      final response = await _repository.getProductCostPriceHistory(
+        _currentProduct.id,
+      );
+      final data = _extractCostPriceHistoryData(response);
+
+      if (!mounted) return;
+      setState(() {
+        _historyCurrentCostPrice = data.$1;
+        _costPriceHistory = data.$2;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _costHistoryError = ApiErrorMessageParser.parse(e);
+        _costPriceHistory = const [];
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isCostHistoryLoading = false);
+      }
+    }
+  }
+
+  (double, List<_CostPriceHistoryItem>) _extractCostPriceHistoryData(
+    dynamic response,
+  ) {
+    Map<String, dynamic>? payload;
+    if (response is Map<String, dynamic>) {
+      final data = response['data'];
+      if (data is Map<String, dynamic>) {
+        payload = data;
+      } else {
+        payload = response;
+      }
+    }
+
+    if (payload == null) {
+      return (0, const []);
+    }
+
+    double parseDouble(dynamic value) {
+      if (value == null) return 0;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
+    DateTime? parseDate(dynamic value) {
+      if (value is String && value.isNotEmpty) {
+        return DateFormatter.parseApiDateTime(value);
+      }
+      return null;
+    }
+
+    final rawHistory = payload['history'];
+    final items = rawHistory is List
+        ? rawHistory
+              .map((item) {
+                if (item is! Map<String, dynamic>) return null;
+                return _CostPriceHistoryItem(
+                  importCode: (item['importCode'] ?? '').toString(),
+                  costPrice: parseDouble(item['costPrice']),
+                  quantity: parseInt(item['quantity']),
+                  totalPrice: parseDouble(item['totalPrice']),
+                  supplier: (item['supplier'] ?? '').toString(),
+                  receivedAt: parseDate(item['receivedAt']),
+                  createdAt: parseDate(item['createdAt']),
+                );
+              })
+              .whereType<_CostPriceHistoryItem>()
+              .toList()
+        : <_CostPriceHistoryItem>[];
+
+    return (parseDouble(payload['currentCostPrice']), items);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: _buildAppBar(context, l10n),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(AppSpacing.md),
+    return BlocBuilder<ProductBloc, ProductState>(
+      buildWhen: (previous, current) =>
+          current is ProductDetailLoaded &&
+          current.product.id == widget.product.id,
+      builder: (context, state) {
+        if (state is ProductDetailLoaded) {
+          _currentProduct = state.product;
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: _buildAppBar(context, l10n),
+          body: RefreshIndicator(
+            onRefresh: () async {
+              context.read<ProductBloc>().add(
+                LoadProductDetailRequested(productId: widget.product.id),
+              );
+              context.read<ProductBloc>().add(
+                LoadProductPriceHistoryRequested(productId: widget.product.id),
+              );
+              context.read<ProductBloc>().add(
+                LoadProductStockMovementsRequested(productId: widget.product.id),
+              );
+              await _loadCostPriceHistory();
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.all(AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image Section
+                  _buildImageSection(),
+                  SizedBox(height: AppSpacing.md),
+
+                  // Product Details Section
+                  _buildProductDetailsSection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Supplier Section (if available)
+                  _buildSupplierSection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Stock Location Section
+                  _buildStockLocationSection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Unit Conversion Section
+                  _buildUnitConversionSection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Barcode Section
+                  _buildBarcodeSection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Price Section
+                  _buildPriceSection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+
+                  // Cost Price History Section
+                  _buildCostPriceHistorySection(context, l10n),
+                  SizedBox(height: AppSpacing.lg),
+                  
+                  if (state is ProductDetailLoaded) ...[
+                    // Price Policy History Section
+                    _buildPricePolicyHistorySection(context, l10n, state),
+                    SizedBox(height: AppSpacing.lg),
+
+                    // Stock Movement History Section
+                    _buildStockMovementHistorySection(context, l10n, state),
+                  ],
+                  
+                  const SafeArea(
+                    top: false,
+                    child: SizedBox(height: AppSpacing.xl),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildImageSection() {
+    if (_currentProduct.imageUrl == null || _currentProduct.imageUrl!.isEmpty) {
+      return Container(
+        height: 200,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.divider),
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Product Details Section
-            _buildProductDetailsSection(context, l10n),
-            SizedBox(height: AppSpacing.lg),
-
-            // Supplier Section (if available)
-            _buildSupplierSection(context, l10n),
-            SizedBox(height: AppSpacing.lg),
-
-            // Stock Location Section
-            _buildStockLocationSection(context, l10n),
-            SizedBox(height: AppSpacing.lg),
-
-            // Unit Conversion Section
-            _buildUnitConversionSection(context, l10n),
-            SizedBox(height: AppSpacing.lg),
-
-            // Barcode Section
-            _buildBarcodeSection(context, l10n),
-            SizedBox(height: AppSpacing.lg),
-
-            // Price Section
-            _buildPriceSection(context, l10n),
-            const SafeArea(top: false, child: SizedBox(height: AppSpacing.xl)),
+            Icon(
+              Icons.image_not_supported_outlined,
+              size: 48,
+              color: AppColors.textSecondary.withOpacity(0.5),
+            ),
+            SizedBox(height: AppSpacing.sm),
+            Text(
+              'No image available',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
           ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: CachedNetworkImage(
+          imageUrl: _currentProduct.imageUrl!,
+          fit: BoxFit.cover,
+          placeholder: (context, url) =>
+              const Center(child: CircularProgressIndicator()),
+          errorWidget: (context, url, error) => Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              size: 48,
+              color: AppColors.error.withOpacity(0.5),
+            ),
+          ),
         ),
       ),
     );
@@ -65,6 +311,10 @@ class ProductDetailPage extends StatelessWidget {
     BuildContext context,
     AppLocalizations? l10n,
   ) {
+    final isOwner = context.watch<BusinessContext>().isOwner;
+    final canAdjustStock = PermissionService.canAdjustStock(isOwner);
+    final canEditProduct = PermissionService.canEditProduct(isOwner);
+
     return AppBar(
       backgroundColor: AppColors.white,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
@@ -78,48 +328,240 @@ class ProductDetailPage extends StatelessWidget {
         style: AppTextStyles.titleMedium.copyWith(color: AppColors.textPrimary),
       ),
       actions: [
-        Padding(
-          padding: EdgeInsets.only(right: AppSpacing.md),
-          child: Center(
-            child: GestureDetector(
-              onTap: () async {
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EditProductPage(
-                      productId: product.id,
-                      locationId: locationId,
-                      productName: product.name,
-                      barcode: product.barcode,
-                      category: product.category,
-                      costPrice: product.costPrice,
-                      salePrice: product.salePrice,
-                      quantity: product.quantity,
-                      unit: product.unit,
-                      description: product.description,
-                      isActive: product.isActive,
-                      businessTypeId: product.businessTypeId,
-                      manufacturer: product.manufacturer,
+        if (canAdjustStock && _currentProduct.trackInventory)
+          IconButton(
+            icon: const Icon(Icons.inventory_2_outlined),
+            tooltip:
+                l10n?.translate('product.stock_adjust.title') ??
+                'Chỉnh tồn kho',
+            onPressed: () => _showAdjustStockDialog(l10n),
+          ),
+        if (canEditProduct)
+          Padding(
+            padding: EdgeInsets.only(right: AppSpacing.md),
+            child: Center(
+              child: GestureDetector(
+                onTap: () async {
+                  final result = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditProductPage(
+                        productId: _currentProduct.id,
+                        locationId: widget.locationId,
+                        productName: _currentProduct.name,
+                        barcode: _currentProduct.barcode,
+                        category: _currentProduct.category,
+                        costPrice: _currentProduct.costPrice,
+                        salePrice: _currentProduct.salePrice,
+                        quantity: _currentProduct.quantity,
+                        unit: _currentProduct.unit,
+                        description: _currentProduct.description,
+                        isActive: _currentProduct.isActive,
+                        trackInventory: _currentProduct.trackInventory,
+                        businessTypeId: _currentProduct.businessTypeId,
+                        manufacturer: _currentProduct.manufacturer,
+                        imageUrl: _currentProduct.imageUrl,
+                      ),
                     ),
+                  );
+                  if (result == true && context.mounted) {
+                    // Pop back to product management screen to reload the list
+                    Navigator.pop(context, true);
+                  }
+                },
+                child: Text(
+                  l10n?.translate('common.edit') ?? 'Chỉnh sửa',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
                   ),
-                );
-                if (result == true && context.mounted) {
-                  // Pop back to product management screen to reload the list
-                  Navigator.pop(context, true);
-                }
-              },
-              child: Text(
-                l10n?.translate('common.edit') ?? 'Chỉnh sửa',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
-        ),
       ],
     );
+  }
+
+  Future<void> _showAdjustStockDialog(AppLocalizations? l10n) async {
+    final stockController = TextEditingController(
+      text: _formatStock(_currentProduct.quantity),
+    );
+    final memoController = TextEditingController();
+    final costPriceController = TextEditingController(
+      text: _currentProduct.costPrice != null
+          ? CurrencyFormatter.formatNumber(_currentProduct.costPrice!)
+          : '',
+    );
+    bool isSubmitting = false;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                l10n?.translate('product.stock_adjust.title') ??
+                    'Chỉnh tồn kho',
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: stockController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[0-9.,]'),
+                          ),
+                        ],
+                      ),
+                      decoration: InputDecoration(
+                        labelText:
+                            l10n?.translate('product.stock_adjust.stock') ??
+                            'Tồn kho mới',
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: costPriceController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                        inputFormatters: [CurrencyInputFormatter()],
+                      ),
+                      decoration: InputDecoration(
+                        labelText:
+                            l10n?.translate(
+                              'product.stock_adjust.cost_price',
+                            ) ??
+                            'Giá nhập (tùy chọn)',
+                      ),
+                    ),
+                    SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: memoController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText:
+                            l10n?.translate('product.stock_adjust.memo') ??
+                            'Ghi chú',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: Text(l10n?.translate('common.cancel') ?? 'Hủy'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          final stock = double.tryParse(
+                            stockController.text.trim().replaceAll(',', '.'),
+                          );
+                          final parsedCostPrice = CurrencyFormatter.parse(
+                            costPriceController.text,
+                          );
+
+                          if (stock == null || stock < 0) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  l10n?.translate(
+                                        'product.stock_adjust.invalid_stock',
+                                      ) ??
+                                      'Tồn kho không hợp lệ',
+                                ),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() => isSubmitting = true);
+                          try {
+                            await _repository.adjustProductStock(
+                              productId: _currentProduct.id,
+                              stock: stock,
+                              memo: memoController.text,
+                              costPrice: parsedCostPrice?.toDouble(),
+                            );
+
+                            if (!mounted) return;
+                            Navigator.pop(dialogContext);
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    l10n?.translate(
+                                          'product.stock_adjust.success',
+                                        ) ??
+                                        'Cập nhật tồn kho thành công',
+                                  ),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+
+                            if (mounted) {
+                              context.read<ProductBloc>().add(
+                                LoadProductDetailRequested(
+                                  productId: _currentProduct.id,
+                                ),
+                              );
+                              context.read<ProductBloc>().add(
+                                LoadProductsByLocationRequested(
+                                  locationId: widget.locationId,
+                                ),
+                              );
+                              _loadCostPriceHistory();
+                            }
+                          } catch (e) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context)..removeCurrentSnackBar()..showSnackBar(
+                              SnackBar(
+                                content: Text(ApiErrorMessageParser.parse(e)),
+                                backgroundColor: AppColors.error,
+                              ),
+                            );
+                            setDialogState(() => isSubmitting = false);
+                          }
+                        },
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(
+                          l10n?.translate(
+                                'product.stock_adjust.apply_button',
+                              ) ??
+                              'Xác nhận',
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    stockController.dispose();
+    memoController.dispose();
+    costPriceController.dispose();
   }
 
   Widget _buildProductDetailsSection(
@@ -150,53 +592,36 @@ class ProductDetailPage extends StatelessWidget {
           // Product Name
           _buildDetailRow(
             label: l10n?.translate('product.name') ?? 'Tên sản phẩm',
-            value: product.name,
+            value: _currentProduct.name,
           ),
           SizedBox(height: AppSpacing.sm),
 
           // SKU/Barcode
-          if (product.barcode != null)
+          if (_currentProduct.barcode != null)
             Column(
               children: [
                 _buildDetailRow(
                   label:
                       l10n?.translate('product.detail.sku') ??
                       'Mã vạch / SKU ID',
-                  value: product.barcode!,
+                  value: _currentProduct.barcode!,
                 ),
                 SizedBox(height: AppSpacing.sm),
               ],
             ),
 
           // Unit
-          if (product.unit != null)
+          if (_currentProduct.unit != null)
             Column(
               children: [
                 _buildDetailRow(
                   label: l10n?.translate('product.unit') ?? 'Đơn vị',
-                  value: product.unit!,
+                  value: _currentProduct.unit!,
                 ),
                 SizedBox(height: AppSpacing.sm),
               ],
             ),
 
-          // Expiry Date (if available in data)
-          _buildDetailRow(
-            label:
-                l10n?.translate('product.detail.expiry_date') ?? 'Ngày hết hạn',
-            value: product.createdAt != null
-                ? _formatDate(product.createdAt!)
-                : l10n?.translate('common.no_data') ?? 'Không có',
-          ),
-          SizedBox(height: AppSpacing.sm),
-
-          // Min Stock
-          _buildDetailRow(
-            label:
-                l10n?.translate('product.detail.min_stock') ??
-                'Định mức tồn kho tối thiểu',
-            value: '${product.quantity}',
-          ),
           SizedBox(height: AppSpacing.sm),
 
           // Status
@@ -204,7 +629,7 @@ class ProductDetailPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                l10n?.translate('product.detail.status') ?? 'Đạo hạn',
+                l10n?.translate('product.detail.status') ?? 'Trạng thái',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -216,16 +641,17 @@ class ProductDetailPage extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  color: product.isActive ? AppColors.success : AppColors.error,
+                  color: _currentProduct.isActive
+                      ? AppColors.success
+                      : AppColors.error,
                 ),
                 child: Text(
-                  product.isActive
-                      ? (l10n?.translate('product.detail.status_in_stock') ??
-                            'Đủ dùng')
-                      : (l10n?.translate(
-                              'product.detail.status_out_of_stock',
-                            ) ??
-                            'Hết hàng'),
+                  _currentProduct.statusLabel ??
+                      (_currentProduct.isActive
+                      ? (l10n?.translate('product.detail.status_active') ??
+                        'Đang hoạt động')
+                      : (l10n?.translate('product.detail.status_inactive') ??
+                        'Ngừng hoạt động')),
                   style: AppTextStyles.bodySmall.copyWith(
                     color: AppColors.white,
                     fontWeight: FontWeight.w600,
@@ -240,6 +666,8 @@ class ProductDetailPage extends StatelessWidget {
   }
 
   Widget _buildSupplierSection(BuildContext context, AppLocalizations? l10n) {
+    final noData = l10n?.translate('common.no_data') ?? 'Không có';
+
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -260,37 +688,16 @@ class ProductDetailPage extends StatelessWidget {
           ),
           SizedBox(height: AppSpacing.md),
 
-          // Supplier Name
+          // Manufacturer Name
           _buildDetailRow(
             label:
                 l10n?.translate('product.detail.supplier_name') ??
                 'Tên nhà sản xuất',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
-          ),
-          SizedBox(height: AppSpacing.sm),
-
-          // Contact
-          _buildDetailRow(
-            label:
-                l10n?.translate('product.detail.supplier_contact') ??
-                'Số liên lạc',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
-          ),
-          SizedBox(height: AppSpacing.sm),
-
-          // Contact Person
-          _buildDetailRow(
-            label:
-                l10n?.translate('product.detail.contact_person') ??
-                'Người liên hệ',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
-          ),
-          SizedBox(height: AppSpacing.sm),
-
-          // Address
-          _buildDetailRow(
-            label: l10n?.translate('product.detail.address') ?? 'Địa chỉ',
-            value: l10n?.translate('common.no_data') ?? 'Không có',
+            value:
+                (_currentProduct.manufacturer != null &&
+                    _currentProduct.manufacturer!.isNotEmpty)
+                ? _currentProduct.manufacturer!
+                : noData,
           ),
         ],
       ),
@@ -350,13 +757,14 @@ class ProductDetailPage extends StatelessWidget {
           ),
           SizedBox(height: AppSpacing.md),
 
-          // Table Row (Sample)
+          // Table Row
           Row(
             children: [
               Expanded(
                 child: Text(
-                  l10n?.translate('product.detail.default_warehouse') ??
-                      'Kho Quận 1',
+                  _currentProduct.businessLocationName ??
+                      l10n?.translate('product.detail.default_warehouse') ??
+                      'Kho chính',
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textPrimary,
                   ),
@@ -366,7 +774,7 @@ class ProductDetailPage extends StatelessWidget {
               SizedBox(
                 width: 60,
                 child: Text(
-                  '${product.quantity}',
+                  _formatStock(_currentProduct.quantity),
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w600,
@@ -385,6 +793,8 @@ class ProductDetailPage extends StatelessWidget {
     BuildContext context,
     AppLocalizations? l10n,
   ) {
+    if (_currentProduct.saleItems.length <= 1) return const SizedBox.shrink();
+
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -411,8 +821,7 @@ class ProductDetailPage extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  l10n?.translate('product.detail.conversion_unit') ??
-                      'Tên kho bán đầu',
+                  l10n?.translate('product.detail.conversion_unit') ?? 'Đơn vị',
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -421,9 +830,22 @@ class ProductDetailPage extends StatelessWidget {
               ),
               SizedBox(width: AppSpacing.md),
               SizedBox(
-                width: 60,
+                width: 100,
                 child: Text(
-                  l10n?.translate('product.detail.conversion_qty') ?? 'Tồn kho',
+                  l10n?.translate('product.detail.conversion_qty') ??
+                      'Số lượng',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(width: AppSpacing.md),
+              SizedBox(
+                width: 100,
+                child: Text(
+                  l10n?.translate('product.sale_price') ?? 'Giá bán',
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
@@ -433,65 +855,67 @@ class ProductDetailPage extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: AppSpacing.md),
+          const Divider(),
+          SizedBox(height: AppSpacing.sm),
 
-          // Sample Row
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n?.translate('product.detail.default_unit') ?? 'Lốc',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              SizedBox(width: AppSpacing.md),
-              SizedBox(
-                width: 60,
-                child: Text(
-                  '${(product.quantity) ~/ 10}',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                  textAlign: TextAlign.right,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: AppSpacing.md),
+          // Dynamic Rows (Skip the item that matches the base unit)
+          ..._currentProduct.saleItems
+              .where((item) {
+                final itemUnit = item['unit'] ?? item['Unit'] ?? '';
+                return itemUnit != _currentProduct.unit;
+              })
+              .map((item) {
+                final unit = item['unit'] ?? item['Unit'] ?? '';
+                final qty = item['quantity'] ?? item['Quantity'] ?? 0;
+                final price = item['price'] ?? item['Price'] ?? 0;
 
-          // Sample Row 2
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n?.translate('product.detail.default_unit2') ?? 'Lon',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
+                return Padding(
+                  padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          unit.toString(),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: AppSpacing.md),
+                      SizedBox(
+                        width: 100,
+                        child: Text(
+                          '1 $unit = $qty ${_currentProduct.unit ?? ''}',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      SizedBox(width: AppSpacing.md),
+                      SizedBox(
+                        width: 100,
+                        child: Text(
+                          _formatPrice(price.toDouble()),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-              SizedBox(width: AppSpacing.md),
-              SizedBox(
-                width: 60,
-                child: Text(
-                  '${product.quantity}',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.textPrimary,
-                  ),
-                  textAlign: TextAlign.right,
-                ),
-              ),
-            ],
-          ),
+                );
+              }),
         ],
       ),
     );
   }
 
   Widget _buildBarcodeSection(BuildContext context, AppLocalizations? l10n) {
-    if (product.barcode == null) return SizedBox.shrink();
+    final barcodeValue = (_currentProduct.barcode ?? '').trim();
+    if (barcodeValue.isEmpty) return SizedBox.shrink();
 
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -512,44 +936,93 @@ class ProductDetailPage extends StatelessWidget {
             ),
           ),
           SizedBox(height: AppSpacing.md),
+          Center(child: _buildBarcodeCard(barcodeValue)),
+          SizedBox(height: AppSpacing.sm),
+        ],
+      ),
+    );
+  }
 
-          // Barcode Display (placeholder for actual barcode image)
-          Center(
-            child: Container(
-              padding: EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  // Barcode placeholder
-                  Container(
-                    height: 80,
-                    width: 150,
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Center(
-                      child: Text(
-                        product.barcode ?? '',
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
+  // Widget _buildQrCodeCard(String value) {
+  //   return Container(
+  //     width: 180,
+  //     padding: EdgeInsets.all(AppSpacing.sm),
+  //     decoration: BoxDecoration(
+  //       border: Border.all(color: AppColors.divider),
+  //       borderRadius: BorderRadius.circular(8),
+  //       color: AppColors.white,
+  //     ),
+  //     child: Column(
+  //       children: [
+  //         QrImageView(
+  //           data: value,
+  //           size: 140,
+  //           backgroundColor: AppColors.white,
+  //           eyeStyle: const QrEyeStyle(
+  //             eyeShape: QrEyeShape.square,
+  //             color: Colors.black,
+  //           ),
+  //           dataModuleStyle: const QrDataModuleStyle(
+  //             dataModuleShape: QrDataModuleShape.square,
+  //             color: Colors.black,
+  //           ),
+  //         ),
+  //         SizedBox(height: AppSpacing.xs),
+  //         Text(
+  //           'QR',
+  //           style: AppTextStyles.bodySmall.copyWith(
+  //             color: AppColors.textSecondary,
+  //             fontWeight: FontWeight.w600,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  Widget _buildBarcodeCard(String value) {
+    return Container(
+      width: 240,
+      padding: EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(8),
+        color: AppColors.white,
+      ),
+      child: Column(
+        children: [
+          BarcodeWidget(
+            barcode: Barcode.code128(),
+            data: value,
+            width: 220,
+            height: 80,
+            color: Colors.black,
+            backgroundColor: AppColors.white,
+            drawText: false,
+            errorBuilder: (context, error) {
+              return Container(
+                width: 220,
+                height: 80,
+                alignment: Alignment.center,
+                color: AppColors.background,
+                child: Text(
+                  'Barcode không hợp lệ',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                  SizedBox(height: AppSpacing.sm),
-                  Text(
-                    product.barcode ?? '',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              );
+            },
+          ),
+          SizedBox(height: AppSpacing.xs),
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -558,7 +1031,8 @@ class ProductDetailPage extends StatelessWidget {
   }
 
   Widget _buildPriceSection(BuildContext context, AppLocalizations? l10n) {
-    final profit = (product.salePrice ?? 0) - (product.costPrice ?? 0);
+    final profit =
+        (_currentProduct.salePrice ?? 0) - (_currentProduct.costPrice ?? 0);
 
     return Container(
       padding: EdgeInsets.all(AppSpacing.md),
@@ -583,14 +1057,14 @@ class ProductDetailPage extends StatelessWidget {
           // Cost Price
           _buildPriceRow(
             label: l10n?.translate('product.cost_price') ?? 'Giá vốn',
-            value: _formatPrice(product.costPrice ?? 0),
+            value: _formatPrice(_currentProduct.costPrice ?? 0),
           ),
           SizedBox(height: AppSpacing.sm),
 
           // Sale Price
           _buildPriceRow(
             label: l10n?.translate('product.sale_price') ?? 'Giá bán',
-            value: _formatPrice(product.salePrice ?? 0),
+            value: _formatPrice(_currentProduct.salePrice ?? 0),
             valueColor: AppColors.primary,
           ),
           SizedBox(height: AppSpacing.sm),
@@ -601,6 +1075,466 @@ class ProductDetailPage extends StatelessWidget {
             value: _formatPrice(profit),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCostPriceHistorySection(
+    BuildContext context,
+    AppLocalizations? l10n,
+  ) {
+    String formatDate(DateTime? value) {
+      if (value == null) return '--';
+      return DateFormatter.formatDateTime(value);
+    }
+
+    final title =
+        l10n?.translate('product.detail.cost_history_title') ??
+        'Lịch sử chỉnh giá vốn';
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(12),
+        color: AppColors.white,
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          shape: const RoundedRectangleBorder(side: BorderSide.none),
+          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+          tilePadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          childrenPadding: EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: AppSpacing.md,
+          ),
+          title: Text(
+            title,
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            '${l10n?.translate('product.detail.current_cost_price') ?? 'Giá vốn hiện tại'}: ${_formatPrice(_historyCurrentCostPrice)}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          children: [
+            if (_isCostHistoryLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_costHistoryError != null)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _costHistoryError!,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadCostPriceHistory,
+                    child: Text(l10n?.translate('common.retry') ?? 'Thử lại'),
+                  ),
+                ],
+              )
+            else if (_costPriceHistory.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.no_cost_history') ??
+                      'Chưa có lịch sử giá vốn',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              )
+            else
+              Padding(
+                padding: EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.cost_history_note') ??
+                      'Chỉ hiển thị các lần nhập kho đã xác nhận. Số lượng là theo từng lần nhập.',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            if (_costPriceHistory.isNotEmpty)
+              ..._costPriceHistory.map(
+                (item) => Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.importCode.isNotEmpty ? item.importCode : '#',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '${l10n?.translate('product.cost_price') ?? 'Giá vốn'}: ${_formatPrice(item.costPrice)}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '${l10n?.translate('product.detail.cost_history_import_qty') ?? 'Số lượng nhập'}: ${item.quantity}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '${l10n?.translate('stock_import.receipt_total') ?? 'Tổng tiền'}: ${_formatPrice(item.totalPrice)}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (item.supplier.isNotEmpty)
+                        Text(
+                          '${l10n?.translate('stock_import.receipt_supplier') ?? 'Nhà cung cấp'}: ${item.supplier}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      Text(
+                        '${l10n?.translate('stock_import.receipt_date') ?? 'Ngày nhập'}: ${formatDate(item.receivedAt ?? item.createdAt)}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPricePolicyHistorySection(
+    BuildContext context,
+    AppLocalizations? l10n,
+    ProductDetailLoaded state,
+  ) {
+    String formatDate(DateTime? value) {
+      if (value == null) return '--';
+      return DateFormatter.formatDateTime(value);
+    }
+
+    final title =
+        l10n?.translate('product.detail.price_history_title') ??
+        'Lịch sử thay đổi giá bán';
+
+    DateTime policySortKey(ProductPricePolicyEntity policy) {
+      return policy.startAt ?? policy.endAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
+    final sortedSaleItems = state.priceHistory
+        .map(
+          (saleItem) => ProductSaleItemHistoryEntity(
+            saleItemId: saleItem.saleItemId,
+            unit: saleItem.unit,
+            quantity: saleItem.quantity,
+            pricePolicies: List<ProductPricePolicyEntity>.from(saleItem.pricePolicies)
+              ..sort((a, b) {
+                final timeCompare = policySortKey(b).compareTo(policySortKey(a));
+                if (timeCompare != 0) return timeCompare;
+                return b.id.compareTo(a.id);
+              }),
+          ),
+        )
+        .toList()
+      ..sort((a, b) {
+        final aKey = a.pricePolicies.isNotEmpty
+            ? policySortKey(a.pricePolicies.first)
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final bKey = b.pricePolicies.isNotEmpty
+            ? policySortKey(b.pricePolicies.first)
+            : DateTime.fromMillisecondsSinceEpoch(0);
+        final timeCompare = bKey.compareTo(aKey);
+        if (timeCompare != 0) return timeCompare;
+        return b.saleItemId.compareTo(a.saleItemId);
+      });
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          shape: const RoundedRectangleBorder(side: BorderSide.none),
+          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+          tilePadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          childrenPadding: EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: AppSpacing.md,
+          ),
+          title: Text(
+            title,
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            '${l10n?.translate('product.detail.current_sale_price') ?? 'Giá bán hiện tại'}: ${_formatPrice(_currentProduct.salePrice ?? 0)}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          children: [
+            if (state.isLoadingPriceHistory)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (state.priceHistory.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.price_history_no_data') ??
+                      'Chưa có lịch sử điều chỉnh giá bán',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              )
+            else
+              ...sortedSaleItems.map((saleItem) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      child: Text(
+                        '${l10n?.translate('product.unit') ?? 'Đơn vị'}: ${saleItem.unit} (x${saleItem.quantity})',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    ...saleItem.pricePolicies.map((policy) {
+                      return Container(
+                        width: double.infinity,
+                        margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                        padding: EdgeInsets.all(AppSpacing.sm),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.divider),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _formatPrice(policy.price),
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                if (policy.isDefault)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      l10n?.translate('product.price_policy.default') ?? 'Mặc định',
+                                      style: AppTextStyles.bodySmall.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: AppSpacing.xs),
+                            Text(
+                              '${l10n?.translate('product.price_policy.start_at') ?? 'Bắt đầu'}: ${formatDate(policy.startAt)}',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            if (policy.endAt != null)
+                              Text(
+                                '${l10n?.translate('product.price_policy.end_at') ?? 'Kết thúc'}: ${formatDate(policy.endAt)}',
+                                style: AppTextStyles.bodySmall.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const Divider(),
+                  ],
+                );
+              }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStockMovementHistorySection(
+    BuildContext context,
+    AppLocalizations? l10n,
+    ProductDetailLoaded state,
+  ) {
+    String formatDate(DateTime? value) {
+      if (value == null) return '--';
+      return DateFormatter.formatDateTime(value);
+    }
+
+    final title =
+        l10n?.translate('product.detail.stock_movement_title') ??
+        'Lịch sử xuất nhập kho';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          shape: const RoundedRectangleBorder(side: BorderSide.none),
+          collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
+          tilePadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          childrenPadding: EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: AppSpacing.md,
+          ),
+          title: Text(
+            title,
+            style: AppTextStyles.titleMedium.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            '${l10n?.translate('product.detail.current_stock') ?? 'Tồn kho hiện tại'}: ${_formatStock(_currentProduct.quantity)} ${_currentProduct.unit ?? ''}'.trim(),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          children: [
+            if (state.isLoadingStockMovements)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (state.stockMovements.isEmpty)
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Text(
+                  l10n?.translate('product.detail.stock_movement_no_data') ??
+                      'Chưa có lịch sử xuất nhập kho',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              )
+            else
+              ...state.stockMovements.map((movement) {
+                final isPositive = movement.quantityChange > 0;
+                final color = isPositive ? AppColors.success : AppColors.error;
+                final prefix = isPositive ? '+' : '';
+
+                return Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.only(bottom: AppSpacing.sm),
+                  padding: EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n?.translate(movement.actionLabel) ?? movement.actionLabel,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '$prefix${movement.quantityChange} ${movement.unit}',
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '${l10n?.translate('product.detail.balance') ?? 'Số dư'}: ${movement.balanceAfter} ${movement.unit}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        formatDate(movement.createdAt),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (movement.notes != null && movement.notes!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '${l10n?.translate('common.notes') ?? 'Ghi chú'}: ${movement.notes}',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.textPrimary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }
@@ -654,8 +1588,28 @@ class ProductDetailPage extends StatelessWidget {
   String _formatPrice(double price) {
     return CurrencyFormatter.formatVND(price);
   }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
 }
+
+class _CostPriceHistoryItem {
+  final String importCode;
+  final double costPrice;
+  final int quantity;
+  final double totalPrice;
+  final String supplier;
+  final DateTime? receivedAt;
+  final DateTime? createdAt;
+
+  const _CostPriceHistoryItem({
+    required this.importCode,
+    required this.costPrice,
+    required this.quantity,
+    required this.totalPrice,
+    required this.supplier,
+    required this.receivedAt,
+    required this.createdAt,
+  });
+}
+
+
+
+

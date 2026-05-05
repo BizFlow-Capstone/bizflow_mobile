@@ -10,8 +10,8 @@ enum AppButtonType { primary, secondary, outlined, text, danger }
 enum AppButtonSize { small, medium, large }
 
 /// AppButton - Shared Button Widget
-/// Stateless, nhận config qua constructor, không import bloc/provider/api
-class AppButton extends StatelessWidget {
+/// Includes lightweight tap cooldown to reduce accidental rapid re-taps.
+class AppButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
   final AppButtonType type;
@@ -38,9 +38,57 @@ class AppButton extends StatelessWidget {
   });
 
   @override
+  State<AppButton> createState() => _AppButtonState();
+}
+
+class _AppButtonState extends State<AppButton> {
+  static const Duration _tapCooldown = Duration(milliseconds: 250);
+
+  bool _tapLocked = false;
+  DateTime? _lastTapAt;
+  int _lockVersion = 0;
+
+  @override
+  void didUpdateWidget(covariant AppButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+  }
+
+  void _lockFor(Duration duration) {
+    _lockVersion += 1;
+    final version = _lockVersion;
+
+    if (!_tapLocked) {
+      _tapLocked = true;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+
+    Future<void>.delayed(duration, () {
+      if (!mounted || version != _lockVersion) return;
+      _tapLocked = false;
+      setState(() {});
+    });
+  }
+
+  void _handleTap() {
+    if (!_isEnabled) return;
+
+    final now = DateTime.now();
+    final lastTapAt = _lastTapAt;
+    if (lastTapAt != null && now.difference(lastTapAt) < _tapCooldown) {
+      return;
+    }
+
+    _lastTapAt = now;
+    _lockFor(_tapCooldown);
+    widget.onPressed?.call();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: isFullWidth ? double.infinity : width,
+      width: widget.isFullWidth ? double.infinity : widget.width,
       height: _getHeight(),
       child: _buildButton(),
     );
@@ -49,38 +97,38 @@ class AppButton extends StatelessWidget {
   Widget _buildButton() {
     final child = _buildChild();
 
-    switch (type) {
+    switch (widget.type) {
       case AppButtonType.primary:
         return ElevatedButton(
-          onPressed: _isEnabled ? onPressed : null,
+          onPressed: _isEnabled ? _handleTap : null,
           style: _primaryStyle(),
           child: child,
         );
 
       case AppButtonType.secondary:
         return ElevatedButton(
-          onPressed: _isEnabled ? onPressed : null,
+          onPressed: _isEnabled ? _handleTap : null,
           style: _secondaryStyle(),
           child: child,
         );
 
       case AppButtonType.outlined:
         return OutlinedButton(
-          onPressed: _isEnabled ? onPressed : null,
+          onPressed: _isEnabled ? _handleTap : null,
           style: _outlinedStyle(),
           child: child,
         );
 
       case AppButtonType.text:
         return TextButton(
-          onPressed: _isEnabled ? onPressed : null,
+          onPressed: _isEnabled ? _handleTap : null,
           style: _textStyle(),
           child: child,
         );
 
       case AppButtonType.danger:
         return ElevatedButton(
-          onPressed: _isEnabled ? onPressed : null,
+          onPressed: _isEnabled ? _handleTap : null,
           style: _dangerStyle(),
           child: child,
         );
@@ -88,7 +136,7 @@ class AppButton extends StatelessWidget {
   }
 
   Widget _buildChild() {
-    if (isLoading) {
+    if (widget.isLoading) {
       return SizedBox(
         width: _getLoadingSize(),
         height: _getLoadingSize(),
@@ -104,26 +152,34 @@ class AppButton extends StatelessWidget {
     final textColor = _getTextColor();
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (prefixIcon != null) ...[
-          Icon(prefixIcon, size: iconSize),
+        if (widget.prefixIcon != null) ...[
+          Icon(widget.prefixIcon, size: iconSize),
           SizedBox(width: AppSpacing.sm),
         ],
-        Text(label, style: textStyle.copyWith(color: textColor)),
-        if (suffixIcon != null) ...[
+        Flexible(
+          child: Text(
+            widget.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: textStyle.copyWith(color: textColor),
+          ),
+        ),
+        if (widget.suffixIcon != null) ...[
           SizedBox(width: AppSpacing.sm),
-          Icon(suffixIcon, size: iconSize),
+          Icon(widget.suffixIcon, size: iconSize),
         ],
       ],
     );
   }
 
-  bool get _isEnabled => !isDisabled && !isLoading;
+  bool get _isEnabled => !widget.isDisabled && !widget.isLoading && !_tapLocked;
 
   double _getHeight() {
-    switch (size) {
+    switch (widget.size) {
       case AppButtonSize.small:
         return 36;
       case AppButtonSize.medium:
@@ -134,7 +190,7 @@ class AppButton extends StatelessWidget {
   }
 
   double _getLoadingSize() {
-    switch (size) {
+    switch (widget.size) {
       case AppButtonSize.small:
         return 16;
       case AppButtonSize.medium:
@@ -145,7 +201,7 @@ class AppButton extends StatelessWidget {
   }
 
   double _getIconSize() {
-    switch (size) {
+    switch (widget.size) {
       case AppButtonSize.small:
         return 16;
       case AppButtonSize.medium:
@@ -156,7 +212,7 @@ class AppButton extends StatelessWidget {
   }
 
   TextStyle _getTextStyle() {
-    switch (size) {
+    switch (widget.size) {
       case AppButtonSize.small:
         return AppTextStyles.labelMedium;
       case AppButtonSize.medium:
@@ -167,7 +223,7 @@ class AppButton extends StatelessWidget {
   }
 
   Color _getTextColor() {
-    switch (type) {
+    switch (widget.type) {
       case AppButtonType.primary:
       case AppButtonType.secondary:
       case AppButtonType.danger:
@@ -179,7 +235,7 @@ class AppButton extends StatelessWidget {
   }
 
   Color _getLoadingColor() {
-    switch (type) {
+    switch (widget.type) {
       case AppButtonType.primary:
       case AppButtonType.secondary:
       case AppButtonType.danger:
@@ -216,7 +272,7 @@ class AppButton extends StatelessWidget {
     return OutlinedButton.styleFrom(
       foregroundColor: AppColors.primary,
       side: BorderSide(
-        color: isDisabled ? AppColors.disabled : AppColors.primary,
+        color: widget.isDisabled ? AppColors.disabled : AppColors.primary,
       ),
       shape: RoundedRectangleBorder(borderRadius: AppSpacing.borderRadiusSm),
       padding: _getPadding(),
@@ -243,7 +299,7 @@ class AppButton extends StatelessWidget {
   }
 
   EdgeInsetsGeometry _getPadding() {
-    switch (size) {
+    switch (widget.size) {
       case AppButtonSize.small:
         return EdgeInsets.symmetric(horizontal: AppSpacing.sm);
       case AppButtonSize.medium:

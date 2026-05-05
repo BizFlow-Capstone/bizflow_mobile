@@ -8,13 +8,17 @@ import '../../../../core/theme/app_text_styles.dart';
 class ManagementCards extends StatelessWidget {
   final int locationsCount;
   final int employeesCount;
+  final bool showEmployeesCard;
+  final VoidCallback? onProductsTab;
   final VoidCallback? onLocationsTab;
   final VoidCallback? onEmployeesTab;
 
   const ManagementCards({
     super.key,
-    this.locationsCount = 5,
-    this.employeesCount = 12,
+    this.locationsCount = 0,
+    this.employeesCount = 0,
+    this.showEmployeesCard = true,
+    this.onProductsTab,
     this.onLocationsTab,
     this.onEmployeesTab,
   });
@@ -25,6 +29,14 @@ class ManagementCards extends StatelessWidget {
     return Column(
       children: [
         _ManagementCard(
+          icon: Icons.inventory_2_outlined,
+          iconColor: const Color(0xFF4CAF50),
+          title: l10n.translate('home.manage_products'),
+          subtitle: l10n.translate('home.products_active'),
+          onTap: onProductsTab,
+        ),
+        SizedBox(height: AppSpacing.md),
+        _ManagementCard(
           icon: Icons.location_on_outlined,
           iconColor: const Color(0xFF00BCD4),
           title: l10n.translate('home.manage_locations'),
@@ -34,17 +46,19 @@ class ManagementCards extends StatelessWidget {
           ),
           onTap: onLocationsTab,
         ),
-        SizedBox(height: AppSpacing.md),
-        _ManagementCard(
-          icon: Icons.people_outlined,
-          iconColor: const Color(0xFF7C3AED),
-          title: l10n.translate('home.manage_employees'),
-          subtitle: l10n.translate(
-            'home.employees_count',
-            params: {'count': employeesCount.toString()},
+        if (showEmployeesCard) ...[
+          SizedBox(height: AppSpacing.md),
+          _ManagementCard(
+            icon: Icons.people_outlined,
+            iconColor: const Color(0xFF7C3AED),
+            title: l10n.translate('home.manage_employees'),
+            subtitle: l10n.translate(
+              'home.employees_count',
+              params: {'count': employeesCount.toString()},
+            ),
+            onTap: onEmployeesTab,
           ),
-          onTap: onEmployeesTab,
-        ),
+        ],
       ],
     );
   }
@@ -68,9 +82,10 @@ class _ManagementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    return MergeSemantics(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -122,6 +137,6 @@ class _ManagementCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }

@@ -1,0 +1,6 @@
+{
+  "ENV": "production",
+  "GOOGLE_CLIENT_ID": "YOUR_GOOGLE_CLIENT_ID",
+  "RUN_ON_PHYSICAL_DEVICE": "true",
+  "API_BASE_URL": "YOUR_API_BASE_URL"
+}

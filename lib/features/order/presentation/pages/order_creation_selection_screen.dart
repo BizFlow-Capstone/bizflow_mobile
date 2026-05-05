@@ -1,13 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/utils/action_guard.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
 import 'order_audio_upload_screen.dart';
+import 'order_form_screen.dart';
 import 'order_voice_record_screen.dart';
-import 'order_manual_input_screen.dart';
 
 /// Screen SC-ORD-01: User selects method to create an order
-class OrderCreationSelectionScreen extends StatelessWidget {
-  const OrderCreationSelectionScreen({Key? key}) : super(key: key);
+class OrderCreationSelectionScreen extends StatefulWidget {
+  const OrderCreationSelectionScreen({super.key});
+
+  @override
+  State<OrderCreationSelectionScreen> createState() =>
+      _OrderCreationSelectionScreenState();
+}
+
+class _OrderCreationSelectionScreenState
+    extends State<OrderCreationSelectionScreen> {
+  final ActionGuard _openCreateMethodGuard = ActionGuard();
 
   @override
   Widget build(BuildContext context) {
@@ -18,8 +34,14 @@ class OrderCreationSelectionScreen extends StatelessWidget {
         title: Text(l10n.translate('order_create.select_method_title')),
         elevation: 0,
         systemOverlayStyle: SystemUiOverlayStyle.dark,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          color: Colors.black,
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        bottom: const AppSyncStatusText(),
       ),
       body: SafeArea(
         child: Padding(
@@ -36,11 +58,15 @@ class OrderCreationSelectionScreen extends StatelessWidget {
                 color: Colors.blue.shade50,
                 iconColor: Colors.blue,
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrderVoiceRecordScreen(),
-                    ),
+                  unawaited(
+                    _openCreateMethodGuard.run(() async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OrderVoiceRecordScreen(),
+                        ),
+                      );
+                    }),
                   );
                 },
               ),
@@ -53,11 +79,15 @@ class OrderCreationSelectionScreen extends StatelessWidget {
                 color: Colors.green.shade50,
                 iconColor: Colors.green,
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrderAudioUploadScreen(),
-                    ),
+                  unawaited(
+                    _openCreateMethodGuard.run(() async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OrderAudioUploadScreen(),
+                        ),
+                      );
+                    }),
                   );
                 },
               ),
@@ -70,11 +100,15 @@ class OrderCreationSelectionScreen extends StatelessWidget {
                 color: Colors.orange.shade50,
                 iconColor: Colors.orange,
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrderManualInputScreen(),
-                    ),
+                  unawaited(
+                    _openCreateMethodGuard.run(() async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OrderFormScreen(inputType: 'manual'),
+                        ),
+                      );
+                    }),
                   );
                 },
               ),
@@ -102,13 +136,19 @@ class OrderCreationSelectionScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                child: Icon(icon, color: iconColor, size: 32),
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 32,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -117,22 +157,27 @@ class OrderCreationSelectionScreen extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        fontSize: 18,
+                      style: AppTextStyles.titleMedium.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              Icon(
+                Icons.chevron_right,
+                color: AppColors.textSecondary,
+              ),
             ],
           ),
         ),
@@ -140,3 +185,4 @@ class OrderCreationSelectionScreen extends StatelessWidget {
     );
   }
 }
+

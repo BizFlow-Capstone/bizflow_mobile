@@ -1,311 +1,339 @@
+import 'dart:io';
+
+import '../../../../core/database/app_database.dart';
+import '../../../../shared/cache/cache_manager.dart';
+import '../../../../shared/cache/local_api_cache_store.dart';
 import '../domain/entities/order_entity.dart';
 import '../domain/entities/order_item_entity.dart';
+import 'datasources/order_local_datasource.dart';
+import 'models/ai_draft_order_dto.dart';
+import 'models/order_dto.dart';
 import 'order_api_service.dart';
+import '../../../shared/models/ocr_purchase_invoice_dto.dart';
 
-/// Mock Order Repository - Returns mock data since API is not ready
-///
-/// Responsibilities:
-/// 1. Provide mock data for order UI creation
-/// 2. Handle data transformations and business rules locally
+/// Real Order Repository - Connects to OrderApiService & implements SWR
 class OrderRepository {
-  // ignore: unused_field
-  final OrderApiService _apiService; // Kept for DI compatibility
+  final OrderApiService _apiService;
+  final CacheManager _cache;
+  final LocalApiCacheStore _localApiCache;
+  final OrderLocalDataSource _localDataSource;
 
-  OrderRepository({required OrderApiService apiService})
-    : _apiService = apiService {
-    _initMockData();
+  static const String _ordersSyncResourceKey = 'orders_list';
+
+  OrderRepository({
+    required OrderApiService apiService,
+    CacheManager? cacheManager,
+    LocalApiCacheStore? localApiCacheStore,
+    OrderLocalDataSource? localDataSource,
+  }) : _apiService = apiService,
+       _cache = cacheManager ?? CacheManager(),
+       _localApiCache = localApiCacheStore ?? LocalApiCacheStore(),
+       _localDataSource = localDataSource ?? OrderLocalDataSource();
+
+  // Convert DTO to Entity
+  OrderEntity _mapToEntity(OrderDto dto) {
+    return OrderEntity(
+      id: dto.id,
+      orderCode: dto.orderCode,
+      customerName: dto.customerName,
+      customerPhone: dto.customerPhone,
+      locationId: dto.locationId,
+      locationName: dto.locationName,
+      status: dto.status,
+      statusLabel: dto.statusLabel,
+      items: dto.items
+          .map(
+            (item) => OrderItemEntity(
+              id: item.id,
+              productId: item.productId,
+              saleItemId: item.saleItemId,
+              unitName: item.unitName,
+              productName: item.productName,
+              price: item.price,
+              quantity: item.quantity,
+              discount: item.discount,
+              note: item.note,
+            ),
+          )
+          .toList(),
+      subtotal: dto.subtotal,
+      discountAmount: dto.discountAmount,
+      taxAmount: dto.taxAmount,
+      totalAmount: dto.totalAmount,
+      cashAmount: dto.cashAmount,
+      bankAmount: dto.bankAmount,
+      debtAmount: dto.debtAmount,
+      debtorId: dto.debtorId,
+      note: dto.note,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      completedAt: dto.completedAt,
+      cancelledAt: dto.cancelledAt,
+      cancelReason: dto.cancelReason,
+      invoiceNumber: dto.invoiceNumber,
+      invoicedAt: dto.invoicedAt,
+      createdByProfileId: dto.createdByProfileId,
+      createdByProfileFullName: dto.createdByProfileFullName,
+    );
   }
 
-  // Cache
-  List<OrderEntity> _ordersCache = [];
-  final Map<String, OrderEntity> _orderDetailsCache = {};
+  OrderEntity _mergeCreatedByInfo(
+    OrderEntity order,
+    OrderEntity? previousOrder,
+  ) {
+    if (previousOrder == null) return order;
 
-  void _initMockData() {
-    final now = DateTime.now();
-    _ordersCache = [
-      OrderEntity(
-        id: '1',
-        locationId: '1',
-        locationName: 'Shinkiri Tech Store - HCM',
-        status: 'DRAFT',
-        items: const [
-          OrderItemEntity(
-            id: 'item1',
-            productId: 'prod1',
-            productName: 'iPhone 15 Pro Max',
-            price: 30000000,
-            quantity: 1,
-            discount: 0,
-          ),
-        ],
-        subtotal: 30000000,
-        discountAmount: 0,
-        taxAmount: 3000000,
-        totalAmount: 33000000,
-        note: 'Khách yêu cầu lấy màu đen',
-        createdAt: now.subtract(const Duration(hours: 2)),
-        updatedAt: now.subtract(const Duration(hours: 1)),
-      ),
-      OrderEntity(
-        id: '2',
-        locationId: '4',
-        locationName: 'Ngan Beauty Salon',
-        status: 'PENDING',
-        items: const [
-          OrderItemEntity(
-            id: 'item2',
-            productId: 'prod2',
-            productName: 'Mặt nạ dưỡng da',
-            price: 500000,
-            quantity: 2,
-            discount: 10,
-          ),
-        ],
-        subtotal: 1000000,
-        discountAmount: 100000,
-        taxAmount: 90000,
-        totalAmount: 990000,
-        createdAt: now.subtract(const Duration(days: 1)),
-        updatedAt: now.subtract(const Duration(days: 1)),
-      ),
-      OrderEntity(
-        id: '3',
-        locationId: '1',
-        locationName: 'Shinkiri Tech Store - HCM',
-        status: 'PUBLISHED',
-        items: const [
-          OrderItemEntity(
-            id: 'item3',
-            productId: 'prod3',
-            productName: 'MacBook Pro M3',
-            price: 45000000,
-            quantity: 1,
-            discount: 0,
-          ),
-        ],
-        subtotal: 45000000,
-        discountAmount: 0,
-        taxAmount: 4500000,
-        totalAmount: 49500000,
-        createdAt: now.subtract(const Duration(days: 2)),
-        updatedAt: now.subtract(const Duration(days: 2)),
-        invoiceNumber: 'INV-2026-001',
-        invoicedAt: now.subtract(const Duration(days: 2)),
-      ),
-    ];
+    return order.copyWith(
+      createdByProfileId:
+          order.createdByProfileId ?? previousOrder.createdByProfileId,
+      createdByProfileFullName: order.createdByProfileFullName ??
+          previousOrder.createdByProfileFullName,
+    );
   }
 
-  /// Get all orders with optional filters
-  Future<List<OrderEntity>> getOrders({
-    int pageNumber = 1,
-    int pageSize = 20,
+  Future<AiDraftOrderResultDto> parseDraftOrderFromAudio({
+    required int locationId,
+    required File audioFile,
+  }) async {
+    return _apiService.parseDraftOrderFromAudio(
+      locationId: locationId,
+      audioFile: audioFile,
+    );
+  }
+
+  Future<OcrPurchaseInvoiceResultDto> ocrPurchaseInvoice({
+    required int locationId,
+    required File imageFile,
+  }) {
+    return _apiService.ocrPurchaseInvoice(
+      locationId: locationId,
+      imageFile: imageFile,
+    );
+  }
+
+  /// Get all orders with optional filters using SWR
+  Future<void> getOrdersSWR({
+    required int pageNumber,
+    required int pageSize,
     String? status,
     String? locationId,
+    required Function(List<OrderEntity> data, int totalCount, bool isFromCache)
+    onData,
+    Function(dynamic error)? onError,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network
+    final key = 'orders_${locationId}_${status}_p${pageNumber}_s$pageSize';
+    final scopeKey = _scopeKey(status: status, locationId: locationId);
+    var hasLocalData = false;
 
-    var filtered = List<OrderEntity>.from(_ordersCache);
-
-    if (status != null && status.isNotEmpty) {
-      filtered = filtered.where((o) => o.status == status).toList();
+    final localOrders = await _localDataSource.getByScopeKey(scopeKey);
+    if (localOrders.isNotEmpty) {
+      onData(localOrders, localOrders.length, true);
+      hasLocalData = true;
     }
 
-    if (locationId != null && locationId.isNotEmpty) {
-      filtered = filtered.where((o) => o.locationId == locationId).toList();
+    final localCached = await _localApiCache.getMap(key);
+    if (!hasLocalData && localCached != null) {
+      final items = (localCached['items'] as List<dynamic>? ?? [])
+          .map((e) => OrderDto.fromJson(e as Map<String, dynamic>))
+          .map(_mapToEntity)
+          .toList();
+      final totalCount = localCached['total'] as int? ?? 0;
+      onData(items, totalCount, true);
+      hasLocalData = true;
     }
 
-    // Sort descending by updated date
-    filtered.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-
-    // Simple pagination mock
-    final startIndex = (pageNumber - 1) * pageSize;
-    if (startIndex >= filtered.length) return [];
-
-    final endIndex = (startIndex + pageSize < filtered.length)
-        ? startIndex + pageSize
-        : filtered.length;
-
-    return filtered.sublist(startIndex, endIndex);
-  }
-
-  /// Get draft orders
-  Future<List<OrderEntity>> getDraftOrders({
-    int pageNumber = 1,
-    int pageSize = 20,
-  }) async {
-    return getOrders(
-      pageNumber: pageNumber,
-      pageSize: pageSize,
-      status: 'DRAFT',
-    );
+    try {
+      final response = await _apiService.getOrders(
+        pageNumber: pageNumber,
+        pageSize: pageSize,
+        status: status,
+        locationId: locationId,
+      );
+      final dataMap = {
+        'items': response.orders.map((e) => e.toJson()).toList(),
+        'total': response.total,
+      };
+      await _localApiCache.setMap(
+        key,
+        dataMap,
+        groupKey: 'orders',
+        cacheType: 'list',
+      );
+      final items = response.orders.map(_mapToEntity).toList();
+      await _localDataSource.replaceForScope(scopeKey, items);
+      await AppDatabase().syncStateDao.upsert(
+        resourceKey: _ordersSyncResourceKey,
+        businessId: scopeKey,
+        lastSyncedAtEpoch: DateTime.now().millisecondsSinceEpoch,
+      );
+      onData(items, response.total, false);
+    } catch (error) {
+      if (!hasLocalData && onError != null) {
+        onError(error);
+      }
+    }
   }
 
   /// Get single order by ID
   Future<OrderEntity> getOrder(String orderId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-
+    final key = 'order_detail_$orderId';
     try {
-      if (_orderDetailsCache.containsKey(orderId)) {
-        return _orderDetailsCache[orderId]!;
-      }
-
-      final order = _ordersCache.firstWhere((o) => o.id == orderId);
-      _orderDetailsCache[orderId] = order;
+      final dto = await _apiService.getOrder(orderId);
+      final existingOrder = await _localDataSource.getById(orderId);
+      final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
+      await _localApiCache.setMap(
+        key,
+        dto.toJson(),
+        groupKey: 'orders',
+        cacheType: 'detail',
+      );
+      await _localDataSource.upsertDetail(order);
       return order;
     } catch (e) {
-      throw Exception('Order not found');
+      final localOrder = await _localDataSource.getById(orderId);
+      if (localOrder != null) {
+        return localOrder;
+      }
+      final localCached = await _localApiCache.getMap(key);
+      if (localCached != null) {
+        return _mapToEntity(OrderDto.fromJson(localCached));
+      }
+      rethrow;
     }
   }
 
-  /// Create a new order (saves as DRAFT locally)
-  Future<OrderEntity> createOrder({
-    required String locationId,
-    required List<OrderItemEntity> items,
-    String? note,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
+  Future<OrderEntity?> getCachedOrder(String orderId) async {
+    final key = 'order_detail_$orderId';
 
-    double subtotal = 0;
-    double discountAmount = 0;
-
-    for (var item in items) {
-      subtotal += item.price * item.quantity;
-      discountAmount += (item.price * item.quantity) * (item.discount / 100);
+    final localCached = await _localApiCache.getMap(key);
+    if (localCached != null) {
+      final cachedOrder = _mapToEntity(
+        OrderDto.fromJson(Map<String, dynamic>.from(localCached)),
+      );
+      final localOrder = await _localDataSource.getById(orderId);
+      return _mergeCreatedByInfo(cachedOrder, localOrder);
     }
 
-    final taxAmount = (subtotal - discountAmount) * 0.1; // 10% tax mock
-    final totalAmount = subtotal - discountAmount + taxAmount;
+    final localOrder = await _localDataSource.getById(orderId);
+    if (localOrder != null) {
+      return localOrder;
+    }
 
-    final now = DateTime.now();
+    return null;
+  }
 
-    final newOrder = OrderEntity(
-      id: 'mock_${now.millisecondsSinceEpoch}',
-      locationId: locationId,
-      locationName: 'Mock Location',
-      status: 'DRAFT',
-      items: items,
-      subtotal: subtotal,
-      discountAmount: discountAmount,
-      taxAmount: taxAmount,
-      totalAmount: totalAmount,
-      note: note,
-      createdAt: now,
-      updatedAt: now,
-    );
+  Future<void> fetchOrderSWR({
+    required String orderId,
+    required Function(OrderEntity data, bool isFromCache) onData,
+    Function(dynamic error)? onError,
+  }) async {
+    final key = 'order_detail_$orderId';
+    final cached = await getCachedOrder(orderId);
 
-    _ordersCache.insert(0, newOrder);
-    _orderDetailsCache[newOrder.id] = newOrder;
+    if (cached != null) {
+      onData(cached, true);
+    }
 
-    return newOrder;
+    try {
+      final dto = await _apiService.getOrder(orderId);
+      final existingOrder = await _localDataSource.getById(orderId);
+      final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
+
+      await _localApiCache.setMap(
+        key,
+        dto.toJson(),
+        groupKey: 'orders',
+        cacheType: 'detail',
+      );
+      await _localDataSource.upsertDetail(order);
+
+      onData(order, false);
+    } catch (error) {
+      if (cached == null && onError != null) {
+        onError(error);
+      }
+    }
+  }
+
+  /// Create a new order (pending)
+  Future<OrderEntity> createOrder(Map<String, dynamic> requestBody) async {
+    final dto = await _apiService.createOrder(requestBody);
+    final order = _mapToEntity(dto);
+    await _localDataSource.upsertDetail(order);
+    await clearCache();
+    return order;
   }
 
   /// Update an existing order
   Future<OrderEntity> updateOrder({
     required String orderId,
-    String? note,
-    List<OrderItemEntity>? items,
+    required Map<String, dynamic> requestBody,
+    String? idempotencyKey,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    try {
-      final index = _ordersCache.indexWhere((o) => o.id == orderId);
-      if (index == -1) throw Exception('Order not found');
-
-      final existingOrder = _ordersCache[index];
-
-      double subtotal = existingOrder.subtotal;
-      double discountAmount = existingOrder.discountAmount;
-      double taxAmount = existingOrder.taxAmount;
-      double totalAmount = existingOrder.totalAmount;
-
-      // Re-calculate if items changed
-      if (items != null) {
-        subtotal = 0;
-        discountAmount = 0;
-        for (var item in items) {
-          subtotal += item.price * item.quantity;
-          discountAmount +=
-              (item.price * item.quantity) * (item.discount / 100);
-        }
-        taxAmount = (subtotal - discountAmount) * 0.1;
-        totalAmount = subtotal - discountAmount + taxAmount;
-      }
-
-      final updatedOrder = existingOrder.copyWith(
-        note: note ?? existingOrder.note,
-        items: items ?? existingOrder.items,
-        subtotal: subtotal,
-        discountAmount: discountAmount,
-        taxAmount: taxAmount,
-        totalAmount: totalAmount,
-        updatedAt: DateTime.now(),
-      );
-
-      _ordersCache[index] = updatedOrder;
-      _orderDetailsCache[orderId] = updatedOrder;
-
-      return updatedOrder;
-    } catch (e) {
-      rethrow;
-    }
+    final dto = await _apiService.updateOrder(
+      orderId: orderId,
+      body: requestBody,
+      idempotencyKey: idempotencyKey,
+    );
+    final existingOrder = await _localDataSource.getById(orderId);
+    final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
+    await _localDataSource.upsertDetail(order);
+    await clearCache();
+    return order;
   }
 
-  /// Publish an order (convert draft to invoice)
-  Future<OrderEntity> publishOrder(String orderId) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-
-    try {
-      final index = _ordersCache.indexWhere((o) => o.id == orderId);
-      if (index == -1) throw Exception('Order not found');
-
-      final existingOrder = _ordersCache[index];
-      final now = DateTime.now();
-
-      final updatedOrder = existingOrder.copyWith(
-        status: 'PUBLISHED',
-        updatedAt: now,
-        invoiceNumber:
-            'INV-${now.year}-${now.millisecondsSinceEpoch.toString().substring(8)}',
-        invoicedAt: now,
-      );
-
-      _ordersCache[index] = updatedOrder;
-      _orderDetailsCache[orderId] = updatedOrder;
-
-      return updatedOrder;
-    } catch (e) {
-      rethrow;
-    }
+  /// Complete an order (convert pending to completed)
+  Future<OrderEntity> completeOrder(
+    String orderId, {
+    bool confirmLowStock = false,
+  }) async {
+    final dto = await _apiService.completeOrder(
+      orderId,
+      confirmLowStock: confirmLowStock,
+    );
+    final existingOrder = await _localDataSource.getById(orderId);
+    final order = _mergeCreatedByInfo(_mapToEntity(dto), existingOrder);
+    await _localDataSource.upsertDetail(order);
+    await clearCache();
+    return order;
   }
 
   /// Cancel an order
-  Future<bool> cancelOrder(String orderId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    final index = _ordersCache.indexWhere((o) => o.id == orderId);
-    if (index == -1) return false;
-
-    final order = _ordersCache[index];
-    if (order.status == 'DRAFT') {
-      // Hard delete draft
-      _ordersCache.removeAt(index);
-      _orderDetailsCache.remove(orderId);
-    } else {
-      // Soft cancel
-      final updatedOrder = order.copyWith(
-        status: 'CANCELLED',
-        updatedAt: DateTime.now(),
-      );
-      _ordersCache[index] = updatedOrder;
-      _orderDetailsCache[orderId] = updatedOrder;
+  Future<bool> cancelOrder(
+    String orderId, {
+    required String cancelReason,
+  }) async {
+    final result = await _apiService.cancelOrder(
+      orderId,
+      cancelReason: cancelReason,
+    );
+    if (result) {
+      await _localDataSource.deleteById(orderId);
+      await clearCache();
     }
-
-    return true;
+    return result;
   }
 
-  /// Clear all caches (keeping mock memory structure intact)
-  void clearCache() {
-    // For mock setup, we don't nullify _ordersCache
-    _orderDetailsCache.clear();
+  String _scopeKey({String? status, String? locationId}) {
+    return 'orders_${locationId ?? 'all'}_${status ?? 'all'}';
+  }
+
+  Future<int?> getOrdersLastSyncedAtEpoch({
+    String? status,
+    String? locationId,
+  }) async {
+    final scopeKey = _scopeKey(status: status, locationId: locationId);
+    final state = await AppDatabase().syncStateDao.getState(
+      resourceKey: _ordersSyncResourceKey,
+      businessId: scopeKey,
+    );
+    return state?.lastSyncedAtEpoch;
+  }
+
+  /// Clear all cache keys related to orders
+  Future<void> clearCache() async {
+    await _cache.removeByPrefix('orders_');
+    await _cache.removeByPrefix('home_dashboard_summary_');
+    await _localApiCache.removeByGroup('orders');
   }
 }

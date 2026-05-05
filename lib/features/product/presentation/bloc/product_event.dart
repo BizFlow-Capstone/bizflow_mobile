@@ -1,4 +1,6 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/product_entity.dart';
+import '../../data/models/business_type_model.dart';
 
 /// Product Events
 /// Các sự kiện được phát ra từ UI layers
@@ -17,6 +19,11 @@ class LoadProductsByLocationRequested extends ProductEvent {
 
   @override
   List<Object?> get props => [locationId];
+}
+
+/// Reset products state (on logout)
+class ResetProducts extends ProductEvent {
+  const ResetProducts();
 }
 
 /// Refresh products (pull to refresh)
@@ -47,16 +54,16 @@ class SearchProductsRequested extends ProductEvent {
 class FilterProductsRequested extends ProductEvent {
   final String locationId;
   final String? status;
-  final String? category;
+  final String? businessTypeId;
 
   const FilterProductsRequested({
     required this.locationId,
     this.status,
-    this.category,
+    this.businessTypeId,
   });
 
   @override
-  List<Object?> get props => [locationId, status, category];
+  List<Object?> get props => [locationId, status, businessTypeId];
 }
 
 /// Sort products
@@ -93,8 +100,9 @@ class AddProductRequested extends ProductEvent {
   final String? category;
   final double? costPrice;
   final double? salePrice;
-  final int? quantity;
+  final double? quantity;
   final String? unit;
+  final bool trackInventory;
   final bool isActive;
   final String? description;
   final String? imagePath;
@@ -111,6 +119,7 @@ class AddProductRequested extends ProductEvent {
     this.salePrice,
     this.quantity,
     this.unit,
+    this.trackInventory = true,
     this.isActive = true,
     this.description,
     this.imagePath,
@@ -129,6 +138,7 @@ class AddProductRequested extends ProductEvent {
     salePrice,
     quantity,
     unit,
+    trackInventory,
     isActive,
     description,
     imagePath,
@@ -147,8 +157,9 @@ class UpdateProductRequested extends ProductEvent {
   final String? category;
   final double? costPrice;
   final double? salePrice;
-  final int? quantity;
+  final double? quantity;
   final String? unit;
+  final bool trackInventory;
   final bool isActive;
   final String? description;
   final String? imagePath;
@@ -167,6 +178,7 @@ class UpdateProductRequested extends ProductEvent {
     this.salePrice,
     this.quantity,
     this.unit,
+    this.trackInventory = true,
     this.isActive = true,
     this.description,
     this.imagePath,
@@ -187,6 +199,7 @@ class UpdateProductRequested extends ProductEvent {
     salePrice,
     quantity,
     unit,
+    trackInventory,
     isActive,
     description,
     imagePath,
@@ -262,3 +275,110 @@ class LoadMoreProductsRequested extends ProductEvent {
   @override
   List<Object?> get props => [locationId];
 }
+
+class LoadProductDetailRequested extends ProductEvent {
+  final String productId;
+
+  const LoadProductDetailRequested({required this.productId});
+
+  @override
+  List<Object?> get props => [productId];
+}
+
+/// Apply local price changes immediately for better UX,
+/// then server refresh can reconcile exact values.
+class ApplyLocalPriceAdjustmentRequested extends ProductEvent {
+  final String locationId;
+  final List<String> affectedProductIds;
+  final double deltaAmount;
+
+  const ApplyLocalPriceAdjustmentRequested({
+    required this.locationId,
+    required this.affectedProductIds,
+    required this.deltaAmount,
+  });
+
+  @override
+  List<Object?> get props => [locationId, affectedProductIds, deltaAmount];
+}
+
+/// Event untuk handle business types dari network sync (SWR background update)
+class BusinessTypesNetworkDataReceived extends ProductEvent {
+  final List<BusinessTypeDto> businessTypes;
+
+  const BusinessTypesNetworkDataReceived({required this.businessTypes});
+
+  @override
+  List<Object?> get props => [businessTypes];
+}
+
+/// Event untuk handle products dari network sync (SWR background update)  
+class ProductsNetworkDataReceived extends ProductEvent {
+  final List<ProductEntity> products;
+  final String locationId;
+
+  const ProductsNetworkDataReceived({
+    required this.products,
+    required this.locationId,
+  });
+
+  @override
+  List<Object?> get props => [products, locationId];
+}
+
+/// Event untuk handle product error dari network sync
+class ProductNetworkErrorOccurred extends ProductEvent {
+  final dynamic error;
+
+  const ProductNetworkErrorOccurred({required this.error});
+
+  @override
+  List<Object?> get props => [error];
+}
+
+/// Event untuk handle sale items dari network sync (SWR background update)
+class ProductSaleItemsNetworkDataReceived extends ProductEvent {
+  final List<Map<String, dynamic>> saleItems;
+
+  const ProductSaleItemsNetworkDataReceived({required this.saleItems});
+
+  @override
+  List<Object?> get props => [saleItems];
+}
+
+/// Event cho handle product detail từ network sync (SWR background update)
+class ProductDetailNetworkDataReceived extends ProductEvent {
+  final ProductEntity? product;
+
+  const ProductDetailNetworkDataReceived({required this.product});
+
+  @override
+  List<Object?> get props => [product];
+}
+
+/// Load selling price policy history for a product
+class LoadProductPriceHistoryRequested extends ProductEvent {
+  final String productId;
+
+  const LoadProductPriceHistoryRequested({required this.productId});
+
+  @override
+  List<Object?> get props => [productId];
+}
+
+/// Load stock movement history for a product
+class LoadProductStockMovementsRequested extends ProductEvent {
+  final String productId;
+  final int pageNumber;
+  final int pageSize;
+
+  const LoadProductStockMovementsRequested({
+    required this.productId,
+    this.pageNumber = 1,
+    this.pageSize = 10,
+  });
+
+  @override
+  List<Object?> get props => [productId, pageNumber, pageSize];
+}
+

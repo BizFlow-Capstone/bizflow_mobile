@@ -3,16 +3,22 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/localization/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/utils/action_guard.dart';
 import '../../../../shared/utils/formatters.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
-import 'package:simple_barcode_scanner/simple_barcode_scanner.dart';
+import '../../../../shared/widgets/app_barcode_scanner.dart';
 import '../../data/models/business_type_model.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Edit Product Page
 /// SC-PRO-02: Chỉnh sửa sản phẩm
@@ -24,12 +30,14 @@ class EditProductPage extends StatefulWidget {
   final String? category;
   final double? costPrice;
   final double? salePrice;
-  final int? quantity;
+  final double? quantity;
   final String? unit;
   final String? description;
   final bool isActive;
   final String? businessTypeId;
   final String? manufacturer;
+  final String? imageUrl;
+  final bool trackInventory;
 
   const EditProductPage({
     super.key,
@@ -46,6 +54,8 @@ class EditProductPage extends StatefulWidget {
     this.isActive = true,
     this.businessTypeId,
     this.manufacturer,
+    this.imageUrl,
+    this.trackInventory = true,
   });
 
   @override
@@ -71,10 +81,23 @@ class _EditProductPageState extends State<EditProductPage> {
   late bool _isActive;
   String? _selectedBusinessTypeId;
   List<BusinessTypeDto> _businessTypes = [];
+  String? _productNameError;
+  String? _unitError;
+  String? _businessTypeError;
+  String? _costPriceError;
+  String? _salePriceError;
+  String? _quantityError;
 
   final ImagePicker _imagePicker = ImagePicker();
+  final ActionGuard _submitGuard = ActionGuard();
+  final ActionGuard _deleteGuard = ActionGuard();
+  bool _isSubmitting = false;
+  bool _isDeleting = false;
+  bool _isStatusUpdating = false;
+  bool? _statusBeforeToggle;
+  late bool _trackInventory;
 
-  AppLocalizations get l10n => AppLocalizations.of(context)!;
+  AppLocalizations get l10n => AppLocalizations.of(context);
 
   @override
   void initState() {
@@ -102,6 +125,7 @@ class _EditProductPageState extends State<EditProductPage> {
       text: widget.manufacturer ?? '',
     );
     _isActive = widget.isActive;
+    _trackInventory = widget.trackInventory;
     _selectedBusinessTypeId = widget.businessTypeId;
 
     // Load business types
@@ -109,6 +133,9 @@ class _EditProductPageState extends State<EditProductPage> {
 
     // Load sale items (price tiers) from API
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProductBloc>().add(
+        LoadProductDetailRequested(productId: widget.productId),
+      );
       context.read<ProductBloc>().add(
         LoadProductSaleItemsRequested(productId: widget.productId),
       );
@@ -131,8 +158,30 @@ class _EditProductPageState extends State<EditProductPage> {
   /// Pick image from gallery or camera
   Future<void> _pickImage() async {
     try {
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (sheetCtx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: Text(l10n.translate('common.source_camera')),
+                onTap: () => Navigator.of(sheetCtx).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text(l10n.translate('common.source_gallery')),
+                onTap: () => Navigator.of(sheetCtx).pop(ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (source == null) return;
+
       final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 80,
       );
 
@@ -142,19 +191,33 @@ class _EditProductPageState extends State<EditProductPage> {
           _removeImage =
               false; // Reset removeImage flag if new image is selected
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
+        AppSnackBar.show(
+          context,
+          message:
               '${l10n.translate('common.image_selected')}: ${pickedFile.name}',
-            ),
-          ),
+          type: AppSnackBarType.info,
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${l10n.translate('common.error')}: $e')),
+      AppSnackBar.show(
+        context,
+        message: '${l10n.translate('common.error')}: $e',
+        type: AppSnackBarType.error,
       );
     }
+  }
+
+  String? _resolveImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return null;
+    final value = rawUrl.trim();
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    final normalizedBase = AppConfig.baseUrl.endsWith('/')
+        ? AppConfig.baseUrl.substring(0, AppConfig.baseUrl.length - 1)
+        : AppConfig.baseUrl;
+    final normalizedPath = value.startsWith('/') ? value : '/$value';
+    return '$normalizedBase$normalizedPath';
   }
 
   /// Show dialog to add or edit price tier
@@ -193,14 +256,16 @@ class _EditProductPageState extends State<EditProductPage> {
                 controller: unitController,
                 decoration: InputDecoration(
                   labelText: l10n.translate('product.unit'),
-                  hintText: 'Lốc, Thùng, ...',
+                  hintText: l10n.translate('product.conversion_example'),
                 ),
               ),
               SizedBox(height: AppSpacing.md),
               TextField(
                 controller: quantityController,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                ),
                 decoration: InputDecoration(
                   labelText: l10n.translate('product.quantity'),
                   hintText: '12',
@@ -210,7 +275,9 @@ class _EditProductPageState extends State<EditProductPage> {
               TextField(
                 controller: priceController,
                 keyboardType: TextInputType.number,
-                inputFormatters: [CurrencyInputFormatter()],
+                inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                  inputFormatters: [CurrencyInputFormatter()],
+                ),
                 decoration: InputDecoration(
                   labelText: l10n.translate('product.price'),
                   hintText: '120,000',
@@ -242,11 +309,13 @@ class _EditProductPageState extends State<EditProductPage> {
               if (unitController.text.isEmpty ||
                   quantityController.text.isEmpty ||
                   priceController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.translate('common.required_field')),
-                  ),
-                );
+                ScaffoldMessenger.of(context)
+                  ..removeCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.translate('common.required_field')),
+                    ),
+                  );
                 return;
               }
 
@@ -258,11 +327,13 @@ class _EditProductPageState extends State<EditProductPage> {
                   0;
 
               if (quantity <= 0 || price < 0) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(l10n.translate('product.invalid_value')),
-                  ),
-                );
+                ScaffoldMessenger.of(context)
+                  ..removeCurrentSnackBar()
+                  ..showSnackBar(
+                    SnackBar(
+                      content: Text(l10n.translate('product.invalid_value')),
+                    ),
+                  );
                 return;
               }
 
@@ -325,110 +396,163 @@ class _EditProductPageState extends State<EditProductPage> {
   }
 
   /// Delete product
-  void _deleteProduct() {
-    context.read<ProductBloc>().add(
-      DeleteProductRequested(
-        locationId: widget.locationId,
-        productId: widget.productId,
-      ),
-    );
+  Future<void> _deleteProduct() async {
+    if (_isDeleting || _isSubmitting) return;
+
+    setState(() {
+      _isDeleting = true;
+    });
+
+    var hasDispatchedDeleteEvent = false;
+    await _deleteGuard.run(() async {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.productManagement,
+      );
+      if (!allowed || !mounted) return;
+
+      hasDispatchedDeleteEvent = true;
+      context.read<ProductBloc>().add(
+        DeleteProductRequested(
+          locationId: widget.locationId,
+          productId: widget.productId,
+        ),
+      );
+    });
+
+    if (!hasDispatchedDeleteEvent && mounted) {
+      setState(() {
+        _isDeleting = false;
+      });
+    }
   }
 
   /// Submit form to update product
-  void _submitForm() {
-    if (_productNameController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('common.required_field'))),
-      );
+  Future<void> _submitForm() async {
+    if (_isSubmitting || _isDeleting) return;
+
+    final requiredMessage = l10n.translate('common.required_field');
+    final invalidCostPriceMessage = l10n.translate(
+      'product.invalid_cost_price',
+    );
+    final invalidSalePriceMessage = l10n.translate(
+      'product.invalid_sale_price',
+    );
+    final invalidStockMessage = l10n.translate('product.invalid_stock');
+
+    double? parseMoney(String value) {
+      return double.tryParse(value.replaceAll(RegExp(r'[,.]'), ''));
+    }
+
+    double? parseStock(String value) {
+      final normalized = value.trim().replaceAll(',', '.');
+      if (normalized.isEmpty) return null;
+      return double.tryParse(normalized);
+    }
+
+    final costPriceText = _costPriceController.text.trim();
+    final salePriceText = _salePriceController.text.trim();
+    final quantityText = _quantityController.text.trim();
+
+    final costPrice = costPriceText.isEmpty ? null : parseMoney(costPriceText);
+    final salePrice = salePriceText.isEmpty ? null : parseMoney(salePriceText);
+    final quantity = quantityText.isEmpty ? null : parseStock(quantityText);
+
+    setState(() {
+      _productNameError = _productNameController.text.trim().isEmpty
+          ? requiredMessage
+          : null;
+      _unitError = _unitController.text.trim().isEmpty ? requiredMessage : null;
+      _businessTypeError = _selectedBusinessTypeId == null
+          ? requiredMessage
+          : null;
+      _costPriceError =
+          (costPriceText.isNotEmpty && (costPrice == null || costPrice < 0))
+          ? invalidCostPriceMessage
+          : null;
+      _salePriceError =
+          (salePriceText.isNotEmpty && (salePrice == null || salePrice < 0))
+          ? invalidSalePriceMessage
+          : null;
+        _quantityError = !_trackInventory
+          ? null
+          :
+          (quantityText.isNotEmpty && (quantity == null || quantity < 0))
+          ? invalidStockMessage
+          : null;
+    });
+
+    if (_productNameError != null ||
+        _unitError != null ||
+        _businessTypeError != null ||
+        _costPriceError != null ||
+        _salePriceError != null ||
+        _quantityError != null) {
       return;
     }
 
-    // Validate prices and quantity
-    if (_costPriceController.text.isNotEmpty) {
-      final costPrice = double.tryParse(_costPriceController.text);
-      if (costPrice == null || costPrice < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.translate('product.invalid_cost_price'))),
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    var hasDispatchedUpdateEvent = false;
+
+    await _submitGuard.run(() async {
+      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+        context,
+        featureCode: SubscriptionFeatureCodes.productManagement,
+      );
+      if (!allowed || !mounted) return;
+
+      if (widget.productId.isEmpty) {
+        AppSnackBar.show(
+          context,
+          message: l10n.translate('product.invalid_id'),
+          type: AppSnackBarType.error,
         );
         return;
       }
-    }
+      debugPrint(
+        'EditProductPage: Updating product with ID: ${widget.productId}',
+      );
 
-    if (_salePriceController.text.isNotEmpty) {
-      final salePrice = double.tryParse(_salePriceController.text);
-      if (salePrice == null || salePrice < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.translate('product.invalid_sale_price'))),
-        );
-        return;
-      }
-    }
-
-    if (_quantityController.text.isNotEmpty) {
-      final quantity = int.tryParse(_quantityController.text);
-      if (quantity == null || quantity < 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.translate('product.invalid_quantity'))),
-        );
-        return;
-      }
-    }
-
-    if (widget.productId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.translate('product.invalid_id')),
-          backgroundColor: AppColors.error,
+      hasDispatchedUpdateEvent = true;
+      context.read<ProductBloc>().add(
+        UpdateProductRequested(
+          productId: widget.productId,
+          locationId: widget.locationId,
+          productName: _productNameController.text,
+          barcode: _barcodeController.text.isNotEmpty
+              ? _barcodeController.text
+              : null,
+          costPrice: _costPriceController.text.isNotEmpty ? costPrice : null,
+          salePrice: _salePriceController.text.isNotEmpty ? salePrice : null,
+            quantity:
+              _trackInventory && _quantityController.text.isNotEmpty
+              ? quantity
+              : null,
+          unit: _unitController.text.isNotEmpty ? _unitController.text : null,
+            trackInventory: _trackInventory,
+          isActive: _isActive,
+          manufacturer: _manufacturerController.text.isNotEmpty
+              ? _manufacturerController.text
+              : null,
+          description: _descriptionController.text.isNotEmpty
+              ? _descriptionController.text
+              : null,
+          imagePath: _selectedImagePath,
+          priceTiers: _priceTiers.isNotEmpty ? _priceTiers : null,
+          removeImage: _removeImage,
+          businessTypeId: _selectedBusinessTypeId,
         ),
       );
-      return;
-    }
-    if (_selectedBusinessTypeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.translate('common.required_field'))),
-      );
-      return;
-    }
+    });
 
-    debugPrint(
-      'EditProductPage: Updating product with ID: ${widget.productId}',
-    );
-
-    context.read<ProductBloc>().add(
-      UpdateProductRequested(
-        productId: widget.productId,
-        locationId: widget.locationId,
-        productName: _productNameController.text,
-        barcode: _barcodeController.text.isNotEmpty
-            ? _barcodeController.text
-            : null,
-        costPrice: _costPriceController.text.isNotEmpty
-            ? double.tryParse(
-                _costPriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-              )
-            : null,
-        salePrice: _salePriceController.text.isNotEmpty
-            ? double.tryParse(
-                _salePriceController.text.replaceAll(RegExp(r'[,.]'), ''),
-              )
-            : null,
-        quantity: _quantityController.text.isNotEmpty
-            ? int.tryParse(_quantityController.text)
-            : null,
-        unit: _unitController.text.isNotEmpty ? _unitController.text : null,
-        isActive: _isActive,
-        manufacturer: _manufacturerController.text.isNotEmpty
-            ? _manufacturerController.text
-            : null,
-        description: _descriptionController.text.isNotEmpty
-            ? _descriptionController.text
-            : null,
-        imagePath: _selectedImagePath,
-        priceTiers: _priceTiers.isNotEmpty ? _priceTiers : null,
-        removeImage: _removeImage,
-        businessTypeId: _selectedBusinessTypeId,
-      ),
-    );
+    if (!hasDispatchedUpdateEvent && mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 
   @override
@@ -455,21 +579,57 @@ class _EditProductPageState extends State<EditProductPage> {
       body: BlocListener<ProductBloc, ProductState>(
         listener: (context, state) {
           if (state is ProductUpdateSuccess) {
+            if (_isStatusUpdating) {
+              setState(() {
+                _isStatusUpdating = false;
+                _statusBeforeToggle = null;
+                _isActive = state.product.isActive;
+              });
+
+              AppSnackBar.show(
+                context,
+                message: l10n.translate('product.status_updated'),
+                type: AppSnackBarType.success,
+              );
+              return;
+            }
+
+            if (!_isSubmitting && !_isDeleting) {
+              return;
+            }
+
+            if (_isSubmitting || _isDeleting) {
+              setState(() {
+                _isSubmitting = false;
+                _isDeleting = false;
+              });
+            }
             // Show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(l10n.translate('product.edit_success'))),
+            AppSnackBar.show(
+              context,
+              message: l10n.translate('product.edit_success'),
+              type: AppSnackBarType.success,
             );
             // Navigate back and return true to indicate success
             Future.delayed(const Duration(milliseconds: 500), () {
               if (mounted) Navigator.pop(context, true);
             });
           } else if (state is ProductDeleteSuccess) {
+            if (!_isDeleting) {
+              return;
+            }
+
+            if (_isSubmitting || _isDeleting) {
+              setState(() {
+                _isSubmitting = false;
+                _isDeleting = false;
+              });
+            }
             // Show delete success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(l10n.translate('product.delete_success')),
-                backgroundColor: AppColors.success,
-              ),
+            AppSnackBar.show(
+              context,
+              message: l10n.translate('product.delete_success'),
+              type: AppSnackBarType.success,
             );
             // Navigate back and return true to indicate success
             Future.delayed(const Duration(milliseconds: 500), () {
@@ -481,26 +641,105 @@ class _EditProductPageState extends State<EditProductPage> {
               if (items.isNotEmpty) {
                 // First element is the base unit
                 final baseItem = items.first;
-                _unitController.text =
+                final baseUnit =
                     baseItem['unit']?.toString() ??
                     baseItem['Unit']?.toString() ??
                     '';
+                if (baseUnit.trim().isNotEmpty ||
+                    _unitController.text.trim().isEmpty) {
+                  _unitController.text = baseUnit;
+                }
                 // The rest are price tiers
                 _priceTiers = items.skip(1).toList();
-              } else {
-                _priceTiers = [];
               }
+            });
+          } else if (state is ProductDetailLoaded &&
+              state.product.id == widget.productId) {
+            final detail = state.product;
+            setState(() {
+              if (detail.name.trim().isNotEmpty) {
+                _productNameController.text = detail.name;
+              }
+
+              final detailBarcode = (detail.barcode ?? '').trim();
+              if (detailBarcode.isNotEmpty ||
+                  _barcodeController.text.trim().isEmpty) {
+                _barcodeController.text = detailBarcode;
+              }
+
+              if ((detail.costPrice ?? 0) > 0 ||
+                  _costPriceController.text.trim().isEmpty) {
+                _costPriceController.text = detail.costPrice != null
+                    ? CurrencyFormatter.formatNumber(detail.costPrice!)
+                    : '';
+              }
+
+              if ((detail.salePrice ?? 0) > 0 ||
+                  _salePriceController.text.trim().isEmpty) {
+                _salePriceController.text = detail.salePrice != null
+                    ? CurrencyFormatter.formatNumber(detail.salePrice!)
+                    : '';
+              }
+
+              if (detail.quantity > 0 ||
+                  _quantityController.text.trim().isEmpty ||
+                  _quantityController.text.trim() == '0') {
+                _quantityController.text = detail.quantity.toString();
+              }
+
+              _trackInventory = detail.trackInventory;
+
+              final detailUnit = (detail.unit ?? '').trim();
+              if (detailUnit.isNotEmpty ||
+                  _unitController.text.trim().isEmpty) {
+                _unitController.text = detailUnit;
+              }
+
+              final detailDescription = (detail.description ?? '').trim();
+              if (detailDescription.isNotEmpty ||
+                  _descriptionController.text.trim().isEmpty) {
+                _descriptionController.text = detailDescription;
+              }
+
+              final detailManufacturer = (detail.manufacturer ?? '').trim();
+              if (detailManufacturer.isNotEmpty ||
+                  _manufacturerController.text.trim().isEmpty) {
+                _manufacturerController.text = detailManufacturer;
+              }
+
+              if ((detail.businessTypeId ?? '').trim().isNotEmpty ||
+                  _selectedBusinessTypeId == null) {
+                _selectedBusinessTypeId = detail.businessTypeId;
+              }
+
+              _isActive = detail.isActive;
             });
           } else if (state is BusinessTypesLoaded) {
             setState(() {
               _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppColors.error,
-              ),
+            if (_isSubmitting || _isDeleting) {
+              setState(() {
+                _isSubmitting = false;
+                _isDeleting = false;
+              });
+            }
+
+            if (_isStatusUpdating) {
+              setState(() {
+                _isStatusUpdating = false;
+                if (_statusBeforeToggle != null) {
+                  _isActive = _statusBeforeToggle!;
+                }
+                _statusBeforeToggle = null;
+              });
+            }
+
+            AppSnackBar.show(
+              context,
+              message: state.message,
+              type: AppSnackBarType.error,
             );
           }
         },
@@ -529,103 +768,116 @@ class _EditProductPageState extends State<EditProductPage> {
                                 File(_selectedImagePath!),
                                 fit: BoxFit.cover,
                               ),
-                              Container(
-                                color: Colors.black26,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.edit,
-                                      size: 48,
-                                      color: AppColors.white,
-                                    ),
-                                    SizedBox(height: AppSpacing.md),
-                                    Text(
-                                      l10n.translate('product.change_image'),
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: AppColors.white,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
+                              _buildEditOverlay(),
+                            ],
+                          )
+                        : ((_resolveImageUrl(widget.imageUrl) != null) &&
+                              !_removeImage)
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.network(
+                                _resolveImageUrl(widget.imageUrl)!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildUploadPlaceholder(),
+                              ),
+                              _buildEditOverlay(),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.delete,
+                                    color: AppColors.error,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _removeImage = true;
+                                    });
+                                  },
                                 ),
                               ),
                             ],
                           )
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.cloud_upload_outlined,
-                                size: 48,
-                                color: AppColors.textSecondary,
-                              ),
-                              SizedBox(height: AppSpacing.md),
-                              Text(
-                                l10n.translate('product.upload_image'),
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              if (_selectedImagePath == null)
-                                Padding(
-                                  padding: EdgeInsets.only(top: AppSpacing.md),
-                                  child: Text(
-                                    l10n.translate('common.tap_to_select'),
-                                    style: AppTextStyles.bodySmall.copyWith(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
+                        : _buildUploadPlaceholder(),
                   ),
                 ),
+                if (_removeImage && widget.imageUrl != null)
+                  Padding(
+                    padding: EdgeInsets.only(top: AppSpacing.sm),
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          _removeImage = false;
+                        });
+                      },
+                      icon: const Icon(Icons.undo, size: 16),
+                      label: Text(l10n.translate('product.undo_remove_image')),
+                    ),
+                  ),
                 SizedBox(height: AppSpacing.lg),
 
                 // Status Section
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                BlocBuilder<ProductBloc, ProductState>(
+                  builder: (context, state) {
+                    final isStatusBusy =
+                        _isStatusUpdating || state is ProductUpdateInProgress;
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          l10n.translate('product.status'),
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            color: AppColors.textPrimary,
-                          ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l10n.translate('product.status'),
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: AppSpacing.sm),
+                            Text(
+                              _isActive
+                                  ? l10n.translate('product.status_active')
+                                  : l10n.translate('product.status_inactive'),
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: AppSpacing.sm),
-                        Text(
-                          _isActive
-                              ? l10n.translate('product.status_active')
-                              : l10n.translate('product.status_inactive'),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
+                        isStatusBusy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.secondary,
+                                ),
+                              )
+                            : Switch(
+                                value: _isActive,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _statusBeforeToggle = _isActive;
+                                    _isActive = value;
+                                    _isStatusUpdating = true;
+                                  });
+
+                                  context.read<ProductBloc>().add(
+                                    UpdateProductStatusRequested(
+                                      locationId: widget.locationId,
+                                      productId: widget.productId,
+                                      isActive: value,
+                                    ),
+                                  );
+                                },
+                                activeThumbColor: AppColors.secondary,
+                              ),
                       ],
-                    ),
-                    Switch(
-                      value: _isActive,
-                      onChanged: (value) {
-                        setState(() {
-                          _isActive = value;
-                        });
-                        // Immediate update as requested by the user
-                        context.read<ProductBloc>().add(
-                          UpdateProductStatusRequested(
-                            locationId: widget.locationId,
-                            productId: widget.productId,
-                            isActive: value,
-                          ),
-                        );
-                      },
-                      activeColor: AppColors.secondary,
-                    ),
-                  ],
+                    );
+                  },
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -644,6 +896,11 @@ class _EditProductPageState extends State<EditProductPage> {
                   controller: _productNameController,
                   hint: l10n.translate('product.name_hint'),
                   isRequired: true,
+                  errorText: _productNameError,
+                  onChanged: (_) {
+                    if (_productNameError == null) return;
+                    setState(() => _productNameError = null);
+                  },
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -683,8 +940,16 @@ class _EditProductPageState extends State<EditProductPage> {
                         label: l10n.translate('product.cost_price'),
                         controller: _costPriceController,
                         hint: '0',
+                        errorText: _costPriceError,
+                        onChanged: (_) {
+                          if (_costPriceError == null) return;
+                          setState(() => _costPriceError = null);
+                        },
                         keyboardType: TextInputType.number,
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters:
+                            AppInputFormatters.withSqlInjectionGuard(
+                              inputFormatters: [CurrencyInputFormatter()],
+                            ),
                       ),
                     ),
                     SizedBox(width: AppSpacing.md),
@@ -693,11 +958,68 @@ class _EditProductPageState extends State<EditProductPage> {
                         label: l10n.translate('product.sale_price'),
                         controller: _salePriceController,
                         hint: '0',
+                        errorText: _salePriceError,
+                        onChanged: (_) {
+                          if (_salePriceError == null) return;
+                          setState(() => _salePriceError = null);
+                        },
                         keyboardType: TextInputType.number,
-                        inputFormatters: [CurrencyInputFormatter()],
+                        inputFormatters:
+                            AppInputFormatters.withSqlInjectionGuard(
+                              inputFormatters: [CurrencyInputFormatter()],
+                            ),
                       ),
                     ),
                   ],
+                ),
+                SizedBox(height: AppSpacing.lg),
+
+                Container(
+                  padding: EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.divider),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _trackInventory,
+                        onChanged: (value) {
+                          setState(() {
+                            _trackInventory = value ?? true;
+                            if (!_trackInventory) {
+                              _quantityController.clear();
+                              _quantityError = null;
+                            }
+                          });
+                        },
+                        activeColor: AppColors.secondary,
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Quản lý tồn kho',
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(height: AppSpacing.xs),
+                            Text(
+                              _trackInventory
+                                  ? 'Bật để cho phép nhập và chỉnh tồn kho.'
+                                  : 'Tắt quản lý tồn kho: không thể chỉnh tồn kho ở danh sách sản phẩm.',
+                              style: AppTextStyles.bodySmall.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 SizedBox(height: AppSpacing.lg),
 
@@ -705,10 +1027,23 @@ class _EditProductPageState extends State<EditProductPage> {
                   children: [
                     Expanded(
                       child: _buildTextFieldWithLabel(
-                        label: l10n.translate('product.quantity'),
+                        label: l10n.translate('product.stock'),
                         controller: _quantityController,
                         hint: '0',
-                        keyboardType: TextInputType.number,
+                        errorText: _quantityError,
+                        enabled: _trackInventory,
+                        onChanged: (_) {
+                          if (_quantityError == null) return;
+                          setState(() => _quantityError = null);
+                        },
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'[0-9.,]'),
+                          ),
+                        ],
                       ),
                     ),
                     SizedBox(width: AppSpacing.md),
@@ -717,6 +1052,12 @@ class _EditProductPageState extends State<EditProductPage> {
                         label: l10n.translate('product.unit'),
                         controller: _unitController,
                         hint: 'cái',
+                        isRequired: true,
+                        errorText: _unitError,
+                        onChanged: (_) {
+                          if (_unitError == null) return;
+                          setState(() => _unitError = null);
+                        },
                       ),
                     ),
                   ],
@@ -792,7 +1133,7 @@ class _EditProductPageState extends State<EditProductPage> {
                                   ),
                                 ),
                               );
-                            }).toList(),
+                            }),
                             SizedBox(height: AppSpacing.md),
                           ],
                         ),
@@ -849,13 +1190,13 @@ class _EditProductPageState extends State<EditProductPage> {
                         Expanded(
                           child: BlocBuilder<ProductBloc, ProductState>(
                             builder: (context, state) {
+                              final isUpdateBusy =
+                                  _isSubmitting ||
+                                  state is ProductUpdateInProgress ||
+                                  state is ProductDeleteInProgress;
                               return ElevatedButton(
-                                onPressed:
-                                    state is ProductUpdateInProgress ||
-                                        state is ProductDeleteInProgress
-                                    ? null
-                                    : _submitForm,
-                                child: state is ProductUpdateInProgress
+                                onPressed: isUpdateBusy ? null : _submitForm,
+                                child: isUpdateBusy
                                     ? SizedBox(
                                         height: 20,
                                         width: 20,
@@ -878,17 +1219,19 @@ class _EditProductPageState extends State<EditProductPage> {
                     SizedBox(height: AppSpacing.md),
                     BlocBuilder<ProductBloc, ProductState>(
                       builder: (context, state) {
+                        final isDeleteBusy =
+                            _isDeleting ||
+                            state is ProductDeleteInProgress ||
+                            state is ProductUpdateInProgress;
                         return ElevatedButton(
-                          onPressed:
-                              state is ProductDeleteInProgress ||
-                                  state is ProductUpdateInProgress
+                          onPressed: isDeleteBusy
                               ? null
                               : _showDeleteConfirmDialog,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.error,
                             minimumSize: const Size(double.infinity, 48),
                           ),
-                          child: state is ProductDeleteInProgress
+                          child: isDeleteBusy
                               ? SizedBox(
                                   height: 20,
                                   width: 20,
@@ -923,9 +1266,12 @@ class _EditProductPageState extends State<EditProductPage> {
     required TextEditingController controller,
     required String hint,
     bool isRequired = false,
+    String? errorText,
+    ValueChanged<String>? onChanged,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     List<TextInputFormatter>? inputFormatters,
+    bool enabled = true,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -950,22 +1296,41 @@ class _EditProductPageState extends State<EditProductPage> {
         SizedBox(height: AppSpacing.sm),
         TextField(
           controller: controller,
+          enabled: enabled,
+          onChanged: onChanged,
           keyboardType: keyboardType,
           maxLines: maxLines,
-          inputFormatters: inputFormatters,
+          inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+            inputFormatters: inputFormatters,
+          ),
           decoration: InputDecoration(
             hintText: hint,
+            errorText: errorText,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppColors.divider),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.divider),
+              borderSide: BorderSide(
+                color: errorText != null ? AppColors.error : AppColors.divider,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: AppColors.secondary),
+              borderSide: BorderSide(
+                color: errorText != null
+                    ? AppColors.error
+                    : AppColors.secondary,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: AppColors.error),
             ),
             contentPadding: EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
@@ -1015,13 +1380,8 @@ class _EditProductPageState extends State<EditProductPage> {
             suffixIcon: IconButton(
               icon: Icon(Icons.qr_code_scanner, color: AppColors.secondary),
               onPressed: () async {
-                var res = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SimpleBarcodeScannerPage(),
-                  ),
-                );
-                if (res is String && res != '-1' && res.isNotEmpty) {
+                final res = await AppBarcodeScanner.scan(context);
+                if (res != null) {
                   setState(() {
                     controller.text = res;
                   });
@@ -1043,6 +1403,22 @@ class _EditProductPageState extends State<EditProductPage> {
             child: Text(type.name),
           );
         }).toList();
+
+        final hasSelectedInList =
+            _selectedBusinessTypeId != null &&
+            _businessTypes.any(
+              (type) => type.businessTypeId == _selectedBusinessTypeId,
+            );
+
+        if (!hasSelectedInList && _selectedBusinessTypeId != null) {
+          typeItems.insert(
+            0,
+            DropdownMenuItem<String>(
+              value: _selectedBusinessTypeId,
+              child: Text(l10n.translate('common.loading')),
+            ),
+          );
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1066,7 +1442,11 @@ class _EditProductPageState extends State<EditProductPage> {
             SizedBox(height: AppSpacing.sm),
             Container(
               decoration: BoxDecoration(
-                border: Border.all(color: AppColors.divider),
+                border: Border.all(
+                  color: _businessTypeError != null
+                      ? AppColors.error
+                      : AppColors.divider,
+                ),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Padding(
@@ -1085,12 +1465,20 @@ class _EditProductPageState extends State<EditProductPage> {
                     onChanged: (value) {
                       setState(() {
                         _selectedBusinessTypeId = value;
+                        _businessTypeError = null;
                       });
                     },
                   ),
                 ),
               ),
             ),
+            if (_businessTypeError != null) ...[
+              SizedBox(height: AppSpacing.xs),
+              Text(
+                _businessTypeError!,
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+              ),
+            ],
           ],
         );
       },
@@ -1111,6 +1499,54 @@ class _EditProductPageState extends State<EditProductPage> {
         Text(
           '+ ${l10n.translate('common.add')}',
           style: AppTextStyles.bodySmall.copyWith(color: AppColors.secondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditOverlay() {
+    return Container(
+      color: Colors.black26,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.edit, size: 48, color: AppColors.white),
+          SizedBox(height: AppSpacing.md),
+          Text(
+            l10n.translate('product.change_image'),
+            style: AppTextStyles.bodyMedium.copyWith(color: AppColors.white),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadPlaceholder() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.cloud_upload_outlined,
+          size: 48,
+          color: AppColors.textSecondary,
+        ),
+        SizedBox(height: AppSpacing.md),
+        Text(
+          l10n.translate('product.upload_image'),
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: AppColors.textSecondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        Padding(
+          padding: EdgeInsets.only(top: AppSpacing.md),
+          child: Text(
+            l10n.translate('common.tap_to_select'),
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
         ),
       ],
     );

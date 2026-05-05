@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import '../../domain/entities/order_entity.dart';
 
 /// Order Card Widget - Displays a single order in list format
@@ -10,15 +11,19 @@ class OrderCard extends StatelessWidget {
   final VoidCallback? onEdit;
   final VoidCallback? onPublish;
   final VoidCallback? onCancel;
+  final VoidCallback? onDeleteDraft;
+  final bool isPublishing;
 
   const OrderCard({
-    Key? key,
+    super.key,
     required this.order,
     required this.onTap,
     this.onEdit,
     this.onPublish,
     this.onCancel,
-  }) : super(key: key);
+    this.onDeleteDraft,
+    this.isPublishing = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,9 +49,15 @@ class OrderCard extends StatelessWidget {
                           l10n.translate(
                             'order.order_number',
                             params: {
-                              'number': order.id.length > 8
-                                  ? order.id.substring(0, 8)
-                                  : order.id,
+                              'number': (order.orderCode.trim().isNotEmpty)
+                                  ? order.orderCode
+                                  : (order.isDraft
+                                      ? order.id
+                                      : (order.id.length > 8
+                                          ? order.id.substring(
+                                              order.id.length - 8,
+                                            )
+                                          : order.id)),
                             },
                           ),
                           style: const TextStyle(
@@ -102,31 +113,57 @@ class OrderCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    DateFormat('dd/MM/yyyy').format(order.createdAt),
+                    DateFormatter.formatDate(order.createdAt),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
 
-              // Action buttons (if draft)
-              if (order.isDraft) ...[
+              // Action buttons
+              if (order.isDraft || order.isPending || (order.isPublished && onCancel != null)) ...[
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
-                    if (onEdit != null)
+                    if ((order.isDraft || order.isPending) && onEdit != null)
                       TextButton(
-                        onPressed: onEdit,
+                        onPressed: isPublishing ? null : onEdit,
                         child: Text(l10n.translate('order.action_edit')),
                       ),
-                    const SizedBox(width: 8),
-                    if (onPublish != null)
+                    if (order.isDraft && onDeleteDraft != null)
                       TextButton(
-                        onPressed: onPublish,
+                        onPressed: isPublishing ? null : onDeleteDraft,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: Text(l10n.translate('common.delete')),
+                      ),
+                    if ((order.isPending || order.isPublished) && onCancel != null)
+                      TextButton(
+                        onPressed: isPublishing ? null : onCancel,
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                        child: Text(l10n.translate('order.action_cancel')),
+                      ),
+                    if ((order.isDraft || order.isPending) && onPublish != null)
+                      TextButton(
+                        onPressed: isPublishing ? null : onPublish,
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.green,
                         ),
-                        child: Text(l10n.translate('order.action_publish')),
+                        child: isPublishing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.green,
+                                ),
+                              )
+                            : Text(l10n.translate('order.action_publish')),
                       ),
                   ],
                 ),

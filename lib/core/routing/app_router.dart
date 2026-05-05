@@ -1,28 +1,73 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import 'package:bizflow_mobile/core/localization/app_localizations.dart';
+import '../../core/theme/app_colors.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/verify_otp_page.dart';
+import '../../features/auth/presentation/pages/splash_page.dart';
+import '../../features/auth/presentation/pages/set_password_page.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/pages/google_phone_link_page.dart';
+import '../../features/auth/presentation/pages/phone_google_link_page.dart';
+import '../../core/services/firebase_messaging_service.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/auth_event.dart';
+
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/location/presentation/pages/location_management_page.dart';
 import '../../features/location/presentation/pages/add_edit_location_page.dart';
+import '../../features/location/presentation/pages/no_location_page.dart';
 import '../../features/product/presentation/pages/product_management_page.dart';
 import '../../features/product/presentation/pages/import_history_page.dart';
+import '../../features/product/presentation/pages/stock_import_page.dart';
 import '../../features/order/presentation/pages/order_list_screen.dart';
 import '../../features/order/presentation/pages/order_status_screen.dart';
 import '../../features/order/presentation/pages/order_creation_selection_screen.dart';
+import '../../features/subscription/presentation/pages/current_subscription_page.dart';
 import '../../features/subscription/presentation/pages/subscription_plans_page.dart';
 import '../../features/subscription/presentation/pages/premium_payment_page.dart';
+import '../../features/subscription/presentation/pages/subscription_checkout_result_page.dart';
+import '../../features/subscription/presentation/pages/subscription_transactions_page.dart';
+
+import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/notification/presentation/pages/notification_list_page.dart';
+import '../../features/notification/presentation/pages/notification_detail_page.dart';
+import '../../features/debt/presentation/pages/debt_list_page.dart';
+import '../../features/accounting/presentation/pages/accounting_hub_page.dart';
+import '../../features/accounting/presentation/pages/accounting_book_detail_page.dart';
+import '../../features/accounting/presentation/pages/general_ledger_page.dart';
+import '../../features/invoice_template/presentation/pages/invoice_template_page.dart';
+import '../../features/invoice_template/presentation/pages/advanced_invoice_template_page.dart';
+import '../../features/employee/presentation/pages/employee_list_page.dart';
+import '../../features/employee/presentation/pages/add_employee_page.dart';
+import '../../features/employee/presentation/pages/edit_employee_page.dart';
+import '../../features/employee/presentation/pages/employee_invitations_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/location/presentation/bloc/location_bloc.dart';
 import '../../features/location/presentation/bloc/location_state.dart';
+
 import '../../shared/widgets/app_bar_custom.dart';
 import '../../shared/widgets/sidebar_widget.dart';
 import '../../shared/dialogs/app_snackbar.dart';
+import '../../shared/context/business_context.dart';
+import '../../shared/context/notification_context.dart';
+import '../../shared/services/permission_service.dart';
+import '../../shared/utils/action_guard.dart';
+import '../../features/subscription/domain/subscription_feature_codes.dart';
+import '../../features/subscription/presentation/utils/subscription_feature_guard.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Route names - Tập trung khai báo tất cả route
 class AppRoutes {
   AppRoutes._();
+
+  static const String setPassword = '/set-password';
+  static const String googlePhoneLink = '/google-phone-link';
+  static const String phoneGoogleLink = '/phone-google-link';
 
   // Auth
   static const String splash = '/';
@@ -35,27 +80,65 @@ class AppRoutes {
   static const String home = '/home';
   static const String locationManagement = '/location-management';
   static const String addEditLocation = '/add-edit-location';
+  static const String noLocation = '/no-location';
   static const String productManagement = '/product-management';
   static const String orderList = '/order-list';
   static const String orderStatus = '/order-status';
   static const String orderCreateSelection = '/order-create-selection';
+  static const String currentSubscription = '/current-subscription';
   static const String subscriptionPlans = '/subscription-plans';
   static const String premiumPayment = '/premium-payment';
+  static const String subscriptionTransactions = '/subscription-transactions';
+  static const String paymentResultSuccess = '/payment-result-success';
+  static const String paymentResultCancel = '/payment-result-cancel';
   static const String profile = '/profile';
   static const String settings = '/settings';
   static const String importHistory = '/import-history';
+  static const String notifications = '/notifications';
+  static const String notificationDetail = '/notification-detail';
+  static const String debtList = '/debt-list';
+  static const String accounting = '/accounting';
+  static const String accountingBookDetail = '/accounting-book-detail';
+  static const String generalLedger = '/general-ledger';
+  static const String invoiceTemplate = '/invoice-template';
+  static const String advancedInvoiceTemplate = '/advanced-invoice-template';
+  static const String employeeList = '/employee-list';
+  static const String addEmployee = '/add-employee';
+  static const String editEmployee = '/edit-employee';
+  static const String employeeDetail = '/employee-detail';
+  static const String employeeAssign = '/employee-assign';
+  static const String employeeUnassign = '/employee-unassign';
+  static const String employeeInvitations = '/employee-invitations';
+  static const String stockImport = '/stock-import';
 }
 
 /// Global AppBar State - Quản lý tập trung cho toàn hệ thống
 class GlobalAppBarState extends ChangeNotifier {
   String _userName = 'User';
+  String? _avatarUrl;
   Locale _currentLocale = const Locale('vi');
 
   String get userName => _userName;
+  String? get avatarUrl => _avatarUrl;
   Locale get currentLocale => _currentLocale;
 
   void updateUserName(String name) {
     _userName = name;
+    notifyListeners();
+  }
+
+  void updateAvatarUrl(String? url) {
+    _avatarUrl = (url == null || url.trim().isEmpty) ? null : url.trim();
+    notifyListeners();
+  }
+
+  void updateProfile({String? name, String? avatarUrl}) {
+    if (name != null && name.trim().isNotEmpty) {
+      _userName = name.trim();
+    }
+    _avatarUrl = (avatarUrl == null || avatarUrl.trim().isEmpty)
+        ? null
+        : avatarUrl.trim();
     notifyListeners();
   }
 
@@ -66,6 +149,7 @@ class GlobalAppBarState extends ChangeNotifier {
 
   void reset() {
     _userName = 'User';
+    _avatarUrl = null;
     _currentLocale = const Locale('vi');
     notifyListeners();
   }
@@ -77,7 +161,12 @@ class AppRouter {
 
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
+  static final AppRouteObserver routeObserver = AppRouteObserver();
   static final GlobalAppBarState globalAppBarState = GlobalAppBarState();
+  static bool _clearStackNavigationInProgress = false;
+  static String? _clearStackRouteInProgress;
+  static String? _lastClearedRoute;
+  static DateTime? _lastClearedAt;
 
   /// Lấy context hiện tại
   static BuildContext? get context => navigatorKey.currentContext;
@@ -87,6 +176,8 @@ class AppRouter {
     switch (settings.name) {
       // Auth Routes - No AppBar
       case AppRoutes.splash:
+        return _buildRoute(settings, const SplashPage());
+
       case AppRoutes.login:
         return _buildRoute(settings, const LoginPage());
 
@@ -99,11 +190,17 @@ class AppRouter {
           const VerifyOtpPage(phoneNumber: '095555555'),
         );
 
+      case AppRoutes.setPassword:
+        return _buildRoute(settings, const SetPasswordPage());
+
+      case AppRoutes.googlePhoneLink:
+        return _buildRoute(settings, const GooglePhoneLinkPage());
+
+      case AppRoutes.phoneGoogleLink:
+        return _buildRoute(settings, const PhoneGoogleLinkPage());
+
       case AppRoutes.forgotPassword:
-        return _buildRoute(
-          settings,
-          const _PlaceholderPage(title: 'Forgot Password'),
-        );
+        return _buildRoute(settings, const ForgotPasswordPage());
 
       // Main Routes - With Global AppBar
       case AppRoutes.home:
@@ -115,50 +212,51 @@ class AppRouter {
         return _buildRoute(
           settings,
           _GlobalAppBarShell(
-            child: const LocationManagementPage(),
             showAddLocationFab: true,
+            child: const LocationManagementPage(),
           ),
         );
 
       case AppRoutes.addEditLocation:
-        return _buildRoute(
-          settings,
-          _GlobalAppBarShell(child: const AddEditLocationPage()),
-        );
+        return _buildRoute(settings, const AddEditLocationPage());
+
+      case AppRoutes.noLocation:
+        return _buildRoute(settings, const NoLocationPage());
 
       case AppRoutes.productManagement:
         final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(
-            child: ProductManagementPage(
-              locationId: args?['locationId'] ?? '',
-              locationName: args?['locationName'] ?? 'Location',
-              locationAddress: args?['locationAddress'] ?? 'Address',
-            ),
+          ProductManagementPage(
+            locationId: args?['locationId'] ?? '',
+            locationName: args?['locationName'] ?? 'Location',
+            locationAddress: args?['locationAddress'] ?? 'Address',
           ),
         );
 
       case AppRoutes.orderList:
-        return _buildRoute(
-          settings,
-          _GlobalAppBarShell(child: const OrderListScreen()),
-        );
+        return _buildRoute(settings, const OrderListScreen());
 
       case AppRoutes.orderCreateSelection:
-        return _buildRoute(
-          settings,
-          _GlobalAppBarShell(child: const OrderCreationSelectionScreen()),
-        );
+        return _buildRoute(settings, const OrderCreationSelectionScreen());
 
       case AppRoutes.orderStatus:
+        return _buildRoute(settings, const OrderStatusScreen());
+
+      case AppRoutes.currentSubscription:
+        final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const OrderStatusScreen()),
+          CurrentSubscriptionPage(
+            fromCheckoutResult: args?['fromCheckoutResult'] as bool? ?? false,
+          ),
         );
 
       case AppRoutes.subscriptionPlans:
         return _buildRoute(settings, const SubscriptionPlansPage());
+
+      case AppRoutes.subscriptionTransactions:
+        return _buildRoute(settings, const SubscriptionTransactionsPage());
 
       case AppRoutes.premiumPayment:
         final args = settings.arguments as Map<String, dynamic>?;
@@ -173,20 +271,144 @@ class AppRouter {
           ),
         );
 
-      case AppRoutes.profile:
+      case AppRoutes.paymentResultSuccess:
+        final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const _PlaceholderPage(title: 'Profile')),
+          SubscriptionCheckoutResultPage(
+            isSuccess: true,
+            sessionId: args?['sessionId'] as String?,
+          ),
         );
 
-      case AppRoutes.settings:
+      case AppRoutes.paymentResultCancel:
+        final args = settings.arguments as Map<String, dynamic>?;
         return _buildRoute(
           settings,
-          _GlobalAppBarShell(child: const _PlaceholderPage(title: 'Settings')),
+          SubscriptionCheckoutResultPage(
+            isSuccess: false,
+            sessionId: args?['sessionId'] as String?,
+          ),
         );
+
+      case AppRoutes.profile:
+        return _buildRoute(settings, const ProfilePage());
+
+      case AppRoutes.settings:
+        return _buildRoute(settings, const SettingsPage());
+
+      case AppRoutes.notifications:
+        return _buildRoute(settings, const NotificationListPage());
+
+      case AppRoutes.notificationDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          NotificationDetailPage(
+            title: args?['title'] ?? '',
+            body: args?['body'] ?? '',
+            time: args?['time'] ?? '',
+            icon: args?['icon'] ?? Icons.notifications,
+            iconColor: args?['iconColor'] ?? Colors.blue,
+            externalUrl: args?['externalUrl'] as String?,
+            notificationType: args?['notificationType'] as String?,
+          ),
+        );
+
+      case AppRoutes.debtList:
+        return _buildRoute(settings, const DebtListPage());
+
+      case AppRoutes.accounting:
+        return _buildRoute(settings, const AccountingHubPage());
+
+      case AppRoutes.accountingBookDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args?['book'] != null && args?['locationId'] != null) {
+          return _buildRoute(
+            settings,
+            AccountingBookDetailPage(
+              book: args!['book'],
+              locationId: args['locationId'],
+            ),
+          );
+        }
+        return _buildRoute(settings, const AccountingHubPage());
+
+      case AppRoutes.generalLedger:
+        return _buildRoute(settings, const GeneralLedgerPage());
 
       case AppRoutes.importHistory:
         return _buildRoute(settings, const ImportHistoryPage());
+
+      case AppRoutes.stockImport:
+        final args = settings.arguments as Map<String, dynamic>?;
+        final locationId = args?['locationId'] ?? '';
+        final importId = args?['importId'] as int?;
+        return _buildRoute(
+          settings,
+          StockImportPage(locationId: locationId, importId: importId),
+        );
+
+      case AppRoutes.invoiceTemplate:
+        return _buildRoute(settings, const InvoiceTemplatePage());
+
+      case AppRoutes.advancedInvoiceTemplate:
+        return _buildRoute(settings, const AdvancedInvoiceTemplatePage());
+
+      case AppRoutes.employeeList:
+        return _buildRoute(settings, const EmployeeListPage());
+
+      case AppRoutes.addEmployee:
+        return _buildRoute(settings, const AddEmployeePage());
+
+      case AppRoutes.editEmployee:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.assign,
+          ),
+        );
+
+      case AppRoutes.employeeDetail:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.detail,
+          ),
+        );
+
+      case AppRoutes.employeeAssign:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.assign,
+          ),
+        );
+
+      case AppRoutes.employeeUnassign:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EditEmployeePage(
+            employeeId: args?['employeeId'] ?? '',
+            mode: EmployeeEditMode.unassign,
+          ),
+        );
+
+      case AppRoutes.employeeInvitations:
+        final args = settings.arguments as Map<String, dynamic>?;
+        return _buildRoute(
+          settings,
+          EmployeeInvitationsPage(
+            allowBack: args?['allowBack'] as bool? ?? true,
+          ),
+        );
 
       default:
         return _buildRoute(settings, const _NotFoundPage());
@@ -222,11 +444,40 @@ class AppRouter {
     String routeName, {
     Object? arguments,
   }) {
-    return navigatorKey.currentState!.pushNamedAndRemoveUntil<T>(
-      routeName,
-      (route) => false,
-      arguments: arguments,
-    );
+    if (routeObserver.currentRouteName == routeName) {
+      return Future<T?>.value(null);
+    }
+
+    if (_clearStackNavigationInProgress &&
+        _clearStackRouteInProgress == routeName) {
+      return Future<T?>.value(null);
+    }
+
+    final now = DateTime.now();
+    final recentlyClearedSameRoute =
+        _lastClearedRoute == routeName &&
+        _lastClearedAt != null &&
+        now.difference(_lastClearedAt!) < const Duration(milliseconds: 1200);
+
+    if (recentlyClearedSameRoute) {
+      return Future<T?>.value(null);
+    }
+
+    _clearStackNavigationInProgress = true;
+    _clearStackRouteInProgress = routeName;
+    _lastClearedRoute = routeName;
+    _lastClearedAt = now;
+
+    return navigatorKey.currentState!
+        .pushNamedAndRemoveUntil<T>(
+          routeName,
+          (route) => false,
+          arguments: arguments,
+        )
+        .whenComplete(() {
+          _clearStackNavigationInProgress = false;
+          _clearStackRouteInProgress = null;
+        });
   }
 
   /// Pop current route
@@ -242,6 +493,151 @@ class AppRouter {
   /// Can pop
   static bool canPop() {
     return navigatorKey.currentState!.canPop();
+  }
+
+  static bool isExternalUrl(String target) {
+    final uri = Uri.tryParse(target.trim());
+    if (uri == null) {
+      return false;
+    }
+
+    return uri.hasScheme &&
+        (uri.scheme.toLowerCase() == 'http' ||
+            uri.scheme.toLowerCase() == 'https');
+  }
+
+  static Future<bool> openExternalUrl(String target) async {
+    final uri = Uri.tryParse(target.trim());
+    if (uri == null) {
+      return false;
+    }
+
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  static Future<bool> navigateFromNotificationTarget(String target) async {
+    if (isExternalUrl(target)) {
+      return openExternalUrl(target);
+    }
+
+    final canAccess = await _canAccessInternalTarget(target);
+    if (!canAccess) {
+      final currentContext = context;
+      if (currentContext != null) {
+        AppSnackBar.show(
+          currentContext,
+          message: 'Bạn không có quyền truy cập màn hình này.',
+          type: AppSnackBarType.warning,
+        );
+      }
+      return false;
+    }
+
+    await navigateTo(target);
+    return true;
+  }
+
+  static Future<bool> _canAccessInternalTarget(String target) async {
+    final businessContext = BusinessContext();
+    await businessContext.init();
+
+    final hasBusinessMembership = (businessContext.currentBusinessId ?? '')
+        .trim()
+        .isNotEmpty;
+    final isOwner = businessContext.isOwner;
+
+    const ownerOnlyRoutes = <String>{
+      AppRoutes.subscriptionPlans,
+      AppRoutes.currentSubscription,
+      AppRoutes.premiumPayment,
+      AppRoutes.subscriptionTransactions,
+      AppRoutes.accounting,
+      AppRoutes.generalLedger,
+      AppRoutes.invoiceTemplate,
+      AppRoutes.advancedInvoiceTemplate,
+      AppRoutes.employeeList,
+      AppRoutes.addEmployee,
+      AppRoutes.editEmployee,
+    };
+
+    const memberOnlyRoutes = <String>{
+      AppRoutes.productManagement,
+      AppRoutes.orderList,
+      AppRoutes.orderStatus,
+      AppRoutes.orderCreateSelection,
+      AppRoutes.debtList,
+      AppRoutes.importHistory,
+      AppRoutes.stockImport,
+    };
+
+    if (ownerOnlyRoutes.contains(target)) {
+      return hasBusinessMembership &&
+          PermissionService.canAccessSubscription(isOwner);
+    }
+
+    if (memberOnlyRoutes.contains(target)) {
+      return hasBusinessMembership;
+    }
+
+    return true;
+  }
+
+  static Future<void> handleIncomingDeepLink(Uri uri) async {
+    if (uri.scheme.toLowerCase() != 'bizflow') {
+      return;
+    }
+
+    final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+    final sessionId = uri.queryParameters['session_id'];
+
+    if (host == 'payment' && path == '/success') {
+      await navigateAndClearStack(
+        AppRoutes.paymentResultSuccess,
+        arguments: {'sessionId': sessionId},
+      );
+      return;
+    }
+
+    if (host == 'payment' && path == '/cancel') {
+      await navigateAndClearStack(
+        AppRoutes.paymentResultCancel,
+        arguments: {'sessionId': sessionId},
+      );
+      return;
+    }
+  }
+}
+
+class AppRouteObserver extends RouteObserver<PageRoute<dynamic>> {
+  String? currentRouteName;
+
+  String? _routeName(Route<dynamic>? route) {
+    return route?.settings.name;
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    currentRouteName = _routeName(route);
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPop(route, previousRoute);
+    currentRouteName = _routeName(previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+    currentRouteName = _routeName(newRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didRemove(route, previousRoute);
+    currentRouteName = _routeName(previousRoute);
   }
 }
 
@@ -261,11 +657,32 @@ class _GlobalAppBarShell extends StatefulWidget {
 }
 
 class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
-  LocationItem? _selectedLocation;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ActionGuard _openLocationFormGuard = ActionGuard();
+  StreamSubscription<String>? _navigationSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen for immediate navigation from notifications
+    _navigationSubscription = FirebaseMessagingService.navigationStream.listen((
+      route,
+    ) {
+      debugPrint('_GlobalAppBarShell: Immediate navigation to $route');
+      unawaited(AppRouter.navigateFromNotificationTarget(route));
+    });
+    NotificationContext().refreshUnreadCount();
+  }
+
+  @override
+  void dispose() {
+    _navigationSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = context.watch<NotificationContext>().unreadCount;
     return ListenableBuilder(
       listenable: AppRouter.globalAppBarState,
       builder: (context, _) {
@@ -274,91 +691,184 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
           // Global AppBar
           appBar: CustomAppBar(
             userName: AppRouter.globalAppBarState.userName,
+            avatarUrl: AppRouter.globalAppBarState.avatarUrl,
             scaffoldKey: _scaffoldKey,
+            notificationCount: unreadCount,
             onLocaleChange: (locale) {
               AppRouter.globalAppBarState.setLocale(locale);
             },
             onNotificationTap: () {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Notifications')));
+              AppRouter.navigateTo(AppRoutes.notifications);
             },
             onSettingsTap: () {
               AppRouter.navigateTo(AppRoutes.settings);
             },
           ),
           // Drawer
-          drawer: BlocBuilder<LocationBloc, LocationState>(
-            builder: (context, state) {
-              // Get locations for sidebar
-              final l10n = AppLocalizations.of(context);
-              List<LocationItem> locations = [];
-              if (state is LocationsLoaded) {
-                locations = state.locations
-                    .map(
-                      (loc) => LocationItem(
-                        id: loc.id,
-                        name: loc.name,
-                        isActive: loc.isActive,
-                      ),
-                    )
-                    .toList();
-              }
+          drawer: Consumer<BusinessContext>(
+            builder: (context, businessContext, _) {
+              return BlocBuilder<LocationBloc, LocationState>(
+                builder: (context, state) {
+                  // Get locations for sidebar
+                  final l10n = AppLocalizations.of(context);
+                  List<LocationItem> locations = [];
+                  LocationItem? selectedLocation;
 
-              return SidebarWidget(
-                locations: locations,
-                selectedLocation: _selectedLocation,
-                onAddLocation: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AddEditLocationPage(),
-                    ),
+                  final allLocations = state is LocationsLoaded
+                      ? state.locations
+                      : context.read<LocationBloc>().currentLocations;
+
+                  locations = allLocations
+                      .map(
+                        (loc) => LocationItem(
+                          id: loc.id,
+                          name: loc.name,
+                          ownerProfileId: loc.ownerProfileId,
+                          isActive: loc.isActive,
+                          isOwner: loc.isOwner,
+                        ),
+                      )
+                      .toList();
+
+                  // Resolve selectedLocation from businessContext
+                  final selectedBusinessId = businessContext.currentBusinessId;
+                  if (selectedBusinessId != null) {
+                    try {
+                      selectedLocation = locations.firstWhere(
+                        (loc) => loc.id == selectedBusinessId,
+                      );
+                    } catch (_) {
+                      // Safe fallback
+                    }
+                  }
+
+                  final hasAnyActive = locations.any(
+                    (location) => location.isActive,
                   );
-                },
-                onLogout: () {
-                  AppSnackBar.show(
-                    context,
-                    message: l10n.translate('sidebar.logout'),
-                    type: AppSnackBarType.info,
+                  final isSelectionValid =
+                      selectedBusinessId != null &&
+                      selectedLocation != null &&
+                      (!hasAnyActive || selectedLocation!.isActive);
+
+                  if (locations.isNotEmpty && !isSelectionValid) {
+                    // Keep sidebar selection and business context in sync,
+                    // including after account switch when old business id is stale
+                    // or when selected location has been inactivated.
+                    final fallbackLocation = locations.firstWhere(
+                      (location) => location.isActive,
+                      orElse: () => locations.first,
+                    );
+                    selectedLocation = fallbackLocation;
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      if (!context.mounted) return;
+                      if (businessContext.currentBusinessId ==
+                          fallbackLocation.id) {
+                        return;
+                      }
+                      await businessContext.switchBusinessLocation(
+                        fallbackLocation.id,
+                        fallbackLocation.name,
+                        isOwner: fallbackLocation.isOwner,
+                        ownerProfileId: fallbackLocation.ownerProfileId,
+                      );
+                    });
+                  } else if (locations.isEmpty && selectedBusinessId != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) async {
+                      if (!context.mounted) return;
+                      if (businessContext.currentBusinessId == null) {
+                        return;
+                      }
+                      await businessContext.clear();
+                    });
+                  }
+
+                  return SidebarWidget(
+                    locations: locations,
+                    selectedLocation: selectedLocation,
+                    isOwner: businessContext.isOwner,
+                    onAddLocation: () {
+                      unawaited(
+                        _openLocationFormGuard.run(() async {
+                          final allowed =
+                              await SubscriptionFeatureGuard.ensureAllowed(
+                                context,
+                                featureCode: SubscriptionFeatureCodes.locations,
+                              );
+                          if (!allowed || !context.mounted) return;
+
+                          Navigator.pop(context);
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AddEditLocationPage(),
+                            ),
+                          );
+                        }),
+                      );
+                    },
+                    onLogout: () {
+                      final authBloc = context.read<AuthBloc>();
+                      authBloc.add(const LogoutRequested());
+                    },
+                    onGuide: () {
+                      AppSnackBar.show(
+                        context,
+                        message: l10n.translate('sidebar.guide'),
+                        type: AppSnackBarType.info,
+                      );
+                    },
+                    onAccountSettings: () {
+                      AppRouter.navigateTo(AppRoutes.profile);
+                    },
+                    onLocationSelected: (location) async {
+                      if (!location.isActive) {
+                        AppSnackBar.show(
+                          context,
+                          message: l10n.translate(
+                            'home.location_inactive_block',
+                          ),
+                          type: AppSnackBarType.warning,
+                        );
+                        return;
+                      }
+                      await businessContext.switchBusinessLocation(
+                        location.id,
+                        location.name,
+                        isOwner: location.isOwner,
+                        ownerProfileId: location.ownerProfileId,
+                      );
+                      // Go back to Home
+                      AppRouter.navigateAndClearStack(AppRoutes.home);
+                    },
                   );
-                },
-                onGuide: () {
-                  AppSnackBar.show(
-                    context,
-                    message: l10n.translate('sidebar.guide'),
-                    type: AppSnackBarType.info,
-                  );
-                },
-                onAccountSettings: () {
-                  AppSnackBar.show(
-                    context,
-                    message: l10n.translate('sidebar.account_settings'),
-                    type: AppSnackBarType.info,
-                  );
-                },
-                onLocationSelected: (location) {
-                  setState(() {
-                    _selectedLocation = location;
-                  });
                 },
               );
             },
           ),
           // Body
           body: widget.child,
-          // FAB - positioned at bottom-right
-          floatingActionButton: widget.showAddLocationFab
+          // FAB - positioned at bottom-right; only visible for owners
+          floatingActionButton:
+              (widget.showAddLocationFab &&
+                  context.watch<BusinessContext>().isOwner)
               ? FloatingActionButton(
+                  tooltip: 'Thêm địa điểm',
                   backgroundColor: const Color(0xFF23C4C1),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AddEditLocationPage(),
-                      ),
-                    );
+                  onPressed: () async {
+                    await _openLocationFormGuard.run(() async {
+                      final allowed =
+                          await SubscriptionFeatureGuard.ensureAllowed(
+                            context,
+                            featureCode: SubscriptionFeatureCodes.locations,
+                          );
+                      if (!allowed || !context.mounted) return;
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddEditLocationPage(),
+                        ),
+                      );
+                    });
                   },
                   child: const Icon(Icons.add, color: Colors.white),
                 )
@@ -370,24 +880,6 @@ class _GlobalAppBarShellState extends State<_GlobalAppBarShell> {
   }
 }
 
-/// Placeholder page - Dùng tạm khi chưa có page thật
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-
-  const _PlaceholderPage({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        '$title Page\n(Placeholder)',
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.headlineMedium,
-      ),
-    );
-  }
-}
-
 /// Not Found page
 class _NotFoundPage extends StatelessWidget {
   const _NotFoundPage();
@@ -395,7 +887,18 @@ class _NotFoundPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Not Found')),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: AppColors.white,
+        foregroundColor: AppColors.textPrimary,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          color: Colors.black,
+        ),
+        title: const Text('Not Found'),
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

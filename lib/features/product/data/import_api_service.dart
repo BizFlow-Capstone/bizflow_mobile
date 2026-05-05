@@ -1,15 +1,24 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../../../shared/models/ocr_purchase_invoice_dto.dart';
+import '../../../../shared/utils/date_formatter.dart';
 import 'models/import_model.dart';
 
 class ImportApiService {
   final ApiClient _apiClient;
 
   ImportApiService({required ApiClient apiClient}) : _apiClient = apiClient;
+
+  Map<String, dynamic> _buildImportItemPayload(ImportItemModel item) {
+    return {
+      'ProductId': item.productId,
+      'Quantity': item.quantity,
+      'CostPrice': item.costPrice,
+    };
+  }
 
   Future<Map<String, dynamic>> getImports({
     String? status,
@@ -23,10 +32,15 @@ class ImportApiService {
     final queryParams = <String, dynamic>{};
     if (status != null) queryParams['Status'] = status;
     if (importType != null) queryParams['ImportType'] = importType;
-    if (businessLocationId != null)
+    if (businessLocationId != null) {
       queryParams['BusinessLocationId'] = businessLocationId;
-    if (fromDate != null) queryParams['FromDate'] = fromDate.toIso8601String();
-    if (toDate != null) queryParams['ToDate'] = toDate.toIso8601String();
+    }
+    if (fromDate != null) {
+      queryParams['FromDate'] = DateFormatter.toApiUtcIsoString(fromDate);
+    }
+    if (toDate != null) {
+      queryParams['ToDate'] = DateFormatter.toApiUtcIsoString(toDate);
+    }
     if (pageNumber != null) queryParams['PageNumber'] = pageNumber;
     if (pageSize != null) queryParams['PageSize'] = pageSize;
 
@@ -35,7 +49,9 @@ class ImportApiService {
       queryParams: queryParams,
     );
 
-    return response.data ?? {};
+    return (response.data?['data'] as Map<String, dynamic>?) ??
+        response.data ??
+        {};
   }
 
   Future<Map<String, dynamic>> getImportDetail(int importId) async {
@@ -43,72 +59,54 @@ class ImportApiService {
       ApiEndpoints.getImportDetail(importId.toString()),
     );
 
-    return response.data ?? {};
+    return (response.data?['data'] as Map<String, dynamic>?) ??
+        response.data ??
+        {};
   }
 
   Future<Map<String, dynamic>> createImport(CreateImportRequest request) async {
     try {
-      if (request.imagePath != null && request.imagePath!.isNotEmpty) {
-        // Use multipart/form-data
-        final Map<String, dynamic> dataMap = {
-          'ImportType': request.importType,
-          'BusinessLocationId': request.businessLocationId,
-          'Supplier': request.supplier,
-          'Note': request.note,
-          'SaveAsDraft': request.saveAsDraft,
-          if (request.receivedAt != null)
-            'ReceivedAt': request.receivedAt!.toIso8601String(),
-          // Assuming items can be sent as JSON string in multipart request
-          if (request.items.isNotEmpty)
-            'Items': jsonEncode(request.items.map((e) => e.toJson()).toList()),
-        };
+      final Map<String, String> fields = {
+        'ImportType': request.importType,
+        'BusinessLocationId': request.businessLocationId.toString(),
+        'Supplier': request.supplier,
+        'Note': request.note,
+        'SaveAsDraft': request.saveAsDraft.toString(),
+        if (request.documentDate != null)
+          'DocumentDate': DateFormatter.toApiDateOnly(request.documentDate!),
+        if (request.documentNumber != null &&
+            request.documentNumber!.isNotEmpty)
+          'DocumentNumber': request.documentNumber!,
+        if (request.receivedAt != null)
+          'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
+        'Items': jsonEncode(
+          request.items.map(_buildImportItemPayload).toList(),
+        ),
+        if (request.paymentMethod != null &&
+            request.paymentMethod!.isNotEmpty)
+          'PaymentMethod': request.paymentMethod!,
+      };
 
+      final Map<String, File> files = {};
+      if (request.imagePath != null && request.imagePath!.isNotEmpty) {
         final imageFile = File(request.imagePath!);
         if (imageFile.existsSync()) {
-          final imageBytes = await imageFile.readAsBytes();
-          dataMap['image'] = MultipartFile.fromBytes(
-            imageBytes,
-            filename: '${DateTime.now().millisecondsSinceEpoch}.jpg',
-          );
+          files['image'] = imageFile;
         }
+      }
 
-        final formData = FormData.fromMap(dataMap);
+      final response = await _apiClient.postMultipart(
+        ApiEndpoints.createImport,
+        fields: fields,
+        files: files,
+      );
 
-        final dio = Dio();
-        final baseUrl = _apiClient.baseUrl;
-        dio.options.headers = {'Accept-Language': 'en'};
-
-        (dio.httpClientAdapter as DefaultHttpClientAdapter).onHttpClientCreate =
-            (HttpClient client) {
-              client.badCertificateCallback = (cert, host, port) => true;
-              return client;
-            };
-
-        final response = await dio.post(
-          '$baseUrl${ApiEndpoints.createImport}',
-          data: formData,
-        );
-
-        if (response.statusCode != null &&
-            response.statusCode! >= 200 &&
-            response.statusCode! < 300) {
-          return response.data ?? {};
-        } else {
-          throw Exception(
-            response.statusMessage ?? 'Failed to create import with image',
-          );
-        }
-      } else {
-        // Fallback to JSON request if no image
-        final response = await _apiClient.post<Map<String, dynamic>>(
-          ApiEndpoints.createImport,
-          body: request.toJson(),
-        );
-
+      if (response.isSuccess) {
         return response.data ?? {};
       }
+      throw Exception(response.message ?? 'Create import failed');
     } catch (e) {
-      rethrow;
+      throw Exception(ApiErrorMessageParser.parse(e));
     }
   }
 
@@ -116,12 +114,51 @@ class ImportApiService {
     int importId,
     UpdateImportRequest request,
   ) async {
-    final response = await _apiClient.put<Map<String, dynamic>>(
-      ApiEndpoints.updateImport(importId.toString()),
-      body: request.toJson(),
-    );
+    try {
+      final Map<String, String> fields = {
+        'ImportType': request.importType,
+        'Supplier': request.supplier,
+        'Note': request.note,
+        'RemoveImage': request.removeImage.toString(),
+        if (request.idempotencyKey != null &&
+            request.idempotencyKey!.isNotEmpty)
+          'IdempotencyKey': request.idempotencyKey!,
+        if (request.documentDate != null)
+          'DocumentDate': DateFormatter.toApiDateOnly(request.documentDate!),
+        if (request.documentNumber != null &&
+            request.documentNumber!.isNotEmpty)
+          'DocumentNumber': request.documentNumber!,
+        if (request.receivedAt != null)
+          'ReceivedAt': DateFormatter.toApiUtcIsoString(request.receivedAt!),
+        'Items': jsonEncode(
+          request.items.map(_buildImportItemPayload).toList(),
+        ),
+        if (request.paymentMethod != null &&
+            request.paymentMethod!.isNotEmpty)
+          'PaymentMethod': request.paymentMethod!,
+      };
 
-    return response.data ?? {};
+      final Map<String, File> files = {};
+      if (request.imagePath != null && request.imagePath!.isNotEmpty) {
+        final imageFile = File(request.imagePath!);
+        if (imageFile.existsSync()) {
+          files['image'] = imageFile;
+        }
+      }
+
+      final response = await _apiClient.putMultipart(
+        ApiEndpoints.updateImport(importId.toString()),
+        fields: fields,
+        files: files,
+      );
+
+      if (response.isSuccess) {
+        return response.data ?? {};
+      }
+      throw Exception(response.message ?? 'Update import failed');
+    } catch (e) {
+      throw Exception(ApiErrorMessageParser.parse(e));
+    }
   }
 
   Future<Map<String, dynamic>> confirmImport(
@@ -150,5 +187,28 @@ class ImportApiService {
     );
 
     return response.data ?? {};
+  }
+
+  Future<OcrPurchaseInvoiceResultDto> ocrPurchaseInvoice({
+    required int locationId,
+    required File imageFile,
+  }) async {
+    try {
+      final response = await _apiClient.postMultipart<Map<String, dynamic>>(
+        ApiEndpoints.aiOcrPurchaseInvoice,
+        fields: {'locationId': locationId.toString()},
+        files: {'image': imageFile},
+      );
+
+      if (!response.isSuccess || response.data == null) {
+        throw Exception(response.message ?? 'OCR purchase invoice failed');
+      }
+
+      return OcrPurchaseInvoiceResultDto.fromJson(response.data!);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw Exception(ApiErrorMessageParser.parse(e));
+    }
   }
 }

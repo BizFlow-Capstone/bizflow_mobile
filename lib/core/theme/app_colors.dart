@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Primary
-  static const Color primary = Color(0xFF1976D2);
-  static const Color primaryLight = Color(0xFF63A4FF);
-  static const Color primaryDark = Color(0xFF004BA0);
+  // Primary (Updated to use Secondary green theme as requested)
+  static const Color primary = Color(0xFF26A69A);
+  static const Color primaryLight = Color(0xFF64D8CB);
+  static const Color primaryDark = Color(0xFF00766C);
 
   // Secondary
   static const Color secondary = Color(0xFF26A69A);
@@ -24,9 +24,9 @@ class AppColors {
   // Neutral
   static const Color white = Color(0xFFFFFFFF);
   static const Color black = Color(0xFF000000);
-  static const Color background = Color(0xFFF5F5F5);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color divider = Color(0xFFE0E0E0);
+  static const Color background = Color(0xFFFFFFFF); // Pure white background
+  static const Color surface = Color(0xFFF9FAFB); // Light distinct surface color for contrast
+  static const Color divider = Color(0xFFEAEEF2); // Softer divider
 
   // Text
   static const Color textPrimary = Color(0xFF212121);

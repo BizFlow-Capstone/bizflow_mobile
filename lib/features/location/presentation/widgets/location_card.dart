@@ -7,23 +7,31 @@ import '../../domain/entities/location_entity.dart';
 class LocationCard extends StatelessWidget {
   final LocationEntity location;
   final VoidCallback onTap;
-  final Function(bool) onToggleStatus;
-  final VoidCallback onEdit;
+  final Function(bool)? onToggleStatus; // nullable — hidden for employees
+  final VoidCallback? onEdit; // nullable — hidden for employees
+  final VoidCallback? onDelete; // nullable — hidden for employees
   final VoidCallback onAddManager;
+  final bool isToggleLoading;
+  final String activeText;
+  final String inactiveText;
 
   const LocationCard({
     super.key,
     required this.location,
     required this.onTap,
-    required this.onToggleStatus,
-    required this.onEdit,
     required this.onAddManager,
+    this.onToggleStatus,
+    this.onEdit,
+    this.onDelete,
+    this.isToggleLoading = false,
+    required this.activeText,
+    required this.inactiveText,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: location.isActive ? onTap : null,
+      onTap: location.isActive && !isToggleLoading ? onTap : null,
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -119,7 +127,7 @@ class LocationCard extends StatelessWidget {
                         SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
-                            '${location.ownerName}',
+                            location.ownerName,
                             style: AppTextStyles.bodySmall.copyWith(
                               color: location.isActive
                                   ? AppColors.textSecondary
@@ -135,48 +143,108 @@ class LocationCard extends StatelessWidget {
                 ),
               ),
 
-              // Top Right Actions
-              Positioned(
-                top: AppSpacing.sm,
-                right: AppSpacing.sm,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Edit Button
-                    GestureDetector(
-                      onTap: onEdit,
-                      child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.xs),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(
-                            AppSpacing.radiusSm,
+              // Top Right Actions — only shown for owners (callbacks non-null)
+              if (onEdit != null || onDelete != null || onToggleStatus != null)
+                Positioned(
+                  top: AppSpacing.sm,
+                  right: AppSpacing.sm,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onEdit != null)
+                        GestureDetector(
+                          onTap: onEdit,
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusSm,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
-                        child: Icon(
-                          Icons.edit_outlined,
-                          size: 18,
-                          color: AppColors.primary,
+                      if (onEdit != null) SizedBox(width: AppSpacing.sm),
+                      if (onDelete != null)
+                        GestureDetector(
+                          onTap: onDelete,
+                          child: Container(
+                            padding: const EdgeInsets.all(AppSpacing.xs),
+                            decoration: BoxDecoration(
+                              color: AppColors.background,
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusSm,
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.delete_outline,
+                              size: 18,
+                              color: AppColors.error,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    SizedBox(width: AppSpacing.sm),
-
-                    // Status Toggle Switch
-                    Transform.scale(
-                      scale: 0.8,
-                      child: Switch(
-                        value: location.isActive,
-                        onChanged: onToggleStatus,
-                        activeThumbColor: const Color(0xFF23C4C1),
-                        activeTrackColor: AppColors.divider,
-                        inactiveThumbColor: AppColors.textDisabled,
-                        inactiveTrackColor: AppColors.divider,
-                      ),
-                    ),
-                  ],
+                      if (onDelete != null) SizedBox(width: AppSpacing.sm),
+                      if (onToggleStatus != null)
+                        GestureDetector(
+                          onTap: isToggleLoading
+                              ? null
+                              : () => onToggleStatus!(!location.isActive),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            curve: Curves.easeOut,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: location.isActive
+                                  ? const Color(0xFFE8FAF9)
+                                  : AppColors.background,
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusSm,
+                              ),
+                              border: Border.all(
+                                color: location.isActive
+                                    ? const Color(0xFF23C4C1)
+                                    : AppColors.divider,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isToggleLoading) ...[
+                                  SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: location.isActive
+                                          ? const Color(0xFF23C4C1)
+                                          : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  SizedBox(width: AppSpacing.xs),
+                                ],
+                                Text(
+                                  location.isActive ? activeText : inactiveText,
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: location.isActive
+                                        ? const Color(0xFF0C8D8A)
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
 
               // Bottom: Add Manager Button (if no manager)
               if (location.ownerName.isEmpty)

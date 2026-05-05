@@ -1,3 +1,5 @@
+import '../../../../shared/utils/date_formatter.dart';
+
 class User {
   final String id;
   final String name;
@@ -22,7 +24,11 @@ class User {
       email: json['email'] as String,
       phone: json['phone'] as String,
       avatar: json['avatar'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: DateFormatter.parseApiDateTime(
+        json['createdAt'] as String?,
+        fallback: DateTime.now().toUtc(),
+          ) ??
+          DateTime.now().toUtc(),
     );
   }
 
@@ -33,7 +39,7 @@ class User {
       'email': email,
       'phone': phone,
       'avatar': avatar,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': DateFormatter.toApiUtcIsoString(createdAt),
     };
   }
 }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/localization/app_localizations.dart';
@@ -173,7 +173,7 @@ class _PremiumPaymentPageState extends State<PremiumPaymentPage> {
         buffer.write(',');
       }
     }
-    return '${buffer.toString()}đ';
+    return '${buffer.toString()}Ä‘';
   }
 }
 
@@ -266,7 +266,7 @@ class _MethodTile extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: selected ? AppColors.info.withOpacity(0.08) : AppColors.white,
+          color: selected ? AppColors.info.withValues(alpha: 0.08) : AppColors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? AppColors.info : AppColors.divider,
@@ -381,7 +381,7 @@ class _QrCard extends StatelessWidget {
         buffer.write(',');
       }
     }
-    return '${buffer.toString()}đ';
+    return '${buffer.toString()}Ä‘';
   }
 }
 
@@ -397,7 +397,7 @@ class _InfoLine extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            '${label}:',
+            '$label:',
             style: AppTextStyles.bodySmall.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -426,9 +426,9 @@ class _SecurityNote extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.info.withOpacity(0.08),
+        color: AppColors.info.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.info.withOpacity(0.25)),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.25)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,3 +449,4 @@ class _SecurityNote extends StatelessWidget {
     );
   }
 }
+

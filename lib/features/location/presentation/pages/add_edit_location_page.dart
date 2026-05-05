@@ -1,17 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/routing/app_router.dart';
+import '../../../../core/storage/secure_storage.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/context/business_context.dart';
+import '../../../../shared/context/user_profile_context.dart';
+import '../../../../shared/utils/action_guard.dart';
 
 import '../../domain/domain.dart';
+import '../../../subscription/data/subscription_repository.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../bloc/location_bloc.dart';
 import '../bloc/location_event.dart';
 import '../bloc/location_state.dart';
+import '../../../../shared/dialogs/app_dialog.dart';
 
 /// Add/Edit Location Page
 /// SC-LOC-03: Thêm/Sửa địa điểm kinh doanh
@@ -36,6 +48,18 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   late TextEditingController _phoneController;
   late TextEditingController _taxCodeController;
   String? _selectedManagerId;
+  final ActionGuard _submitGuard = ActionGuard();
+  final ActionGuard _employeeMutationGuard = ActionGuard();
+  Completer<void>? _submitCompleter;
+  final ScrollController _formScrollController = ScrollController();
+  final GlobalKey _nameFieldKey = GlobalKey();
+  final GlobalKey _addressFieldKey = GlobalKey();
+  final FocusNode _nameFocusNode = FocusNode();
+  final FocusNode _addressFocusNode = FocusNode();
+  String? _nameError;
+  String? _addressError;
+  bool _showRequiredValidation = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -60,6 +84,10 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     );
     _selectedManagerId = widget.location?.id;
 
+    if (widget.location == null) {
+      _prefillTaxCodeFromRegister();
+    }
+
     // Load location employees for employee tab (edit mode only)
     if (widget.location != null) {
       context.read<LocationBloc>().add(
@@ -71,61 +99,187 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
     }
   }
 
+  Future<void> _prefillTaxCodeFromRegister() async {
+    if (_taxCodeController.text.trim().isNotEmpty) return;
+
+    final profileTaxCode = UserProfileContext().taxCode?.trim();
+    if ((profileTaxCode ?? '').isNotEmpty && mounted) {
+      setState(() {
+        _taxCodeController.text = profileTaxCode!;
+      });
+      return;
+    }
+
+    final savedTaxCode = await SecureStorage().getRegisterTaxCode();
+    if (!mounted) return;
+    if ((savedTaxCode ?? '').isEmpty) return;
+
+    setState(() {
+      _taxCodeController.text = savedTaxCode!.trim();
+    });
+  }
+
+  void _completeSubmitGuard() {
+    final completer = _submitCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
+    _submitCompleter = null;
+    if (_isSubmitting && mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
+  }
+
+  Future<void> _runEmployeeMutation(Future<void> Function() action) async {
+    if (_employeeMutationGuard.isRunning) return;
+    if (mounted) setState(() {});
+    await _employeeMutationGuard.run(action);
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _completeSubmitGuard();
     _tabController.dispose();
+    _formScrollController.dispose();
     _nameController.dispose();
     _addressController.dispose();
     _managerNameController.dispose();
     _districtController.dispose();
     _cityController.dispose();
     _phoneController.dispose();
+    _nameFocusNode.dispose();
+    _addressFocusNode.dispose();
     _taxCodeController.dispose();
     super.dispose();
   }
 
-  void _handleSubmit() {
-    if (_nameController.text.isEmpty || _addressController.text.isEmpty) {
-      final l10n = AppLocalizations.of(context);
-      AppSnackBar.show(
-        context,
-        message: l10n.translate('location.validation_error'),
-        type: AppSnackBarType.warning,
+  String _requiredLabel(String label) => '$label *';
+
+  String? _requiredFieldError(String value) {
+    if (value.trim().isEmpty) {
+      return AppLocalizations.of(context).translate('common.required_field');
+    }
+    return null;
+  }
+
+  bool _validateRequiredFields({required bool shouldFocus}) {
+    final nameError = _requiredFieldError(_nameController.text);
+    final addressError = _requiredFieldError(_addressController.text);
+
+    setState(() {
+      _showRequiredValidation = true;
+      _nameError = nameError;
+      _addressError = addressError;
+    });
+
+    if (nameError == null && addressError == null) {
+      return true;
+    }
+
+    if (shouldFocus) {
+      _scrollToFirstInvalidField(
+        nameError: nameError,
+        addressError: addressError,
       );
+    }
+    return false;
+  }
+
+  void _scrollToField(GlobalKey key) {
+    final contextForKey = key.currentContext;
+    if (contextForKey == null) return;
+    Scrollable.ensureVisible(
+      contextForKey,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      alignment: 0.1,
+    );
+  }
+
+  void _scrollToFirstInvalidField({
+    required String? nameError,
+    required String? addressError,
+  }) {
+    if (nameError != null) {
+      _scrollToField(_nameFieldKey);
+      _nameFocusNode.requestFocus();
+      return;
+    }
+    if (addressError != null) {
+      _scrollToField(_addressFieldKey);
+      _addressFocusNode.requestFocus();
+    }
+  }
+
+  Future<void> _handleSubmit() async {
+    if (_isSubmitting) {
       return;
     }
 
-    if (widget.location != null) {
-      // Edit location - employee mgmt via Tab 2
-      context.read<LocationBloc>().add(
-        EditLocationRequested(
-          locationId: widget.location!.id,
-          name: _nameController.text,
-          address: _addressController.text,
-          district: _districtController.text,
-          city: _cityController.text,
-          phone: _phoneController.text,
-          taxCode: _taxCodeController.text,
-          managerId: _selectedManagerId ?? '',
-          managerName: _managerNameController.text,
-          employeeIds: widget.location!.employeeIds,
-        ),
-      );
-    } else {
-      // Add new location - no employees (assign via Tab 2 after creation)
-      context.read<LocationBloc>().add(
-        AddLocationRequested(
-          name: _nameController.text,
-          address: _addressController.text,
-          district: _districtController.text,
-          city: _cityController.text,
-          phone: _phoneController.text,
-          taxCode: _taxCodeController.text,
-          managerId: _selectedManagerId ?? '',
-          managerName: _managerNameController.text,
-          employeeIds: [],
-        ),
-      );
+    if (!_validateRequiredFields(shouldFocus: true)) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    var hasDispatchedSubmitEvent = false;
+
+    await _submitGuard.run(() async {
+      if (widget.location == null) {
+        final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+          context,
+          featureCode: SubscriptionFeatureCodes.locations,
+        );
+        if (!allowed || !mounted) return;
+      }
+
+      final completer = Completer<void>();
+      _submitCompleter = completer;
+      hasDispatchedSubmitEvent = true;
+
+      if (widget.location != null) {
+        context.read<LocationBloc>().add(
+          EditLocationRequested(
+            locationId: widget.location!.id,
+            name: _nameController.text,
+            address: _addressController.text,
+            district: _districtController.text,
+            city: _cityController.text,
+            phone: _phoneController.text,
+            taxCode: _taxCodeController.text,
+            managerId: _selectedManagerId ?? '',
+            managerName: _managerNameController.text,
+            employeeIds: widget.location!.employeeIds,
+          ),
+        );
+      } else {
+        context.read<LocationBloc>().add(
+          AddLocationRequested(
+            name: _nameController.text,
+            address: _addressController.text,
+            district: _districtController.text,
+            city: _cityController.text,
+            phone: _phoneController.text,
+            taxCode: _taxCodeController.text,
+            managerId: _selectedManagerId ?? '',
+            managerName: _managerNameController.text,
+            employeeIds: [],
+          ),
+        );
+      }
+
+      await completer.future;
+    });
+
+    if (!hasDispatchedSubmitEvent && mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
     }
   }
 
@@ -169,9 +323,35 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
         ),
       ),
       body: BlocListener<LocationBloc, LocationState>(
-        listener: (context, state) {
-          if (state is LocationAddSuccess || state is LocationEditSuccess) {
-            Navigator.pop(context);
+        listener: (context, state) async {
+          if (state is LocationAddSuccess) {
+            _completeSubmitGuard();
+            await BusinessContext().switchBusinessLocation(
+              state.newLocation.id,
+              state.newLocation.name,
+              isOwner: true, // Creating a location → always owner
+            );
+            if (!mounted) {
+              return;
+            }
+            AppRouter.navigateAndClearStack(AppRoutes.home);
+          } else if (state is LocationEditSuccess) {
+            _completeSubmitGuard();
+            final businessContext = Provider.of<BusinessContext>(
+              context,
+              listen: false,
+            );
+            final navigator = Navigator.of(context);
+            if (businessContext.currentBusinessId == state.updatedLocation.id) {
+              await businessContext.switchBusinessLocation(
+                state.updatedLocation.id,
+                state.updatedLocation.name,
+                isOwner:
+                    true, // Editing a location → must be owner to have reached this screen
+              );
+            }
+            if (!mounted) return;
+            navigator.pop();
           } else if (state is AddEmployeeToLocationSuccess) {
             AppSnackBar.show(
               context,
@@ -179,6 +359,7 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
               type: AppSnackBarType.success,
             );
           } else if (state is LocationFailure) {
+            _completeSubmitGuard();
             AppSnackBar.show(
               context,
               message: state.message,
@@ -201,24 +382,37 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
   Widget _buildLocationForm(AppLocalizations l10n, bool isEditMode) {
     return SafeArea(
       child: SingleChildScrollView(
+        controller: _formScrollController,
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Location Name
             Text(
-              l10n.translate('location.location_name'),
+              _requiredLabel(l10n.translate('location.location_name')),
               style: AppTextStyles.labelLarge.copyWith(
                 color: AppColors.textPrimary,
               ),
             ),
             SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _nameController,
-              decoration: InputDecoration(
-                hintText: l10n.translate('location.location_name_hint'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            Container(
+              key: _nameFieldKey,
+              child: TextField(
+                controller: _nameController,
+                focusNode: _nameFocusNode,
+                onChanged: (_) {
+                  if (_showRequiredValidation) {
+                    setState(() {
+                      _nameError = _requiredFieldError(_nameController.text);
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: l10n.translate('location.location_name_hint'),
+                  errorText: _showRequiredValidation ? _nameError : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
                 ),
               ),
             ),
@@ -226,21 +420,35 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
 
             // Address
             Text(
-              l10n.translate('location.location_address'),
+              _requiredLabel(l10n.translate('location.location_address')),
               style: AppTextStyles.labelLarge.copyWith(
                 color: AppColors.textPrimary,
               ),
             ),
             SizedBox(height: AppSpacing.sm),
-            TextField(
-              controller: _addressController,
-              decoration: InputDecoration(
-                hintText: l10n.translate('location.location_address_hint'),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+            Container(
+              key: _addressFieldKey,
+              child: TextField(
+                controller: _addressController,
+                focusNode: _addressFocusNode,
+                onChanged: (_) {
+                  if (_showRequiredValidation) {
+                    setState(() {
+                      _addressError = _requiredFieldError(
+                        _addressController.text,
+                      );
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: l10n.translate('location.location_address_hint'),
+                  errorText: _showRequiredValidation ? _addressError : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                  ),
                 ),
+                maxLines: 3,
               ),
-              maxLines: 3,
             ),
             SizedBox(height: AppSpacing.lg),
 
@@ -348,16 +556,32 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
             BlocBuilder<LocationBloc, LocationState>(
               builder: (context, state) {
                 final isLoading =
+                    _isSubmitting ||
                     state is LocationAddInProgress ||
                     state is LocationEditInProgress;
 
+                if (isEditMode) {
+                  return AppButton(
+                    label: l10n.translate('location.update_button'),
+                    isFullWidth: true,
+                    isLoading: isLoading,
+                    isDisabled: _submitGuard.isRunning,
+                    onPressed: (isLoading || _submitGuard.isRunning)
+                        ? null
+                        : _handleSubmit,
+                    type: AppButtonType.secondary,
+                    size: AppButtonSize.large,
+                  );
+                }
+
                 return AppButton(
-                  label: isEditMode
-                      ? l10n.translate('location.update_button')
-                      : l10n.translate('location.create_button'),
+                  label: l10n.translate('location.create_button'),
                   isFullWidth: true,
                   isLoading: isLoading,
-                  onPressed: isLoading ? null : _handleSubmit,
+                  isDisabled: _submitGuard.isRunning,
+                  onPressed: (isLoading || _submitGuard.isRunning)
+                      ? null
+                      : _handleSubmit,
                   type: AppButtonType.secondary,
                   size: AppButtonSize.large,
                 );
@@ -493,14 +717,33 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline),
                       color: Colors.red,
-                      onPressed: () {
-                        context.read<LocationBloc>().add(
-                          RemoveEmployeeFromTabRequested(
-                            locationId: widget.location!.id,
-                            employeeId: employee.id,
-                          ),
-                        );
-                      },
+                      onPressed: _employeeMutationGuard.isRunning
+                          ? null
+                          : () async {
+                              await _runEmployeeMutation(() async {
+                                final confirmed = await AppDialog.delete(
+                                  context,
+                                  title: l10n.translate(
+                                    'product.confirm_delete_title',
+                                  ),
+                                  message: l10n.translate(
+                                    'product.confirm_delete_message',
+                                  ),
+                                  confirmText: l10n.translate('common.delete'),
+                                );
+
+                                if (!context.mounted || confirmed != true) {
+                                  return;
+                                }
+
+                                context.read<LocationBloc>().add(
+                                  RemoveEmployeeFromLocationRequested(
+                                    locationId: widget.location!.id,
+                                    employeeId: employee.id,
+                                  ),
+                                );
+                              });
+                            },
                     ),
                   );
                 },
@@ -566,14 +809,18 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                     trailing: IconButton(
                       icon: const Icon(Icons.add_circle_outline),
                       color: AppColors.primary,
-                      onPressed: () {
-                        context.read<LocationBloc>().add(
-                          AddEmployeeToLocationFromTabRequested(
-                            locationId: widget.location!.id,
-                            employeeId: employee.id,
-                          ),
-                        );
-                      },
+                      onPressed: _employeeMutationGuard.isRunning
+                          ? null
+                          : () async {
+                              await _runEmployeeMutation(() async {
+                                context.read<LocationBloc>().add(
+                                  AddEmployeeToLocationFromTabRequested(
+                                    locationId: widget.location!.id,
+                                    employeeId: employee.id,
+                                  ),
+                                );
+                              });
+                            },
                     ),
                   );
                 },
@@ -588,6 +835,11 @@ class _AddEditLocationPageState extends State<AddEditLocationPage>
                   AppSnackBar.success(
                     context,
                     l10n.translate('location.employee_update_success'),
+                  );
+                } else if (state is RemoveEmployeeFromLocationSuccess) {
+                  AppSnackBar.success(
+                    context,
+                    l10n.translate('location.employee_remove_success'),
                   );
                 } else if (state is LocationFailure) {
                   AppSnackBar.error(context, state.message);

@@ -11,31 +11,40 @@ abstract class OrderEvent extends Equatable {
 
 /// Load all orders with optional filters
 class LoadOrdersRequested extends OrderEvent {
-  final int pageNumber;
-  final int pageSize;
-  final String? status; // DRAFT, PENDING, PUBLISHED, CANCELLED
-  final String? locationId;
-
   const LoadOrdersRequested({
     this.pageNumber = 1,
     this.pageSize = 20,
     this.status,
     this.locationId,
   });
+  final int pageNumber;
+  final int pageSize;
+  final String? status; // DRAFT, PENDING, PUBLISHED, CANCELLED
+  final String? locationId;
 
   @override
   List<Object?> get props => [pageNumber, pageSize, status, locationId];
+}
+
+/// Reset orders state (on logout)
+class ResetOrders extends OrderEvent {
+  const ResetOrders();
 }
 
 /// Load draft orders only
 class LoadDraftOrdersRequested extends OrderEvent {
   final int pageNumber;
   final int pageSize;
+  final String? locationId;
 
-  const LoadDraftOrdersRequested({this.pageNumber = 1, this.pageSize = 20});
+  const LoadDraftOrdersRequested({
+    this.pageNumber = 1,
+    this.pageSize = 20,
+    this.locationId,
+  });
 
   @override
-  List<Object?> get props => [pageNumber, pageSize];
+  List<Object?> get props => [pageNumber, pageSize, locationId];
 }
 
 /// Load single order details
@@ -52,16 +61,35 @@ class LoadOrderDetailsRequested extends OrderEvent {
 class CreateOrderRequested extends OrderEvent {
   final String locationId;
   final List<OrderItemEntity> items;
+  final double cashAmount;
+  final double bankAmount;
+  final double debtAmount;
   final String? note;
+  final DateTime? documentDate;
+  final String? documentNumber;
 
   const CreateOrderRequested({
     required this.locationId,
     required this.items,
+    this.cashAmount = 0,
+    this.bankAmount = 0,
+    this.debtAmount = 0,
     this.note,
+    this.documentDate,
+    this.documentNumber,
   });
 
   @override
-  List<Object?> get props => [locationId, items, note];
+  List<Object?> get props => [
+    locationId,
+    items,
+    cashAmount,
+    bankAmount,
+    debtAmount,
+    note,
+    documentDate,
+    documentNumber,
+  ];
 }
 
 /// Update existing order
@@ -69,11 +97,49 @@ class UpdateOrderRequested extends OrderEvent {
   final String orderId;
   final String? note;
   final List<OrderItemEntity>? items;
+  final String? status;
+  final String? idempotencyKey;
+  final String? businessLocationId;
+  final double? cashAmount;
+  final double? bankAmount;
+  final double? debtAmount;
+  final int? debtorId;
+  final String? customerName;
+  final String? customerPhone;
+  final String? billMetadata;
 
-  const UpdateOrderRequested({required this.orderId, this.note, this.items});
+  const UpdateOrderRequested({
+    required this.orderId,
+    this.note,
+    this.items,
+    this.status,
+    this.idempotencyKey,
+    this.businessLocationId,
+    this.cashAmount,
+    this.bankAmount,
+    this.debtAmount,
+    this.debtorId,
+    this.customerName,
+    this.customerPhone,
+    this.billMetadata,
+  });
 
   @override
-  List<Object?> get props => [orderId, note, items];
+  List<Object?> get props => [
+        orderId,
+        note,
+        items,
+        status,
+        idempotencyKey,
+        businessLocationId,
+        cashAmount,
+        bankAmount,
+        debtAmount,
+        debtorId,
+        customerName,
+        customerPhone,
+        billMetadata,
+      ];
 }
 
 /// Publish order (convert draft to invoice)
@@ -89,11 +155,15 @@ class PublishOrderRequested extends OrderEvent {
 /// Cancel order
 class CancelOrderRequested extends OrderEvent {
   final String orderId;
+  final String cancelReason;
 
-  const CancelOrderRequested({required this.orderId});
+  const CancelOrderRequested({
+    required this.orderId,
+    required this.cancelReason,
+  });
 
   @override
-  List<Object?> get props => [orderId];
+  List<Object?> get props => [orderId, cancelReason];
 }
 
 /// Filter orders by status or location
@@ -116,5 +186,18 @@ class FilterOrdersRequested extends OrderEvent {
 
 /// Refresh orders
 class RefreshOrdersRequested extends OrderEvent {
-  const RefreshOrdersRequested();
+  final String? locationId;
+  const RefreshOrdersRequested({this.locationId});
+
+  @override
+  List<Object?> get props => [locationId];
+}
+
+/// Search orders by keyword (local filtering)
+class SearchOrdersRequested extends OrderEvent {
+  final String keyword;
+  const SearchOrdersRequested({required this.keyword});
+
+  @override
+  List<Object?> get props => [keyword];
 }

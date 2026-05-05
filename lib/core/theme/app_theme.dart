@@ -34,6 +34,8 @@ class AppTheme {
       centerTitle: true,
       backgroundColor: AppColors.primary,
       foregroundColor: AppColors.white,
+      surfaceTintColor:
+          Colors.transparent, // Prevents Material 3 scroll color change
       systemOverlayStyle: SystemUiOverlayStyle.light,
       titleTextStyle: AppTextStyles.titleLarge,
       iconTheme: IconThemeData(color: AppColors.white),
@@ -102,33 +104,35 @@ class AppTheme {
     // Input Decoration
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surface,
+      fillColor: AppColors.white,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+        vertical: 16, // Better vertical padding for premium feel
       ),
       border: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
+        borderRadius: AppSpacing.borderRadiusMd,
         borderSide: const BorderSide(color: AppColors.divider),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
+        borderRadius: AppSpacing.borderRadiusMd,
         borderSide: const BorderSide(color: AppColors.divider),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        borderRadius: AppSpacing.borderRadiusMd,
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
+        borderRadius: AppSpacing.borderRadiusMd,
         borderSide: const BorderSide(color: AppColors.error),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: AppSpacing.borderRadiusSm,
-        borderSide: const BorderSide(color: AppColors.error, width: 2),
+        borderRadius: AppSpacing.borderRadiusMd,
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
       hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.textHint),
-      labelStyle: AppTextStyles.bodyMedium,
+      labelStyle: AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.textSecondary,
+      ),
       errorStyle: AppTextStyles.error,
     ),
 
@@ -248,6 +252,8 @@ class AppTheme {
       centerTitle: true,
       backgroundColor: const Color(0xFF1E1E1E),
       foregroundColor: AppColors.white,
+      surfaceTintColor:
+          Colors.transparent, // Prevents Material 3 scroll color change
       systemOverlayStyle: SystemUiOverlayStyle.dark,
       titleTextStyle: AppTextStyles.titleLarge.copyWith(color: AppColors.white),
       iconTheme: const IconThemeData(color: AppColors.white),

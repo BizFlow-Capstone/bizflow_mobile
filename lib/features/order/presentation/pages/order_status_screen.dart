@@ -1,15 +1,23 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/localization/app_localizations.dart';
+import '../../../../core/storage/local_storage.dart';
+import '../../../../shared/utils/action_guard.dart';
+import '../../domain/entities/order_entity.dart';
 import '../bloc/order_bloc.dart';
-import '../bloc/order_event.dart';
-import '../bloc/order_state.dart';
 import '../widgets/order_card.dart';
+import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/widgets/app_sync_status_text.dart';
+import 'order_form_screen.dart';
+import '../../../subscription/domain/subscription_feature_codes.dart';
+import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Order Status Screen (SC-ORD-02.2)
 /// Displays unpublished invoices and draft orders with tabs
 class OrderStatusScreen extends StatefulWidget {
-  const OrderStatusScreen({Key? key}) : super(key: key);
+  const OrderStatusScreen({super.key});
 
   @override
   State<OrderStatusScreen> createState() => _OrderStatusScreenState();
@@ -18,6 +26,10 @@ class OrderStatusScreen extends StatefulWidget {
 class _OrderStatusScreenState extends State<OrderStatusScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  final ActionGuard _publishOrderGuard = ActionGuard();
+  final ActionGuard _cancelOrderGuard = ActionGuard();
+  final ActionGuard _openOrderFormGuard = ActionGuard();
+  String? _processingOrderId;
 
   @override
   void initState() {
@@ -38,6 +50,117 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
     context.read<OrderBloc>().add(const RefreshOrdersRequested());
   }
 
+  Future<void> _openDraftForEditing(OrderEntity order) async {
+    if (!order.isDraft) return;
+    await _openOrderFormGuard.run(() async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OrderFormScreen(inputType: 'manual', draftId: order.id),
+        ),
+      );
+      if (!mounted) return;
+      context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+    });
+  }
+
+  Future<void> _openPendingForEditing(OrderEntity order) async {
+    if (!order.isPending) return;
+
+    await _openOrderFormGuard.run(() async {
+      final storage = await LocalStorage.getInstance();
+      final raw = storage.getString(StorageKeys.orderLocalDrafts);
+
+      List<Map<String, dynamic>> drafts = [];
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          drafts = decoded
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        }
+      }
+
+      final draftId = 'edit_${order.id}';
+      final payload = {
+        'id': draftId,
+        'locationId': order.locationId,
+        'locationName': order.locationName,
+        'status': 'draft',
+        'customerType': 'walkin',
+        'customerName': order.customerName ?? '',
+        'customerPhone': order.customerPhone ?? '',
+        'subtotal': order.subtotal,
+        'discountAmount': order.discountAmount,
+        'taxAmount': order.taxAmount,
+        'totalAmount': order.totalAmount,
+        'items': order.items
+            .map(
+              (item) => {
+                'id': item.id,
+                'productId': item.productId,
+                'saleItemId': item.saleItemId ?? int.tryParse(item.productId),
+                'unitName': item.unitName,
+                'productName': item.productName,
+                'price': item.price,
+                'quantity': item.quantity,
+                'discount': item.discount,
+                'note': item.note,
+              },
+            )
+            .toList(),
+        'createdByProfileId': order.createdByProfileId,
+        'createdByProfileFullName': order.createdByProfileFullName,
+        'createdAt': order.createdAt.toUtc().toIso8601String(),
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      };
+
+      final index = drafts.indexWhere((item) => item['id'] == draftId);
+      if (index >= 0) {
+        drafts[index] = payload;
+      } else {
+        drafts.insert(0, payload);
+      }
+
+      await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
+
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              OrderFormScreen(inputType: 'manual', draftId: draftId),
+        ),
+      );
+      if (!mounted) return;
+      await _removeTempDraftById(draftId);
+      if (!mounted) return;
+      _refreshOrders();
+    });
+  }
+
+  Future<void> _removeTempDraftById(String draftId) async {
+    final storage = await LocalStorage.getInstance();
+    final raw = storage.getString(StorageKeys.orderLocalDrafts);
+    if (raw == null || raw.trim().isEmpty) return;
+
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return;
+
+    final drafts = decoded
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+
+    final before = drafts.length;
+    drafts.removeWhere((item) => item['id']?.toString() == draftId);
+    if (drafts.length == before) return;
+
+    await storage.setString(StorageKeys.orderLocalDrafts, jsonEncode(drafts));
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -45,18 +168,26 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
       appBar: AppBar(
         title: Text(l10n.translate('order.status_title')),
         elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(
-              text: l10n.translate('order.tab_draft'),
-              icon: const Icon(Icons.edit, size: 18),
-            ),
-            Tab(
-              text: l10n.translate('order.tab_pending'),
-              icon: const Icon(Icons.pending_actions, size: 18),
-            ),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(66),
+          child: Column(
+            children: [
+              const AppSyncStatusText(),
+              TabBar(
+                controller: _tabController,
+                tabs: [
+                  Tab(
+                    text: l10n.translate('order.tab_draft'),
+                    icon: const Icon(Icons.edit, size: 18),
+                  ),
+                  Tab(
+                    text: l10n.translate('order.tab_pending'),
+                    icon: const Icon(Icons.pending_actions, size: 18),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         actions: [
           IconButton(
@@ -65,14 +196,31 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           ),
         ],
       ),
-      body: BlocBuilder<OrderBloc, OrderState>(
-        builder: (context, state) {
-          if (state is OrdersLoading) {
-            return const Center(child: CircularProgressIndicator());
+      body: BlocConsumer<OrderBloc, OrderState>(
+        listener: (context, state) {
+          if (state is OrderPublished ||
+              state is OrderCancelled ||
+              state is OrderError) {
+            if (_processingOrderId != null && mounted) {
+              setState(() {
+                _processingOrderId = null;
+              });
+            }
           }
 
           if (state is OrderError) {
-            return _buildErrorWidget(context, state.message, _refreshOrders);
+            AppSnackBar.show(
+              context,
+              message: state.message.isNotEmpty
+                  ? state.message
+                  : l10n.translate('common.error_occurred'),
+              type: AppSnackBarType.error,
+            );
+          }
+        },
+        builder: (context, state) {
+          if (state is OrdersLoading) {
+            return const Center(child: CircularProgressIndicator());
           }
 
           return TabBarView(
@@ -88,8 +236,17 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigate to create order screen
+        onPressed: () async {
+          await _openOrderFormGuard.run(() async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const OrderFormScreen(inputType: 'manual'),
+              ),
+            );
+            if (!mounted) return;
+            context.read<OrderBloc>().add(const LoadDraftOrdersRequested());
+          });
         },
         child: const Icon(Icons.add),
       ),
@@ -98,13 +255,11 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
 
   Widget _buildDraftOrdersTab(BuildContext context, OrderState state) {
     final l10n = AppLocalizations.of(context);
-    List<dynamic> draftOrders = [];
+    List<OrderEntity> draftOrders = [];
 
     if (state is DraftOrdersLoaded) {
       draftOrders = state.orders;
     } else if (state is OrdersLoaded) {
-      draftOrders = state.orders.where((o) => o.isDraft).toList();
-    } else if (state is OrdersFiltered) {
       draftOrders = state.orders.where((o) => o.isDraft).toList();
     }
 
@@ -127,19 +282,40 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           return OrderCard(
             order: order,
             onTap: () {
-              // TODO: Navigate to order details
+              _openDraftForEditing(order);
             },
             onEdit: () {
-              // TODO: Navigate to edit order
+              _openDraftForEditing(order);
             },
             onPublish: () {
-              context.read<OrderBloc>().add(
-                PublishOrderRequested(orderId: order.id),
-              );
+              _publishOrderGuard.run(() async {
+                if (!mounted) return;
+                setState(() {
+                  _processingOrderId = order.id;
+                });
+
+                final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                  context,
+                  featureCode: SubscriptionFeatureCodes.orderManagement,
+                );
+                if (!allowed || !context.mounted) {
+                  if (mounted) {
+                    setState(() {
+                      _processingOrderId = null;
+                    });
+                  }
+                  return;
+                }
+
+                context.read<OrderBloc>().add(
+                  PublishOrderRequested(orderId: order.id),
+                );
+              });
             },
             onCancel: () {
               _showCancelConfirmDialog(context, order.id);
             },
+            isPublishing: _processingOrderId == order.id,
           );
         },
       ),
@@ -148,11 +324,9 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
 
   Widget _buildPendingOrdersTab(BuildContext context, OrderState state) {
     final l10n = AppLocalizations.of(context);
-    List<dynamic> pendingOrders = [];
+    List<OrderEntity> pendingOrders = [];
 
     if (state is OrdersLoaded) {
-      pendingOrders = state.orders.where((o) => o.isPending).toList();
-    } else if (state is OrdersFiltered) {
       pendingOrders = state.orders.where((o) => o.isPending).toList();
     }
 
@@ -175,7 +349,10 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
           return OrderCard(
             order: order,
             onTap: () {
-              // TODO: Navigate to order details
+              _openPendingForEditing(order);
+            },
+            onEdit: () {
+              _openPendingForEditing(order);
             },
           );
         },
@@ -208,63 +385,69 @@ class _OrderStatusScreenState extends State<OrderStatusScreen>
     );
   }
 
-  Widget _buildErrorWidget(
-    BuildContext context,
-    String message,
-    VoidCallback onRetry,
-  ) {
-    final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
-          const SizedBox(height: 16),
-          Text(
-            l10n.translate('order.error_title'),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[800],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: onRetry,
-            child: Text(l10n.translate('common.retry')),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showCancelConfirmDialog(BuildContext context, String orderId) {
     final l10n = AppLocalizations.of(context);
+    final reasonController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.translate('order.cancel_confirm_title')),
-        content: Text(l10n.translate('order.cancel_confirm_message')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(l10n.translate('order.cancel_confirm_message')),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: l10n.translate('order.detail_cancel_reason'),
+                hintText: l10n.translate('order.detail_cancel_reason'),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text(l10n.translate('order.cancel_confirm_no')),
           ),
           TextButton(
-            onPressed: () {
-              context.read<OrderBloc>().add(
-                CancelOrderRequested(orderId: orderId),
-              );
-              Navigator.pop(context);
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                AppSnackBar.show(
+                  context,
+                  message: l10n.translate('order.cancel_reason_required'),
+                  type: AppSnackBarType.warning,
+                );
+                return;
+              }
+              await _cancelOrderGuard.run(() async {
+                if (!mounted) return;
+                setState(() {
+                  _processingOrderId = orderId;
+                });
+
+                final allowed = await SubscriptionFeatureGuard.ensureAllowed(
+                  context,
+                  featureCode: SubscriptionFeatureCodes.orderManagement,
+                );
+                if (!allowed || !context.mounted) {
+                  if (mounted) {
+                    setState(() {
+                      _processingOrderId = null;
+                    });
+                  }
+                  return;
+                }
+
+                context.read<OrderBloc>().add(
+                  CancelOrderRequested(orderId: orderId, cancelReason: reason),
+                );
+                Navigator.pop(context);
+              });
             },
             child: Text(l10n.translate('order.cancel_confirm_yes')),
           ),
