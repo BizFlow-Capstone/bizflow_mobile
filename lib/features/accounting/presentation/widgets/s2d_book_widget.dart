@@ -204,7 +204,16 @@ class S2dBookWidget extends StatelessWidget {
               }
               return true;
             });
-            for (final entry in matching) {
+            final sortedMatching = matching.toList()
+              ..sort((a, b) {
+                final da = _parseDate(_pick(a.value, 'ngay_thang', _dateAliases));
+                final db = _parseDate(_pick(b.value, 'ngay_thang', _dateAliases));
+                if (da == null && db == null) return 0;
+                if (da == null) return 1;
+                if (db == null) return -1;
+                return db.compareTo(da);
+              });
+            for (final entry in sortedMatching) {
               consumedIndexes.add(entry.key);
               tableRows.add(
                 _buildDataRow(
@@ -276,7 +285,16 @@ class S2dBookWidget extends StatelessWidget {
     }
 
     if (consumedIndexes.isEmpty && dataRows.isNotEmpty) {
-      for (final dataRow in dataRows) {
+      final sortedDataRows = dataRows.toList()
+        ..sort((a, b) {
+          final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
+          final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+          if (da == null && db == null) return 0;
+          if (da == null) return 1;
+          if (db == null) return -1;
+          return db.compareTo(da);
+        });
+      for (final dataRow in sortedDataRows) {
         tableRows.add(
           _buildDataRow(
             SectionRowDto(
@@ -820,5 +838,25 @@ class S2dBookWidget extends StatelessWidget {
   bool _isDescriptionField(String fieldCode) {
     final code = fieldCode.trim().toLowerCase();
     return code.contains('dien_giai') || code.contains('description') || code.contains('note');
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static dynamic _pick(
+    Map<String, dynamic> values,
+    List<String> aliases,
+  ) {
+    for (final key in aliases) {
+      final v = values[key];
+      if (v != null && v.toString().trim().isNotEmpty) return v;
+    }
+    return null;
   }
 }

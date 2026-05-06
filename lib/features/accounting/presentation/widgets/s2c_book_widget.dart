@@ -663,14 +663,13 @@ class S2cBookWidget extends StatelessWidget {
             if (da == null && db == null) return 0;
             if (da == null) return 1;
             if (db == null) return -1;
-            return da.compareTo(db);
+            return db.compareTo(da);
           });
 
         for (final dataRow in matching) {
           final amount = _toNum(_pickDyn(dataRow, _soTienAliases));
-          final rawNote =
-              _pickDyn(dataRow, _descAliases)?.toString().trim() ?? '';
-          if (amount == null || rawNote.isEmpty) continue;
+          final rawNote = _pickDyn(dataRow, _descAliases)?.toString() ?? '';
+          if (amount == null || rawNote.trim().isEmpty) continue;
           entries.add(
             _S2cEntry(
               code: _pickDyn(dataRow, _soHieuAliases)?.toString() ?? '',
@@ -711,13 +710,13 @@ class S2cBookWidget extends StatelessWidget {
         if (da == null && db == null) return 0;
         if (da == null) return 1;
         if (db == null) return -1;
-        return da.compareTo(db);
+        return db.compareTo(da);
       });
 
     for (final row in matchingRows) {
       final amount = _toNum(_pickDyn(row, _soTienAliases));
-      final rawNote = _pickDyn(row, _descAliases)?.toString().trim() ?? '';
-      if (amount == null || rawNote.isEmpty) continue;
+      final rawNote = _pickDyn(row, _descAliases)?.toString() ?? '';
+      if (amount == null || rawNote.trim().isEmpty) continue;
 
       final industry = _resolveIndustry(row, rawNote, seeds);
       final group = groups.putIfAbsent(
@@ -731,7 +730,7 @@ class S2cBookWidget extends StatelessWidget {
       group.entries.add(
         _S2cEntry(
           code: _pickDyn(row, _soHieuAliases)?.toString() ?? '',
-          note: _normalizeNoteForGroup(rawNote, industry.label),
+          note: rawNote,
           explanation: _pickDyn(row, const ['explanation'])?.toString().trim(),
           amount: amount,
           date: _parseDate(_pickDyn(row, _dateAliases)),
@@ -825,20 +824,6 @@ class S2cBookWidget extends StatelessWidget {
       );
     }
 
-    final colonIndex = rawNote.indexOf(':');
-    if (colonIndex > 0) {
-      final prefix = rawNote.substring(0, colonIndex).trim();
-      if (prefix.isNotEmpty && prefix.length <= 80) {
-        final key = 'name:${_normalizeKey(prefix)}';
-        final seeded = seeds[key];
-        return _ResolvedIndustry(
-          key: key,
-          label: seeded?.label ?? prefix,
-          order: seeded?.order ?? 10000,
-        );
-      }
-    }
-
     return const _ResolvedIndustry(
       key: 'name:khac',
       label: 'Khác',
@@ -846,16 +831,13 @@ class S2cBookWidget extends StatelessWidget {
     );
   }
 
-  static String _normalizeNoteForGroup(String note, String groupLabel) {
-    final normalizedNote = note.trim();
-    final colonIndex = normalizedNote.indexOf(':');
-    if (colonIndex <= 0) return normalizedNote;
-
-    final prefix = normalizedNote.substring(0, colonIndex).trim();
-    if (_normalizeKey(prefix) != _normalizeKey(groupLabel)) return normalizedNote;
-
-    final trimmed = normalizedNote.substring(colonIndex + 1).trim();
-    return trimmed.isEmpty ? normalizedNote : trimmed;
+  static bool _isReversalDescription(String note) {
+    final normalized = note.trim().toLowerCase();
+    return normalized.startsWith('bút toán đảo') ||
+        normalized.startsWith('but toan dao') ||
+        normalized.contains('bút toán đảo của') ||
+        normalized.contains('but toan dao cua') ||
+        normalized.contains('reversal');
   }
 
   static String _normalizeKey(String value) {

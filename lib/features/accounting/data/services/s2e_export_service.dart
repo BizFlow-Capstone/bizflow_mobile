@@ -163,6 +163,13 @@ class S2eExportService {
                   return dr['section']?.toString() == sFilter;
                 }
                 return true;
+              }).toList()..sort((a, b) {
+                final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
+                final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+                if (da == null && db == null) return 0;
+                if (da == null) return 1;
+                if (db == null) return -1;
+                return da.compareTo(db);
               });
               for (final dataRow in matching) {
                 _writeDataRow(sheet, r, dataRow);

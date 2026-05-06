@@ -817,7 +817,7 @@ class S2cExportService {
       group.entries.add(
         _S2cEntry(
           code: _pick(row, 'so_hieu', _codeAliases)?.toString() ?? '',
-          note: _normalizeNoteForGroup(rawNote, industry.label),
+          note: rawNote,
           amount: amount,
           date: _parseDate(_pick(row, 'ngay_thang', _dateAliases)),
         ),
@@ -920,38 +920,11 @@ class S2cExportService {
       );
     }
 
-    final colonIndex = rawNote.indexOf(':');
-    if (colonIndex > 0) {
-      final prefix = rawNote.substring(0, colonIndex).trim();
-      if (prefix.isNotEmpty && prefix.length <= 80) {
-        final key = 'name:${_normalizeKey(prefix)}';
-        final seeded = seeds[key];
-        return _ResolvedIndustry(
-          key: key,
-          label: seeded?.label ?? prefix,
-          order: seeded?.order ?? 10000,
-        );
-      }
-    }
-
     return const _ResolvedIndustry(
       key: 'name:khac',
       label: 'Khác',
       order: 10001,
     );
-  }
-
-  static String _normalizeNoteForGroup(String note, String groupLabel) {
-    final normalizedNote = note.trim();
-    final colonIndex = normalizedNote.indexOf(':');
-    if (colonIndex <= 0) return normalizedNote;
-
-    final prefix = normalizedNote.substring(0, colonIndex).trim();
-    if (_normalizeKey(prefix) != _normalizeKey(groupLabel))
-      return normalizedNote;
-
-    final trimmed = normalizedNote.substring(colonIndex + 1).trim();
-    return trimmed.isEmpty ? normalizedNote : trimmed;
   }
 
   static String _normalizeKey(String value) {
