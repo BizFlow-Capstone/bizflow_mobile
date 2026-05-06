@@ -430,9 +430,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
               e.warnings.isNotEmpty
                   ? e.warnings
                       .map((w) =>
-                          l10n.translate('order_create.$w') ??
-                          l10n.translate(w) ??
-                          w)
+                          l10n.translate('order_create.$w'))
                       .join('\n\n')
                   : l10n.translate('order_create.confirm_continue_message'),
             ),
@@ -723,6 +721,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
       inputFormatters: AppInputFormatters.withSqlInjectionGuard(
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'[0-9,\.]')),
+          CurrencyInputFormatter(),
         ],
       ),
       onChanged: onChanged,
