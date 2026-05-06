@@ -33,6 +33,7 @@ class AccountingCostRevenueTab extends StatefulWidget {
   final bool isLoadingMoreCost;
   final VoidCallback? onLoadMoreRevenue;
   final VoidCallback? onLoadMoreCost;
+  final Future<void> Function()? onRefresh;
 
   const AccountingCostRevenueTab({
     super.key,
@@ -56,6 +57,7 @@ class AccountingCostRevenueTab extends StatefulWidget {
     this.isLoadingMoreCost = false,
     this.onLoadMoreRevenue,
     this.onLoadMoreCost,
+    this.onRefresh,
   });
 
   @override
@@ -113,10 +115,12 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
         widget.mode == AccountingCostRevenueMode.both ||
         widget.mode == AccountingCostRevenueMode.cost;
 
-    return ListView(
-      controller: _scrollController,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      children: [
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh ?? () async {},
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
         if (showRevenue)
           _card(
             title: l10n.translate('accounting.revenue_list'),
@@ -178,7 +182,8 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
                     ],
                   ),
           ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -209,16 +214,20 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
     final effectiveLanguageCode = widget.languageCode;
 
     if (item is RevenueEntity) {
-      title = (item.documentNumber ?? '').trim().isNotEmpty
-          ? item.documentNumber!.trim()
-          : (item.revenueCode ?? '').trim().isNotEmpty
-              ? item.revenueCode!.trim()
-              : AccountingReferenceDisplay.displayReference(
-                  referenceType: 'revenue',
-                  referenceId: item.id,
-                  languageCode: effectiveLanguageCode,
-                  fallback: 'REV-${item.id}',
-                );
+      final revenueCode = (item.revenueCode ?? '').trim();
+      
+      // Build title: prioritize revenueCode, then reference display (ID)
+      if (revenueCode.isNotEmpty) {
+        title = revenueCode;
+      } else {
+        title = AccountingReferenceDisplay.displayReference(
+          referenceType: 'revenue',
+          referenceId: item.id,
+          languageCode: effectiveLanguageCode,
+          fallback: 'REV-${item.id}',
+        );
+      }
+      
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'revenue',
@@ -230,16 +239,20 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
       isReplaced = (item.statusCode ?? '').trim().toLowerCase() == 'replaced' || (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
       statusLabel = item.statusLabel;
     } else if (item is CostEntity) {
-      title = (item.documentNumber ?? '').trim().isNotEmpty
-          ? item.documentNumber!.trim()
-          : (item.costCode ?? '').trim().isNotEmpty
-              ? item.costCode!.trim()
-              : AccountingReferenceDisplay.displayReference(
-                  referenceType: 'cost',
-                  referenceId: item.id,
-                  languageCode: effectiveLanguageCode,
-                  fallback: 'COST-${item.id}',
-                );
+      final costCode = (item.costCode ?? '').trim();
+      
+      // Build title: prioritize costCode, then reference display (ID)
+      if (costCode.isNotEmpty) {
+        title = costCode;
+      } else {
+        title = AccountingReferenceDisplay.displayReference(
+          referenceType: 'cost',
+          referenceId: item.id,
+          languageCode: effectiveLanguageCode,
+          fallback: 'COST-${item.id}',
+        );
+      }
+      
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'cost',

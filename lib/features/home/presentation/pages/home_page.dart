@@ -275,9 +275,12 @@ class _HomePageState extends State<HomePage> with RouteAware {
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Column(
+          child: RefreshIndicator(
+            onRefresh: _refreshHomeManually,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Business Context Section
@@ -608,7 +611,8 @@ class _HomePageState extends State<HomePage> with RouteAware {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   String _summaryCacheKey(int? businessLocationId, _SummaryPeriod period) {

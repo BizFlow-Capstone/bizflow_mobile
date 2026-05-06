@@ -314,58 +314,65 @@ class _LocationPageContent extends StatelessWidget {
               children: [
                 // Location List
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.only(
-                      left: AppSpacing.md,
-                      right: AppSpacing.md,
-                      top: AppSpacing.sm,
-                      bottom: 80.0,
-                    ),
-                    itemCount: locations.length,
-                    itemBuilder: (context, index) {
-                      final location = locations[index];
-                      final isOwner = Provider.of<BusinessContext>(
-                        context,
-                        listen: false,
-                      ).isOwner;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                        child: LocationCard(
-                          location: location,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ProductManagementPage(
-                                  locationId: location.id,
-                                  locationName: location.name,
-                                  locationAddress: location.address,
-                                ),
-                              ),
-                            );
-                          },
-                          // Owner-only actions
-                          onToggleStatus: isOwner
-                            ? (isActive) =>
-                              onToggleStatus(location.id, isActive)
-                              : null,
-                          isToggleLoading: togglingLocationId == location.id,
-                          onEdit: isOwner ? () => onEdit(location) : null,
-                          onDelete: isOwner ? () => onDelete(location) : null,
-                          activeText: l10n.translate('location.active_status'),
-                          inactiveText: l10n.translate(
-                            'location.inactive_status',
-                          ),
-                          onAddManager: () {
-                            AppSnackBar.show(
-                              context,
-                              message: l10n.translate('location.add_manager'),
-                              type: AppSnackBarType.info,
-                            );
-                          },
-                        ),
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<LocationBloc>().add(
+                        const LoadLocationsRequested(useCache: false),
                       );
+                      await Future<void>.delayed(const Duration(milliseconds: 300));
                     },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        top: AppSpacing.sm,
+                        bottom: 80.0,
+                      ),
+                      itemCount: locations.length,
+                      itemBuilder: (context, index) {
+                        final location = locations[index];
+                        final isOwner = Provider.of<BusinessContext>(
+                          context,
+                          listen: false,
+                        ).isOwner;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                          child: LocationCard(
+                            location: location,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProductManagementPage(
+                                    locationId: location.id,
+                                    locationName: location.name,
+                                    locationAddress: location.address,
+                                  ),
+                                ),
+                              );
+                            },
+                            // Owner-only actions
+                            onToggleStatus: isOwner
+                                ? (isActive) => onToggleStatus(location.id, isActive)
+                                : null,
+                            isToggleLoading: togglingLocationId == location.id,
+                            onEdit: isOwner ? () => onEdit(location) : null,
+                            onDelete: isOwner ? () => onDelete(location) : null,
+                            activeText: l10n.translate('location.active_status'),
+                            inactiveText: l10n.translate(
+                              'location.inactive_status',
+                            ),
+                            onAddManager: () {
+                              AppSnackBar.show(
+                                context,
+                                message: l10n.translate('location.add_manager'),
+                                type: AppSnackBarType.info,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],

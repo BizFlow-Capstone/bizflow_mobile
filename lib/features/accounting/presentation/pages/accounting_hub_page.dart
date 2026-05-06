@@ -126,6 +126,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   List<RevenueEntity> _cachedRevenues = const <RevenueEntity>[];
   List<CostEntity> _cachedCosts = const <CostEntity>[];
   bool _suppressNextRevenueError = false;
+  String? _lastLocationId;
   // Pagination trackers for revenue & cost tabs
   int _revenuePageNumber = 0;
   int _revenuePageSize = 20;
@@ -201,6 +202,23 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      final currentLocationId = context.read<BusinessContext>().currentBusinessId;
+      if (_lastLocationId != currentLocationId) {
+        _lastLocationId = currentLocationId;
+        if (currentLocationId != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _loadTab(_tabController.index);
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   void _handleTabSelection() {
     if (_tabController.indexIsChanging) {
       _loadTab(_tabController.index);
@@ -253,19 +271,61 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           _revenuePageNumber = 0; // Reset to initial state
           _isLoadingMoreRevenue = false;
         });
-        context.read<RevenueBloc>().add(
-          LoadRevenuesRequested(businessLocationId: locationId),
-        );
+        try {
+          final periodDetail = context.read<AccountingPeriodBloc>().state.periodDetail;
+          if (periodDetail != null) {
+            final fromDate = DateTime.parse(periodDetail.startDate);
+            final toDate = DateTime.parse(periodDetail.endDate);
+            context.read<RevenueBloc>().add(
+              LoadRevenuesRequested(
+                businessLocationId: locationId,
+                fromDate: fromDate,
+                toDate: toDate,
+              ),
+            );
+          } else {
+            context.read<RevenueBloc>().add(
+              LoadRevenuesRequested(businessLocationId: locationId),
+            );
+          }
+        } catch (_) {
+          context.read<RevenueBloc>().add(
+            LoadRevenuesRequested(businessLocationId: locationId),
+          );
+        }
         break;
       case 3: // Chi phí
         setState(() {
           _costPageNumber = 0; // Reset to initial state
           _isLoadingMoreCost = false;
         });
-        if (context.mounted) {
-          context.read<CostBloc>().add(
-            LoadCostsRequested(businessLocationId: locationId),
-          );
+        try {
+          final periodDetail = context.read<AccountingPeriodBloc>().state.periodDetail;
+          if (periodDetail != null) {
+            final fromDate = DateTime.parse(periodDetail.startDate);
+            final toDate = DateTime.parse(periodDetail.endDate);
+            if (context.mounted) {
+              context.read<CostBloc>().add(
+                LoadCostsRequested(
+                  businessLocationId: locationId,
+                  fromDate: fromDate,
+                  toDate: toDate,
+                ),
+              );
+            }
+          } else {
+            if (context.mounted) {
+              context.read<CostBloc>().add(
+                LoadCostsRequested(businessLocationId: locationId),
+              );
+            }
+          }
+        } catch (_) {
+          if (context.mounted) {
+            context.read<CostBloc>().add(
+              LoadCostsRequested(businessLocationId: locationId),
+            );
+          }
         }
         break;
       // Tab 1 (Nhật ký/Sổ cái) is handled by AccountingGlTab internally or we could add triggering logic here later
@@ -435,8 +495,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     return double.tryParse(normalized);
   }
 
-  String _formatIsoDate(DateTime? date, {String fallback = '-'}) {
-    final formatted = DateFormatter.formatIso(date);
+  String _formatDate(DateTime? date, {String fallback = '-'}) {
+    final formatted = DateFormatter.formatDate(date);
     return formatted.isEmpty ? fallback : formatted;
   }
 
@@ -512,7 +572,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     return ListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(title),
-      subtitle: Text(value == null ? emptyText : _formatIsoDate(value)),
+      subtitle: Text(value == null ? emptyText : _formatDate(value)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -913,6 +973,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           ).languageCode,
                           revenues: revenueEntities,
                           costs: const <CostEntity>[],
+                          onRefresh: _refreshCurrentTabAsync,
                           onAddRevenue: _showCreateRevenueModeDialog,
                           onAddCost: _showCreateCostModeDialog,
                           onEditRevenue: _showEditRevenueDialog,
@@ -962,6 +1023,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           ).languageCode,
                           revenues: const <RevenueEntity>[],
                           costs: costEntities,
+                          onRefresh: _refreshCurrentTabAsync,
                           onAddRevenue: _showCreateRevenueModeDialog,
                           onAddCost: _showCreateCostModeDialog,
                           onEditRevenue: _showEditRevenueDialog,
@@ -2368,6 +2430,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               ),
               const SizedBox(height: 6),
               Text(
+                '${l10n.translate('accounting.revenue_date')}: ${_formatDate(revenue.date)}',
+              ),
+              const SizedBox(height: 6),
+              Text(
                 '${l10n.translate('accounting.revenue_business_type')}: ${revenue.businessTypeName ?? '-'}',
               ),
               const SizedBox(height: 6),
@@ -2574,7 +2640,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
               ),
               const SizedBox(height: 6),
               Text(
-                '${l10n.translate('accounting.cost_date')}: ${_formatIsoDate(cost.date)}',
+                '${l10n.translate('accounting.cost_date')}: ${_formatDate(cost.date)}',
               ),
               const SizedBox(height: 6),
               Text(
