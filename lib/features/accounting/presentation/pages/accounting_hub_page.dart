@@ -58,7 +58,9 @@ import '../../../../core/config/app_config.dart';
 import '../../../../shared/services/document_number_check_helper.dart';
 
 class AccountingHubPage extends StatefulWidget {
-  const AccountingHubPage({super.key});
+  final int initialTabIndex;
+
+  const AccountingHubPage({super.key, this.initialTabIndex = 0});
 
   @override
   State<AccountingHubPage> createState() => _AccountingHubPageState();
@@ -138,7 +140,12 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    final safeInitialIndex = widget.initialTabIndex.clamp(0, 3).toInt();
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: safeInitialIndex,
+    );
     SyncStatusController().clearError();
     SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
 
@@ -189,7 +196,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     // Initial load of first tab and references only
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadTab(0);
+      _loadTab(safeInitialIndex);
       _loadReferences();
     });
   }
@@ -303,24 +310,28 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     if (_isLoadingMoreRevenue) return;
     final nextPage = (_revenuePageNumber <= 0) ? 2 : _revenuePageNumber + 1;
     setState(() => _isLoadingMoreRevenue = true);
-    context.read<RevenueBloc>().add(LoadRevenuesRequested(
-      pageNumber: nextPage,
-      pageSize: _revenuePageSize,
-      businessLocationId: context.read<BusinessContext>().currentBusinessId,
-      isLoadMore: true,
-    ));
+    context.read<RevenueBloc>().add(
+      LoadRevenuesRequested(
+        pageNumber: nextPage,
+        pageSize: _revenuePageSize,
+        businessLocationId: context.read<BusinessContext>().currentBusinessId,
+        isLoadMore: true,
+      ),
+    );
   }
 
   void _loadMoreCosts() {
     if (_isLoadingMoreCost) return;
     final nextPage = (_costPageNumber <= 0) ? 2 : _costPageNumber + 1;
     setState(() => _isLoadingMoreCost = true);
-    context.read<CostBloc>().add(LoadCostsRequested(
-      pageNumber: nextPage,
-      pageSize: _costPageSize,
-      businessLocationId: context.read<BusinessContext>().currentBusinessId,
-      isLoadMore: true,
-    ));
+    context.read<CostBloc>().add(
+      LoadCostsRequested(
+        pageNumber: nextPage,
+        pageSize: _costPageSize,
+        businessLocationId: context.read<BusinessContext>().currentBusinessId,
+        isLoadMore: true,
+      ),
+    );
   }
 
   @override
@@ -883,10 +894,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           _revenuePageNumber = revenueState.pageNumber;
                           _revenuePageSize = revenueState.pageSize;
                           // Sync local loading flag with bloc state after frame
-                          if (_isLoadingMoreRevenue != revenueState.isLoadMore) {
+                          if (_isLoadingMoreRevenue !=
+                              revenueState.isLoadMore) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               if (!mounted) return;
-                              setState(() => _isLoadingMoreRevenue = revenueState.isLoadMore);
+                              setState(
+                                () => _isLoadingMoreRevenue =
+                                    revenueState.isLoadMore,
+                              );
                             });
                           }
                         }
@@ -911,7 +926,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           hasReachedMaxRevenue: revenueState is RevenuesLoaded
                               ? revenueState.hasReachedMax
                               : false,
-                          isLoadingMoreRevenue: revenueState is RevenuesLoaded ? revenueState.isLoadMore : false,
+                          isLoadingMoreRevenue: revenueState is RevenuesLoaded
+                              ? revenueState.isLoadMore
+                              : false,
                           onLoadMoreRevenue: _loadMoreRevenues,
                         );
                       },
@@ -931,7 +948,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           if (_isLoadingMoreCost != costState.isLoadMore) {
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               if (!mounted) return;
-                              setState(() => _isLoadingMoreCost = costState.isLoadMore);
+                              setState(
+                                () => _isLoadingMoreCost = costState.isLoadMore,
+                              );
                             });
                           }
                         }
@@ -956,7 +975,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           hasReachedMaxCost: costState is CostsLoaded
                               ? costState.hasReachedMax
                               : false,
-                          isLoadingMoreCost: costState is CostsLoaded ? costState.isLoadMore : false,
+                          isLoadingMoreCost: costState is CostsLoaded
+                              ? costState.isLoadMore
+                              : false,
                           onLoadMoreCost: _loadMoreCosts,
                         );
                       },

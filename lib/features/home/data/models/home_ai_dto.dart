@@ -97,6 +97,8 @@ class HomeAiAnomalyItemDto {
   final String alertType;
   final String severity;
   final String description;
+  final String? referenceId;
+  final String? recordType;
   final bool isAcknowledged;
   final String referenceDate;
 
@@ -105,6 +107,8 @@ class HomeAiAnomalyItemDto {
     required this.alertType,
     required this.severity,
     required this.description,
+    this.referenceId,
+    this.recordType,
     required this.isAcknowledged,
     required this.referenceDate,
   });
@@ -115,6 +119,8 @@ class HomeAiAnomalyItemDto {
       alertType: json['alertType']?.toString() ?? '',
       severity: json['severity']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
+      referenceId: json['referenceId']?.toString(),
+      recordType: json['recordType']?.toString(),
       isAcknowledged: json['isAcknowledged'] == true,
       referenceDate: json['referenceDate']?.toString() ?? '',
     );
@@ -126,6 +132,8 @@ class HomeAiAnomalyItemDto {
       'alertType': alertType,
       'severity': severity,
       'description': description,
+      'referenceId': referenceId,
+      'recordType': recordType,
       'isAcknowledged': isAcknowledged,
       'referenceDate': referenceDate,
     };
