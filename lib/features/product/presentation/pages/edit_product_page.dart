@@ -90,9 +90,7 @@ class _EditProductPageState extends State<EditProductPage> {
 
   final ImagePicker _imagePicker = ImagePicker();
   final ActionGuard _submitGuard = ActionGuard();
-  final ActionGuard _deleteGuard = ActionGuard();
   bool _isSubmitting = false;
-  bool _isDeleting = false;
   bool _isStatusUpdating = false;
   bool? _statusBeforeToggle;
   late bool _trackInventory;
@@ -368,68 +366,9 @@ class _EditProductPageState extends State<EditProductPage> {
     );
   }
 
-  /// Show delete confirmation dialog
-  void _showDeleteConfirmDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.translate('common.confirm')),
-        content: Text(l10n.translate('product.delete_confirm')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.translate('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteProduct();
-            },
-            child: Text(
-              l10n.translate('common.delete'),
-              style: TextStyle(color: AppColors.error),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Delete product
-  Future<void> _deleteProduct() async {
-    if (_isDeleting || _isSubmitting) return;
-
-    setState(() {
-      _isDeleting = true;
-    });
-
-    var hasDispatchedDeleteEvent = false;
-    await _deleteGuard.run(() async {
-      final allowed = await SubscriptionFeatureGuard.ensureAllowed(
-        context,
-        featureCode: SubscriptionFeatureCodes.productManagement,
-      );
-      if (!allowed || !mounted) return;
-
-      hasDispatchedDeleteEvent = true;
-      context.read<ProductBloc>().add(
-        DeleteProductRequested(
-          locationId: widget.locationId,
-          productId: widget.productId,
-        ),
-      );
-    });
-
-    if (!hasDispatchedDeleteEvent && mounted) {
-      setState(() {
-        _isDeleting = false;
-      });
-    }
-  }
-
   /// Submit form to update product
   Future<void> _submitForm() async {
-    if (_isSubmitting || _isDeleting) return;
+    if (_isSubmitting) return;
 
     final requiredMessage = l10n.translate('common.required_field');
     final invalidCostPriceMessage = l10n.translate(
@@ -474,10 +413,9 @@ class _EditProductPageState extends State<EditProductPage> {
           (salePriceText.isNotEmpty && (salePrice == null || salePrice < 0))
           ? invalidSalePriceMessage
           : null;
-        _quantityError = !_trackInventory
+      _quantityError = !_trackInventory
           ? null
-          :
-          (quantityText.isNotEmpty && (quantity == null || quantity < 0))
+          : (quantityText.isNotEmpty && (quantity == null || quantity < 0))
           ? invalidStockMessage
           : null;
     });
@@ -527,12 +465,11 @@ class _EditProductPageState extends State<EditProductPage> {
               : null,
           costPrice: _costPriceController.text.isNotEmpty ? costPrice : null,
           salePrice: _salePriceController.text.isNotEmpty ? salePrice : null,
-            quantity:
-              _trackInventory && _quantityController.text.isNotEmpty
+          quantity: _trackInventory && _quantityController.text.isNotEmpty
               ? quantity
               : null,
           unit: _unitController.text.isNotEmpty ? _unitController.text : null,
-            trackInventory: _trackInventory,
+          trackInventory: _trackInventory,
           isActive: _isActive,
           manufacturer: _manufacturerController.text.isNotEmpty
               ? _manufacturerController.text
@@ -594,41 +531,19 @@ class _EditProductPageState extends State<EditProductPage> {
               return;
             }
 
-            if (!_isSubmitting && !_isDeleting) {
+            if (!_isSubmitting) {
               return;
             }
 
-            if (_isSubmitting || _isDeleting) {
+            if (_isSubmitting) {
               setState(() {
                 _isSubmitting = false;
-                _isDeleting = false;
               });
             }
             // Show success message
             AppSnackBar.show(
               context,
               message: l10n.translate('product.edit_success'),
-              type: AppSnackBarType.success,
-            );
-            // Navigate back and return true to indicate success
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (mounted) Navigator.pop(context, true);
-            });
-          } else if (state is ProductDeleteSuccess) {
-            if (!_isDeleting) {
-              return;
-            }
-
-            if (_isSubmitting || _isDeleting) {
-              setState(() {
-                _isSubmitting = false;
-                _isDeleting = false;
-              });
-            }
-            // Show delete success message
-            AppSnackBar.show(
-              context,
-              message: l10n.translate('product.delete_success'),
               type: AppSnackBarType.success,
             );
             // Navigate back and return true to indicate success
@@ -719,10 +634,9 @@ class _EditProductPageState extends State<EditProductPage> {
               _businessTypes = state.businessTypes;
             });
           } else if (state is ProductFailure) {
-            if (_isSubmitting || _isDeleting) {
+            if (_isSubmitting) {
               setState(() {
                 _isSubmitting = false;
-                _isDeleting = false;
               });
             }
 
@@ -1040,9 +954,7 @@ class _EditProductPageState extends State<EditProductPage> {
                           decimal: true,
                         ),
                         inputFormatters: [
-                          FilteringTextInputFormatter.allow(
-                            RegExp(r'[0-9.,]'),
-                          ),
+                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                         ],
                       ),
                     ),
@@ -1215,39 +1127,6 @@ class _EditProductPageState extends State<EditProductPage> {
                           ),
                         ),
                       ],
-                    ),
-                    SizedBox(height: AppSpacing.md),
-                    BlocBuilder<ProductBloc, ProductState>(
-                      builder: (context, state) {
-                        final isDeleteBusy =
-                            _isDeleting ||
-                            state is ProductDeleteInProgress ||
-                            state is ProductUpdateInProgress;
-                        return ElevatedButton(
-                          onPressed: isDeleteBusy
-                              ? null
-                              : _showDeleteConfirmDialog,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            minimumSize: const Size(double.infinity, 48),
-                          ),
-                          child: isDeleteBusy
-                              ? SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.white,
-                                  ),
-                                )
-                              : Text(
-                                  l10n.translate('common.delete'),
-                                  style: AppTextStyles.labelLarge.copyWith(
-                                    color: AppColors.white,
-                                  ),
-                                ),
-                        );
-                      },
                     ),
                   ],
                 ),

@@ -12,8 +12,6 @@ import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../pages/edit_product_page.dart';
 import '../pages/product_detail_page.dart';
-import '../../../subscription/domain/subscription_feature_codes.dart';
-import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
 /// Product Card Widget
 /// Hiển thị thông tin sản phẩm dưới dạng card
@@ -22,7 +20,6 @@ class ProductCardWidget extends StatelessWidget {
   final String locationId;
   final VoidCallback? onQuickAdjustStock;
   final bool canManageActions;
-  final ActionGuard _deleteGuard = ActionGuard();
   final ActionGuard _detailGuard = ActionGuard();
   final ActionGuard _editGuard = ActionGuard();
 
@@ -86,13 +83,13 @@ class ProductCardWidget extends StatelessWidget {
     );
 
     return ((candidate['baseUnit'] ??
-                candidate['BaseUnit'] ??
-                candidate['unitName'] ??
-                candidate['UnitName'] ??
-                candidate['unit'] ??
-                candidate['Unit'])
-            ?.toString() ??
-        '')
+                    candidate['BaseUnit'] ??
+                    candidate['unitName'] ??
+                    candidate['UnitName'] ??
+                    candidate['unit'] ??
+                    candidate['Unit'])
+                ?.toString() ??
+            '')
         .trim();
   }
 
@@ -308,120 +305,45 @@ class ProductCardWidget extends StatelessWidget {
                 ),
                 SizedBox(height: AppSpacing.sm),
                 if (canManageActions)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            await _editGuard.run(() async {
-                              final result = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => EditProductPage(
-                                    productId: product.id,
-                                    locationId: locationId,
-                                    productName: product.name,
-                                    barcode: product.barcode,
-                                    category: product.category,
-                                    costPrice: product.costPrice,
-                                    salePrice: product.salePrice,
-                                    quantity: product.quantity,
-                                    unit: product.unit,
-                                    description: product.description,
-                                    isActive: product.isActive,
-                                    trackInventory: product.trackInventory,
-                                    businessTypeId: product.businessTypeId,
-                                    manufacturer: product.manufacturer,
-                                    imageUrl: product.imageUrl,
-                                  ),
-                                ),
-                              );
-                              if (result == true && context.mounted) {
-                                context.read<ProductBloc>().add(
-                                  LoadProductsByLocationRequested(
-                                    locationId: locationId,
-                                  ),
-                                );
-                              }
-                            });
-                          },
-                          icon: const Icon(Icons.edit, size: 18),
-                          label: Text(
-                            l10n.translate('product.edit_button_label'),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await _editGuard.run(() async {
+                        final result = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditProductPage(
+                              productId: product.id,
+                              locationId: locationId,
+                              productName: product.name,
+                              barcode: product.barcode,
+                              category: product.category,
+                              costPrice: product.costPrice,
+                              salePrice: product.salePrice,
+                              quantity: product.quantity,
+                              unit: product.unit,
+                              description: product.description,
+                              isActive: product.isActive,
+                              trackInventory: product.trackInventory,
+                              businessTypeId: product.businessTypeId,
+                              manufacturer: product.manufacturer,
+                              imageUrl: product.imageUrl,
+                            ),
                           ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.secondary,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            // Show confirmation dialog for delete
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text(
-                                  l10n.translate(
-                                    'product.confirm_delete_title',
-                                  ),
-                                ),
-                                content: Text(
-                                  l10n.translate(
-                                    'product.confirm_delete_message',
-                                  ),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: Text(
-                                      l10n.translate('common.cancel'),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: () async {
-                                      await _deleteGuard.run(() async {
-                                        final allowed =
-                                            await SubscriptionFeatureGuard.ensureAllowed(
-                                              context,
-                                              featureCode:
-                                                  SubscriptionFeatureCodes
-                                                      .productManagement,
-                                            );
-                                        if (!allowed || !context.mounted)
-                                          return;
-
-                                        Navigator.pop(context);
-                                        context.read<ProductBloc>().add(
-                                          DeleteProductRequested(
-                                            locationId: locationId,
-                                            productId: product.id,
-                                          ),
-                                        );
-                                      });
-                                    },
-                                    child: Text(
-                                      l10n.translate(
-                                        'product.delete_button_label',
-                                      ),
-                                      style: const TextStyle(color: Colors.red),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          label: Text(
-                            l10n.translate('product.delete_button_label'),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                          ),
-                        ),
-                      ),
-                    ],
+                        );
+                        if (result == true && context.mounted) {
+                          context.read<ProductBloc>().add(
+                            LoadProductsByLocationRequested(
+                              locationId: locationId,
+                            ),
+                          );
+                        }
+                      });
+                    },
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: Text(l10n.translate('product.edit_button_label')),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.secondary,
+                    ),
                   ),
               ],
             ),
