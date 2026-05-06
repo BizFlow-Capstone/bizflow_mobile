@@ -117,6 +117,7 @@ class S2cBookWidget extends StatelessWidget {
         '1. Doanh thu bán hàng hóa, dịch vụ',
         _fmtAmount(summary.revenueTotal),
         emphasized: true,
+        explanation: summary.revenueExplanation,
       ),
     );
     tableRows.addAll(
@@ -137,6 +138,7 @@ class S2cBookWidget extends StatelessWidget {
         '2. Chi phí hợp lý',
         _fmtAmount(summary.costTotal),
         emphasized: true,
+        explanation: summary.costExplanation,
       ),
     );
     tableRows.addAll(
@@ -157,6 +159,7 @@ class S2cBookWidget extends StatelessWidget {
         '3. Chênh lệch {(3) = (1) - (2)}',
         _fmtAmount(summary.difference),
         emphasized: true,
+        explanation: summary.differenceExplanation,
       ),
     );
     tableRows.add(
@@ -166,6 +169,7 @@ class S2cBookWidget extends StatelessWidget {
         _fmtAmount(summary.pitTax),
         emphasized: true,
         taxLike: true,
+        explanation: summary.pitExplanation,
       ),
     );
 
@@ -598,6 +602,19 @@ class S2cBookWidget extends StatelessWidget {
             ? revenueTotal - costTotal
             : null);
     final pitTax = _findPitAmount(allSummaryRows);
+    final revenueExplanation = _findExplanationByKeywords(
+      allSummaryRows,
+      const ['tổng doanh thu', 'doanh thu'],
+    );
+    final costExplanation = _findExplanationByKeywords(allSummaryRows, const [
+      'tổng chi phí hợp lý',
+      'chi phí hợp lý',
+    ]);
+    final differenceExplanation = _findExplanationByKeywords(
+      allSummaryRows,
+      const ['chênh lệch', 'chenh lech'],
+    );
+    final pitExplanation = _findPitExplanation(allSummaryRows);
 
     // Build flat entries lists sorted by date (descending)
     final revenueEntries = _buildFlatEntries(sectionFilter: 'revenue');
@@ -610,6 +627,10 @@ class S2cBookWidget extends StatelessWidget {
       costEntries: costEntries,
       difference: difference,
       pitTax: pitTax,
+      revenueExplanation: revenueExplanation,
+      costExplanation: costExplanation,
+      differenceExplanation: differenceExplanation,
+      pitExplanation: pitExplanation,
     );
   }
 
@@ -699,6 +720,37 @@ class S2cBookWidget extends StatelessWidget {
     return null;
   }
 
+  String? _findExplanationByKeywords(
+    List<SectionRowDto> rows,
+    List<String> keywords,
+  ) {
+    for (final row in rows) {
+      final label = (row.values['dien_giai']?.toString() ?? '').toLowerCase();
+      if (label.isEmpty) continue;
+      final matched = keywords.any((keyword) => label.contains(keyword));
+      if (!matched) continue;
+      final explanation = row.values['explanation']?.toString().trim();
+      if ((explanation ?? '').isNotEmpty) {
+        return explanation;
+      }
+    }
+    return null;
+  }
+
+  String? _findPitExplanation(List<SectionRowDto> rows) {
+    for (final row in rows) {
+      final label = (row.values['dien_giai']?.toString() ?? '').toLowerCase();
+      final taxType = row.taxType?.trim().toUpperCase();
+      if (taxType == 'PIT' || taxType == 'TNCN' || label.contains('tncn')) {
+        final explanation = row.values['explanation']?.toString().trim();
+        if ((explanation ?? '').isNotEmpty) {
+          return explanation;
+        }
+      }
+    }
+    return null;
+  }
+
   static String? _inferSection(Map<String, dynamic> v) {
     const keys = ['section', 'Section', 'sectionType', 'kind', 'type'];
     for (final key in keys) {
@@ -764,6 +816,10 @@ class _S2cSummaryData {
   final List<_S2cEntry> costEntries;
   final num? difference;
   final num? pitTax;
+  final String? revenueExplanation;
+  final String? costExplanation;
+  final String? differenceExplanation;
+  final String? pitExplanation;
 
   const _S2cSummaryData({
     this.revenueTotal,
@@ -772,6 +828,10 @@ class _S2cSummaryData {
     this.costEntries = const [],
     this.difference,
     this.pitTax,
+    this.revenueExplanation,
+    this.costExplanation,
+    this.differenceExplanation,
+    this.pitExplanation,
   });
 }
 

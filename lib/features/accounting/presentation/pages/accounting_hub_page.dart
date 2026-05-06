@@ -42,6 +42,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
 import '../../../order/domain/entities/order_entity.dart';
 import '../bloc/accounting_period_bloc.dart';
+import '../../domain/models/accounting_period.dart';
 import '../bloc/gl_bloc/gl_bloc.dart';
 import '../bloc/gl_bloc/gl_event.dart';
 import '../bloc/gl_bloc/gl_state.dart';
@@ -171,43 +172,35 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           await CacheManager().removeByPrefix('costs_');
           await LocalApiCacheStore().removeByGroup('costs');
 
-          // If user is viewing revenue or cost tab, reload with period date range
-          if (_tabController.index == 2) {
-            try {
-              final fromDate = DateTime.parse(periodDetail.startDate);
-              final toDate = DateTime.parse(periodDetail.endDate);
-              if (mounted) {
-                context.read<RevenueBloc>().add(
-                  LoadRevenuesRequested(
-                    businessLocationId: locationId,
-                    fromDate: fromDate,
-                    toDate: toDate,
-                  ),
-                );
-              }
-            } catch (_) {}
-          } else if (_tabController.index == 3) {
-            try {
-              final fromDate = DateTime.parse(periodDetail.startDate);
-              final toDate = DateTime.parse(periodDetail.endDate);
-              if (mounted) {
-                context.read<CostBloc>().add(
-                  LoadCostsRequested(
-                    businessLocationId: locationId,
-                    fromDate: fromDate,
-                    toDate: toDate,
-                  ),
-                );
-              }
-            } catch (_) {}
-          }
+          // Always reload revenue and cost data with new period date range
+          // regardless of which tab is currently viewed
+          try {
+            final fromDate = DateTime.parse(periodDetail.startDate);
+            final toDate = DateTime.parse(periodDetail.endDate);
+            if (mounted) {
+              context.read<RevenueBloc>().add(
+                LoadRevenuesRequested(
+                  businessLocationId: locationId,
+                  fromDate: fromDate,
+                  toDate: toDate,
+                ),
+              );
+              context.read<CostBloc>().add(
+                LoadCostsRequested(
+                  businessLocationId: locationId,
+                  fromDate: fromDate,
+                  toDate: toDate,
+                ),
+              );
+            }
+          } catch (_) {}
         });
       } catch (_) {}
     });
 
     // Initial load of first tab and references only
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadTab(safeInitialIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadTab(safeInitialIndex);
       _loadReferences();
     });
   }
@@ -216,13 +209,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   void didChangeDependencies() {
     super.didChangeDependencies();
     try {
-      final currentLocationId = context.read<BusinessContext>().currentBusinessId;
+      final currentLocationId = context
+          .read<BusinessContext>()
+          .currentBusinessId;
       if (_lastLocationId != currentLocationId) {
         _lastLocationId = currentLocationId;
         if (currentLocationId != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
             if (!mounted) return;
-            _loadTab(_tabController.index);
+            await _loadTab(_tabController.index);
           });
         }
       }
@@ -231,11 +226,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
   void _handleTabSelection() {
     if (_tabController.indexIsChanging) {
-      _loadTab(_tabController.index);
+      unawaited(_loadTab(_tabController.index));
     }
   }
 
-  void _loadTab(int index) {
+  Future<void> _loadTab(int index) async {
     final locationId = context.read<BusinessContext>().currentBusinessId;
     if (locationId == null) return;
 
@@ -281,8 +276,22 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           _revenuePageNumber = 0; // Reset to initial state
           _isLoadingMoreRevenue = false;
         });
+
+        // Get period details before async operations
+        AccountingPeriod? periodDetail;
         try {
-          final periodDetail = context.read<AccountingPeriodBloc>().state.periodDetail;
+          periodDetail = context
+              .read<AccountingPeriodBloc>()
+              .state
+              .periodDetail;
+        } catch (_) {}
+
+        // Clear revenue cache when loading tab to avoid stale data after period close
+        await _clearRevenueCache();
+
+        if (!mounted) return;
+
+        try {
           if (periodDetail != null) {
             final fromDate = DateTime.parse(periodDetail.startDate);
             final toDate = DateTime.parse(periodDetail.endDate);
@@ -309,33 +318,41 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           _costPageNumber = 0; // Reset to initial state
           _isLoadingMoreCost = false;
         });
+
+        // Get period details before async operations
+        AccountingPeriod? costPeriodDetail;
         try {
-          final periodDetail = context.read<AccountingPeriodBloc>().state.periodDetail;
-          if (periodDetail != null) {
-            final fromDate = DateTime.parse(periodDetail.startDate);
-            final toDate = DateTime.parse(periodDetail.endDate);
-            if (context.mounted) {
-              context.read<CostBloc>().add(
-                LoadCostsRequested(
-                  businessLocationId: locationId,
-                  fromDate: fromDate,
-                  toDate: toDate,
-                ),
-              );
-            }
+          costPeriodDetail = context
+              .read<AccountingPeriodBloc>()
+              .state
+              .periodDetail;
+        } catch (_) {}
+
+        // Clear cost cache when loading tab to avoid stale data after period close
+        await _clearCostCache();
+
+        if (!mounted) return;
+
+        try {
+          if (costPeriodDetail != null) {
+            final fromDate = DateTime.parse(costPeriodDetail.startDate);
+            final toDate = DateTime.parse(costPeriodDetail.endDate);
+            context.read<CostBloc>().add(
+              LoadCostsRequested(
+                businessLocationId: locationId,
+                fromDate: fromDate,
+                toDate: toDate,
+              ),
+            );
           } else {
-            if (context.mounted) {
-              context.read<CostBloc>().add(
-                LoadCostsRequested(businessLocationId: locationId),
-              );
-            }
-          }
-        } catch (_) {
-          if (context.mounted) {
             context.read<CostBloc>().add(
               LoadCostsRequested(businessLocationId: locationId),
             );
           }
+        } catch (_) {
+          context.read<CostBloc>().add(
+            LoadCostsRequested(businessLocationId: locationId),
+          );
         }
         break;
       // Tab 1 (Nhật ký/Sổ cái) is handled by AccountingGlTab internally or we could add triggering logic here later
@@ -369,7 +386,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       await CacheManager().removeByPrefix('costs_');
       await LocalApiCacheStore().removeByGroup('costs');
 
-      _loadTab(_tabController.index);
+      await _loadTab(_tabController.index);
       SyncStatusController().endSync(updatedAt: DateTime.now());
     } catch (_) {
       SyncStatusController().endSync(hasError: true);
@@ -402,6 +419,16 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         isLoadMore: true,
       ),
     );
+  }
+
+  Future<void> _clearRevenueCache() async {
+    await CacheManager().removeByPrefix('revenues_');
+    await LocalApiCacheStore().removeByGroup('revenues');
+  }
+
+  Future<void> _clearCostCache() async {
+    await CacheManager().removeByPrefix('costs_');
+    await LocalApiCacheStore().removeByGroup('costs');
   }
 
   @override

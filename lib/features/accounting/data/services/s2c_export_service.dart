@@ -613,7 +613,7 @@ class S2cExportService {
           if (da == null && db == null) return 0;
           if (da == null) return 1;
           if (db == null) return -1;
-          return db.compareTo(da); // Descending (newest first)
+          return da.compareTo(db); // Ascending (oldest first)
         });
 
     for (final row in matchingRows) {
