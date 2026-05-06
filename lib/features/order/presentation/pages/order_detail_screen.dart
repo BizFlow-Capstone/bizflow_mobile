@@ -63,23 +63,27 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _canEditOrder(OrderEntity order) {
     // Rule 0: do not allow edit until accounting periods are loaded.
     if (!_periodsLoaded) return false;
+    // Rule 1: only block editing when the order's date falls into a closed period.
+    final orderDate = order.completedAt ?? order.createdAt;
+    if (orderDate == null) return false;
 
-    // Rule 1: if order belongs to a closed/finalized accounting period, editing is blocked.
+    final target = DateUtils.dateOnly(orderDate.toLocal());
     for (final period in _periods) {
-      DateTime? start;
-      DateTime? end;
       try {
-        start = DateUtils.dateOnly(DateTime.parse(period.startDate));
-        end = DateUtils.dateOnly(DateTime.parse(period.endDate));
-      } catch (_) {
-        continue;
-      }
+        final start = DateUtils.dateOnly(DateTime.parse(period.startDate));
+        final end = DateUtils.dateOnly(DateTime.parse(period.endDate));
 
-      if (!period.isOpen) {
-        return false;
+        if (!target.isBefore(start) && !target.isAfter(end)) {
+          // If the period that contains the order date is not open, block edit.
+          return period.isOpen;
+        }
+      } catch (_) {
+        // ignore malformed period dates
+        continue;
       }
     }
 
+    // If order date does not fall into any known period, allow editing.
     return true;
   }
 
@@ -118,11 +122,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
     }
     // Trigger load template khi screen mở
-    context.read<InvoiceTemplateBloc>().add(const LoadInvoiceTemplateRequested());
+    context.read<InvoiceTemplateBloc>().add(
+      const LoadInvoiceTemplateRequested(),
+    );
   }
 
   Future<void> _loadAccountingPeriods(String locationId) async {
-    final fallbackLocationId = context.read<BusinessContext>().currentBusinessId;
+    final fallbackLocationId = context
+        .read<BusinessContext>()
+        .currentBusinessId;
     final resolvedLocationId = int.tryParse(locationId) != null
         ? locationId
         : (fallbackLocationId ?? '');
@@ -407,15 +415,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   String _pdfFormat(String text) => StringUtils.removeDiacritics(text);
   String _formatMoney(num? amount) => CurrencyFormatter.formatVND(amount);
-  String _pdfCurrency(num? amount) => _formatMoney(amount).replaceAll('đ', ' VND');
+  String _pdfCurrency(num? amount) =>
+      _formatMoney(amount).replaceAll('đ', ' VND');
 
   String _formatQuantityWithUnit(double quantity, String? unitName) {
     final unit = unitName?.trim() ?? '';
-    final quantityText = quantity % 1 == 0 ? quantity.toStringAsFixed(1) : quantity.toString();
+    final quantityText = quantity % 1 == 0
+        ? quantity.toStringAsFixed(1)
+        : quantity.toString();
     return unit.isNotEmpty ? '$quantityText $unit' : quantityText;
   }
 
-  String _translateOrFallback(AppLocalizations l10n, String key, String fallback) {
+  String _translateOrFallback(
+    AppLocalizations l10n,
+    String key,
+    String fallback,
+  ) {
     final t = l10n.translate(key);
     if (t.trim().isEmpty || t == key) return fallback;
     return t;
@@ -432,7 +447,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (template.showItemName) {
       columns.add({
         'key': 'name',
-        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng')),
+        'label': _pdfFormat(
+          _translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng'),
+        ),
       });
     }
     if (template.showQuantity) {
@@ -450,13 +467,17 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (template.showUnitPrice) {
       columns.add({
         'key': 'unitPrice',
-        'label': _pdfFormat(_translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá')),
+        'label': _pdfFormat(
+          _translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá'),
+        ),
       });
     }
     if (template.showItemDiscount) {
       columns.add({
         'key': 'discount',
-        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_discount', 'Chiết khấu')),
+        'label': _pdfFormat(
+          _translateOrFallback(l10n, 'invoice_item_discount', 'Chiết khấu'),
+        ),
       });
     }
     if (template.showItemVat) {
@@ -468,23 +489,34 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (template.showItemTotalAmount) {
       columns.add({
         'key': 'total',
-        'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền')),
+        'label': _pdfFormat(
+          _translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền'),
+        ),
       });
     }
     if (columns.isEmpty) {
       columns.addAll([
         {
           'key': 'name',
-          'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng')),
+          'label': _pdfFormat(
+            _translateOrFallback(l10n, 'invoice_item_name', 'Tên hàng'),
+          ),
         },
-        {'key': 'qty', 'label': _pdfFormat(_translateOrFallback(l10n, 'quantity', 'SL'))},
+        {
+          'key': 'qty',
+          'label': _pdfFormat(_translateOrFallback(l10n, 'quantity', 'SL')),
+        },
         {
           'key': 'unitPrice',
-          'label': _pdfFormat(_translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá')),
+          'label': _pdfFormat(
+            _translateOrFallback(l10n, 'detail_unit_price_label', 'Đơn giá'),
+          ),
         },
         {
           'key': 'total',
-          'label': _pdfFormat(_translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền')),
+          'label': _pdfFormat(
+            _translateOrFallback(l10n, 'invoice_item_total', 'T.Tiền'),
+          ),
         },
       ]);
     }
@@ -546,7 +578,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 pw.Text(
                   _pdfFormat(
-                    template.businessName.isNotEmpty ? template.businessName : '',
+                    template.businessName.isNotEmpty
+                        ? template.businessName
+                        : '',
                   ),
                   style: pw.TextStyle(
                     fontSize: 16,
@@ -571,7 +605,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           pw.SizedBox(height: 8),
           pw.Center(
             child: pw.Text(
-              _pdfFormat(_translateOrFallback(l10n, 'invoice_title', 'HÓA ĐƠN BÁN HÀNG')),
+              _pdfFormat(
+                _translateOrFallback(l10n, 'invoice_title', 'HÓA ĐƠN BÁN HÀNG'),
+              ),
               style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
             ),
           ),
@@ -582,16 +618,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                  pw.Text(
-                    _pdfFormat(
-                      '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+                    pw.Text(
+                      _pdfFormat(
+                        '${_translateOrFallback(l10n, 'invoice_order_code', 'Mã đơn')}: ${detail.orderCode.isNotEmpty ? detail.orderCode : detail.id}',
+                      ),
                     ),
-                  ),
-                  pw.Text(
-                    _pdfFormat(
-                      '${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: ${CurrencyFormatter.formatDate(detail.createdAt)}',
+                    pw.Text(
+                      _pdfFormat(
+                        '${_translateOrFallback(l10n, 'invoice_date', 'Ngày')}: ${CurrencyFormatter.formatDate(detail.createdAt)}',
+                      ),
                     ),
-                  ),
                   ],
                 ),
               ),
@@ -600,22 +636,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                  if (template.showCustomerName)
-                    pw.Text(
-                      _pdfFormat(
-                        '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${detail.customerName?.isNotEmpty == true ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
+                    if (template.showCustomerName)
+                      pw.Text(
+                        _pdfFormat(
+                          '${_translateOrFallback(l10n, 'invoice_customer', 'Khách hàng')}: ${detail.customerName?.isNotEmpty == true ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
+                        ),
                       ),
-                    ),
-                  if (template.showCustomerPhone)
-                    pw.Text(
-                      _pdfFormat(
-                        '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${detail.customerPhone?.isNotEmpty == true ? detail.customerPhone : '-'}',
+                    if (template.showCustomerPhone)
+                      pw.Text(
+                        _pdfFormat(
+                          '${_translateOrFallback(l10n, 'invoice_phone', 'SĐT')}: ${detail.customerPhone?.isNotEmpty == true ? detail.customerPhone : '-'}',
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
-          ],
+            ],
           ),
           pw.SizedBox(height: 16),
           pw.TableHelper.fromTextArray(
@@ -632,7 +668,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               children: [
                 if (template.showSubTotal)
                   pw.Text(
-                    _pdfFormat('${_translateOrFallback(l10n, 'invoice_subtotal', 'Tạm tính')}: ${_pdfCurrency(detail.subtotal)}'),
+                    _pdfFormat(
+                      '${_translateOrFallback(l10n, 'invoice_subtotal', 'Tạm tính')}: ${_pdfCurrency(detail.subtotal)}',
+                    ),
                   ),
                 if (template.showTotalDiscount)
                   pw.Text(
@@ -641,7 +679,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     ),
                   ),
                 if (template.showTotalVat)
-                  pw.Text(_pdfFormat('${_translateOrFallback(l10n, 'invoice_tax', 'VAT')}: ${_pdfCurrency(detail.taxAmount)}')),
+                  pw.Text(
+                    _pdfFormat(
+                      '${_translateOrFallback(l10n, 'invoice_tax', 'VAT')}: ${_pdfCurrency(detail.taxAmount)}',
+                    ),
+                  ),
                 pw.Text(
                   _pdfFormat(
                     '${_translateOrFallback(l10n, 'invoice_total', 'Tổng thanh toán')}: ${_pdfCurrency(detail.totalAmount)}',
@@ -815,269 +857,288 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
               return Column(
                 children: [
-                if (detail.status.toLowerCase() == 'completed')
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: _isInvoiceActionInProgress
-                                ? null
-                                : () => _shareInvoice(detail),
-                            icon: const Icon(Icons.share_outlined),
-                            label: Text(
-                              l10n.translate('order_payment.share_invoice'),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: _isInvoiceActionInProgress
-                                ? null
-                                : () => _downloadInvoice(detail),
-                            icon: const Icon(Icons.download_outlined),
-                            label: Text(
-                              l10n.translate('order_payment.download_invoice'),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (detail.isPending ||
-                    (detail.isPublished && !_hideCancelForCompletedOrder(detail))) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.sm,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: (_isCancelling || _isPublishing)
-                                ? null
-                                : () => _cancelOrder(detail),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.error,
-                              side: const BorderSide(color: AppColors.error),
-                            ),
-                            icon: _isCancelling
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.cancel),
-                            label: Text(l10n.translate('order.action_cancel')),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        if ((detail.isPending || (detail.isPublished && !_hideCancelForCompletedOrder(detail))) && _canEditOrder(detail))
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: (_isCancelling || _isPublishing)
-                                  ? null
-                                  : () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => OrderFormScreen(
-                                            inputType: 'manual',
-                                            initialOrder: detail,
-                                            pendingOrderId: detail.id,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                              icon: const Icon(Icons.edit),
-                              label: Text(l10n.translate('order.action_edit')),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (detail.isPending)
+                  if (detail.status.toLowerCase() == 'completed')
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
                         vertical: AppSpacing.sm,
                       ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: (_isPublishing || _isCancelling)
-                              ? null
-                              : () => _completeOrder(detail),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.success,
-                            foregroundColor: Colors.white,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _isInvoiceActionInProgress
+                                  ? null
+                                  : () => _shareInvoice(detail),
+                              icon: const Icon(Icons.share_outlined),
+                              label: Text(
+                                l10n.translate('order_payment.share_invoice'),
+                              ),
+                            ),
                           ),
-                          icon: _isPublishing
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.check_circle),
-                          label: Text(l10n.translate('order.action_publish')),
-                        ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _isInvoiceActionInProgress
+                                  ? null
+                                  : () => _downloadInvoice(detail),
+                              icon: const Icon(Icons.download_outlined),
+                              label: Text(
+                                l10n.translate(
+                                  'order_payment.download_invoice',
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                ],
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    children: [
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                detail.orderCode.trim().isNotEmpty
-                                    ? detail.orderCode
-                                    : l10n.translate(
-                                        'order.order_number',
-                                        params: {'number': detail.id},
+                  if (detail.isPending ||
+                      (detail.isPublished &&
+                          !_hideCancelForCompletedOrder(detail))) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.sm,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: (_isCancelling || _isPublishing)
+                                  ? null
+                                  : () => _cancelOrder(detail),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                side: const BorderSide(color: AppColors.error),
+                              ),
+                              icon: _isCancelling
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
                                       ),
-                                style: AppTextStyles.titleMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
+                                    )
+                                  : const Icon(Icons.cancel),
+                              label: Text(
+                                l10n.translate('order.action_cancel'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          if ((detail.isPending ||
+                                  (detail.isPublished &&
+                                      !_hideCancelForCompletedOrder(detail))) &&
+                              _canEditOrder(detail))
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: (_isCancelling || _isPublishing)
+                                    ? null
+                                    : () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                OrderFormScreen(
+                                                  inputType: 'manual',
+                                                  initialOrder: detail,
+                                                  pendingOrderId: detail.id,
+                                                ),
+                                          ),
+                                        );
+                                      },
+                                icon: const Icon(Icons.edit),
+                                label: Text(
+                                  l10n.translate('order.action_edit'),
                                 ),
                               ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Text(
-                                '${l10n.translate('accounting.document_number')}: ${detail.documentNumber?.trim().isNotEmpty == true ? detail.documentNumber!.trim() : ''}',
-                              ),
-                              Text(
-                                '${l10n.translate('order.detail_status')}: ${detail.statusLabel ?? (() {
-                                  final refState = context.read<ReferenceBloc>().state;
-                                  if (refState is ReferenceLoaded) {
-                                    final orderStatuses = refState.references['orderStatuses'] ?? <ReferenceItem>[];
-                                    return orderStatuses.getLabelByCode(detail.status);
-                                  }
-                                  return detail.status;
-                                })()} ',
-                              ),
-                              Text(
-                                '${l10n.translate('order.detail_customer_name')}: ${((detail.customerName ?? '').trim().isNotEmpty) ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
-                              ),
-                              if ((detail.customerPhone ?? '').trim().isNotEmpty)
-                                Text(
-                                  '${l10n.translate('order.detail_customer_phone')}: ${detail.customerPhone}',
-                                ),
-                              Text(
-                                '${l10n.translate('order.detail_created_at')}: ${_formatDateTime(detail.createdAt)}',
-                              ),
-                              Text(
-                                '${l10n.translate('order.detail_updated_at')}: ${_formatDateTime(detail.updatedAt)}',
-                              ),
-                              Text(
-                                '${l10n.translate('order.detail_created_by')}: ${detail.createdByProfileFullName ?? detail.createdByProfileId ?? '-'}',
-                              ),
-                              if (detail.completedAt != null)
-                                Text(
-                                  '${l10n.translate('order.detail_completed_at')}: ${_formatDateTime(detail.completedAt!)}',
-                                ),
-                              if (detail.cancelledAt != null)
-                                Text(
-                                  '${l10n.translate('order.detail_cancelled_at')}: ${_formatDateTime(detail.cancelledAt!)}',
-                                ),
-                              if (detail.status.toLowerCase() == 'cancelled' && (detail.cancelReason ?? '').trim().isNotEmpty)
-                                Text(
-                                  '${l10n.translate('order.detail_cancel_reason')}: ${detail.cancelReason}',
-                                ),
-                            ],
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (detail.isPending)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: (_isPublishing || _isCancelling)
+                                ? null
+                                : () => _completeOrder(detail),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.success,
+                              foregroundColor: Colors.white,
+                            ),
+                            icon: _isPublishing
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.check_circle),
+                            label: Text(l10n.translate('order.action_publish')),
                           ),
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(AppSpacing.md),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.translate('order.detail_payment_section'),
-                                style: AppTextStyles.titleSmall.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              Text(
-                                '${l10n.translate('order.detail_cash_amount')}: ${_formatMoney(detail.cashAmount)}',
-                              ),
-                              Text(
-                                '${l10n.translate('order.detail_bank_amount')}: ${_formatMoney(detail.bankAmount)}',
-                              ),
-                              Text(
-                                '${l10n.translate('order.detail_debt_amount')}: ${_formatMoney(detail.debtAmount)}',
-                              ),
-                              const Divider(height: 20),
-                              Text(
-                                '${l10n.translate('order.detail_subtotal')}: ${_formatMoney(detail.subtotal)}',
-                              ),
-                              Text(
-                                '${l10n.translate('order.detail_discount')}: ${_formatMoney(detail.discountAmount)}',
-                              ),
-                              if ((detail.taxAmount).round() != 0)
+                  ],
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      children: [
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                                 Text(
-                                  '${l10n.translate('order.detail_tax')}: ${_formatMoney(detail.taxAmount)}',
+                                  detail.orderCode.trim().isNotEmpty
+                                      ? detail.orderCode
+                                      : l10n.translate(
+                                          'order.order_number',
+                                          params: {'number': detail.id},
+                                        ),
+                                  style: AppTextStyles.titleMedium.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              const SizedBox(height: AppSpacing.xs),
-                              Text(
-                                '${l10n.translate('order.detail_total')}: ${_formatMoney(detail.totalAmount)}',
-                                style: AppTextStyles.titleSmall.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  '${l10n.translate('accounting.document_number')}: ${detail.documentNumber?.trim().isNotEmpty == true ? detail.documentNumber!.trim() : ''}',
                                 ),
-                              ),
-                            ],
+                                Text(
+                                  '${l10n.translate('order.detail_status')}: ${detail.statusLabel ?? (() {
+                                        final refState = context.read<ReferenceBloc>().state;
+                                        if (refState is ReferenceLoaded) {
+                                          final orderStatuses = refState.references['orderStatuses'] ?? <ReferenceItem>[];
+                                          return orderStatuses.getLabelByCode(detail.status);
+                                        }
+                                        return detail.status;
+                                      })()} ',
+                                ),
+                                Text(
+                                  '${l10n.translate('order.detail_customer_name')}: ${((detail.customerName ?? '').trim().isNotEmpty) ? detail.customerName : l10n.translate('order_create.customer_walkin')}',
+                                ),
+                                if ((detail.customerPhone ?? '')
+                                    .trim()
+                                    .isNotEmpty)
+                                  Text(
+                                    '${l10n.translate('order.detail_customer_phone')}: ${detail.customerPhone}',
+                                  ),
+                                Text(
+                                  '${l10n.translate('order.detail_created_at')}: ${_formatDateTime(detail.createdAt)}',
+                                ),
+                                Text(
+                                  '${l10n.translate('order.detail_updated_at')}: ${_formatDateTime(detail.updatedAt)}',
+                                ),
+                                Text(
+                                  '${l10n.translate('order.detail_created_by')}: ${detail.createdByProfileFullName ?? detail.createdByProfileId ?? '-'}',
+                                ),
+                                if (detail.completedAt != null)
+                                  Text(
+                                    '${l10n.translate('order.detail_completed_at')}: ${_formatDateTime(detail.completedAt!)}',
+                                  ),
+                                if (detail.cancelledAt != null)
+                                  Text(
+                                    '${l10n.translate('order.detail_cancelled_at')}: ${_formatDateTime(detail.cancelledAt!)}',
+                                  ),
+                                if (detail.status.toLowerCase() ==
+                                        'cancelled' &&
+                                    (detail.cancelReason ?? '')
+                                        .trim()
+                                        .isNotEmpty)
+                                  Text(
+                                    '${l10n.translate('order.detail_cancel_reason')}: ${detail.cancelReason}',
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        l10n.translate('order.detail_items_section'),
-                        style: AppTextStyles.titleSmall.copyWith(
-                          fontWeight: FontWeight.bold,
+                        const SizedBox(height: AppSpacing.md),
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.md),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  l10n.translate(
+                                    'order.detail_payment_section',
+                                  ),
+                                  style: AppTextStyles.titleSmall.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  '${l10n.translate('order.detail_cash_amount')}: ${_formatMoney(detail.cashAmount)}',
+                                ),
+                                Text(
+                                  '${l10n.translate('order.detail_bank_amount')}: ${_formatMoney(detail.bankAmount)}',
+                                ),
+                                Text(
+                                  '${l10n.translate('order.detail_debt_amount')}: ${_formatMoney(detail.debtAmount)}',
+                                ),
+                                const Divider(height: 20),
+                                Text(
+                                  '${l10n.translate('order.detail_subtotal')}: ${_formatMoney(detail.subtotal)}',
+                                ),
+                                Text(
+                                  '${l10n.translate('order.detail_discount')}: ${_formatMoney(detail.discountAmount)}',
+                                ),
+                                if ((detail.taxAmount).round() != 0)
+                                  Text(
+                                    '${l10n.translate('order.detail_tax')}: ${_formatMoney(detail.taxAmount)}',
+                                  ),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                  '${l10n.translate('order.detail_total')}: ${_formatMoney(detail.totalAmount)}',
+                                  style: AppTextStyles.titleSmall.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      ...detail.items.map(
-                        (item) => Card(
-                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: ListTile(
-                            title: Text(item.productName),
-                            subtitle: Text(
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          l10n.translate('order.detail_items_section'),
+                          style: AppTextStyles.titleSmall.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        ...detail.items.map(
+                          (item) => Card(
+                            margin: const EdgeInsets.only(
+                              bottom: AppSpacing.sm,
+                            ),
+                            child: ListTile(
+                              title: Text(item.productName),
+                              subtitle: Text(
                                 '${l10n.translate('order.detail_qty_label')}: ${_formatQuantityWithUnit(item.quantity, item.unitName)} | ${l10n.translate('order.detail_unit_price_label')}: ${_formatMoney(item.price)}',
-                            ),
-                            trailing: Text(
-                              _formatMoney(
-                                item.price * item.quantity,
                               ),
-                              style: AppTextStyles.titleSmall.copyWith(
-                                fontWeight: FontWeight.bold,
+                              trailing: Text(
+                                _formatMoney(item.price * item.quantity),
+                                style: AppTextStyles.titleSmall.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
                 ],
               );
             },
