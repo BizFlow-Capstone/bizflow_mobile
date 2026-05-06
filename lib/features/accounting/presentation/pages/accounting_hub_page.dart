@@ -157,7 +157,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         final periodBloc = context.read<AccountingPeriodBloc>();
-        _periodSubscription = periodBloc.stream.listen((state) {
+        _periodSubscription = periodBloc.stream.listen((state) async {
           if (!mounted) return;
           final periodDetail = state.periodDetail;
           if (periodDetail == null) return;
@@ -165,30 +165,40 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           final locationId = context.read<BusinessContext>().currentBusinessId;
           if (locationId == null) return;
 
+          // Clear cache when period changes to avoid stale data
+          await CacheManager().removeByPrefix('revenues_');
+          await LocalApiCacheStore().removeByGroup('revenues');
+          await CacheManager().removeByPrefix('costs_');
+          await LocalApiCacheStore().removeByGroup('costs');
+
           // If user is viewing revenue or cost tab, reload with period date range
           if (_tabController.index == 2) {
             try {
               final fromDate = DateTime.parse(periodDetail.startDate);
               final toDate = DateTime.parse(periodDetail.endDate);
-              context.read<RevenueBloc>().add(
-                LoadRevenuesRequested(
-                  businessLocationId: locationId,
-                  fromDate: fromDate,
-                  toDate: toDate,
-                ),
-              );
+              if (mounted) {
+                context.read<RevenueBloc>().add(
+                  LoadRevenuesRequested(
+                    businessLocationId: locationId,
+                    fromDate: fromDate,
+                    toDate: toDate,
+                  ),
+                );
+              }
             } catch (_) {}
           } else if (_tabController.index == 3) {
             try {
               final fromDate = DateTime.parse(periodDetail.startDate);
               final toDate = DateTime.parse(periodDetail.endDate);
-              context.read<CostBloc>().add(
-                LoadCostsRequested(
-                  businessLocationId: locationId,
-                  fromDate: fromDate,
-                  toDate: toDate,
-                ),
-              );
+              if (mounted) {
+                context.read<CostBloc>().add(
+                  LoadCostsRequested(
+                    businessLocationId: locationId,
+                    fromDate: fromDate,
+                    toDate: toDate,
+                  ),
+                );
+              }
             } catch (_) {}
           }
         });
