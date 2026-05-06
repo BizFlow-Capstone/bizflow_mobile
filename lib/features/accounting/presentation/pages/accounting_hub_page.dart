@@ -3209,7 +3209,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             if (documentNumberController.text.trim().isNotEmpty)
                               'documentNumber': documentNumberController.text
                                   .trim(),
-                            'removeImage': removeImage,
+                            'removeDocument': removeImage,
                             if ((selectedBusinessTypeId ?? '').isNotEmpty)
                               'businessTypeId': selectedBusinessTypeId,
                           },

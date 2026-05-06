@@ -147,8 +147,11 @@ class RevenueApiService {
             'ReferenceType': body['referenceType'].toString(),
           if (body['referenceId'] != null)
             'ReferenceId': body['referenceId'].toString(),
-          if (body['removeImage'] != null)
-            'RemoveImage': body['removeImage'].toString(),
+          // Backend uses RemoveDocument for revenue updates; accept both keys from client.
+          if (body['removeDocument'] != null)
+            'RemoveDocument': body['removeDocument'].toString(),
+          if (body['removeDocument'] == null && body['removeImage'] != null)
+            'RemoveDocument': body['removeImage'].toString(),
           if (trimmedIdempotencyKey != null && trimmedIdempotencyKey.isNotEmpty)
             'IdempotencyKey': trimmedIdempotencyKey,
         },

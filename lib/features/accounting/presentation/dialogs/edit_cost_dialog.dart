@@ -56,6 +56,7 @@ class _EditCostDialogState extends State<_EditCostDialog> {
   String? selectedCostType;
   String? selectedPaymentMethod;
   File? selectedImage;
+  bool removeImage = false;
   bool isSubmitting = false;
   final ImagePicker _picker = ImagePicker();
 
@@ -87,7 +88,7 @@ class _EditCostDialogState extends State<_EditCostDialog> {
 
   Future<void> pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
-    if (pickedFile != null && mounted) setState(() => selectedImage = File(pickedFile.path));
+    if (pickedFile != null && mounted) setState(() { selectedImage = File(pickedFile.path); removeImage = false; });
   }
 
   List<ReferenceItem> getCostTypes() {
@@ -140,11 +141,20 @@ class _EditCostDialogState extends State<_EditCostDialog> {
                 ElevatedButton.icon(icon: const Icon(Icons.photo_library), label: Text(l10n.translate('accounting.select_image')), onPressed: () => pickImage(ImageSource.gallery)),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(icon: const Icon(Icons.camera_alt), label: Text(l10n.translate('accounting.take_photo')), onPressed: () => pickImage(ImageSource.camera)),
+                const SizedBox(width: 8),
+                if (!removeImage && widget.item.documentUrl != null && widget.item.documentUrl!.isNotEmpty)
+                  TextButton(onPressed: () => setState(() => removeImage = true), child: Text(l10n.translate('accounting.remove_image'))),
               ],
             ),
             if (selectedImage != null) ...[
               const SizedBox(height: 8),
               ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(selectedImage!, height: 120, fit: BoxFit.cover)),
+            ] else if (!removeImage && widget.item.documentUrl != null && widget.item.documentUrl!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(widget.item.documentUrl!, height: 120, fit: BoxFit.cover)),
+            ] else if (removeImage) ...[
+              const SizedBox(height: 8),
+              Text(l10n.translate('accounting.image_will_be_removed')),
             ],
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String>(
@@ -190,7 +200,7 @@ class _EditCostDialogState extends State<_EditCostDialog> {
                   if (!context.mounted) return;
 
                   context.read<CostBloc>().add(
-                    UpdateManualCostRequested(
+                        UpdateManualCostRequested(
                       costId: widget.item.id,
                       body: {
                         'amount': amount,
@@ -200,7 +210,7 @@ class _EditCostDialogState extends State<_EditCostDialog> {
                         'description': descriptionController.text.trim(),
                         'costType': selectedCostType ?? widget.item.type,
                         'paymentMethod': selectedPaymentMethod ?? widget.item.paymentMethod,
-                        'removeDocument': false,
+                        'removeDocument': removeImage,
                       },
                       image: selectedImage,
                     ),

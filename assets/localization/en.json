@@ -1252,6 +1252,8 @@
     "voice_upload_file": "Upload audio file",
     "select_image": "Upload image",
     "take_photo": "Take photo",
+    "remove_image": "Remove image",
+    "image_will_be_removed": "Image will be removed",
     "audio_saved_to": "Recording saved to {path}",
     "audio_file_label": "Audio: {file}",
     "document_number": "Document",

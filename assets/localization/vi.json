@@ -1255,6 +1255,8 @@
     "voice_upload_file": "Tải file ghi âm",
     "select_image": "Tải ảnh lên",
     "take_photo": "Chụp ảnh",
+    "remove_image": "Xóa ảnh",
+    "image_will_be_removed": "Ảnh sẽ bị xóa",
     "audio_saved_to": "Đã lưu bản ghi vào {path}",
     "audio_file_label": "Audio: {file}",
     "document_number": "Chứng từ",

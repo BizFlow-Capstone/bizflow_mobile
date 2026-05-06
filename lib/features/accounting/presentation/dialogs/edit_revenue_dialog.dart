@@ -24,7 +24,8 @@ Future<void> showEditRevenueDialog({
   required Future<bool> Function({
     required String title,
     required String message,
-  }) confirmAction,
+  })
+  confirmAction,
   required Future<bool> Function() checkFeatureAccess,
 }) async {
   final refState = context.read<ReferenceBloc>().state;
@@ -43,10 +44,15 @@ Future<void> showEditRevenueDialog({
 }
 
 class _EditRevenueDialog extends StatefulWidget {
-  const _EditRevenueDialog({required this.item, required this.confirmAction, required this.checkFeatureAccess});
+  const _EditRevenueDialog({
+    required this.item,
+    required this.confirmAction,
+    required this.checkFeatureAccess,
+  });
 
   final RevenueEntity item;
-  final Future<bool> Function({required String title, required String message}) confirmAction;
+  final Future<bool> Function({required String title, required String message})
+  confirmAction;
   final Future<bool> Function() checkFeatureAccess;
 
   @override
@@ -63,6 +69,7 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
   List<BusinessTypeDto> businessTypes = [];
   String? selectedBusinessTypeId;
   File? selectedImage;
+  bool removeImage = false;
   bool isSubmitting = false;
   final ImagePicker _picker = ImagePicker();
 
@@ -78,9 +85,15 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
   @override
   void initState() {
     super.initState();
-    amountController = TextEditingController(text: CurrencyFormatter.formatNumber(widget.item.amount));
-    descriptionController = TextEditingController(text: widget.item.description);
-    documentNumberController = TextEditingController(text: widget.item.documentNumber ?? '');
+    amountController = TextEditingController(
+      text: CurrencyFormatter.formatNumber(widget.item.amount),
+    );
+    descriptionController = TextEditingController(
+      text: widget.item.description,
+    );
+    documentNumberController = TextEditingController(
+      text: widget.item.documentNumber ?? '',
+    );
     selectedDocumentDate = widget.item.documentDate;
     selectedMoneyChannel = widget.item.moneyChannel;
     selectedBusinessTypeId = widget.item.businessTypeId;
@@ -89,8 +102,12 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
 
   Future<void> _loadBusinessTypes() async {
     try {
-      final result = await context.read<ProductBloc>().repository.getBusinessTypes();
-      if (mounted) setState(() => businessTypes = List<BusinessTypeDto>.from(result));
+      final result = await context
+          .read<ProductBloc>()
+          .repository
+          .getBusinessTypes();
+      if (mounted)
+        setState(() => businessTypes = List<BusinessTypeDto>.from(result));
     } catch (_) {
       businessTypes = [];
     }
@@ -105,8 +122,17 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
   }
 
   Future<void> pickImage(ImageSource source) async {
-    final pickedFile = await _picker.pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
-    if (pickedFile != null && mounted) setState(() => selectedImage = File(pickedFile.path));
+    final pickedFile = await _picker.pickImage(
+      source: source,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 85,
+    );
+    if (pickedFile != null && mounted)
+      setState(() {
+        selectedImage = File(pickedFile.path);
+        removeImage = false;
+      });
   }
 
   List<ReferenceItem> getMoneyChannels() {
@@ -122,8 +148,14 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
     final l10n = AppLocalizations.of(context);
     final channels = getMoneyChannels();
     final businessTypeIds = businessTypes.map((e) => e.businessTypeId).toSet();
-    final effectiveMoneyChannel = channels.any((c) => c.code == selectedMoneyChannel) ? selectedMoneyChannel : null;
-    final effectiveBusinessTypeId = businessTypeIds.contains(selectedBusinessTypeId) ? selectedBusinessTypeId : null;
+    final effectiveMoneyChannel =
+        channels.any((c) => c.code == selectedMoneyChannel)
+        ? selectedMoneyChannel
+        : null;
+    final effectiveBusinessTypeId =
+        businessTypeIds.contains(selectedBusinessTypeId)
+        ? selectedBusinessTypeId
+        : null;
 
     return AlertDialog(
       title: Text(l10n.translate('accounting.edit_revenue')),
@@ -134,57 +166,150 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
             TextField(
               controller: amountController,
               keyboardType: TextInputType.number,
-              inputFormatters: AppInputFormatters.withSqlInjectionGuard(inputFormatters: [CurrencyInputFormatter()]),
-              decoration: InputDecoration(labelText: l10n.translate('accounting.revenue_amount')),
+              inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                inputFormatters: [CurrencyInputFormatter()],
+              ),
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.revenue_amount'),
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
-            TextField(controller: descriptionController, decoration: InputDecoration(labelText: l10n.translate('accounting.revenue_description'))),
+            TextField(
+              controller: descriptionController,
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.revenue_description'),
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
-            Row(children: [
-              ElevatedButton.icon(icon: const Icon(Icons.photo_library), label: Text(l10n.translate('accounting.select_image')), onPressed: () => pickImage(ImageSource.gallery)),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(icon: const Icon(Icons.camera_alt), label: Text(l10n.translate('accounting.take_photo')), onPressed: () => pickImage(ImageSource.camera)),
-            ]),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.photo_library),
+                  label: Text(l10n.translate('accounting.select_image')),
+                  onPressed: () => pickImage(ImageSource.gallery),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.camera_alt),
+                  label: Text(l10n.translate('accounting.take_photo')),
+                  onPressed: () => pickImage(ImageSource.camera),
+                ),
+                const SizedBox(width: 8),
+                if (!removeImage &&
+                    widget.item.imagePath != null &&
+                    widget.item.imagePath!.isNotEmpty)
+                  TextButton(
+                    onPressed: () => setState(() => removeImage = true),
+                    child: Text(l10n.translate('accounting.remove_image')),
+                  ),
+              ],
+            ),
             if (selectedImage != null) ...[
               const SizedBox(height: 8),
-              ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(selectedImage!, height: 120, fit: BoxFit.cover)),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  selectedImage!,
+                  height: 120,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ] else if (!removeImage &&
+                widget.item.imagePath != null &&
+                widget.item.imagePath!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  widget.item.imagePath!,
+                  height: 120,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ] else if (removeImage) ...[
+              const SizedBox(height: 8),
+              Text(l10n.translate('accounting.image_will_be_removed')),
             ],
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String>(
               initialValue: effectiveMoneyChannel,
-              decoration: InputDecoration(labelText: l10n.translate('accounting.channel')),
-              items: getMoneyChannels().where((item) => item.label.trim().isNotEmpty).map((item) => DropdownMenuItem<String>(value: item.code, child: Text(item.label))).toList(),
-              onChanged: (value) => setState(() => selectedMoneyChannel = value),
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.channel'),
+              ),
+              items: getMoneyChannels()
+                  .where((item) => item.label.trim().isNotEmpty)
+                  .map(
+                    (item) => DropdownMenuItem<String>(
+                      value: item.code,
+                      child: Text(item.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) =>
+                  setState(() => selectedMoneyChannel = value),
             ),
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String>(
               isExpanded: true,
               initialValue: effectiveBusinessTypeId,
-              decoration: InputDecoration(labelText: l10n.translate('accounting.revenue_business_type')),
-              items: businessTypes.map((type) => DropdownMenuItem<String>(value: type.businessTypeId, child: Text(type.name, overflow: TextOverflow.ellipsis))).toList(),
-              onChanged: (value) => setState(() => selectedBusinessTypeId = value),
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.revenue_business_type'),
+              ),
+              items: businessTypes
+                  .map(
+                    (type) => DropdownMenuItem<String>(
+                      value: type.businessTypeId,
+                      child: Text(type.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) =>
+                  setState(() => selectedBusinessTypeId = value),
             ),
             const SizedBox(height: AppSpacing.md),
-            ListTile(contentPadding: EdgeInsets.zero, title: Text(l10n.translate('accounting.revenue_date')), subtitle: Text(DateFormatter.formatDate(selectedDate)), trailing: const Icon(Icons.lock), enabled: false, onTap: null),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.translate('accounting.revenue_date')),
+              subtitle: Text(DateFormatter.formatDate(selectedDate)),
+              trailing: const Icon(Icons.lock),
+              enabled: false,
+              onTap: null,
+            ),
             const SizedBox(height: AppSpacing.sm),
-            TextField(controller: documentNumberController, decoration: InputDecoration(labelText: l10n.translate('accounting.document_number'), hintText: l10n.translate('accounting.document_number_hint'))),
+            TextField(
+              controller: documentNumberController,
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.document_number'),
+                hintText: l10n.translate('accounting.document_number_hint'),
+              ),
+            ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: isSubmitting ? null : _closeDialog, child: Text(l10n.translate('common.cancel'))),
+        TextButton(
+          onPressed: isSubmitting ? null : _closeDialog,
+          child: Text(l10n.translate('common.cancel')),
+        ),
         ElevatedButton(
           onPressed: isSubmitting
               ? null
               : () async {
                   setState(() => isSubmitting = true);
-                  final amount = (CurrencyFormatter.parse(amountController.text) ?? 0).toDouble();
+                  final amount =
+                      (CurrencyFormatter.parse(amountController.text) ?? 0)
+                          .toDouble();
                   if (amount <= 0 || (selectedMoneyChannel ?? '').isEmpty) {
                     setState(() => isSubmitting = false);
                     return;
                   }
 
-                  final ok = await widget.confirmAction(title: l10n.translate('accounting.confirm_title'), message: l10n.translate('accounting.confirm_update_revenue'));
+                  final ok = await widget.confirmAction(
+                    title: l10n.translate('accounting.confirm_title'),
+                    message: l10n.translate(
+                      'accounting.confirm_update_revenue',
+                    ),
+                  );
                   if (!mounted) return;
                   if (!ok) {
                     if (mounted) setState(() => isSubmitting = false);
@@ -200,19 +325,33 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
 
                   if (!context.mounted) return;
 
-                  final locationId = context.read<BusinessContext>().currentBusinessId;
+                  final locationId = context
+                      .read<BusinessContext>()
+                      .currentBusinessId;
                   context.read<RevenueBloc>().add(
                     UpdateManualRevenueRequested(
                       revenueId: widget.item.id,
                       body: {
-                        'businessLocationId': int.tryParse(locationId ?? '') ?? widget.item.locationId,
+                        'businessLocationId':
+                            int.tryParse(locationId ?? '') ??
+                            widget.item.locationId,
                         'amount': amount,
-                        'revenueDate': DateFormat('yyyy-MM-dd').format(selectedDate),
-                        'documentDate': selectedDocumentDate == null ? null : DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
-                        if (documentNumberController.text.trim().isNotEmpty) 'documentNumber': documentNumberController.text.trim(),
+                        'revenueDate': DateFormat(
+                          'yyyy-MM-dd',
+                        ).format(selectedDate),
+                        'documentDate': selectedDocumentDate == null
+                            ? null
+                            : DateFormat(
+                                'yyyy-MM-dd',
+                              ).format(selectedDocumentDate!),
+                        if (documentNumberController.text.trim().isNotEmpty)
+                          'documentNumber': documentNumberController.text
+                              .trim(),
                         'description': descriptionController.text.trim(),
                         'moneyChannel': selectedMoneyChannel,
-                        if ((selectedBusinessTypeId ?? '').isNotEmpty) 'businessTypeId': selectedBusinessTypeId,
+                        if ((selectedBusinessTypeId ?? '').isNotEmpty)
+                          'businessTypeId': selectedBusinessTypeId,
+                        'removeDocument': removeImage,
                       },
                       image: selectedImage,
                     ),
@@ -227,4 +366,3 @@ class _EditRevenueDialogState extends State<_EditRevenueDialog> {
     );
   }
 }
-
