@@ -22,19 +22,6 @@ class S2cExportService {
     'documentNo',
     'DocumentNo',
   ];
-  static const _businessTypeIdAliases = [
-    'businessTypeId',
-    'BusinessTypeId',
-    'business_type_id',
-  ];
-  static const _businessTypeNameAliases = [
-    'businessTypeName',
-    'BusinessTypeName',
-    'businessType',
-    'industryName',
-    'industry',
-    'nganh_nghe',
-  ];
 
   static const _dateAliases = [
     'costDate',
@@ -149,16 +136,8 @@ class S2cExportService {
     return _S2cSummaryData(
       revenueTotal: revenueTotal,
       costTotal: costTotal,
-      revenueGroups: _buildEntryGroups(
-        dataRows,
-        sectionsData,
-        sectionFilter: 'revenue',
-      ),
-      costGroups: _buildEntryGroups(
-        dataRows,
-        sectionsData,
-        sectionFilter: 'cost',
-      ),
+      revenueEntries: _buildFlatEntries(dataRows, sectionsData, 'revenue'),
+      costEntries: _buildFlatEntries(dataRows, sectionsData, 'cost'),
       difference: difference,
       pitTax: pitTax,
     );
@@ -321,7 +300,10 @@ class S2cExportService {
     );
 
     var currentRow = revenueTotalRow + 1;
-    currentRow = _writeGroupedEntries(sheet, currentRow, summary.revenueGroups);
+    for (final entry in summary.revenueEntries) {
+      _writeDetailRow(sheet, row: currentRow, entry: entry);
+      currentRow++;
+    }
 
     final costTotalRow = currentRow;
     _writeSummaryLabel(
@@ -338,11 +320,11 @@ class S2cExportService {
       bold: true,
     );
 
-    currentRow = _writeGroupedEntries(
-      sheet,
-      costTotalRow + 1,
-      summary.costGroups,
-    );
+    currentRow = costTotalRow + 1;
+    for (final entry in summary.costEntries) {
+      _writeDetailRow(sheet, row: currentRow, entry: entry);
+      currentRow++;
+    }
 
     _writeSummaryLabel(
       sheet,
@@ -373,48 +355,6 @@ class S2cExportService {
     );
 
     return currentRow + 2;
-  }
-
-  static int _writeGroupedEntries(
-    xlsio.Worksheet sheet,
-    int startRow,
-    List<_S2cIndustryGroup> groups,
-  ) {
-    var currentRow = startRow;
-    for (final group in groups) {
-      if (!_isStructuralSummaryLabel(group.label)) {
-        _writeIndustryHeader(sheet, row: currentRow, label: group.label);
-        currentRow++;
-      }
-      for (final entry in group.entries) {
-        _writeDetailRow(sheet, row: currentRow, entry: entry);
-        currentRow++;
-      }
-    }
-    return currentRow;
-  }
-
-  static bool _isStructuralSummaryLabel(String label) {
-    final normalized = label.trim().toLowerCase();
-    if (normalized.isEmpty) return true;
-    return normalized.contains('doanh thu') || normalized.contains('chi phí');
-  }
-
-  static void _writeIndustryHeader(
-    xlsio.Worksheet sheet, {
-    required int row,
-    required String label,
-  }) {
-    _applyRowStyle(sheet, row);
-    _clearRow(sheet, row);
-    final range = sheet.getRangeByIndex(row + 1, 3);
-    range.setText(label);
-    range.cellStyle.fontName = 'Times New Roman';
-    range.cellStyle.fontSize = 12;
-    range.cellStyle.bold = true;
-    range.cellStyle.italic = true;
-    range.cellStyle.hAlign = xlsio.HAlignType.left;
-    range.cellStyle.vAlign = xlsio.VAlignType.center;
   }
 
   static void _writeDetailRow(
@@ -649,140 +589,17 @@ class S2cExportService {
     return null;
   }
 
-  static List<_S2cIndustryGroup> _buildEntryGroups(
-    List<Map<String, dynamic>> dataRows,
-    BookSectionsResponse? sectionsData, {
-    required String sectionFilter,
-  }) {
-    // Only use sections-based grouping when sections have per-industry structure
-    // (businessTypeName populated per section — S2a/S2b per_group pattern).
-    // S2c uses per_section path: sections are structural blocks without
-    // per-industry businessTypeName, so fall through to dataRows grouping.
-    final matchingSections =
-        sectionsData?.sections.where((s) {
-          final st = s.sectionType.trim().toLowerCase();
-          if (st == sectionFilter) return true;
-          if (st == 'revenue_cost') {
-            final groupKey = s.businessTypeId?.trim().toLowerCase();
-            return groupKey == sectionFilter;
-          }
-          return false;
-        }).toList() ??
-        [];
-
-    final hasIndustryStructure = matchingSections.any(
-      (s) => s.businessTypeName?.trim().isNotEmpty == true,
-    );
-
-    final isRevenueCostStructure = matchingSections.any(
-      (s) => s.sectionType.trim().toLowerCase() == 'revenue_cost',
-    );
-
-    // In S2c, revenue_cost sections are structural blocks, not industry groups.
-    // Group details from row data to avoid duplicate headers like I/II.
-    if (isRevenueCostStructure) {
-      return _buildGroupsFromDataRows(dataRows, sectionsData, sectionFilter);
-    }
-
-    if (matchingSections.isNotEmpty && hasIndustryStructure) {
-      return _buildGroupsFromSections(dataRows, matchingSections);
-    }
-
-    // Also check all sections in case sectionType is not explicitly labelled.
-    if (sectionFilter == 'revenue') {
-      final allWithIndustry = (sectionsData?.sections ?? [])
-          .where((s) => s.businessTypeName?.trim().isNotEmpty == true)
-          .toList();
-      if (allWithIndustry.isNotEmpty) {
-        return _buildGroupsFromSections(dataRows, allWithIndustry);
-      }
-
-      // Requirement: revenue detail is shown only when revenue sections exist.
-      // If revenue sections are not ready yet, keep only the summary row.
-      return const [];
-    }
-
-    return _buildGroupsFromDataRows(dataRows, sectionsData, sectionFilter);
-  }
-
-  static List<_S2cIndustryGroup> _buildGroupsFromSections(
-    List<Map<String, dynamic>> dataRows,
-    List<BookSectionResponseDto> sections,
-  ) {
-    final result = <_S2cIndustryGroup>[];
-    final sorted = [...sections]
-      ..sort((a, b) => a.groupIndex.compareTo(b.groupIndex));
-
-    for (final section in sorted) {
-      final groupLabel = (section.businessTypeName?.trim().isNotEmpty == true)
-          ? section.businessTypeName!
-          : 'Ngành nghề';
-
-      final entries = <_S2cEntry>[];
-      for (final row in section.rows) {
-        if (row.lineType.trim().toLowerCase() != 'data_placeholder') continue;
-        final btFilter = row.businessTypeId ?? section.businessTypeId;
-        final sectionFilter =
-            row.section?.trim().toLowerCase() ?? section.sectionType.trim().toLowerCase();
-        final matching =
-            dataRows.where((dataRow) {
-              final rowSection = _inferSection(dataRow)?.trim().toLowerCase();
-              if (sectionFilter.isNotEmpty &&
-                  sectionFilter != 'revenue_cost' &&
-                  rowSection != sectionFilter) {
-                return false;
-              }
-              if (btFilter == null || btFilter.isEmpty) return true;
-              final dataBt = dataRow['businessTypeId']?.toString();
-              return dataBt == btFilter || rowSection == btFilter.toLowerCase();
-            }).toList()..sort((a, b) {
-              final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
-              final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
-              if (da == null && db == null) return 0;
-              if (da == null) return 1;
-              if (db == null) return -1;
-              return da.compareTo(db);
-            });
-
-        for (final dataRow in matching) {
-          final amount = _toNum(_pick(dataRow, 'so_tien', _amountAliases));
-          final rawNote =
-              _pick(dataRow, 'dien_giai', _descAliases)?.toString().trim() ??
-              '';
-          if (amount == null || rawNote.isEmpty) continue;
-          entries.add(
-            _S2cEntry(
-              code: _pick(dataRow, 'so_hieu', _codeAliases)?.toString() ?? '',
-              note: rawNote,
-              amount: amount,
-              date: _parseDate(_pick(dataRow, 'ngay_thang', _dateAliases)),
-            ),
-          );
-        }
-      }
-
-      if (entries.isNotEmpty) {
-        result.add(_S2cIndustryGroup(label: groupLabel, entries: entries));
-      }
-    }
-    return result;
-  }
-
-  static List<_S2cIndustryGroup> _buildGroupsFromDataRows(
+  static List<_S2cEntry> _buildFlatEntries(
     List<Map<String, dynamic>> dataRows,
     BookSectionsResponse? sectionsData,
     String sectionFilter,
   ) {
-    final seeds = _buildIndustrySeeds(sectionsData);
-    final groups = <String, _PendingIndustryGroup>{};
-
+    final entries = <_S2cEntry>[];
     final matchingRows =
         dataRows.where((row) {
           final rowSection = _inferSection(row)?.trim().toLowerCase();
           final isCostLike = _pick(row, 'CostType', _costHints) != null;
           if (sectionFilter == 'revenue') {
-            // Revenue rows are either explicitly tagged 'revenue' or have no section
-            // tag at all (raw transaction data from the /rows API).
             final isRevenueShape =
                 rowSection == 'revenue' ||
                 rowSection == null ||
@@ -796,7 +613,7 @@ class S2cExportService {
           if (da == null && db == null) return 0;
           if (da == null) return 1;
           if (db == null) return -1;
-          return da.compareTo(db);
+          return db.compareTo(da); // Descending (newest first)
         });
 
     for (final row in matchingRows) {
@@ -804,17 +621,7 @@ class S2cExportService {
       final rawNote =
           _pick(row, 'dien_giai', _descAliases)?.toString().trim() ?? '';
       if (amount == null || rawNote.isEmpty) continue;
-
-      final industry = _resolveIndustry(row, rawNote, seeds);
-      final group = groups.putIfAbsent(
-        industry.key,
-        () => _PendingIndustryGroup(
-          key: industry.key,
-          label: industry.label,
-          order: industry.order,
-        ),
-      );
-      group.entries.add(
+      entries.add(
         _S2cEntry(
           code: _pick(row, 'so_hieu', _codeAliases)?.toString() ?? '',
           note: rawNote,
@@ -824,111 +631,7 @@ class S2cExportService {
       );
     }
 
-    final built = groups.values.toList()
-      ..sort((a, b) {
-        final orderCompare = a.order.compareTo(b.order);
-        if (orderCompare != 0) return orderCompare;
-        return a.label.toLowerCase().compareTo(b.label.toLowerCase());
-      });
-
-    return built
-        .map(
-          (group) => _S2cIndustryGroup(
-            label: group.label,
-            entries: List<_S2cEntry>.unmodifiable(group.entries),
-          ),
-        )
-        .where((group) => group.entries.isNotEmpty)
-        .toList(growable: false);
-  }
-
-  static Map<String, _IndustrySeed> _buildIndustrySeeds(
-    BookSectionsResponse? sectionsData,
-  ) {
-    final seeds = <String, _IndustrySeed>{};
-    final sections = [...?sectionsData?.sections]
-      ..sort((a, b) => a.groupIndex.compareTo(b.groupIndex));
-    for (final section in sections) {
-      final label = section.businessTypeName?.trim() ?? '';
-      final id = section.businessTypeId?.trim() ?? '';
-      final order = section.groupIndex <= 0 ? 9999 : section.groupIndex;
-      if (id.isNotEmpty) {
-        seeds['id:$id'] = _IndustrySeed(
-          label: label.isEmpty ? 'Ngành nghề khác' : label,
-          order: order,
-        );
-      }
-      if (label.isNotEmpty) {
-        seeds['name:${_normalizeKey(label)}'] = _IndustrySeed(
-          label: label,
-          order: order,
-        );
-      }
-
-      for (final row in section.rows) {
-        final breakdown = row.values['revenueBreakdown'];
-        if (breakdown is! List) continue;
-        for (final item in breakdown) {
-          if (item is! Map) continue;
-          final btId = item['businessTypeId']?.toString().trim() ?? '';
-          final btName = item['businessTypeName']?.toString().trim() ?? '';
-          if (btId.isEmpty || btName.isEmpty) continue;
-          seeds['id:$btId'] = _IndustrySeed(label: btName, order: order);
-          seeds['name:${_normalizeKey(btName)}'] = _IndustrySeed(
-            label: btName,
-            order: order,
-          );
-        }
-      }
-    }
-    return seeds;
-  }
-
-  static _ResolvedIndustry _resolveIndustry(
-    Map<String, dynamic> row,
-    String rawNote,
-    Map<String, _IndustrySeed> seeds,
-  ) {
-    final businessTypeId = _pick(
-      row,
-      'businessTypeId',
-      _businessTypeIdAliases,
-    )?.toString().trim();
-    if (businessTypeId != null && businessTypeId.isNotEmpty) {
-      final byId = seeds['id:$businessTypeId'];
-      if (byId != null) {
-        return _ResolvedIndustry(
-          key: 'id:$businessTypeId',
-          label: byId.label,
-          order: byId.order,
-        );
-      }
-    }
-
-    final businessTypeName = _pick(
-      row,
-      'businessTypeName',
-      _businessTypeNameAliases,
-    )?.toString().trim();
-    if (businessTypeName != null && businessTypeName.isNotEmpty) {
-      final key = 'name:${_normalizeKey(businessTypeName)}';
-      final seeded = seeds[key];
-      return _ResolvedIndustry(
-        key: key,
-        label: seeded?.label ?? businessTypeName,
-        order: seeded?.order ?? 10000,
-      );
-    }
-
-    return const _ResolvedIndustry(
-      key: 'name:khac',
-      label: 'Khác',
-      order: 10001,
-    );
-  }
-
-  static String _normalizeKey(String value) {
-    return value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    return entries;
   }
 
   static num? _findAmountByKeywords(
@@ -1085,26 +788,19 @@ class S2cExportService {
 class _S2cSummaryData {
   final num? revenueTotal;
   final num? costTotal;
-  final List<_S2cIndustryGroup> revenueGroups;
-  final List<_S2cIndustryGroup> costGroups;
+  final List<_S2cEntry> revenueEntries;
+  final List<_S2cEntry> costEntries;
   final num? difference;
   final num? pitTax;
 
   const _S2cSummaryData({
     this.revenueTotal,
     this.costTotal,
-    this.revenueGroups = const [],
-    this.costGroups = const [],
+    this.revenueEntries = const [],
+    this.costEntries = const [],
     this.difference,
     this.pitTax,
   });
-}
-
-class _S2cIndustryGroup {
-  final String label;
-  final List<_S2cEntry> entries;
-
-  const _S2cIndustryGroup({required this.label, this.entries = const []});
 }
 
 class _S2cEntry {
@@ -1118,37 +814,5 @@ class _S2cEntry {
     required this.note,
     required this.amount,
     this.date,
-  });
-}
-
-class _PendingIndustryGroup {
-  final String key;
-  final String label;
-  final int order;
-  final List<_S2cEntry> entries = [];
-
-  _PendingIndustryGroup({
-    required this.key,
-    required this.label,
-    required this.order,
-  });
-}
-
-class _IndustrySeed {
-  final String label;
-  final int order;
-
-  const _IndustrySeed({required this.label, required this.order});
-}
-
-class _ResolvedIndustry {
-  final String key;
-  final String label;
-  final int order;
-
-  const _ResolvedIndustry({
-    required this.key,
-    required this.label,
-    required this.order,
   });
 }
