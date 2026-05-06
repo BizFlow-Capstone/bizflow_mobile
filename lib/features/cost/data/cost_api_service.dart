@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import '../../../core/network/api_client.dart';
@@ -37,14 +38,22 @@ class CostApiService {
       queryParams['ToDate'] = DateFormat('yyyy-MM-dd').format(toDate);
     }
 
+    debugPrint('[CostApiService] GET ${ApiEndpoints.costs} query=$queryParams');
+
     final response = await _apiClient.get<Map<String, dynamic>>(
       ApiEndpoints.costs,
       queryParams: queryParams,
     );
     if (response.data == null) {
+      debugPrint('[CostApiService] response data is null');
       throw Exception(ApiErrorMessageParser.genericMessage);
     }
-    return CostResponseDto.fromJson(response.data!);
+
+    final dto = CostResponseDto.fromJson(response.data!);
+    debugPrint(
+      '[CostApiService] response items=${dto.items.length} total=${dto.totalCount}',
+    );
+    return dto;
   }
 
   Future<CostDto> createManualCost(
@@ -125,7 +134,11 @@ class CostApiService {
         'hasImage': image != null,
         'idempotencyKey': trimmedIdempotencyKey ?? '',
       };
-      await logFile.writeAsString('${logEntry.toString()}\n', mode: FileMode.append, flush: true);
+      await logFile.writeAsString(
+        '${logEntry.toString()}\n',
+        mode: FileMode.append,
+        flush: true,
+      );
     } catch (_) {
       // best-effort logging only
     }

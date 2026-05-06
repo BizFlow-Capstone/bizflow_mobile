@@ -5,6 +5,7 @@ import 'revenue_api_service.dart';
 import 'models/ai_draft_revenue_dto.dart';
 import 'models/revenue_dto.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class RevenueRepository {
   final RevenueApiService _apiService;
@@ -43,6 +44,10 @@ class RevenueRepository {
     );
   }
 
+  String _buildCacheKey(int locationId, int page, int size) {
+    return 'revenues_${locationId}_p${page}_s${size}';
+  }
+
   Future<void> getRevenuesSWR({
     required int pageNumber,
     required int pageSize,
@@ -57,7 +62,12 @@ class RevenueRepository {
     onData,
     Function(dynamic error)? onError,
   }) async {
-    final key = 'revenues_${businessLocationId}_p${pageNumber}_s$pageSize';
+    final key = _buildCacheKey(businessLocationId ?? 0, pageNumber, pageSize);
+    debugPrint(
+      '[RevenueRepository] getRevenuesSWR start '
+      'key=$key locationId=$businessLocationId page=$pageNumber size=$pageSize',
+    );
+
     final localCached = await _localApiCache.getMap(key);
     if (localCached != null) {
       final items = (localCached['items'] as List<dynamic>? ?? [])
@@ -65,7 +75,12 @@ class RevenueRepository {
           .map(_mapToEntity)
           .toList();
       final totalCount = localCached['total'] as int? ?? 0;
+      debugPrint(
+        '[RevenueRepository] local cache hit key=$key items=${items.length} total=$totalCount',
+      );
       onData(items, totalCount, true);
+    } else {
+      debugPrint('[RevenueRepository] local cache miss key=$key');
     }
 
     await _cache.fetchWithSWR<Map<String, dynamic>>(
@@ -96,9 +111,15 @@ class RevenueRepository {
             .map(_mapToEntity)
             .toList();
         final totalCount = dataMap['total'] as int? ?? 0;
+        debugPrint(
+          '[RevenueRepository] swr onData key=$key fromCache=$isFromCache items=${items.length} total=$totalCount',
+        );
         onData(items, totalCount, isFromCache);
       },
-      onError: onError,
+      onError: (error) {
+        debugPrint('[RevenueRepository] swr onError key=$key error=$error');
+        onError?.call(error);
+      },
       toJson: (data) => data,
       fromJson: (json) => json,
     );
@@ -120,12 +141,10 @@ class RevenueRepository {
 
   Future<RevenueEntity> updateManualRevenue(
     int revenueId,
-    Map<String, dynamic> body,
-    {
-      String? idempotencyKey,
+    Map<String, dynamic> body, {
+    String? idempotencyKey,
     File? image,
-  }
-  ) async {
+  }) async {
     final dto = await _apiService.updateManualRevenue(
       revenueId,
       body,

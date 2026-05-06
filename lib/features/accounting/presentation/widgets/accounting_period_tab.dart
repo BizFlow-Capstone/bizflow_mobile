@@ -475,70 +475,26 @@ class _PeriodCard extends StatelessWidget {
   }
 
   Future<void> _confirmReopen(BuildContext context) async {
-    final reasonController = TextEditingController();
-    String? validationError;
-
-    final confirmed = await showDialog<bool>(
+    final reason = await showDialog<String?>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: Text(l10n.translate('accounting.reopen_period')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l10n.translate('accounting.confirm_reopen')),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: reasonController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: l10n.translate('accounting.reopen_reason'),
-                  hintText: l10n.translate('accounting.reopen_reason_hint'),
-                  errorText: validationError,
-                  border: const OutlineInputBorder(),
-                ),
-                onChanged: (_) {
-                  if (validationError != null) {
-                    setStateDialog(() => validationError = null);
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.translate('common.cancel')),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (reasonController.text.trim().isEmpty) {
-                  setStateDialog(() {
-                    validationError = l10n.translate(
-                      'accounting.reopen_reason_required',
-                    );
-                  });
-                  return;
-                }
-                Navigator.pop(ctx, true);
-              },
-              child: Text(l10n.translate('accounting.action_reopen')),
-            ),
-          ],
-        ),
+      builder: (_) => _ReopenPeriodDialog(
+        title: l10n.translate('accounting.reopen_period'),
+        message: l10n.translate('accounting.confirm_reopen'),
+        hint: l10n.translate('accounting.reopen_reason_hint'),
+        label: l10n.translate('accounting.reopen_reason'),
+        validationMessage: l10n.translate('accounting.reopen_reason_required'),
       ),
     );
 
-    if (confirmed == true && context.mounted) {
+    if (reason != null && reason.trim().isNotEmpty && context.mounted) {
       context.read<AccountingPeriodBloc>().add(
         ReopenPeriodRequested(
           locationId: locationId,
           periodId: period.periodId.toString(),
-          reason: reasonController.text.trim(),
+          reason: reason.trim(),
         ),
       );
     }
-    reasonController.dispose();
   }
 
   Future<void> _showAuditLog(BuildContext context) async {
@@ -698,6 +654,91 @@ class _PeriodCard extends StatelessWidget {
         ),
       );
     }
+  }
+}
+
+// Reopen dialog moved here so it's top-level (avoids nesting issues)
+class _ReopenPeriodDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String label;
+  final String hint;
+  final String validationMessage;
+
+  const _ReopenPeriodDialog({
+    Key? key,
+    required this.title,
+    required this.message,
+    required this.label,
+    required this.hint,
+    required this.validationMessage,
+  }) : super(key: key);
+
+  @override
+  State<_ReopenPeriodDialog> createState() => _ReopenPeriodDialogState();
+}
+
+class _ReopenPeriodDialogState extends State<_ReopenPeriodDialog> {
+  late final TextEditingController _reasonController;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _reasonController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String _) {
+    if (_validationError != null) {
+      setState(() => _validationError = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(widget.message),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _reasonController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: widget.label,
+              hintText: widget.hint,
+              errorText: _validationError,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: _onChanged,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: Text(AppLocalizations.of(context).translate('common.cancel')),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (_reasonController.text.trim().isEmpty) {
+              setState(() => _validationError = widget.validationMessage);
+              return;
+            }
+            Navigator.pop(context, _reasonController.text.trim());
+          },
+          child: Text(AppLocalizations.of(context).translate('accounting.action_reopen')),
+        ),
+      ],
+    );
   }
 }
 
