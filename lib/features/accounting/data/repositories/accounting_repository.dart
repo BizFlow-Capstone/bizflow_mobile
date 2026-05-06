@@ -382,6 +382,14 @@ class AccountingRepository {
     return _apiService.listBooks(locationId, periodId: periodId);
   }
 
+  Future<void> deleteBook({
+    required String locationId,
+    required String bookId,
+  }) async {
+    await _apiService.deleteBook(locationId, bookId);
+    await _invalidateCache(locationId);
+  }
+
   /// ──────────────────────────────────────────────────────
   /// Direct server fetch (used after mutations to refresh list)
   Future<List<AccountingPeriod>> fetchPeriodsFromServer(

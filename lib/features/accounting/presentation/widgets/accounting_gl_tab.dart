@@ -46,6 +46,7 @@ class _LinkedEntityDetail {
     required this.rows,
     this.itemLines = const <String>[],
   });
+  
 }
 
 class AccountingGlTab extends StatefulWidget {
@@ -66,17 +67,11 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final refState = context.read<ReferenceBloc>().state;
-      if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
-        context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
-      }
-      _loadData();
-    });
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
@@ -375,7 +370,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
-        itemCount: entries.length + (hasReachedMax ? 0 : 1),
+        itemCount: entries.length + (isLoadMore && !hasReachedMax ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= entries.length) {
             return const Padding(
@@ -708,6 +703,13 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
           value: order.orderCode.trim().isNotEmpty
               ? order.orderCode.trim()
               : order.id.toString(),
+        ),
+        _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.document_number'),
+          value: (() {
+            final doc = (order.documentNumber ?? '').trim();
+            return doc.isNotEmpty ? doc : '-';
+          })(),
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('order.detail_status'),

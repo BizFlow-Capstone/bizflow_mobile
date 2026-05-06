@@ -48,6 +48,7 @@ class OrderDto extends Equatable {
   final DateTime? cancelledAt;
   final String? cancelReason;
   final String? invoiceNumber;
+  final String? documentNumber;
   final DateTime? invoicedAt;
   final String? createdByProfileId;
   final String? createdByProfileFullName;
@@ -77,6 +78,7 @@ class OrderDto extends Equatable {
     this.cancelledAt,
     this.cancelReason,
     this.invoiceNumber,
+    this.documentNumber,
     this.invoicedAt,
     this.createdByProfileId,
     this.createdByProfileFullName,
@@ -149,6 +151,7 @@ class OrderDto extends Equatable {
       createdByProfileFullName: json['createdByProfileFullName']?.toString(),
       cancelReason: json['cancelReason']?.toString(),
       invoiceNumber: json['invoiceNumber']?.toString(),
+      documentNumber: json['documentNumber']?.toString() ?? json['documentNo']?.toString(),
       invoicedAt: parseDate(json['invoicedAt']),
     );
   }
@@ -185,6 +188,7 @@ class OrderDto extends Equatable {
           'createdByProfileFullName': createdByProfileFullName,
         'cancelReason': cancelReason,
       'invoiceNumber': invoiceNumber,
+      if ((documentNumber ?? '').trim().isNotEmpty) 'documentNumber': documentNumber,
       'invoicedAt': invoicedAt != null
           ? DateFormatter.toApiUtcIsoString(invoicedAt!)
           : null,
@@ -216,6 +220,7 @@ class OrderDto extends Equatable {
     DateTime? cancelledAt,
     String? cancelReason,
     String? invoiceNumber,
+    String? documentNumber,
     DateTime? invoicedAt,
   }) {
     return OrderDto(
@@ -243,6 +248,7 @@ class OrderDto extends Equatable {
       cancelledAt: cancelledAt ?? this.cancelledAt,
       cancelReason: cancelReason ?? this.cancelReason,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      documentNumber: documentNumber ?? this.documentNumber,
       invoicedAt: invoicedAt ?? this.invoicedAt,
       createdByProfileId: createdByProfileId ?? this.createdByProfileId,
       createdByProfileFullName:
@@ -276,6 +282,7 @@ class OrderDto extends Equatable {
     cancelledAt,
     cancelReason,
     invoiceNumber,
+    documentNumber,
     invoicedAt,
     createdByProfileId,
     createdByProfileFullName,

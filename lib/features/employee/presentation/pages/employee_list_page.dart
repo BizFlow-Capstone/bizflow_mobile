@@ -315,34 +315,57 @@ class _EmployeeListPageState extends State<EmployeeListPage>
 
                   // List
                   Expanded(
-                    child: state.filteredEmployees.isEmpty
-                        ? Center(
-                            child: Text(
-                              t.translate('common.no_data'),
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.only(
-                              left: 16.0,
-                              right: 16.0,
-                              bottom: 120.0, // Added bottom padding for FAB
-                            ),
-                            itemCount: state.filteredEmployees.length,
-                            itemBuilder: (context, index) {
-                              final employee = state.filteredEmployees[index];
-                              return EmployeeCardWidget(
-                                employee: employee,
-                                onActionTap: () => _showActionSheet(
-                                  context,
-                                  employee,
-                                  state.currentTab,
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        final businessId = Provider.of<BusinessContext>(
+                          context,
+                          listen: false,
+                        ).currentBusinessId;
+                        if (businessId != null) {
+                          context.read<EmployeeBloc>().add(
+                            LoadEmployeesRequested(businessId: businessId),
+                          );
+                        }
+                        // Wait a small moment for bloc to process (UI updates via BlocBuilder)
+                        await Future<void>.delayed(const Duration(milliseconds: 300));
+                      },
+                      child: state.filteredEmployees.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 48.0),
+                                    child: Text(
+                                      t.translate('common.no_data'),
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
+                              ],
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(
+                                left: 16.0,
+                                right: 16.0,
+                                bottom: 120.0, // Added bottom padding for FAB
+                              ),
+                              itemCount: state.filteredEmployees.length,
+                              itemBuilder: (context, index) {
+                                final employee = state.filteredEmployees[index];
+                                return EmployeeCardWidget(
+                                  employee: employee,
+                                  onActionTap: () => _showActionSheet(
+                                    context,
+                                    employee,
+                                    state.currentTab,
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
                   ),
                 ],
               );

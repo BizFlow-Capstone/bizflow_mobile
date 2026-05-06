@@ -508,19 +508,6 @@ class _OrderDebtScreenState extends State<OrderDebtScreen> {
         );
       }
 
-      // 2. Record Debt Adjustment (already existing logic)
-      await repository.recordDebtAdjustment(
-        debtorId: debtorId,
-        amount: roundedDebt,
-        action: 'increase_debt',
-        paymentMethod: _selectedDebtType == 'full'
-            ? 'CASH'
-            : _selectedPaymentMethod.toUpperCase(),
-        notes: _notesController.text.trim().isEmpty
-            ? null
-            : _notesController.text.trim(),
-      );
-
       if (!mounted) return;
       Navigator.push(
         context,

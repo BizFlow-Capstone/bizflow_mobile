@@ -161,8 +161,45 @@ class S3aBookWidget extends StatelessWidget {
   List<DataCell> _buildRowCells(Map<String, dynamic> values, TextStyle style, {int? stt}) {
     return _effectiveColumns().map((column) {
       final value = _resolveCellValue(values, column.fieldCode, stt: stt);
-      return DataCell(Text(_formatCellValue(value, column.fieldCode), style: style));
+      return DataCell(
+        _buildCellContent(
+          text: _formatCellValue(value, column.fieldCode),
+          style: style,
+          fieldCode: column.fieldCode,
+          explanation: values['explanation']?.toString(),
+        ),
+      );
     }).toList();
+  }
+
+  Widget _buildCellContent({
+    required String text,
+    required TextStyle style,
+    required String fieldCode,
+    String? explanation,
+  }) {
+    final normalizedExplanation = explanation?.trim() ?? '';
+    if (normalizedExplanation.isEmpty || !_isNoteField(fieldCode)) {
+      return Text(text, style: style);
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(text, style: style),
+        const SizedBox(height: 4),
+        Text(
+          normalizedExplanation,
+          style: style.copyWith(
+            fontSize: 13,
+            fontStyle: FontStyle.italic,
+            color: AppColors.textPrimary.withValues(alpha: 0.75),
+          ),
+          softWrap: true,
+        ),
+      ],
+    );
   }
 
   bool _isNumericColumn(BookColumnDto column) {
@@ -269,5 +306,10 @@ class S3aBookWidget extends StatelessWidget {
       return value;
     }
     return value.toString();
+  }
+
+  bool _isNoteField(String fieldCode) {
+    final code = fieldCode.trim().toLowerCase();
+    return code.contains('note') || code.contains('ghi_chu') || code.contains('remark') || code.contains('description');
   }
 }

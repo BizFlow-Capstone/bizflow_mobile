@@ -380,19 +380,6 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
 
         await _removeLocalDraftById(widget.localDraftId);
 
-        if (_debtAmount > 0 && _selectedDebtor != null) {
-          final debtorRepo = context.read<DebtorBloc>().repository;
-          await debtorRepo.recordDebtAdjustment(
-            debtorId: _selectedDebtor!.debtorId,
-            amount: _debtAmount,
-            action: 'increase_debt',
-            paymentMethod: _cashAmount > 0
-                ? 'cash'
-                : (_bankAmount > 0 ? 'bank' : 'cash'),
-            notes: widget.note,
-          );
-        }
-
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -423,19 +410,6 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
 
         await _removeLocalDraftById(widget.localDraftId);
 
-        if (_debtAmount > 0 && _selectedDebtor != null) {
-          final debtorRepo = context.read<DebtorBloc>().repository;
-          await debtorRepo.recordDebtAdjustment(
-            debtorId: _selectedDebtor!.debtorId,
-            amount: _debtAmount,
-            action: 'increase_debt',
-            paymentMethod: _cashAmount > 0
-                ? 'cash'
-                : (_bankAmount > 0 ? 'bank' : 'cash'),
-            notes: widget.note,
-          );
-        }
-
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -456,9 +430,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
               e.warnings.isNotEmpty
                   ? e.warnings
                       .map((w) =>
-                          l10n.translate('order_create.$w') ??
-                          l10n.translate(w) ??
-                          w)
+                          l10n.translate('order_create.$w'))
                       .join('\n\n')
                   : l10n.translate('order_create.confirm_continue_message'),
             ),
@@ -749,6 +721,7 @@ class _OrderPaymentScreenState extends State<OrderPaymentScreen> {
       inputFormatters: AppInputFormatters.withSqlInjectionGuard(
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'[0-9,\.]')),
+          CurrencyInputFormatter(),
         ],
       ),
       onChanged: onChanged,

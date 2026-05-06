@@ -306,7 +306,14 @@ class S1aBookWidget extends StatelessWidget {
     final cells = _effectiveColumns().map((column) {
       final value = _resolveCellValue(row.values, column.fieldCode);
       final text = _formatCellValue(value, column.fieldCode);
-      return DataCell(Text(text, style: style));
+      return DataCell(
+        _buildCellContent(
+          text: text,
+          style: style,
+          fieldCode: column.fieldCode,
+          explanation: row.values['explanation']?.toString(),
+        ),
+      );
     }).toList();
 
     return DataRow(
@@ -325,7 +332,14 @@ class S1aBookWidget extends StatelessWidget {
     final cells = _effectiveColumns().map((column) {
       final value = _resolveCellValue(row.values, column.fieldCode);
       final text = _formatCellValue(value, column.fieldCode);
-      return DataCell(Text(text, style: style));
+      return DataCell(
+        _buildCellContent(
+          text: text,
+          style: style,
+          fieldCode: column.fieldCode,
+          explanation: row.values['explanation']?.toString(),
+        ),
+      );
     }).toList();
 
     return DataRow(
@@ -400,6 +414,36 @@ class S1aBookWidget extends StatelessWidget {
         fieldCode.contains('revenue') ||
         fieldCode.contains('amount') ||
         fieldCode.contains('tien');
+  }
+
+  Widget _buildCellContent({
+    required String text,
+    required TextStyle style,
+    required String fieldCode,
+    String? explanation,
+  }) {
+    final normalizedExplanation = explanation?.trim() ?? '';
+    if (normalizedExplanation.isEmpty || !_isDescriptionField(fieldCode)) {
+      return Text(text, style: style);
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(text, style: style),
+        const SizedBox(height: 4),
+        Text(
+          normalizedExplanation,
+          style: style.copyWith(
+            fontSize: 13,
+            fontStyle: FontStyle.italic,
+            color: AppColors.textPrimary.withValues(alpha: 0.75),
+          ),
+          softWrap: true,
+        ),
+      ],
+    );
   }
 
   String _formatDate(dynamic value) {

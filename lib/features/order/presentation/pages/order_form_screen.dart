@@ -106,6 +106,7 @@ class _OrderFormScreenState extends State<OrderFormScreen> {
       _items.addAll(order.items);
       _customerNameController.text = order.customerName ?? '';
       _customerPhoneController.text = order.customerPhone ?? '';
+      _documentNumberController.text = order.documentNumber?.trim() ?? '';
       if (widget.inputType != 'manual') {
         final note = (order.note ?? '').trim();
         _aiRawTranscript = note.isNotEmpty ? note : null;

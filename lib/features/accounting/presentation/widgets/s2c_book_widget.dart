@@ -395,6 +395,7 @@ class S2cBookWidget extends StatelessWidget {
             date: entry.date,
             entry.note,
             _fmtAmount(entry.amount),
+            explanation: entry.explanation,
           ),
         ),
       );
@@ -417,6 +418,7 @@ class S2cBookWidget extends StatelessWidget {
     DateTime? date,
     bool emphasized = false,
     bool taxLike = false,
+    String? explanation,
   }) {
     final values = <String, dynamic>{
       'so_hieu': code,
@@ -424,6 +426,7 @@ class S2cBookWidget extends StatelessWidget {
       'dien_giai': label,
       'so_tien': amount,
       'amount': amount,
+      'explanation': explanation,
     };
     final style = taxLike
         ? _boldItalicStyle()
@@ -439,8 +442,45 @@ class S2cBookWidget extends StatelessWidget {
   List<DataCell> _buildRowCells(Map<String, dynamic> values, TextStyle style) {
     return _effectiveColumns().map((column) {
       final value = _resolveCellValue(values, column.fieldCode);
-      return DataCell(Text(_formatCellValue(value, column.fieldCode), style: style));
+      return DataCell(
+        _buildCellContent(
+          text: _formatCellValue(value, column.fieldCode),
+          style: style,
+          fieldCode: column.fieldCode,
+          explanation: values['explanation']?.toString(),
+        ),
+      );
     }).toList();
+  }
+
+  Widget _buildCellContent({
+    required String text,
+    required TextStyle style,
+    required String fieldCode,
+    String? explanation,
+  }) {
+    final normalizedExplanation = explanation?.trim() ?? '';
+    if (normalizedExplanation.isEmpty || !_isDescriptionField(fieldCode)) {
+      return Text(text, style: style);
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(text, style: style),
+        const SizedBox(height: 4),
+        Text(
+          normalizedExplanation,
+          style: style.copyWith(
+            fontSize: 13,
+            fontStyle: FontStyle.italic,
+            color: AppColors.textPrimary.withValues(alpha: 0.75),
+          ),
+          softWrap: true,
+        ),
+      ],
+    );
   }
 
   bool _isNumericColumn(BookColumnDto column) {
@@ -635,6 +675,7 @@ class S2cBookWidget extends StatelessWidget {
             _S2cEntry(
               code: _pickDyn(dataRow, _soHieuAliases)?.toString() ?? '',
               note: rawNote,
+              explanation: _pickDyn(dataRow, const ['explanation'])?.toString().trim(),
               amount: amount,
               date: _parseDate(_pickDyn(dataRow, _dateAliases)),
             ),
@@ -691,6 +732,7 @@ class S2cBookWidget extends StatelessWidget {
         _S2cEntry(
           code: _pickDyn(row, _soHieuAliases)?.toString() ?? '',
           note: _normalizeNoteForGroup(rawNote, industry.label),
+          explanation: _pickDyn(row, const ['explanation'])?.toString().trim(),
           amount: amount,
           date: _parseDate(_pickDyn(row, _dateAliases)),
         ),
@@ -826,6 +868,11 @@ class S2cBookWidget extends StatelessWidget {
     return normalized.contains('doanh thu') || normalized.contains('chi phí');
   }
 
+  bool _isDescriptionField(String fieldCode) {
+    final code = fieldCode.trim().toLowerCase();
+    return code.contains('dien_giai') || code.contains('description') || code.contains('note');
+  }
+
   num? _sumSectionAmounts(String section) {
     num sum = 0;
     var hasValue = false;
@@ -953,12 +1000,14 @@ class _S2cIndustryGroup {
 class _S2cEntry {
   final String code;
   final String note;
+  final String? explanation;
   final num amount;
   final DateTime? date;
 
   const _S2cEntry({
     required this.code,
     required this.note,
+    this.explanation,
     required this.amount,
     this.date,
   });

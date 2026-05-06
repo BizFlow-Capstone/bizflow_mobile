@@ -319,7 +319,15 @@ class AppRouter {
         return _buildRoute(settings, const DebtListPage());
 
       case AppRoutes.accounting:
-        return _buildRoute(settings, const AccountingHubPage());
+        final args = settings.arguments as Map<String, dynamic>?;
+        final rawInitialTabIndex = args?['initialTabIndex'];
+        final initialTabIndex = rawInitialTabIndex is int
+            ? rawInitialTabIndex
+            : int.tryParse(rawInitialTabIndex?.toString() ?? '') ?? 0;
+        return _buildRoute(
+          settings,
+          AccountingHubPage(initialTabIndex: initialTabIndex),
+        );
 
       case AppRoutes.accountingBookDetail:
         final args = settings.arguments as Map<String, dynamic>?;
