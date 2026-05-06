@@ -926,7 +926,7 @@ class S2cBookWidget extends StatelessWidget {
   static String _toPercentageText(dynamic value) {
     final numValue = _toNum(value);
     if (numValue == null) return '';
-    return '${(numValue * 1000).toStringAsFixed(4)} %';
+    return '${(numValue * 100).toStringAsFixed(4)} %';
   }
 
   static String _fmtDate(DateTime? value) {

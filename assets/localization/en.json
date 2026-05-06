@@ -1412,6 +1412,7 @@
     "method": "Method",
     "action_create_books": "Create Books",
     "books_created_success": "Accounting books created successfully",
+    "book_create_failed": "Unable to create accounting books",
     "period_info": "Period Info",
     "books": "Books",
     "payment_method":"Payment Method"

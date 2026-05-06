@@ -522,12 +522,7 @@ class AccountingPeriodBloc
           return;
         }
 
-        emit(
-          state.copyWith(
-            isLogsLoading: false,
-            isRefreshing: false,
-          ),
-        );
+        emit(state.copyWith(isLogsLoading: false, isRefreshing: false));
       },
     );
   }
@@ -602,7 +597,7 @@ class AccountingPeriodBloc
         emit(
           state.copyWith(
             status: AccountingPeriodStatus.error,
-            errorMessage: 'Failed to create accounting books',
+            errorMessage: 'accounting.book_create_failed',
             isActionLoading: false,
           ),
         );

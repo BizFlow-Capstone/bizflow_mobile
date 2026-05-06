@@ -1420,6 +1420,7 @@
     "method": "Phương pháp",
     "action_create_books": "Tạo Sổ",
     "books_created_success": "Sổ kế toán đã được tạo thành công",
+    "book_create_failed": "Không thể tạo sổ kế toán",
     "period_info": "Thông tin kỳ",
     "books": "Sổ kế toán",
     "payment_method":"Phương thức thanh toán"

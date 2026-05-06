@@ -294,7 +294,7 @@ class S1aBookWidget extends StatelessWidget {
   String _toPercentageText(dynamic value) {
     final parsed = _parseAmountNum(value);
     if (parsed == null) return '';
-    return '${(parsed * 1000).toStringAsFixed(4)} %';
+    return '${(parsed * 100).toStringAsFixed(4)} %';
   }
 
   DataRow _buildDataRow(SectionRowDto row) {

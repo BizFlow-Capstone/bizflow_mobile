@@ -161,7 +161,10 @@ class _AccountingPeriodTabState extends State<AccountingPeriodTab> {
   ) {
     if (messenger == null) return;
     String userMessage;
-    if (rawMessage.contains('period_already_exists')) {
+    final translatedMessage = l10n.translateOrRaw(rawMessage);
+    if (translatedMessage != rawMessage) {
+      userMessage = translatedMessage;
+    } else if (rawMessage.contains('period_already_exists')) {
       userMessage = l10n.translate('accounting.period_already_exists');
     } else if (rawMessage.contains('period_no_books')) {
       userMessage = l10n.translate('accounting.period_no_books');
