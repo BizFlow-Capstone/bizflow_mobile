@@ -65,7 +65,6 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (!_periodsLoaded) return false;
     // Rule 1: only block editing when the order's date falls into a closed period.
     final orderDate = order.completedAt ?? order.createdAt;
-    if (orderDate == null) return false;
 
     final target = DateUtils.dateOnly(orderDate.toLocal());
     for (final period in _periods) {
