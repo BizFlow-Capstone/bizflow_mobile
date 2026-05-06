@@ -148,56 +148,56 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       initialIndex: safeInitialIndex,
     );
     SyncStatusController().clearError();
-    SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
 
     _tabController.addListener(_handleTabSelection);
 
     // Listen for accounting period detail changes so revenue/cost tabs reload
     // automatically when the selected period changes.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final periodBloc = context.read<AccountingPeriodBloc>();
-        _periodSubscription = periodBloc.stream.listen((state) {
-          if (!mounted) return;
-          final periodDetail = state.periodDetail;
-          if (periodDetail == null) return;
+    // Read bloc before callback to avoid dependency tracking issues
+    final periodBloc = context.read<AccountingPeriodBloc>();
+    try {
+      _periodSubscription = periodBloc.stream.listen((state) async {
+        if (!mounted) return;
+        final periodDetail = state.periodDetail;
+        if (periodDetail == null) return;
 
-          final locationId = context.read<BusinessContext>().currentBusinessId;
-          if (locationId == null) return;
+        final locationId = context.read<BusinessContext>().currentBusinessId;
+        if (locationId == null) return;
 
-          // If user is viewing revenue or cost tab, reload with period date range
-          if (_tabController.index == 2) {
-            try {
-              final fromDate = DateTime.parse(periodDetail.startDate);
-              final toDate = DateTime.parse(periodDetail.endDate);
-              context.read<RevenueBloc>().add(
-                LoadRevenuesRequested(
-                  businessLocationId: locationId,
-                  fromDate: fromDate,
-                  toDate: toDate,
-                ),
-              );
-            } catch (_) {}
-          } else if (_tabController.index == 3) {
-            try {
-              final fromDate = DateTime.parse(periodDetail.startDate);
-              final toDate = DateTime.parse(periodDetail.endDate);
-              context.read<CostBloc>().add(
-                LoadCostsRequested(
-                  businessLocationId: locationId,
-                  fromDate: fromDate,
-                  toDate: toDate,
-                ),
-              );
-            } catch (_) {}
+        // Clear cache when period changes to avoid stale data
+        await CacheManager().removeByPrefix('revenues_');
+        await LocalApiCacheStore().removeByGroup('revenues');
+        await CacheManager().removeByPrefix('costs_');
+        await LocalApiCacheStore().removeByGroup('costs');
+
+        // Always reload revenue and cost data when period changes
+        try {
+          debugPrint(
+            '[AccountingHub] Period changed -> reload revenue/cost | '
+            'locationId=$locationId '
+            'status=${state.status} tab=${_tabController.index}',
+          );
+          if (mounted) {
+            context.read<RevenueBloc>().add(
+              LoadRevenuesRequested(businessLocationId: locationId),
+            );
+            context.read<CostBloc>().add(
+              LoadCostsRequested(businessLocationId: locationId),
+            );
           }
-        });
-      } catch (_) {}
+        } catch (e) {
+          debugPrint('[AccountingHub] Period reload parse error: $e');
+        }
+      });
+    } catch (_) {}
+
+    // Defer initial load and manual refresh callback to after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SyncStatusController().setManualRefreshCallback(_refreshCurrentTab);
     });
 
-    // Initial load of first tab and references only
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadTab(safeInitialIndex);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadTab(safeInitialIndex);
       _loadReferences();
     });
   }
@@ -206,13 +206,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   void didChangeDependencies() {
     super.didChangeDependencies();
     try {
-      final currentLocationId = context.read<BusinessContext>().currentBusinessId;
+      final currentLocationId = context
+          .read<BusinessContext>()
+          .currentBusinessId;
       if (_lastLocationId != currentLocationId) {
         _lastLocationId = currentLocationId;
         if (currentLocationId != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
             if (!mounted) return;
-            _loadTab(_tabController.index);
+            await _loadTab(_tabController.index);
           });
         }
       }
@@ -221,11 +223,11 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
   void _handleTabSelection() {
     if (_tabController.indexIsChanging) {
-      _loadTab(_tabController.index);
+      unawaited(_loadTab(_tabController.index));
     }
   }
 
-  void _loadTab(int index) {
+  Future<void> _loadTab(int index) async {
     final locationId = context.read<BusinessContext>().currentBusinessId;
     if (locationId == null) return;
 
@@ -271,62 +273,32 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           _revenuePageNumber = 0; // Reset to initial state
           _isLoadingMoreRevenue = false;
         });
-        try {
-          final periodDetail = context.read<AccountingPeriodBloc>().state.periodDetail;
-          if (periodDetail != null) {
-            final fromDate = DateTime.parse(periodDetail.startDate);
-            final toDate = DateTime.parse(periodDetail.endDate);
-            context.read<RevenueBloc>().add(
-              LoadRevenuesRequested(
-                businessLocationId: locationId,
-                fromDate: fromDate,
-                toDate: toDate,
-              ),
-            );
-          } else {
-            context.read<RevenueBloc>().add(
-              LoadRevenuesRequested(businessLocationId: locationId),
-            );
-          }
-        } catch (_) {
-          context.read<RevenueBloc>().add(
-            LoadRevenuesRequested(businessLocationId: locationId),
-          );
-        }
+
+        // Clear revenue cache when loading tab to avoid stale data after period close
+        await _clearRevenueCache();
+
+        if (!mounted) return;
+
+        debugPrint('[AccountingHub] Load revenue tab | locationId=$locationId');
+        context.read<RevenueBloc>().add(
+          LoadRevenuesRequested(businessLocationId: locationId),
+        );
         break;
       case 3: // Chi phí
         setState(() {
           _costPageNumber = 0; // Reset to initial state
           _isLoadingMoreCost = false;
         });
-        try {
-          final periodDetail = context.read<AccountingPeriodBloc>().state.periodDetail;
-          if (periodDetail != null) {
-            final fromDate = DateTime.parse(periodDetail.startDate);
-            final toDate = DateTime.parse(periodDetail.endDate);
-            if (context.mounted) {
-              context.read<CostBloc>().add(
-                LoadCostsRequested(
-                  businessLocationId: locationId,
-                  fromDate: fromDate,
-                  toDate: toDate,
-                ),
-              );
-            }
-          } else {
-            if (context.mounted) {
-              context.read<CostBloc>().add(
-                LoadCostsRequested(businessLocationId: locationId),
-              );
-            }
-          }
-        } catch (_) {
-          if (context.mounted) {
-            context.read<CostBloc>().add(
-              LoadCostsRequested(businessLocationId: locationId),
-            );
-          }
-        }
+
+        // Clear cost cache when loading tab to avoid stale data after period close
+        await _clearCostCache();
+
+        if (!mounted) return;
+
+        debugPrint('[AccountingHub] Load cost tab | locationId=$locationId');
+        context.read<CostBloc>().add(
+          LoadCostsRequested(businessLocationId: locationId),
+        );
         break;
       // Tab 1 (Nhật ký/Sổ cái) is handled by AccountingGlTab internally or we could add triggering logic here later
     }
@@ -359,7 +331,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       await CacheManager().removeByPrefix('costs_');
       await LocalApiCacheStore().removeByGroup('costs');
 
-      _loadTab(_tabController.index);
+      await _loadTab(_tabController.index);
       SyncStatusController().endSync(updatedAt: DateTime.now());
     } catch (_) {
       SyncStatusController().endSync(hasError: true);
@@ -392,6 +364,16 @@ class _AccountingHubPageState extends State<AccountingHubPage>
         isLoadMore: true,
       ),
     );
+  }
+
+  Future<void> _clearRevenueCache() async {
+    await CacheManager().removeByPrefix('revenues_');
+    await LocalApiCacheStore().removeByGroup('revenues');
+  }
+
+  Future<void> _clearCostCache() async {
+    await CacheManager().removeByPrefix('costs_');
+    await LocalApiCacheStore().removeByGroup('costs');
   }
 
   @override
@@ -2014,6 +1996,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     // We don't initialize selectedImage from item.imagePath if it's a network URL
     // since File() won't work on URLs. We handle network display separately.
 
+    void closeDialog(BuildContext dialogContext) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (dialogContext.mounted) {
+          Navigator.of(dialogContext).pop();
+        }
+      });
+    }
+
     await showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
@@ -2167,7 +2158,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ),
           actions: [
             TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
+              onPressed: isSubmitting ? null : () => closeDialog(dialogCtx),
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
@@ -2281,7 +2272,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                           image: selectedImage,
                         ),
                       );
-                      Navigator.of(dialogCtx).pop();
+                      closeDialog(dialogCtx);
                     },
               child: isSubmitting
                   ? const SizedBox(
@@ -2296,6 +2287,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       ),
     );
 
+    await WidgetsBinding.instance.endOfFrame;
     amountController.dispose();
     descriptionController.dispose();
     documentNumberController.dispose();
@@ -2978,6 +2970,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     bool removeImage = false;
     File? selectedImage;
 
+    void closeDialog(BuildContext dialogContext) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (dialogContext.mounted) {
+          Navigator.of(dialogContext).pop();
+        }
+      });
+    }
+
     await showDialog(
       context: context,
       builder: (dialogCtx) => StatefulBuilder(
@@ -3147,7 +3148,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
           ),
           actions: [
             TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
+              onPressed: isSubmitting ? null : () => closeDialog(dialogCtx),
               child: Text(l10n.translate('common.cancel')),
             ),
             ElevatedButton(
@@ -3208,14 +3209,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                             if (documentNumberController.text.trim().isNotEmpty)
                               'documentNumber': documentNumberController.text
                                   .trim(),
-                            'removeImage': removeImage,
+                            'removeDocument': removeImage,
                             if ((selectedBusinessTypeId ?? '').isNotEmpty)
                               'businessTypeId': selectedBusinessTypeId,
                           },
                           image: selectedImage,
                         ),
                       );
-                      Navigator.of(dialogCtx).pop();
+                      closeDialog(dialogCtx);
                     },
               child: isSubmitting
                   ? const SizedBox(
@@ -3230,6 +3231,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
       ),
     );
 
+    await WidgetsBinding.instance.endOfFrame;
     amountController.dispose();
     descriptionController.dispose();
     documentNumberController.dispose();

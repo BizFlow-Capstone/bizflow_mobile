@@ -61,7 +61,8 @@ class AccountingCostRevenueTab extends StatefulWidget {
   });
 
   @override
-  State<AccountingCostRevenueTab> createState() => _AccountingCostRevenueTabState();
+  State<AccountingCostRevenueTab> createState() =>
+      _AccountingCostRevenueTabState();
 }
 
 class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
@@ -94,12 +95,18 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
         widget.mode == AccountingCostRevenueMode.cost;
 
     // Try to load cost first (cost section is rendered after revenue).
-    if (showCost && widget.onLoadMoreCost != null && !widget.hasReachedMaxCost && !widget.isLoadingMoreCost) {
+    if (showCost &&
+        widget.onLoadMoreCost != null &&
+        !widget.hasReachedMaxCost &&
+        !widget.isLoadingMoreCost) {
       widget.onLoadMoreCost!();
       return;
     }
 
-    if (showRevenue && widget.onLoadMoreRevenue != null && !widget.hasReachedMaxRevenue && !widget.isLoadingMoreRevenue) {
+    if (showRevenue &&
+        widget.onLoadMoreRevenue != null &&
+        !widget.hasReachedMaxRevenue &&
+        !widget.isLoadingMoreRevenue) {
       widget.onLoadMoreRevenue!();
       return;
     }
@@ -121,67 +128,67 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
         controller: _scrollController,
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-        if (showRevenue)
-          _card(
-            title: l10n.translate('accounting.revenue_list'),
-            onAdd: widget.onAddRevenue,
-            child: widget.revenues.isEmpty
-                ? _buildEmptyState(
-                    context,
-                    l10n.translate('accounting.revenue_list'),
-                  )
-                : Column(
-                    children: [
-                      ...widget.revenues.map(
-                        (item) => _itemTile(
-                          context,
-                          item: item,
-                          isRevenue: true,
-                          onTap: () => widget.onTapRevenue(item),
-                          onEdit: () => widget.onEditRevenue(item),
-                          onDelete: () => widget.onDeleteRevenue(item),
-                          isModifiable: widget.canModifyRevenue(item),
+          if (showRevenue)
+            _card(
+              title: l10n.translate('accounting.revenue_list'),
+              onAdd: widget.onAddRevenue,
+              child: widget.revenues.isEmpty
+                  ? _buildEmptyState(
+                      context,
+                      l10n.translate('accounting.revenue_list'),
+                    )
+                  : Column(
+                      children: [
+                        ...widget.revenues.map(
+                          (item) => _itemTile(
+                            context,
+                            item: item,
+                            isRevenue: true,
+                            onTap: () => widget.onTapRevenue(item),
+                            onEdit: () => widget.onEditRevenue(item),
+                            onDelete: () => widget.onDeleteRevenue(item),
+                            isModifiable: widget.canModifyRevenue(item),
+                          ),
                         ),
-                      ),
-                      if (widget.isLoadingMoreRevenue)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(child: CircularProgressIndicator()),
+                        if (widget.isLoadingMoreRevenue)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                      ],
+                    ),
+            ),
+          if (showRevenue && showCost) const SizedBox(height: AppSpacing.md),
+          if (showCost)
+            _card(
+              title: l10n.translate('accounting.cost_list'),
+              onAdd: widget.onAddCost,
+              child: widget.costs.isEmpty
+                  ? _buildEmptyState(
+                      context,
+                      l10n.translate('accounting.cost_list'),
+                    )
+                  : Column(
+                      children: [
+                        ...widget.costs.map(
+                          (item) => _itemTile(
+                            context,
+                            item: item,
+                            isRevenue: false,
+                            onTap: () => widget.onTapCost(item),
+                            onEdit: () => widget.onEditCost(item),
+                            onDelete: () => widget.onDeleteCost(item),
+                            isModifiable: widget.canModifyCost(item),
+                          ),
                         ),
-                    ],
-                  ),
-          ),
-        if (showRevenue && showCost) const SizedBox(height: AppSpacing.md),
-        if (showCost)
-          _card(
-            title: l10n.translate('accounting.cost_list'),
-            onAdd: widget.onAddCost,
-            child: widget.costs.isEmpty
-                ? _buildEmptyState(
-                    context,
-                    l10n.translate('accounting.cost_list'),
-                  )
-                : Column(
-                    children: [
-                      ...widget.costs.map(
-                        (item) => _itemTile(
-                          context,
-                          item: item,
-                          isRevenue: false,
-                          onTap: () => widget.onTapCost(item),
-                          onEdit: () => widget.onEditCost(item),
-                          onDelete: () => widget.onDeleteCost(item),
-                          isModifiable: widget.canModifyCost(item),
-                        ),
-                      ),
-                      if (widget.isLoadingMoreCost)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                    ],
-                  ),
-          ),
+                        if (widget.isLoadingMoreCost)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            child: Center(child: CircularProgressIndicator()),
+                          ),
+                      ],
+                    ),
+            ),
         ],
       ),
     );
@@ -215,7 +222,7 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
 
     if (item is RevenueEntity) {
       final revenueCode = (item.revenueCode ?? '').trim();
-      
+
       // Build title: prioritize revenueCode, then reference display (ID)
       if (revenueCode.isNotEmpty) {
         title = revenueCode;
@@ -227,7 +234,7 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
           fallback: 'REV-${item.id}',
         );
       }
-      
+
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'revenue',
@@ -236,11 +243,13 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;
-      isReplaced = (item.statusCode ?? '').trim().toLowerCase() == 'replaced' || (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
+      isReplaced =
+          (item.statusCode ?? '').trim().toLowerCase() == 'replaced' ||
+          (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
       statusLabel = item.statusLabel;
     } else if (item is CostEntity) {
       final costCode = (item.costCode ?? '').trim();
-      
+
       // Build title: prioritize costCode, then reference display (ID)
       if (costCode.isNotEmpty) {
         title = costCode;
@@ -252,7 +261,7 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
           fallback: 'COST-${item.id}',
         );
       }
-      
+
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'cost',
@@ -261,11 +270,15 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
         languageCode: effectiveLanguageCode,
       );
       amount = item.amount;
-      isReplaced = (item.statusCode ?? '').trim().toLowerCase() == 'replaced' || (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
+      isReplaced =
+          (item.statusCode ?? '').trim().toLowerCase() == 'replaced' ||
+          (item.statusCode ?? '').trim().toLowerCase() == 'cancelled';
       statusLabel = item.statusLabel;
     }
 
-    final textDecoration = isReplaced ? TextDecoration.lineThrough : TextDecoration.none;
+    final textDecoration = isReplaced
+        ? TextDecoration.lineThrough
+        : TextDecoration.none;
     final editable = isModifiable && !isReplaced;
 
     return ListTile(
@@ -276,7 +289,9 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
           Expanded(
             child: Text(
               title,
-              style: AppTextStyles.bodyMedium.copyWith(decoration: textDecoration),
+              style: AppTextStyles.bodyMedium.copyWith(
+                decoration: textDecoration,
+              ),
             ),
           ),
         ],

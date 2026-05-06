@@ -76,6 +76,13 @@ class S2aBookWidget extends StatelessWidget {
             final matching = dataRows.where((r) {
               if (filter == null) return true;
               return r['businessTypeId']?.toString() == filter;
+            }).toList()..sort((a, b) {
+              final da = _parseDate(a['ngay_thang'] ?? a['date']);
+              final db = _parseDate(b['ngay_thang'] ?? b['date']);
+              if (da == null && db == null) return 0;
+              if (da == null) return 1;
+              if (db == null) return -1;
+              return db.compareTo(da);
             });
             for (final dataRow in matching) {
               tableRows.add(
@@ -293,7 +300,7 @@ class S2aBookWidget extends StatelessWidget {
   String _toPercentageText(dynamic value) {
     final parsed = _parseAmountNum(value);
     if (parsed == null) return '';
-    return '${(parsed * 1000).toStringAsFixed(4)} %';
+    return '${(parsed * 100).toStringAsFixed(4)} %';
   }
 
   DataRow _buildSectionHeaderRow(BookSectionResponseDto section) {
@@ -489,5 +496,14 @@ class S2aBookWidget extends StatelessWidget {
   bool _isDescriptionField(String fieldCode) {
     final code = fieldCode.trim().toLowerCase();
     return code.contains('dien_giai') || code.contains('description') || code.contains('note');
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
   }
 }

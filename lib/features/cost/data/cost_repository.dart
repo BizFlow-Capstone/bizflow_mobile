@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../../../shared/cache/cache_manager.dart';
 import '../../../shared/cache/local_api_cache_store.dart';
 import '../domain/entities/cost_entity.dart';
@@ -42,6 +43,10 @@ class CostRepository {
     );
   }
 
+  String _buildCacheKey(int locationId, int page, int size) {
+    return 'costs_${locationId}_p${page}_s${size}';
+  }
+
   Future<void> getCostsSWR({
     required int pageNumber,
     required int pageSize,
@@ -52,7 +57,12 @@ class CostRepository {
     onData,
     Function(dynamic error)? onError,
   }) async {
-    final key = 'costs_${businessLocationId}_p${pageNumber}_s$pageSize';
+    final key = _buildCacheKey(businessLocationId ?? 0, pageNumber, pageSize);
+    debugPrint(
+      '[CostRepository] getCostsSWR start '
+      'key=$key locationId=$businessLocationId page=$pageNumber size=$pageSize',
+    );
+
     final localCached = await _localApiCache.getMap(key);
     if (localCached != null) {
       final items = (localCached['items'] as List<dynamic>? ?? [])
@@ -60,7 +70,12 @@ class CostRepository {
           .map(_mapToEntity)
           .toList();
       final totalCount = localCached['total'] as int? ?? 0;
+      debugPrint(
+        '[CostRepository] local cache hit key=$key items=${items.length} total=$totalCount',
+      );
       onData(items, totalCount, true);
+    } else {
+      debugPrint('[CostRepository] local cache miss key=$key');
     }
 
     await _cache.fetchWithSWR<Map<String, dynamic>>(
@@ -91,9 +106,15 @@ class CostRepository {
             .map(_mapToEntity)
             .toList();
         final totalCount = dataMap['total'] as int? ?? 0;
+        debugPrint(
+          '[CostRepository] swr onData key=$key fromCache=$isFromCache items=${items.length} total=$totalCount',
+        );
         onData(items, totalCount, isFromCache);
       },
-      onError: onError,
+      onError: (error) {
+        debugPrint('[CostRepository] swr onError key=$key error=$error');
+        onError?.call(error);
+      },
       toJson: (data) => data,
       fromJson: (json) => json,
     );

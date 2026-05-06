@@ -16,27 +16,70 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../../cost/presentation/bloc/cost_bloc.dart';
 
 Future<void> showAddCostDialog(BuildContext context) async {
-  final l10n = AppLocalizations.of(context);
   final refState = context.read<ReferenceBloc>().state;
   if (refState is! ReferenceLoaded && refState is! ReferenceLoading) {
     context.read<ReferenceBloc>().add(LoadAllReferencesRequested());
   }
 
-  final amountController = TextEditingController();
-  final descriptionController = TextEditingController();
-  final documentNumberController = TextEditingController();
+  await showDialog(
+    context: context,
+    builder: (_) => const _AddCostDialog(),
+  );
+}
+
+class _AddCostDialog extends StatefulWidget {
+  const _AddCostDialog();
+
+  @override
+  State<_AddCostDialog> createState() => _AddCostDialogState();
+}
+
+class _AddCostDialogState extends State<_AddCostDialog> {
+  late final TextEditingController amountController;
+  late final TextEditingController descriptionController;
+  late final TextEditingController documentNumberController;
   DateTime selectedDate = DateTime.now();
   DateTime? selectedDocumentDate;
   String? selectedCostType;
   String? selectedPaymentMethod;
   File? selectedImage;
-  var isSubmitting = false;
+  bool isSubmitting = false;
   final ImagePicker _picker = ImagePicker();
 
-  Future<void> pickImage(ImageSource source, void Function(void Function()) setDialogState) async {
-    final pickedFile = await _picker.pickImage(source: source, maxWidth: 1280, maxHeight: 1280, imageQuality: 85);
-    if (pickedFile != null) {
-      setDialogState(() => selectedImage = File(pickedFile.path));
+  void _closeDialog() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    amountController = TextEditingController();
+    descriptionController = TextEditingController();
+    documentNumberController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    amountController.dispose();
+    descriptionController.dispose();
+    documentNumberController.dispose();
+    super.dispose();
+  }
+
+  Future<void> pickImage(ImageSource source) async {
+    final pickedFile = await _picker.pickImage(
+      source: source,
+      maxWidth: 1280,
+      maxHeight: 1280,
+      imageQuality: 85,
+    );
+    if (pickedFile != null && mounted) {
+      setState(() => selectedImage = File(pickedFile.path));
     }
   }
 
@@ -60,164 +103,152 @@ Future<void> showAddCostDialog(BuildContext context) async {
     return const <ReferenceItem>[];
   }
 
-  await showDialog(
-    context: context,
-    builder: (dialogCtx) => StatefulBuilder(
-      builder: (dialogCtx, setDialogState) => AlertDialog(
-        title: Text(l10n.translate('accounting.add_cost')),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: descriptionController,
-                decoration: InputDecoration(
-                  labelText: l10n.translate('accounting.description'),
-                ),
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return AlertDialog(
+      title: Text(l10n.translate('accounting.add_cost')),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: descriptionController,
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.description'),
               ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                inputFormatters: AppInputFormatters.withSqlInjectionGuard(
-                  inputFormatters: [CurrencyInputFormatter()],
-                ),
-                decoration: InputDecoration(
-                  labelText: l10n.translate('accounting.amount'),
-                ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: AppInputFormatters.withSqlInjectionGuard(
+                inputFormatters: [CurrencyInputFormatter()],
               ),
-              const SizedBox(height: AppSpacing.md),
-              Row(
-                children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.photo_library),
-                    label: Text(l10n.translate('accounting.select_image')),
-                    onPressed: () => pickImage(ImageSource.gallery, setDialogState),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.camera_alt),
-                    label: Text(l10n.translate('accounting.take_photo')),
-                    onPressed: () => pickImage(ImageSource.camera, setDialogState),
-                  ),
-                ],
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.amount'),
               ),
-              if (selectedImage != null) ...[
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.file(
-                    selectedImage!,
-                    height: 120,
-                    fit: BoxFit.cover,
-                  ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.photo_library),
+                  label: Text(l10n.translate('accounting.select_image')),
+                  onPressed: () => pickImage(ImageSource.gallery),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.camera_alt),
+                  label: Text(l10n.translate('accounting.take_photo')),
+                  onPressed: () => pickImage(ImageSource.camera),
                 ),
               ],
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<String>(
-                initialValue: selectedCostType,
-                decoration: InputDecoration(
-                  labelText: l10n.translate('accounting.ai_cost_type'),
-                ),
-                items: getCostTypes()
-                    .where((c) => c.code.toLowerCase() != 'import' && c.label.trim().isNotEmpty)
-                    .map(
-                      (item) => DropdownMenuItem<String>(
-                        value: item.code,
-                        child: Text(item.label),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) =>
-                    setDialogState(() => selectedCostType = value),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButtonFormField<String>(
-                initialValue: selectedPaymentMethod,
-                decoration: InputDecoration(
-                  labelText: l10n.translate('accounting.ai_payment_method'),
-                ),
-                items: getPaymentMethods()
-                    .where((item) => item.label.trim().isNotEmpty)
-                    .map(
-                      (item) => DropdownMenuItem<String>(
-                        value: item.code,
-                        child: Text(item.label),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) =>
-                    setDialogState(() => selectedPaymentMethod = value),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(l10n.translate('accounting.cost_date')),
-                subtitle: Text(DateFormatter.formatDate(selectedDate)),
-                trailing: const Icon(Icons.lock),
-                enabled: false,
-                onTap: null,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(
-                controller: documentNumberController,
-                decoration: InputDecoration(
-                  labelText: l10n.translate('accounting.document_number'),
-                  hintText: l10n.translate('accounting.document_number_hint'),
+            ),
+            if (selectedImage != null) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  selectedImage!,
+                  height: 120,
+                  fit: BoxFit.cover,
                 ),
               ),
             ],
-          ),
+            const SizedBox(height: AppSpacing.md),
+            DropdownButtonFormField<String>(
+              initialValue: selectedCostType,
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.ai_cost_type'),
+              ),
+              items: getCostTypes()
+                  .where((c) => c.code.toLowerCase() != 'import' && c.label.trim().isNotEmpty)
+                  .map(
+                    (item) => DropdownMenuItem<String>(
+                      value: item.code,
+                      child: Text(item.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => selectedCostType = value),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            DropdownButtonFormField<String>(
+              initialValue: selectedPaymentMethod,
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.ai_payment_method'),
+              ),
+              items: getPaymentMethods()
+                  .where((item) => item.label.trim().isNotEmpty)
+                  .map(
+                    (item) => DropdownMenuItem<String>(
+                      value: item.code,
+                      child: Text(item.label),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => selectedPaymentMethod = value),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.translate('accounting.cost_date')),
+              subtitle: Text(DateFormatter.formatDate(selectedDate)),
+              trailing: const Icon(Icons.lock),
+              enabled: false,
+              onTap: null,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: documentNumberController,
+              decoration: InputDecoration(
+                labelText: l10n.translate('accounting.document_number'),
+                hintText: l10n.translate('accounting.document_number_hint'),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: isSubmitting ? null : () => Navigator.pop(dialogCtx),
-            child: Text(l10n.translate('common.cancel')),
-          ),
-          ElevatedButton(
-            onPressed: isSubmitting
-                ? null
-                : () async {
-                    setDialogState(() => isSubmitting = true);
-                    final amount =
-                        (CurrencyFormatter.parse(amountController.text) ?? 0)
-                            .toDouble();
-                    if (descriptionController.text.trim().isEmpty ||
-                        amount <= 0 ||
-                        selectedCostType == null ||
-                        selectedPaymentMethod == null) {
-                      setDialogState(() => isSubmitting = false);
-                      return;
-                    }
-
-                    final locationId =
-                        context.read<BusinessContext>().currentBusinessId;
-                    context.read<CostBloc>().add(
-                      CreateManualCostRequested(
-                        body: {
-                          'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
-                          'amount': amount,
-                          'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
-                          if (selectedDocumentDate != null)
-                            'documentDate': DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
-                          if (documentNumberController.text.trim().isNotEmpty)
-                            'documentNumber': documentNumberController.text.trim(),
-                          'description': descriptionController.text,
-                          'costType': selectedCostType,
-                          'paymentMethod': selectedPaymentMethod,
-                        },
-                        image: selectedImage,
-                      ),
-                    );
-                    Navigator.pop(dialogCtx);
-                    if (dialogCtx.mounted) {
-                      setDialogState(() => isSubmitting = false);
-                    }
-                  },
-            child: Text(l10n.translate('common.save')),
-          ),
-        ],
       ),
-    ),
-  );
+      actions: [
+        TextButton(
+          onPressed: isSubmitting ? null : _closeDialog,
+          child: Text(l10n.translate('common.cancel')),
+        ),
+        ElevatedButton(
+          onPressed: isSubmitting
+              ? null
+              : () async {
+                  setState(() => isSubmitting = true);
+                  final amount = (CurrencyFormatter.parse(amountController.text) ?? 0).toDouble();
+                  if (descriptionController.text.trim().isEmpty || amount <= 0 || selectedCostType == null || selectedPaymentMethod == null) {
+                    setState(() => isSubmitting = false);
+                    return;
+                  }
+
+                  final locationId = context.read<BusinessContext>().currentBusinessId;
+                  context.read<CostBloc>().add(
+                    CreateManualCostRequested(
+                      body: {
+                        'businessLocationId': int.tryParse(locationId ?? '') ?? 0,
+                        'amount': amount,
+                        'costDate': DateFormat('yyyy-MM-dd').format(selectedDate),
+                        if (selectedDocumentDate != null) 'documentDate': DateFormat('yyyy-MM-dd').format(selectedDocumentDate!),
+                        if (documentNumberController.text.trim().isNotEmpty) 'documentNumber': documentNumberController.text.trim(),
+                        'description': descriptionController.text,
+                        'costType': selectedCostType,
+                        'paymentMethod': selectedPaymentMethod,
+                      },
+                      image: selectedImage,
+                    ),
+                  );
+                  if (mounted) {
+                    _closeDialog();
+                  }
+                },
+          child: Text(l10n.translate('common.save')),
+        ),
+      ],
+    );
+  }
 }

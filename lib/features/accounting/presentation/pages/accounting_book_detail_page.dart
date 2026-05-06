@@ -498,15 +498,10 @@ class _AccountingBookDetailPageState extends State<AccountingBookDetailPage> {
 
     try {
       final rawRows = await _rowsFuture;
-      final rows = AccountingReferenceDisplay.normalizeRows(
-        rawRows,
-        languageCode: languageCode,
-        preserveOriginalDocumentNumber: true,
-      );
       final headerInfo = _buildExportHeaderInfo(sectionsData);
       final files = await ExcelExportService.exportToExcelFiles(
         widget.book,
-        rows,
+        rawRows,
         sectionsData: sectionsData,
         headerInfo: headerInfo,
       );

@@ -30,16 +30,27 @@ class RevenueApiService {
         if (toDate != null) 'toDate': toDate.toIso8601String(),
       };
 
+      debugPrint(
+        '[RevenueApiService] GET ${ApiEndpoints.revenues} query=$queryParams',
+      );
+
       final response = await _apiClient.get(
         ApiEndpoints.revenues,
         queryParams: queryParams,
       );
 
       if (response.isSuccess && response.data != null) {
-        return RevenueResponseDto.fromJson(
+        final dto = RevenueResponseDto.fromJson(
           response.data as Map<String, dynamic>,
         );
+        debugPrint(
+          '[RevenueApiService] response items=${dto.items.length} total=${dto.totalCount}',
+        );
+        return dto;
       } else {
+        debugPrint(
+          '[RevenueApiService] failed isSuccess=${response.isSuccess} message=${response.message}',
+        );
         throw Exception(response.message ?? 'Failed to load revenues');
       }
     } catch (e) {
@@ -112,8 +123,7 @@ class RevenueApiService {
 
   Future<RevenueDto> updateManualRevenue(
     int revenueId,
-    Map<String, dynamic> body,
-    {
+    Map<String, dynamic> body, {
     String? idempotencyKey,
     File? image,
   }) async {
@@ -137,8 +147,11 @@ class RevenueApiService {
             'ReferenceType': body['referenceType'].toString(),
           if (body['referenceId'] != null)
             'ReferenceId': body['referenceId'].toString(),
-          if (body['removeImage'] != null)
-            'RemoveImage': body['removeImage'].toString(),
+          // Backend uses RemoveDocument for revenue updates; accept both keys from client.
+          if (body['removeDocument'] != null)
+            'RemoveDocument': body['removeDocument'].toString(),
+          if (body['removeDocument'] == null && body['removeImage'] != null)
+            'RemoveDocument': body['removeImage'].toString(),
           if (trimmedIdempotencyKey != null && trimmedIdempotencyKey.isNotEmpty)
             'IdempotencyKey': trimmedIdempotencyKey,
         },
@@ -161,7 +174,11 @@ class RevenueApiService {
           'hasImage': image != null,
           'idempotencyKey': trimmedIdempotencyKey ?? '',
         };
-        await logFile.writeAsString('${logEntry.toString()}\n', mode: FileMode.append, flush: true);
+        await logFile.writeAsString(
+          '${logEntry.toString()}\n',
+          mode: FileMode.append,
+          flush: true,
+        );
       } catch (_) {
         // best-effort logging only
       }

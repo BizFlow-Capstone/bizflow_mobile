@@ -204,7 +204,20 @@ class S2dBookWidget extends StatelessWidget {
               }
               return true;
             });
-            for (final entry in matching) {
+            final sortedMatching = matching.toList()
+              ..sort((a, b) {
+                final da = _parseDate(
+                  _pick(a.value, 'ngay_thang', _dateAliases),
+                );
+                final db = _parseDate(
+                  _pick(b.value, 'ngay_thang', _dateAliases),
+                );
+                if (da == null && db == null) return 0;
+                if (da == null) return 1;
+                if (db == null) return -1;
+                return db.compareTo(da);
+              });
+            for (final entry in sortedMatching) {
               consumedIndexes.add(entry.key);
               tableRows.add(
                 _buildDataRow(
@@ -276,7 +289,16 @@ class S2dBookWidget extends StatelessWidget {
     }
 
     if (consumedIndexes.isEmpty && dataRows.isNotEmpty) {
-      for (final dataRow in dataRows) {
+      final sortedDataRows = dataRows.toList()
+        ..sort((a, b) {
+          final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
+          final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+          if (da == null && db == null) return 0;
+          if (da == null) return 1;
+          if (db == null) return -1;
+          return db.compareTo(da);
+        });
+      for (final dataRow in sortedDataRows) {
         tableRows.add(
           _buildDataRow(
             SectionRowDto(
@@ -322,18 +344,50 @@ class S2dBookWidget extends StatelessWidget {
       return sections.columns;
     }
     return const [
-      BookColumnDto(fieldCode: 'so_hieu', label: 'Số hiệu CT', fieldType: 'text'),
+      BookColumnDto(
+        fieldCode: 'so_hieu',
+        label: 'Số hiệu CT',
+        fieldType: 'text',
+      ),
       BookColumnDto(fieldCode: 'ngay', label: 'Ngày', fieldType: 'date'),
-      BookColumnDto(fieldCode: 'ten_san_pham', label: 'Tên sản phẩm', fieldType: 'text'),
-      BookColumnDto(fieldCode: 'dien_giai', label: 'Diễn giải', fieldType: 'text'),
+      BookColumnDto(
+        fieldCode: 'ten_san_pham',
+        label: 'Tên sản phẩm',
+        fieldType: 'text',
+      ),
+      BookColumnDto(
+        fieldCode: 'dien_giai',
+        label: 'Diễn giải',
+        fieldType: 'text',
+      ),
       BookColumnDto(fieldCode: 'dvt', label: 'ĐVT', fieldType: 'text'),
       BookColumnDto(fieldCode: 'don_gia', label: 'Đơn giá', fieldType: 'money'),
-      BookColumnDto(fieldCode: 'sl_nhap', label: 'SL nhập', fieldType: 'number'),
-      BookColumnDto(fieldCode: 'tien_nhap', label: 'Tiền nhập', fieldType: 'money'),
-      BookColumnDto(fieldCode: 'sl_xuat', label: 'SL xuất', fieldType: 'number'),
-      BookColumnDto(fieldCode: 'tien_xuat', label: 'Tiền xuất', fieldType: 'money'),
+      BookColumnDto(
+        fieldCode: 'sl_nhap',
+        label: 'SL nhập',
+        fieldType: 'number',
+      ),
+      BookColumnDto(
+        fieldCode: 'tien_nhap',
+        label: 'Tiền nhập',
+        fieldType: 'money',
+      ),
+      BookColumnDto(
+        fieldCode: 'sl_xuat',
+        label: 'SL xuất',
+        fieldType: 'number',
+      ),
+      BookColumnDto(
+        fieldCode: 'tien_xuat',
+        label: 'Tiền xuất',
+        fieldType: 'money',
+      ),
       BookColumnDto(fieldCode: 'sl_ton', label: 'SL tồn', fieldType: 'number'),
-      BookColumnDto(fieldCode: 'tien_ton', label: 'Tiền tồn', fieldType: 'money'),
+      BookColumnDto(
+        fieldCode: 'tien_ton',
+        label: 'Tiền tồn',
+        fieldType: 'money',
+      ),
     ];
   }
 
@@ -437,7 +491,8 @@ class S2dBookWidget extends StatelessWidget {
   }) {
     final aggregated = <String, Map<String, dynamic>>{};
     for (final item in items) {
-      final name = item[nameKey]?.toString() ??
+      final name =
+          item[nameKey]?.toString() ??
           item['businessType']?.toString() ??
           item['taxName']?.toString() ??
           'Khác';
@@ -512,7 +567,7 @@ class S2dBookWidget extends StatelessWidget {
   String _toPercentageText(dynamic value) {
     final parsed = _parseAmountNum(value);
     if (parsed == null) return '';
-    return '${(parsed * 1000).toStringAsFixed(4)} %';
+    return '${(parsed * 100).toStringAsFixed(4)} %';
   }
 
   DataRow _buildDataRow(SectionRowDto row) {
@@ -520,9 +575,7 @@ class S2dBookWidget extends StatelessWidget {
       color: AppColors.textPrimary,
       fontSize: 13,
     );
-    return DataRow(
-      cells: _buildRowCells(row.values, cellStyle),
-    );
+    return DataRow(cells: _buildRowCells(row.values, cellStyle));
   }
 
   String? _extractBusinessTypeId(Map<String, dynamic> row) {
@@ -573,16 +626,6 @@ class S2dBookWidget extends StatelessWidget {
     return null;
   }
 
-  dynamic _pick(Map<String, dynamic> row, List<String> keys) {
-    for (final key in keys) {
-      final value = row[key];
-      if (value == null) continue;
-      final normalized = value.toString().trim();
-      if (normalized.isNotEmpty) return value;
-    }
-    return null;
-  }
-
   DataRow _buildSubtotalRow(SectionRowDto row) {
     final style = AppTextStyles.bodyMedium.copyWith(
       color: AppColors.textPrimary,
@@ -610,10 +653,10 @@ class S2dBookWidget extends StatelessWidget {
     );
     return DataRow(
       color: WidgetStateProperty.all(Colors.blue[50]),
-      cells: _buildRowCells(
-        {...row.values, 'dien_giai': row.values['dien_giai']?.toString() ?? 'Tổng cộng XNT'},
-        style,
-      ),
+      cells: _buildRowCells({
+        ...row.values,
+        'dien_giai': row.values['dien_giai']?.toString() ?? 'Tổng cộng XNT',
+      }, style),
     );
   }
 
@@ -633,15 +676,13 @@ class S2dBookWidget extends StatelessWidget {
 
     return DataRow(
       color: WidgetStateProperty.all(Colors.indigo[50]),
-      cells: _buildRowCells(
-        {
-          ...row.values,
-          'ten_san_pham': _pick(row.values, _productNameAliases)?.toString() ?? '',
-          'dien_giai': label,
-          'tien_ton': _pick(row.values, _tienTonAliases) ?? row.values['so_tien'],
-        },
-        style,
-      ),
+      cells: _buildRowCells({
+        ...row.values,
+        'ten_san_pham':
+            _pick(row.values, _productNameAliases)?.toString() ?? '',
+        'dien_giai': label,
+        'tien_ton': _pick(row.values, _tienTonAliases) ?? row.values['so_tien'],
+      }, style),
     );
   }
 
@@ -709,57 +750,87 @@ class S2dBookWidget extends StatelessWidget {
     if (values.containsKey(fieldCode)) return values[fieldCode];
     final code = fieldCode.trim().toLowerCase();
 
-    if (code.contains('so_hieu') || code.contains('voucher') || code.contains('document')) {
+    if (code.contains('so_hieu') ||
+        code.contains('voucher') ||
+        code.contains('document')) {
       return _pick(values, _soHieuAliases);
     }
-    if (code == 'ngay' || code.contains('date') || code.contains('ngay_thang')) {
+    if (code == 'ngay' ||
+        code.contains('date') ||
+        code.contains('ngay_thang')) {
       return _pick(values, _dateAliases);
     }
-    if (code.contains('ten_san_pham') || code.contains('product') || code.contains('item')) {
+    if (code.contains('ten_san_pham') ||
+        code.contains('product') ||
+        code.contains('item')) {
       return _pick(values, _productNameAliases);
     }
-    if (code.contains('dien_giai') || code.contains('description') || code.contains('note')) {
+    if (code.contains('dien_giai') ||
+        code.contains('description') ||
+        code.contains('note')) {
       return _pick(values, _descAliases);
     }
     if (code == 'dvt' || code.contains('unit')) {
       return _pick(values, _dvtAliases);
     }
-    if (code.contains('don_gia') || code.contains('unitprice') || code.contains('price')) {
+    if (code.contains('don_gia') ||
+        code.contains('unitprice') ||
+        code.contains('price')) {
       return _pick(values, _donGiaAliases);
     }
-    if (code.contains('sl_nhap') || code.contains('quantityin') || code.contains('importquantity')) {
+    if (code.contains('sl_nhap') ||
+        code.contains('quantityin') ||
+        code.contains('importquantity')) {
       return _pick(values, _slNhapAliases);
     }
-    if (code.contains('tien_nhap') || code.contains('amountin') || code.contains('importamount')) {
+    if (code.contains('tien_nhap') ||
+        code.contains('amountin') ||
+        code.contains('importamount')) {
       return _pick(values, _tienNhapAliases);
     }
-    if (code.contains('sl_xuat') || code.contains('quantityout') || code.contains('exportquantity')) {
+    if (code.contains('sl_xuat') ||
+        code.contains('quantityout') ||
+        code.contains('exportquantity')) {
       return _pick(values, _slXuatAliases);
     }
-    if (code.contains('tien_xuat') || code.contains('amountout') || code.contains('exportamount')) {
+    if (code.contains('tien_xuat') ||
+        code.contains('amountout') ||
+        code.contains('exportamount')) {
       return _pick(values, _tienXuatAliases);
     }
-    if (code.contains('sl_ton') || code.contains('stockquantity') || code.contains('remainingquantity')) {
+    if (code.contains('sl_ton') ||
+        code.contains('stockquantity') ||
+        code.contains('remainingquantity')) {
       return _pick(values, _slTonAliases);
     }
-    if (code.contains('tien_ton') || code.contains('stockamount') || code.contains('remainingamount')) {
+    if (code.contains('tien_ton') ||
+        code.contains('stockamount') ||
+        code.contains('remainingamount')) {
       return _pick(values, _tienTonAliases) ?? values['so_tien'];
     }
 
     return values.entries
-        .firstWhere((e) => e.key.trim().toLowerCase() == code, orElse: () => const MapEntry('', null))
+        .firstWhere(
+          (e) => e.key.trim().toLowerCase() == code,
+          orElse: () => const MapEntry('', null),
+        )
         .value;
   }
 
   String _formatCellValue(dynamic value, String fieldCode) {
     final code = fieldCode.trim().toLowerCase();
-    if (code == 'ngay' || code.contains('date') || code.contains('ngay_thang')) {
+    if (code == 'ngay' ||
+        code.contains('date') ||
+        code.contains('ngay_thang')) {
       return _formatDate(value);
     }
     if (code.contains('sl_') || code.contains('quantity')) {
       return _formatQty(value);
     }
-    if (code.contains('tien') || code.contains('amount') || code.contains('don_gia') || code.contains('price')) {
+    if (code.contains('tien') ||
+        code.contains('amount') ||
+        code.contains('don_gia') ||
+        code.contains('price')) {
       return _formatAmount(value);
     }
     return value?.toString() ?? '';
@@ -819,6 +890,39 @@ class S2dBookWidget extends StatelessWidget {
 
   bool _isDescriptionField(String fieldCode) {
     final code = fieldCode.trim().toLowerCase();
-    return code.contains('dien_giai') || code.contains('description') || code.contains('note');
+    return code.contains('dien_giai') ||
+        code.contains('description') ||
+        code.contains('note');
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static dynamic _pick(
+    Map<String, dynamic> values,
+    dynamic primaryOrAliases, [
+    List<String>? aliases,
+  ]) {
+    final keys = <String>[];
+    if (primaryOrAliases is String) {
+      keys.add(primaryOrAliases);
+    } else if (primaryOrAliases is List<String>) {
+      keys.addAll(primaryOrAliases);
+    }
+    if (aliases != null) {
+      keys.addAll(aliases);
+    }
+
+    for (final key in keys) {
+      final v = values[key];
+      if (v != null && v.toString().trim().isNotEmpty) return v;
+    }
+    return null;
   }
 }

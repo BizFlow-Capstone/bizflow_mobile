@@ -73,6 +73,18 @@ class AppTextField extends StatelessWidget {
     }
   }
 
+  bool _isFocusNodeUsable(FocusNode? node) {
+    if (node == null) return false;
+    void noop() {}
+    try {
+      node.addListener(noop);
+      node.removeListener(noop);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   List<TextInputFormatter>? _buildInputFormatters() {
     return AppInputFormatters.withSqlInjectionGuard(
       inputFormatters: inputFormatters,
@@ -82,9 +94,8 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveController = _isControllerUsable(controller)
-        ? controller
-        : null;
+    final effectiveController = _isControllerUsable(controller) ? controller : null;
+    final effectiveFocusNode = _isFocusNodeUsable(focusNode) ? focusNode : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,7 +119,7 @@ class AppTextField extends StatelessWidget {
           onChanged: onChanged,
           onTap: onTap,
           onFieldSubmitted: onSubmitted,
-          focusNode: focusNode,
+          focusNode: effectiveFocusNode,
           validator: validator,
           autovalidateMode: autovalidateMode,
           style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textPrimary),

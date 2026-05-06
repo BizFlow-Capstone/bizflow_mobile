@@ -150,20 +150,30 @@ class S2eExportService {
               // Insert matching data rows
               final btFilter = row.businessTypeId ?? section.businessTypeId;
               final sFilter = row.section;
-              final matching = dataRows.where((dr) {
-                if (btFilter != null && btFilter.isNotEmpty) {
-                  // Backend rows for S2e usually have section=cash/bank and
-                  // businessTypeId=null, while section metadata stores cash/bank
-                  // in businessTypeId. Accept either field for matching.
-                  final btMatch = dr['businessTypeId']?.toString() == btFilter;
-                  final sectionMatch = dr['section']?.toString() == btFilter;
-                  if (!btMatch && !sectionMatch) return false;
-                }
-                if (sFilter != null && sFilter.isNotEmpty) {
-                  return dr['section']?.toString() == sFilter;
-                }
-                return true;
-              });
+              final matching =
+                  dataRows.where((dr) {
+                    if (btFilter != null && btFilter.isNotEmpty) {
+                      // Backend rows for S2e usually have section=cash/bank and
+                      // businessTypeId=null, while section metadata stores cash/bank
+                      // in businessTypeId. Accept either field for matching.
+                      final btMatch =
+                          dr['businessTypeId']?.toString() == btFilter;
+                      final sectionMatch =
+                          dr['section']?.toString() == btFilter;
+                      if (!btMatch && !sectionMatch) return false;
+                    }
+                    if (sFilter != null && sFilter.isNotEmpty) {
+                      return dr['section']?.toString() == sFilter;
+                    }
+                    return true;
+                  }).toList()..sort((a, b) {
+                    final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
+                    final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+                    if (da == null && db == null) return 0;
+                    if (da == null) return 1;
+                    if (db == null) return -1;
+                    return da.compareTo(db);
+                  });
               for (final dataRow in matching) {
                 _writeDataRow(sheet, r, dataRow);
                 r++;
@@ -669,6 +679,15 @@ class S2eExportService {
       return s;
     }
     return value.toString();
+  }
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String && value.trim().isNotEmpty) {
+      return DateTime.tryParse(value.trim());
+    }
+    return DateTime.tryParse(value.toString().trim());
   }
 
   // ─── Save ───────────────────────────────────────────────────────────

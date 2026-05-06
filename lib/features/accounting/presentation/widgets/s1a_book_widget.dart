@@ -71,6 +71,13 @@ class S1aBookWidget extends StatelessWidget {
             if (filter == null) return true;
             return r['businessTypeId']?.toString() == filter ||
                 r['section']?.toString() == filter;
+          }).toList()..sort((a, b) {
+            final da = _parseDate(a['ngay_thang'] ?? a['date']);
+            final db = _parseDate(b['ngay_thang'] ?? b['date']);
+            if (da == null && db == null) return 0;
+            if (da == null) return 1;
+            if (db == null) return -1;
+            return db.compareTo(da);
           });
           for (final row in matching) {
             allRows.add(SectionRowDto(lineType: 'data', values: row));
@@ -287,7 +294,7 @@ class S1aBookWidget extends StatelessWidget {
   String _toPercentageText(dynamic value) {
     final parsed = _parseAmountNum(value);
     if (parsed == null) return '';
-    return '${(parsed * 1000).toStringAsFixed(4)} %';
+    return '${(parsed * 100).toStringAsFixed(4)} %';
   }
 
   DataRow _buildDataRow(SectionRowDto row) {
@@ -470,5 +477,14 @@ class S1aBookWidget extends StatelessWidget {
       return value;
     }
     return value.toString();
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    try {
+      return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
   }
 }
