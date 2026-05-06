@@ -15,6 +15,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/action_guard.dart';
 import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
@@ -22,15 +23,15 @@ import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_event.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
 import '../../../invoice_template/presentation/widgets/invoice_preview_widget.dart';
+import '../../../location/domain/entities/location_entity.dart';
+import '../../../location/presentation/bloc/location_bloc.dart';
+import '../../../location/presentation/bloc/location_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 import '../../domain/entities/order_entity.dart';
 import '../../../../shared/utils/string_utils.dart';
 
 class OrderInvoicePreviewScreen extends StatefulWidget {
-  static const String _featureReportExport =
-      SubscriptionFeatureCodes.reportExport;
-
   final OrderEntity order;
 
   const OrderInvoicePreviewScreen({super.key, required this.order});
@@ -47,6 +48,49 @@ class _OrderInvoicePreviewScreenState extends State<OrderInvoicePreviewScreen> {
 
   bool get _shouldReturnToOrderListOnBack =>
       widget.order.status.toLowerCase() == 'completed';
+
+  LocationEntity? _findActiveLocation(
+    List<LocationEntity> locations,
+    String? businessId,
+  ) {
+    if ((businessId ?? '').isNotEmpty) {
+      for (final location in locations) {
+        if (location.isActive && location.id == businessId) {
+          return location;
+        }
+      }
+    }
+
+    for (final location in locations) {
+      if (location.isActive) {
+        return location;
+      }
+    }
+
+    return locations.isNotEmpty ? locations.first : null;
+  }
+
+  InvoiceTemplateEntity _mergeTemplateWithCurrentLocation(
+    InvoiceTemplateEntity template,
+  ) {
+    final locationState = context.read<LocationBloc>().state;
+    if (locationState is! LocationsLoaded) {
+      return template;
+    }
+
+    final currentLocation = _findActiveLocation(
+      locationState.locations,
+      context.read<BusinessContext>().currentBusinessId,
+    );
+    if (currentLocation == null) return template;
+
+    return template.copyWith(
+      businessName: currentLocation.name,
+      businessAddress: currentLocation.fullAddress,
+      businessPhone: currentLocation.phone,
+      businessTaxCode: currentLocation.taxCode ?? '',
+    );
+  }
 
   @override
   void initState() {
@@ -452,6 +496,9 @@ class _OrderInvoicePreviewScreenState extends State<OrderInvoicePreviewScreen> {
               final template = state is InvoiceTemplateLoaded
                   ? state.template
                   : InvoiceTemplateEntity.empty();
+              final effectiveTemplate = _mergeTemplateWithCurrentLocation(
+                template,
+              );
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(AppSpacing.md),
@@ -461,28 +508,28 @@ class _OrderInvoicePreviewScreenState extends State<OrderInvoicePreviewScreen> {
                     _buildSummaryCard(l10n),
                     const SizedBox(height: AppSpacing.md),
                     InvoicePreviewWidget(
-                      businessName: template.businessName,
-                      businessAddress: template.businessAddress,
-                      businessPhone: template.businessPhone,
+                      businessName: effectiveTemplate.businessName,
+                      businessAddress: effectiveTemplate.businessAddress,
+                      businessPhone: effectiveTemplate.businessPhone,
                       order: widget.order,
-                      showStt: template.showStt,
-                      showItemName: template.showItemName,
-                      showQuantity: template.showQuantity,
-                      showUnit: template.showUnit,
-                      showUnitPrice: template.showUnitPrice,
-                      showItemDiscount: template.showItemDiscount,
-                      showItemVat: template.showItemVat,
-                      showItemTotalAmount: template.showItemTotalAmount,
-                      showCustomerName: template.showCustomerName,
-                      showCustomerPhone: template.showCustomerPhone,
-                      showCustomerEmail: template.showCustomerEmail,
-                      showCustomerTaxCode: template.showCustomerTaxCode,
-                      showTotalVat: template.showTotalVat,
-                      showTotalDiscount: template.showTotalDiscount,
-                      showSubTotal: template.showSubTotal,
-                      showFooterNote: template.showFooterNote,
-                      footerNoteText: template.footerNoteText,
-                      showSignature: template.showSignature,
+                      showStt: effectiveTemplate.showStt,
+                      showItemName: effectiveTemplate.showItemName,
+                      showQuantity: effectiveTemplate.showQuantity,
+                      showUnit: effectiveTemplate.showUnit,
+                      showUnitPrice: effectiveTemplate.showUnitPrice,
+                      showItemDiscount: effectiveTemplate.showItemDiscount,
+                      showItemVat: effectiveTemplate.showItemVat,
+                      showItemTotalAmount: effectiveTemplate.showItemTotalAmount,
+                      showCustomerName: effectiveTemplate.showCustomerName,
+                      showCustomerPhone: effectiveTemplate.showCustomerPhone,
+                      showCustomerEmail: effectiveTemplate.showCustomerEmail,
+                      showCustomerTaxCode: effectiveTemplate.showCustomerTaxCode,
+                      showTotalVat: effectiveTemplate.showTotalVat,
+                      showTotalDiscount: effectiveTemplate.showTotalDiscount,
+                      showSubTotal: effectiveTemplate.showSubTotal,
+                      showFooterNote: effectiveTemplate.showFooterNote,
+                      footerNoteText: effectiveTemplate.footerNoteText,
+                      showSignature: effectiveTemplate.showSignature,
                     ),
                     const SizedBox(height: AppSpacing.md),
                     Row(
@@ -495,7 +542,7 @@ class _OrderInvoicePreviewScreenState extends State<OrderInvoicePreviewScreen> {
                                   context,
                                 );
                                 if (!allowed) return;
-                                await _sharePdf(context, template);
+                                await _sharePdf(context, effectiveTemplate);
                               });
                             },
                             icon: const Icon(Icons.share_outlined),
@@ -513,7 +560,7 @@ class _OrderInvoicePreviewScreenState extends State<OrderInvoicePreviewScreen> {
                                   context,
                                 );
                                 if (!allowed) return;
-                                await _downloadInvoice(context, template);
+                                await _downloadInvoice(context, effectiveTemplate);
                               });
                             },
                             icon: const Icon(Icons.download_outlined),

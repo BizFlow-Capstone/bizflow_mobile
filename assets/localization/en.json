@@ -1276,7 +1276,7 @@
     "period_list_empty_sub": "Create your first accounting period to get started",
     "create_new_period": "Create Period",
     "period_guide_title": "Detailed accounting books and tax formulas guide",
-    "period_guide_subtitle": "Updated according to Circular 152/2025/TT-BTC & Circular 40/2021/TT-BTC",
+    "period_guide_subtitle": "Updated according to Circular 152/2025/TT-BTC & Circular 40/2021/TT-BTC (as of 31/03/2026)",
     "period_guide_intro": "BizFlow helps you manage 06 digital accounting books and automatically calculate the tax payable based on the prescribed methods.",
     "period_guide_books_title": "1. The 06 digital accounting books",
     "period_guide_books_body": "Your data is stored consistently and can be exported into any book template:\n- S1a / S2a (Revenue book): For Group 1 and Group 2 taxpayers using percentage-based taxation.\n- S2b (Detailed revenue book): Records each invoice and sales document in detail.\n- S2c (Detailed revenue and cost book): Tracks actual profit/loss (required when using Method 2).\n- S2d (Materials and inventory book): Manages inventory in - out - on hand for goods such as steel, paint, and similar items.\n- S2e (Cash book): Tracks cash and bank balances in detail.",

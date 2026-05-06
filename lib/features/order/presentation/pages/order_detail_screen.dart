@@ -15,11 +15,11 @@ import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
-import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/string_utils.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -27,9 +27,11 @@ import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_event.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
+import '../../../location/domain/entities/location_entity.dart';
+import '../../../location/presentation/bloc/location_bloc.dart';
+import '../../../location/presentation/bloc/location_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
-import '../../../../shared/context/business_context.dart';
 import '../../../accounting/data/repositories/accounting_repository.dart';
 import '../../../accounting/domain/models/accounting_period.dart';
 import '../../data/order_api_service.dart';
@@ -110,6 +112,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
 
     return false;
+  }
+
+  LocationEntity? _findActiveLocation(
+    List<LocationEntity> locations,
+    String? businessId,
+  ) {
+    if ((businessId ?? '').isNotEmpty) {
+      for (final location in locations) {
+        if (location.isActive && location.id == businessId) {
+          return location;
+        }
+      }
+    }
+
+    for (final location in locations) {
+      if (location.isActive) {
+        return location;
+      }
+    }
+
+    return locations.isNotEmpty ? locations.first : null;
+  }
+
+  InvoiceTemplateEntity _mergeTemplateWithCurrentLocation(
+    InvoiceTemplateEntity template,
+  ) {
+    final locationState = context.read<LocationBloc>().state;
+    if (locationState is! LocationsLoaded) {
+      return template;
+    }
+
+    final currentLocation = _findActiveLocation(
+      locationState.locations,
+      context.read<BusinessContext>().currentBusinessId,
+    );
+    if (currentLocation == null) return template;
+
+    return template.copyWith(
+      businessName: currentLocation.name,
+      businessAddress: currentLocation.fullAddress,
+      businessPhone: currentLocation.phone,
+      businessTaxCode: currentLocation.taxCode ?? '',
+    );
   }
 
   @override
@@ -407,9 +452,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   InvoiceTemplateEntity _getTemplate() {
     final state = context.read<InvoiceTemplateBloc>().state;
-    return state is InvoiceTemplateLoaded
+    final template = state is InvoiceTemplateLoaded
         ? state.template
         : InvoiceTemplateEntity.empty();
+    return _mergeTemplateWithCurrentLocation(template);
   }
 
   String _pdfFormat(String text) => StringUtils.removeDiacritics(text);
