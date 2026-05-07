@@ -223,6 +223,7 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
     if (item is RevenueEntity) {
       final revenueCode = (item.revenueCode ?? '').trim();
       final referenceCode = (item.referenceCode ?? '').trim();
+      final moneyChannelLabel = (item.moneyChannelLabel ?? '').trim();
 
       // Build title: prioritize explicit codes only.
       if (revenueCode.isNotEmpty) {
@@ -233,13 +234,17 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
         title = '-';
       }
 
-      subtitle = AccountingReferenceDisplay.displayDescriptionValue(
+      final descriptionValue = AccountingReferenceDisplay.displayDescriptionValue(
         description: item.description,
         referenceType: item.referenceType ?? 'revenue',
         referenceId: item.referenceId ?? item.id,
         referenceCode: item.referenceCode ?? item.revenueCode,
         languageCode: effectiveLanguageCode,
       );
+      subtitle = [
+        descriptionValue,
+        if (moneyChannelLabel.isNotEmpty) moneyChannelLabel,
+      ].join(' • ');
       amount = item.amount;
       isReplaced =
           (item.statusCode ?? '').trim().toLowerCase() == 'replaced' ||
@@ -248,6 +253,16 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
     } else if (item is CostEntity) {
       final costCode = (item.costCode ?? '').trim();
       final referenceCode = (item.referenceCode ?? '').trim();
+      final costTypeLabel = (item.costTypeLabel ?? '').trim();
+      final paymentMethodLabel = (item.paymentMethodLabel ?? '').trim();
+      final descriptionValue =
+          AccountingReferenceDisplay.displayDescriptionValue(
+        description: item.description,
+        referenceType: item.referenceType ?? 'cost',
+        referenceId: item.referenceId ?? item.id,
+        referenceCode: item.referenceCode ?? item.costCode,
+        languageCode: effectiveLanguageCode,
+      );
 
       // Build title: prioritize explicit codes only.
       if (costCode.isNotEmpty) {
@@ -258,13 +273,11 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
         title = '-';
       }
 
-      subtitle = AccountingReferenceDisplay.displayDescriptionValue(
-        description: item.description,
-        referenceType: item.referenceType ?? 'cost',
-        referenceId: item.referenceId ?? item.id,
-        referenceCode: item.referenceCode ?? item.costCode,
-        languageCode: effectiveLanguageCode,
-      );
+      subtitle = [
+        descriptionValue,
+        if (costTypeLabel.isNotEmpty) costTypeLabel,
+        if (paymentMethodLabel.isNotEmpty) paymentMethodLabel,
+      ].join(' • ');
       amount = item.amount;
       isReplaced =
           (item.statusCode ?? '').trim().toLowerCase() == 'replaced' ||
@@ -295,7 +308,7 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
       subtitle: Text(
         subtitle,
         style: AppTextStyles.bodySmall.copyWith(decoration: textDecoration),
-        maxLines: 1,
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
       trailing: Row(

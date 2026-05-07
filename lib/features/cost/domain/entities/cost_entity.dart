@@ -4,11 +4,14 @@ class CostEntity extends Equatable {
   final int id;
   final int locationId;
   final String type;
+  final String? costType;
+  final String? costTypeLabel;
   final double amount;
   final DateTime date;
   final DateTime? documentDate;
   final String description;
   final String? paymentMethod;
+  final String? paymentMethodLabel;
   final String? documentUrl;
   final String? referenceType;
   final int? referenceId;
@@ -24,11 +27,14 @@ class CostEntity extends Equatable {
     required this.id,
     required this.locationId,
     required this.type,
+    this.costType,
+    this.costTypeLabel,
     required this.amount,
     required this.date,
     this.documentDate,
     required this.description,
     this.paymentMethod,
+    this.paymentMethodLabel,
     this.documentUrl,
     this.referenceType,
     this.referenceId,
@@ -46,11 +52,14 @@ class CostEntity extends Equatable {
     id,
     locationId,
     type,
+    costType,
+    costTypeLabel,
     amount,
     date,
     documentDate,
     description,
     paymentMethod,
+    paymentMethodLabel,
     documentUrl,
     referenceType,
     referenceId,
@@ -61,5 +70,7 @@ class CostEntity extends Equatable {
     statusLabel,
     imagePath,
     createdAt,
+    costType,
+    costTypeLabel,
   ];
 }

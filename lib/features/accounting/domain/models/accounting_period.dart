@@ -147,7 +147,7 @@ class AccountingPeriod {
     }
   }
 
-  bool get isOpen => status == 'open' || status == 'reopened';
+  bool get isOpen => status == 'open';
   bool get isFinalized => status == 'finalized';
   bool get isReopened => status == 'reopened';
 }

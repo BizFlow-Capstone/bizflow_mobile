@@ -9,6 +9,7 @@ class RevenueEntity extends Equatable {
   final DateTime? documentDate;
   final String description;
   final String? moneyChannel;
+  final String? moneyChannelLabel;
   final String? referenceType;
   final int? referenceId;
   final String? documentNumber;
@@ -30,6 +31,7 @@ class RevenueEntity extends Equatable {
     this.documentDate,
     required this.description,
     this.moneyChannel,
+    this.moneyChannelLabel,
     this.referenceType,
     this.referenceId,
     this.documentNumber,
@@ -53,6 +55,7 @@ class RevenueEntity extends Equatable {
     documentDate,
     description,
     moneyChannel,
+    moneyChannelLabel,
     referenceType,
     referenceId,
     documentNumber,

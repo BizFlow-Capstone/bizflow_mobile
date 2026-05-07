@@ -30,6 +30,7 @@ class RevenueRepository {
       documentDate: dto.documentDate,
       description: dto.description,
       moneyChannel: dto.moneyChannel,
+      moneyChannelLabel: dto.moneyChannelLabel,
       referenceType: dto.referenceType,
       referenceId: dto.referenceId,
       referenceCode: dto.referenceCode,
