@@ -65,9 +65,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _canEditOrder(OrderEntity order) {
     // Rule 0: do not allow edit until accounting periods are loaded.
     if (!_periodsLoaded) return false;
-    // Rule 1: only block editing when the order's date falls into a closed period.
-    final orderDate = order.completedAt ?? order.createdAt;
-
+    // Rule 1: only block editing when the order's date falls into a finalized period.
+    final orderDate = order.completedAt ?? order.updatedAt ?? order.createdAt;
     final target = DateUtils.dateOnly(orderDate.toLocal());
     for (final period in _periods) {
       try {
@@ -75,8 +74,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         final end = DateUtils.dateOnly(DateTime.parse(period.endDate));
 
         if (!target.isBefore(start) && !target.isAfter(end)) {
-          // If the period that contains the order date is not open, block edit.
-          return period.isOpen;
+          // If the period that contains the order date is finalized, block edit.
+          return !period.isFinalized;
         }
       } catch (_) {
         // ignore malformed period dates
@@ -100,18 +99,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   bool _hideCancelForCompletedOrder(OrderEntity order) {
-    if (!order.isPublished || !_periodsLoaded) {
+    if (!order.isPublished) {
       return false;
     }
 
-    final orderDate = order.completedAt ?? order.createdAt;
-    for (final period in _periods) {
-      if (_isDateInPeriod(orderDate, period) && period.isFinalized) {
-        return true;
-      }
-    }
-
-    return false;
+    return !_canEditOrder(order);
   }
 
   LocationEntity? _findActiveLocation(
@@ -900,8 +892,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 );
               }
 
-              final canEditOrder =
-                  detail.isPending || (detail.isPublished && _canEditOrder(detail));
+                final showEditAndCancelActions = detail.isPending ||
+                  (detail.isPublished && !_hideCancelForCompletedOrder(detail));
 
               return Column(
                 children: [
@@ -941,9 +933,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ],
                       ),
                     ),
-                  if (detail.isPending ||
-                      (detail.isPublished &&
-                          !_hideCancelForCompletedOrder(detail))) ...[
+                      if (showEditAndCancelActions) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
@@ -975,7 +965,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
-                          if (canEditOrder)
+                          if (detail.isPending ||
+                              (detail.isPublished &&
+                                  !_hideCancelForCompletedOrder(detail)))
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: (_isCancelling || _isPublishing)
