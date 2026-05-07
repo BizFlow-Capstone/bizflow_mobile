@@ -89,8 +89,12 @@ class S2dExportService {
       // Row 5 (index 4): "Kỳ kê khai: [period]"
       _writeLabel(sheet, row: 4, label: 'Kỳ kê khai', value: periodLabel);
       final sortedRows = [...dataRows]..sort(_compareRows);
-      final openingRow = sortedRows.isNotEmpty ? sortedRows.first : null;
-      final closingRow = sortedRows.isNotEmpty ? sortedRows.last : null;
+      final openingSectionRow = _findS2dOpeningBalanceRow(categoryName, sectionsData);
+      final rowForOpening = openingSectionRow?.values ??
+          (sortedRows.isNotEmpty ? sortedRows.first : const <String, dynamic>{});
+      final closingRow = sortedRows.isNotEmpty
+          ? sortedRows.last
+          : rowForOpening as Map<String, dynamic>;
       final totalImportQty = _sum(sortedRows, 'sl_nhap', _slNhapAliases);
       final totalImportValue = _sum(sortedRows, 'tien_nhap', _tienNhapAliases);
       final totalExportQty = _sum(sortedRows, 'sl_xuat', _slXuatAliases);
@@ -101,15 +105,12 @@ class S2dExportService {
         sheet,
         r++,
         label: 'Số dư đầu kỳ',
-        unit:
-            _pick(openingRow ?? const {}, 'dvt', _dvtAliases)?.toString() ?? '',
-        unitPrice: _pick(openingRow ?? const {}, 'don_gia', _donGiaAliases),
-        balanceQty:
-            _pick(openingRow ?? const {}, 'sl_ton', _slTonAliases) ??
-            _pick(openingRow ?? const {}, 'sl_nhap', _slNhapAliases),
-        balanceValue:
-            _pick(openingRow ?? const {}, 'tien_ton', _tienTonAliases) ??
-            _pick(openingRow ?? const {}, 'tien_nhap', _tienNhapAliases),
+        unit: _pick(rowForOpening, 'dvt', _dvtAliases)?.toString() ?? '',
+        unitPrice: _pick(rowForOpening, 'don_gia', _donGiaAliases),
+        balanceQty: _pick(rowForOpening, 'sl_ton', _slTonAliases) ??
+            _pick(rowForOpening, 'sl_nhap', _slNhapAliases),
+        balanceValue: _pick(rowForOpening, 'tien_ton', _tienTonAliases) ??
+            _pick(rowForOpening, 'tien_nhap', _tienNhapAliases),
       );
 
       for (final row in sortedRows) {
@@ -510,6 +511,31 @@ class S2dExportService {
       return DateFormatter.formatDate(date);
     }
     return value.toString();
+  }
+
+  static SectionRowDto? _findS2dOpeningBalanceRow(
+    String categoryName,
+    BookSectionsResponse? sectionsData,
+  ) {
+    if (sectionsData == null || categoryName.trim().isEmpty) return null;
+
+    final normalizedCategory = categoryName.trim().toLowerCase();
+    final matchingSection = sectionsData.sections
+        .where((section) =>
+            section.businessTypeName?.trim().toLowerCase() == normalizedCategory)
+        .toList();
+    if (matchingSection.isEmpty) return null;
+
+    final openingRows = matchingSection.first.rows
+        .where((row) {
+          final type = row.lineType.trim().toLowerCase();
+          return type == 'balance_row' ||
+              type == 'opening_inventory' ||
+              type == 'opening_balance';
+        })
+        .toList();
+
+    return openingRows.isEmpty ? null : openingRows.first;
   }
 
   static Future<File?> _save(
