@@ -32,9 +32,11 @@ import '../../domain/entities/product_entity.dart';
 import '../bloc/import_action/import_action_bloc.dart';
 import '../bloc/import_action/import_action_event.dart';
 import '../bloc/import_action/import_action_state.dart';
+import '../../data/models/import_model.dart';
 import '../bloc/product_bloc.dart';
 import '../bloc/product_event.dart';
 import '../bloc/product_state.dart';
+import '../../../accounting/presentation/bloc/accounting_period_bloc.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
 
@@ -98,6 +100,40 @@ class _StockImportViewState extends State<_StockImportView> {
   final ActionGuard _saveDraftGuard = ActionGuard();
   final ActionGuard _confirmGuard = ActionGuard();
   final ActionGuard _deleteGuard = ActionGuard();
+
+  bool _isDateInFinalizedPeriod(DateTime date) {
+    try {
+      final periodBloc = context.read<AccountingPeriodBloc>();
+      final periods = periodBloc.state.periods;
+
+      for (final period in periods) {
+        if (!period.isFinalized) {
+          continue;
+        }
+
+        final start = DateTime.parse(period.startDate);
+        final end = DateTime.parse(period.endDate);
+        if (date.isAfter(start.subtract(const Duration(days: 1))) &&
+            date.isBefore(end.add(const Duration(days: 1)))) {
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  bool _canModifyImportDetail(ImportDetailModel? detail) {
+    if (detail == null) {
+      return false;
+    }
+
+    final transactionDate = detail.receivedAt ?? detail.createdAt;
+    if (_isDateInFinalizedPeriod(transactionDate)) {
+      return false;
+    }
+
+    return _status == 'CONFIRMED';
+  }
 
   late TextEditingController _noteController;
   late TextEditingController _supplierController;
@@ -1210,6 +1246,8 @@ class _StockImportViewState extends State<_StockImportView> {
         }
       },
       builder: (context, state) {
+        final importDetail = state.importDetail;
+        final canModifyImportDetail = _canModifyImportDetail(importDetail);
         final isSubmitting =
             _isActionGuardLoading ||
             state.status == ImportActionStatus.submitting;
@@ -1322,12 +1360,15 @@ class _StockImportViewState extends State<_StockImportView> {
             actions: [
               if (widget.importId != null &&
                   _status == 'CONFIRMED' &&
+                  canModifyImportDetail &&
                   !isSubmitting)
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: AppColors.black),
                   onPressed: _onEditImport,
                 ),
-              if (widget.importId != null && _status != 'CANCELLED')
+              if (widget.importId != null &&
+                  _status != 'CANCELLED' &&
+                  canModifyImportDetail)
                 IconButton(
                   icon: const Icon(
                     Icons.delete_outline,

@@ -2412,7 +2412,7 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 const SizedBox(height: 6),
               ],
               Text(
-                '${l10n.translate('accounting.channel')}: ${revenue.moneyChannel ?? '-'}',
+                '${l10n.translate('accounting.channel')}: ${revenue.moneyChannelLabel ?? revenue.moneyChannel ?? '-'}',
               ),
               const SizedBox(height: 6),
               Text(
@@ -2616,15 +2616,15 @@ class _AccountingHubPageState extends State<AccountingHubPage>
                 const SizedBox(height: 6),
               ],
               Text(
-                '${l10n.translate('accounting.channel')}: ${cost.paymentMethod ?? '-'}',
+                '${l10n.translate('accounting.ai_cost_type')}: ${cost.costTypeLabel ?? cost.costType ?? '-'}',
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${l10n.translate('accounting.channel')}: ${cost.paymentMethodLabel ?? cost.paymentMethod ?? '-'}',
               ),
               const SizedBox(height: 6),
               Text(
                 '${l10n.translate('accounting.cost_date')}: ${_formatDate(cost.date)}',
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${l10n.translate('accounting.ai_cost_type')}: ${cost.type}',
               ),
               const SizedBox(height: 6),
               Text(

@@ -900,6 +900,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 );
               }
 
+              final canEditOrder =
+                  detail.isPending || (detail.isPublished && _canEditOrder(detail));
+
               return Column(
                 children: [
                   if (detail.status.toLowerCase() == 'completed')
@@ -972,10 +975,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
-                          if ((detail.isPending ||
-                                  (detail.isPublished &&
-                                      !_hideCancelForCompletedOrder(detail))) &&
-                              _canEditOrder(detail))
+                          if (canEditOrder)
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: (_isCancelling || _isPublishing)

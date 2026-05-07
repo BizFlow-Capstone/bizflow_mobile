@@ -412,7 +412,7 @@ class _PeriodCard extends StatelessWidget {
                         ),
                       ),
                     // Finalize / Reopen button
-                    if (period.isOpen)
+                    if (period.isOpen || period.isReopened)
                       TextButton.icon(
                         onPressed: isActionLoading
                             ? null

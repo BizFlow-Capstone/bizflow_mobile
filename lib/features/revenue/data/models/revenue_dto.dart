@@ -145,7 +145,7 @@ class RevenueDto extends Equatable {
           : referenceCodeFromDynamic(
               json['moneyChannel'] ?? json['MoneyChannel'],
             ),
-      moneyChannelLabel: referenceLabelFromDynamic(
+      moneyChannelLabel: _extractNestedLabel(
         json['moneyChannel'] ?? json['MoneyChannel'],
       ) ?? asNullableString(json['moneyChannelLabel']),
       referenceType: asNullableString(
@@ -255,6 +255,25 @@ class RevenueDto extends Equatable {
     );
   }
 
+  /// Extract label from nested object like { code: "...", label: "..." }
+  static String? _extractNestedLabel(dynamic data) {
+    if (data == null) return null;
+    
+    if (data is Map<String, dynamic>) {
+      final label = data['label']?.toString().trim() ?? 
+                    data['Label']?.toString().trim() ?? '';
+      return label.isNotEmpty ? label : null;
+    }
+    
+    if (data is Map) {
+      final label = data['label']?.toString().trim() ?? 
+                    data['Label']?.toString().trim() ?? '';
+      return label.isNotEmpty ? label : null;
+    }
+    
+    return null;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'revenueId': revenueId,
@@ -265,6 +284,7 @@ class RevenueDto extends Equatable {
       'documentDate': documentDate?.toIso8601String(),
       'description': description,
       'moneyChannel': moneyChannel,
+      'moneyChannelLabel': moneyChannelLabel,
       'referenceType': referenceType,
       'referenceId': referenceId,
       'documentNumber': documentNumber,

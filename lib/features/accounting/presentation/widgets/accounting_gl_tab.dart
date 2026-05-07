@@ -865,7 +865,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.channel'),
-          value: revenue.moneyChannel ?? '-',
+          value: revenue.moneyChannelLabel ?? revenue.moneyChannel ?? '-',
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.revenue_business_type'),
@@ -910,8 +910,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
           value: cost.description,
         ),
         _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.ai_cost_type'),
+          value: cost.costTypeLabel ?? cost.costType ?? '-',
+        ),
+        _LinkedEntityDetailRow(
           label: l10n.translate('accounting.channel'),
-          value: cost.paymentMethod ?? '-',
+          value: cost.paymentMethodLabel ?? cost.paymentMethod ?? '-',
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.cost_date'),
