@@ -1279,7 +1279,7 @@
     "period_list_empty_sub": "Tạo kỳ kế toán đầu tiên để bắt đầu theo dõi",
     "create_new_period": "Tạo kỳ mới",
     "period_guide_title": "Hướng dẫn chi tiết sổ sách & công thức tính thuế",
-    "period_guide_subtitle": "Cập nhật theo Thông tư 152/2025/TT-BTC & Thông tư 40/2021/TT-BTC (tính đến ngày 31/03/2026)",
+    "period_guide_subtitle": "Cập nhật theo Thông tư 152/2025/TT-BTC & Thông tư 40/2021/TT-BTC (tính đến ngày 22/04/2026)",
     "period_guide_intro": "Hệ thống BizFlow hỗ trợ bạn quản lý 06 mẫu sổ kế toán và tự động tính toán số thuế phải nộp dựa trên các phương pháp quy định.",
     "period_guide_books_title": "1. Hệ thống 06 mẫu sổ kế toán số",
     "period_guide_books_body": "Dữ liệu của bạn được lưu trữ đồng nhất và có thể trích xuất ra bất kỳ mẫu sổ nào:\n- S1a / S2a (Sổ doanh thu): Dành cho hộ Nhóm 1 và Nhóm 2 tính thuế theo tỷ lệ %.\n- S2b (Sổ chi tiết doanh thu): Ghi chép chi tiết từng hóa đơn, chứng từ bán hàng.\n- S2c (Sổ chi tiết doanh thu, chi phí): Theo dõi lãi/lỗ thực tế (cần thiết khi tính thuế theo Cách 2).\n- S2d (Sổ vật tư, hàng hóa): Quản lý Nhập - Xuất - Tồn kho hàng hóa (sắt, thép, sơn...).\n- S2e (Sổ tiền): Theo dõi chi tiết tiền mặt và tiền gửi ngân hàng.",

@@ -588,11 +588,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         case 'unitPrice':
           return _pdfCurrency(item.price);
         case 'discount':
-          return '${item.discount.toStringAsFixed(0)}%';
+          return CurrencyFormatter.formatNumber(item.discount.round());
         case 'vat':
           return _pdfCurrency(0);
         case 'total':
-          return _pdfCurrency(item.total);
+          return _pdfCurrency((item.price * item.quantity - item.discount).clamp(0, double.infinity));
         default:
           return '';
       }
