@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/cache/swr_builder.dart';
 import '../../data/subscription_api_service.dart';
 import '../../data/models/subscription_models.dart';
@@ -307,16 +308,17 @@ class _DynamicPlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final price = plan.currentPrice;
-    final priceText = price != null
-        ? (price.effectivePrice == 0
-              ? l10n.translate('subscription.free.price')
-              : price.effectivePrice.toStringAsFixed(0))
-        : 'Contact Us';
-
-    final currency = price?.currency ?? 'VND';
-    final formattedPrice = price != null && price.effectivePrice > 0
-        ? '$priceText $currency'
-        : priceText;
+    final hasDiscount =
+      price != null &&
+      price.discountedPrice != null &&
+      price.discountedPrice! > 0 &&
+      price.basePrice > price.effectivePrice;
+    final formattedBasePrice = price != null
+      ? CurrencyFormatter.formatVND(price.basePrice)
+      : 'Contact Us';
+    final formattedEffectivePrice = price != null
+      ? CurrencyFormatter.formatVND(price.effectivePrice)
+      : 'Contact Us';
 
     final borderColor = isCurrentPlan
         ? AppColors.success
@@ -361,29 +363,79 @@ class _DynamicPlanCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: AppSpacing.md),
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: formattedPrice,
-                  style: AppTextStyles.headlineSmall.copyWith(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (plan.durationDays > 0 &&
-                    price != null &&
-                    price.effectivePrice > 0)
+          if (price == null)
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                children: [
                   TextSpan(
-                    text: ' / ${plan.durationDays} days',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: AppColors.textSecondary,
+                    text: formattedEffectivePrice,
+                    style: AppTextStyles.headlineSmall.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                ],
+              ),
+            )
+          else if (hasDiscount)
+            Column(
+              children: [
+                Text(
+                  formattedBasePrice,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                    decoration: TextDecoration.lineThrough,
+                    decorationColor: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: formattedEffectivePrice,
+                        style: AppTextStyles.headlineSmall.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (plan.durationDays > 0)
+                        TextSpan(
+                          text: ' / ${plan.durationDays} days',
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
+            )
+          else
+            RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: formattedEffectivePrice,
+                    style: AppTextStyles.headlineSmall.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (plan.durationDays > 0 && price.effectivePrice > 0)
+                    TextSpan(
+                      text: ' / ${plan.durationDays} days',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
           SizedBox(height: AppSpacing.md),
           ...plan.features.map(
             (f) => Column(
@@ -408,8 +460,17 @@ class _DynamicPlanCard extends StatelessWidget {
   Widget _buildActionButton(BuildContext context) {
     if (!isOwner) return const SizedBox.shrink();
 
-    if (type == _PlanType.free && isCurrentPlan) {
-      return const SizedBox.shrink();
+    if (type == _PlanType.free) {
+      if (!isCurrentPlan) {
+        return const SizedBox.shrink();
+      }
+
+      return AppButton(
+        label: l10n.translate('subscription.free.current'),
+        onPressed: null,
+        isDisabled: true,
+        isFullWidth: true,
+      );
     }
 
     if (isCurrentPlan) {
@@ -442,15 +503,6 @@ class _DynamicPlanCard extends StatelessWidget {
                   ),
                 ),
         ),
-      );
-    }
-
-    if (type == _PlanType.free) {
-      return AppButton(
-        label: l10n.translate('subscription.free.current'),
-        onPressed: null,
-        isDisabled: true,
-        isFullWidth: true,
       );
     }
 

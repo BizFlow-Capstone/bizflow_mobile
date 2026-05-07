@@ -128,7 +128,8 @@ class CostDto extends Equatable {
       costId: asInt(json['costId'] ?? json['id']),
       businessLocationId: asInt(json['businessLocationId']),
       costType: referenceCodeFromDynamic(json['costType']),
-      costTypeLabel: referenceLabelFromDynamic(json['costType']),
+      costTypeLabel: referenceLabelFromDynamic(json['costType']) ?? 
+          asNullableString(json['costTypeLabel']),
       amount: asDouble(json['amount']),
       costDate:
           DateFormatter.parseApiDateTime(asNullableString(json['costDate'])) ??
@@ -146,7 +147,7 @@ class CostDto extends Equatable {
             ),
       paymentMethodLabel: referenceLabelFromDynamic(
         json['paymentMethod'] ?? json['PaymentMethod'],
-      ),
+      ) ?? asNullableString(json['paymentMethodLabel']),
       documentUrl: asNullableString(
         json['documentUrl'] ??
         json['DocumentUrl'] ??

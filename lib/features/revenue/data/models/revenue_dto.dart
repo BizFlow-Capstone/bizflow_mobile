@@ -147,7 +147,7 @@ class RevenueDto extends Equatable {
             ),
       moneyChannelLabel: referenceLabelFromDynamic(
         json['moneyChannel'] ?? json['MoneyChannel'],
-      ),
+      ) ?? asNullableString(json['moneyChannelLabel']),
       referenceType: asNullableString(
         json['entityType'] ??
           json['EntityType'] ??

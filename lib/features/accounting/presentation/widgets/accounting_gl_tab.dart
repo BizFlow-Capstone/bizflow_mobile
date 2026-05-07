@@ -1055,16 +1055,6 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                     params: {'type': displayReference, 'id': ''},
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  context.tr(
-                    'accounting.gl_detail_entity',
-                    params: {
-                      'type': entry.entityType ?? '-',
-                      'id': displayEntity,
-                    },
-                  ),
-                ),
                 if (entityId > 0) ...[
                   const SizedBox(height: 12),
                   const Divider(),
