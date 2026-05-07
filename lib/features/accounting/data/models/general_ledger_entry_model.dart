@@ -21,6 +21,8 @@ class GeneralLedgerEntryModel {
   final String? referenceTypeLabel;
   final int? referenceId;
   final String? referenceCode;
+  final String? rootCode;
+  final String? code;
   final String? entityType;
   final int? entityId;
   final String? createdAt;
@@ -46,6 +48,8 @@ class GeneralLedgerEntryModel {
     this.referenceTypeLabel,
     this.referenceId,
     this.referenceCode,
+    this.rootCode,
+    this.code,
     this.entityType,
     this.entityId,
     this.createdAt,
@@ -151,6 +155,12 @@ class GeneralLedgerEntryModel {
         referenceTypeLabel: referenceLabelFromDynamic(rawReferenceType),
       referenceId: refId,
       referenceCode: parsedReferenceCode.isEmpty ? null : parsedReferenceCode,
+          rootCode: asString(source['rootCode']).trim().isEmpty
+            ? null
+            : asString(source['rootCode']).trim(),
+          code: asString(json['code']).trim().isEmpty
+            ? null
+            : asString(json['code']).trim(),
       entityType: entityType.trim().isEmpty ? null : entityType.trim(),
       entityId: entityId,
       createdAt:
@@ -182,6 +192,8 @@ class GeneralLedgerEntryModel {
       'referenceTypeLabel': referenceTypeLabel,
       'referenceId': referenceId,
       'referenceCode': referenceCode,
+      'rootCode': rootCode,
+      'code': code,
       'entityType': entityType,
       'entityId': entityId,
       'createdAt': createdAt,

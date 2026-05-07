@@ -222,17 +222,15 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
 
     if (item is RevenueEntity) {
       final revenueCode = (item.revenueCode ?? '').trim();
+      final referenceCode = (item.referenceCode ?? '').trim();
 
-      // Build title: prioritize revenueCode, then reference display (ID)
+      // Build title: prioritize explicit codes only.
       if (revenueCode.isNotEmpty) {
         title = revenueCode;
+      } else if (referenceCode.isNotEmpty) {
+        title = referenceCode;
       } else {
-        title = AccountingReferenceDisplay.displayReference(
-          referenceType: 'revenue',
-          referenceId: item.id,
-          languageCode: effectiveLanguageCode,
-          fallback: 'REV-${item.id}',
-        );
+        title = '-';
       }
 
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(
@@ -249,17 +247,15 @@ class _AccountingCostRevenueTabState extends State<AccountingCostRevenueTab> {
       statusLabel = item.statusLabel;
     } else if (item is CostEntity) {
       final costCode = (item.costCode ?? '').trim();
+      final referenceCode = (item.referenceCode ?? '').trim();
 
-      // Build title: prioritize costCode, then reference display (ID)
+      // Build title: prioritize explicit codes only.
       if (costCode.isNotEmpty) {
         title = costCode;
+      } else if (referenceCode.isNotEmpty) {
+        title = referenceCode;
       } else {
-        title = AccountingReferenceDisplay.displayReference(
-          referenceType: 'cost',
-          referenceId: item.id,
-          languageCode: effectiveLanguageCode,
-          fallback: 'COST-${item.id}',
-        );
+        title = '-';
       }
 
       subtitle = AccountingReferenceDisplay.displayDescriptionValue(

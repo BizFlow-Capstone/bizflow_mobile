@@ -2296,13 +2296,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   Future<void> _showRevenueDetailDialog(RevenueEntity revenue) async {
     final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
     final languageCode = Localizations.localeOf(context).languageCode;
-    final referenceLabel = AccountingReferenceDisplay.displayReference(
-      referenceType: revenue.referenceType,
-      referenceId: revenue.referenceId,
-      referenceCode: revenue.referenceCode ?? revenue.revenueCode,
-      languageCode: languageCode,
-      fallback: '-',
-    );
+    final referenceLabel =
+        (revenue.referenceCode ?? revenue.revenueCode ?? '').trim().isNotEmpty
+        ? (revenue.referenceCode ?? revenue.revenueCode ?? '').trim()
+        : '-';
     final displayDescription =
         AccountingReferenceDisplay.displayDescriptionValue(
           description: revenue.description,
@@ -2344,12 +2341,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     AppDialog.show(
       context,
-      title: AccountingReferenceDisplay.displayReference(
-        referenceType: 'revenue',
-        referenceId: revenue.id,
-        languageCode: languageCode,
-        fallback: 'REV-${revenue.id}',
-      ),
+      title: (revenue.revenueCode ?? revenue.referenceCode ?? '').trim().isNotEmpty
+          ? (revenue.revenueCode ?? revenue.referenceCode ?? '').trim()
+          : '-',
       confirmText: l10n.translate('common.close'),
       content: SizedBox(
         width: 420,
@@ -2507,13 +2501,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   Future<void> _showCostDetailDialog(CostEntity cost) async {
     final locationId = context.read<BusinessContext>().currentBusinessId ?? '';
     final languageCode = Localizations.localeOf(context).languageCode;
-    final referenceLabel = AccountingReferenceDisplay.displayReference(
-      referenceType: cost.referenceType,
-      referenceId: cost.referenceId,
-      referenceCode: cost.referenceCode ?? cost.costCode,
-      languageCode: languageCode,
-      fallback: '-',
-    );
+    final referenceLabel =
+        (cost.referenceCode ?? cost.costCode ?? '').trim().isNotEmpty
+        ? (cost.referenceCode ?? cost.costCode ?? '').trim()
+        : '-';
     final displayDescription =
         AccountingReferenceDisplay.displayDescriptionValue(
           description: cost.description,
@@ -2555,12 +2546,9 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     AppDialog.show(
       context,
-      title: AccountingReferenceDisplay.displayReference(
-        referenceType: 'cost',
-        referenceId: cost.id,
-        languageCode: languageCode,
-        fallback: 'COST-${cost.id}',
-      ),
+      title: (cost.costCode ?? cost.referenceCode ?? '').trim().isNotEmpty
+          ? (cost.costCode ?? cost.referenceCode ?? '').trim()
+          : '-',
       confirmText: l10n.translate('common.close'),
       content: SizedBox(
         width: 420,
