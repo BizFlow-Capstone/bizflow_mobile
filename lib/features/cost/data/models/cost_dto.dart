@@ -128,7 +128,8 @@ class CostDto extends Equatable {
       costId: asInt(json['costId'] ?? json['id']),
       businessLocationId: asInt(json['businessLocationId']),
       costType: referenceCodeFromDynamic(json['costType']),
-      costTypeLabel: referenceLabelFromDynamic(json['costType']),
+      costTypeLabel: _extractNestedLabel(json['costType']) ?? 
+          asNullableString(json['costTypeLabel']),
       amount: asDouble(json['amount']),
       costDate:
           DateFormatter.parseApiDateTime(asNullableString(json['costDate'])) ??
@@ -144,9 +145,9 @@ class CostDto extends Equatable {
           : referenceCodeFromDynamic(
               json['paymentMethod'] ?? json['PaymentMethod'],
             ),
-      paymentMethodLabel: referenceLabelFromDynamic(
+      paymentMethodLabel: _extractNestedLabel(
         json['paymentMethod'] ?? json['PaymentMethod'],
-      ),
+      ) ?? asNullableString(json['paymentMethodLabel']),
       documentUrl: asNullableString(
         json['documentUrl'] ??
         json['DocumentUrl'] ??
@@ -257,16 +258,37 @@ class CostDto extends Equatable {
     );
   }
 
+  /// Extract label from nested object like { code: "...", label: "..." }
+  static String? _extractNestedLabel(dynamic data) {
+    if (data == null) return null;
+    
+    if (data is Map<String, dynamic>) {
+      final label = data['label']?.toString().trim() ?? 
+                    data['Label']?.toString().trim() ?? '';
+      return label.isNotEmpty ? label : null;
+    }
+    
+    if (data is Map) {
+      final label = data['label']?.toString().trim() ?? 
+                    data['Label']?.toString().trim() ?? '';
+      return label.isNotEmpty ? label : null;
+    }
+    
+    return null;
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'costId': costId,
       'businessLocationId': businessLocationId,
       'costType': costType,
+      'costTypeLabel': costTypeLabel,
       'amount': amount,
       'costDate': costDate.toIso8601String(),
       'documentDate': documentDate?.toIso8601String(),
       'description': description,
       'paymentMethod': paymentMethod,
+      'paymentMethodLabel': paymentMethodLabel,
       'documentUrl': documentUrl,
       'referenceType': referenceType,
       'referenceId': referenceId,

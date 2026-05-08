@@ -412,7 +412,7 @@ class _PeriodCard extends StatelessWidget {
                         ),
                       ),
                     // Finalize / Reopen button
-                    if (period.isOpen)
+                    if (period.isOpen || period.isReopened)
                       TextButton.icon(
                         onPressed: isActionLoading
                             ? null
@@ -562,6 +562,7 @@ class _PeriodCard extends StatelessWidget {
     if (!context.mounted) return;
 
     String? selectedGroup;
+    Set<String> selectedTemplateCodes = {};
     late int groupNumber;
     late String taxMethod;
     late List<String> templateCodes;
@@ -569,77 +570,144 @@ class _PeriodCard extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setStateDialog) => AlertDialog(
-          title: Text(l10n.translate('accounting.create_accounting_books')),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l10n.translate('accounting.select_accounting_group')),
-              const SizedBox(height: AppSpacing.md),
-              DropdownButton<String>(
-                isExpanded: true,
-                value: selectedGroup,
-                hint: Text(l10n.translate('accounting.select_group')),
-                items: [
-                  DropdownMenuItem(
-                    value: 'group1',
-                    child: Text(
-                      '${l10n.translate("accounting.group")} 1 - Exempt (S1a)',
+        builder: (context, setStateDialog) {
+          void updateGroup(String? value) {
+            setStateDialog(() {
+              selectedGroup = value;
+              selectedTemplateCodes = value == 'group234_m2'
+                  ? <String>{}
+                  : value == 'group2_m1'
+                  ? {'S2a'}
+                  : value == 'group1'
+                  ? {'S1a'}
+                  : <String>{};
+            });
+          }
+
+          Widget buildTemplateOption(String code) {
+            return CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(code),
+              value: selectedTemplateCodes.contains(code),
+              controlAffinity: ListTileControlAffinity.leading,
+              onChanged: selectedGroup == 'group234_m2'
+                  ? (checked) {
+                      setStateDialog(() {
+                        if (checked == true) {
+                          selectedTemplateCodes.add(code);
+                        } else {
+                          selectedTemplateCodes.remove(code);
+                        }
+                      });
+                    }
+                  : null,
+            );
+          }
+
+          return AlertDialog(
+            title: Text(l10n.translate('accounting.create_accounting_books')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(l10n.translate('accounting.select_accounting_group')),
+                const SizedBox(height: AppSpacing.md),
+                DropdownButton<String>(
+                  isExpanded: true,
+                  value: selectedGroup,
+                  hint: Text(l10n.translate('accounting.select_group')),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'group1',
+                      child: Text(
+                        '${l10n.translate("accounting.group")} 1 - ${l10n.translate("accounting.exempt")} (S1a)',
+                      ),
                     ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'group2_m1',
-                    child: Text(
-                      '${l10n.translate("accounting.group")} 2 - ${l10n.translate("accounting.method")} 1 (S2a)',
+                    DropdownMenuItem(
+                      value: 'group2_m1',
+                      child: Text(
+                        '${l10n.translate("accounting.group")} 2 - ${l10n.translate("accounting.method")} 1 (S2a)',
+                      ),
                     ),
-                  ),
-                  DropdownMenuItem(
-                    value: 'group234_m2',
+                    DropdownMenuItem(
+                      value: 'group234_m2',
+                      child: Text(
+                        '${l10n.translate("accounting.group")} 2-4 - ${l10n.translate("accounting.method")} 2 (S2b+S2c+S2d+S2e)',
+                      ),
+                    ),
+                  ],
+                  onChanged: updateGroup,
+                ),
+                if (selectedGroup != null) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  Align(
+                    alignment: Alignment.centerLeft,
                     child: Text(
-                      '${l10n.translate("accounting.group")} 2-4 - ${l10n.translate("accounting.method")} 2 (S2b+S2c+S2d+S2e)',
+                      selectedGroup == 'group234_m2'
+                          ? l10n.translate('accounting.select_templates')
+                          : l10n.translate('accounting.auto_create_books_note'),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ],
-                onChanged: (value) {
-                  setStateDialog(() => selectedGroup = value);
-                },
+                if (selectedGroup == 'group234_m2') ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  buildTemplateOption('S2b'),
+                  buildTemplateOption('S2c'),
+                  buildTemplateOption('S2d'),
+                  buildTemplateOption('S2e'),
+                  if (selectedTemplateCodes.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      child: Text(
+                        l10n.translate('accounting.select_at_least_one_book'),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(l10n.translate('common.cancel')),
+              ),
+              ElevatedButton(
+                onPressed:
+                    selectedGroup == null || selectedTemplateCodes.isEmpty
+                    ? null
+                    : () {
+                        switch (selectedGroup) {
+                          case 'group1':
+                            groupNumber = 1;
+                            taxMethod = 'exempt';
+                            templateCodes = ['S1a'];
+                            break;
+                          case 'group2_m1':
+                            groupNumber = 2;
+                            taxMethod = 'method_1';
+                            templateCodes = ['S2a'];
+                            break;
+                          case 'group234_m2':
+                            groupNumber = 2;
+                            taxMethod = 'method_2';
+                            templateCodes = selectedTemplateCodes.toList();
+                            break;
+                          default:
+                            groupNumber = 2;
+                            taxMethod = 'method_2';
+                            templateCodes = selectedTemplateCodes.toList();
+                        }
+                        Navigator.pop(ctx, true);
+                      },
+                child: Text(l10n.translate('common.create')),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l10n.translate('common.cancel')),
-            ),
-            ElevatedButton(
-              onPressed: selectedGroup == null
-                  ? null
-                  : () {
-                      // Map selection to group/method/templates
-                      switch (selectedGroup) {
-                        case 'group1':
-                          groupNumber = 1;
-                          taxMethod = 'exempt';
-                          templateCodes = ['S1a'];
-                          break;
-                        case 'group2_m1':
-                          groupNumber = 2;
-                          taxMethod = 'method_1';
-                          templateCodes = ['S2a'];
-                          break;
-                        case 'group234_m2':
-                          groupNumber =
-                              2; // default group 2; user adjust if needed
-                          taxMethod = 'method_2';
-                          templateCodes = ['S2b', 'S2c', 'S2d', 'S2e'];
-                          break;
-                      }
-                      Navigator.pop(ctx, true);
-                    },
-              child: Text(l10n.translate('common.create')),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
 
@@ -735,7 +803,9 @@ class _ReopenPeriodDialogState extends State<_ReopenPeriodDialog> {
             }
             Navigator.pop(context, _reasonController.text.trim());
           },
-          child: Text(AppLocalizations.of(context).translate('accounting.action_reopen')),
+          child: Text(
+            AppLocalizations.of(context).translate('accounting.action_reopen'),
+          ),
         ),
       ],
     );

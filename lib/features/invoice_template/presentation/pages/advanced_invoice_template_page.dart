@@ -65,6 +65,8 @@ class _AdvancedInvoiceTemplatePageState
   bool showSignature = false;
 
   Timer? _debounce;
+  String? _lastSyncedBusinessId;
+  bool _syncScheduled = false;
 
   @override
   void initState() {
@@ -89,6 +91,7 @@ class _AdvancedInvoiceTemplatePageState
 
   void _populateData(InvoiceTemplateLoaded state) {
     final tpl = state.template;
+    final businessContext = context.read<BusinessContext>();
 
     bool isBrandNew = tpl.businessName.isEmpty ||
         tpl.businessName == 'Hộ Kinh Doanh TNHH ABC';
@@ -106,10 +109,10 @@ class _AdvancedInvoiceTemplatePageState
         // Auto-fill from current location if template is empty/default
         final locationState = context.read<LocationBloc>().state;
         if (locationState is LocationsLoaded) {
+          final currentId = businessContext.currentBusinessId;
           final activeLocations = locationState.locations
               .where((location) => location.isActive)
               .toList();
-          final currentId = BusinessContext().currentBusinessId;
           final currentLocation = activeLocations.cast<LocationEntity?>().firstWhere(
                 (l) => l?.id == currentId,
                 orElse: () => activeLocations.isNotEmpty ? activeLocations.first : null,
@@ -151,6 +154,73 @@ class _AdvancedInvoiceTemplatePageState
       showFooterTerms = tpl.showFooterTerms;
       showSignature = tpl.showSignature;
     }
+  }
+
+  void _syncBusinessInfoFromCurrentLocation() {
+    if (_syncScheduled) return;
+
+    final businessContext = context.read<BusinessContext>();
+    final currentBusinessId = businessContext.currentBusinessId;
+    if (currentBusinessId == null || currentBusinessId.isEmpty) return;
+
+    final locationState = context.read<LocationBloc>().state;
+    if (locationState is! LocationsLoaded) return;
+
+    final currentLocation = _findActiveLocation(
+      locationState.locations,
+      currentBusinessId,
+    );
+    if (currentLocation == null) return;
+    if (_lastSyncedBusinessId == currentBusinessId &&
+        _businessNameController.text == currentLocation.name &&
+        _businessAddressController.text == currentLocation.fullAddress &&
+        _businessPhoneController.text == currentLocation.phone &&
+        _businessTaxController.text == (currentLocation.taxCode ?? '')) {
+      return;
+    }
+
+    _syncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncScheduled = false;
+      if (!mounted) return;
+
+      final latestBusinessId = context.read<BusinessContext>().currentBusinessId;
+      if (latestBusinessId == null || latestBusinessId.isEmpty) return;
+
+      final latestLocationState = context.read<LocationBloc>().state;
+      if (latestLocationState is! LocationsLoaded) return;
+
+      final latestLocation = _findActiveLocation(
+        latestLocationState.locations,
+        latestBusinessId,
+      );
+      if (latestLocation == null) return;
+
+      setState(() {
+        _businessNameController.text = latestLocation.name;
+        _businessAddressController.text = latestLocation.fullAddress;
+        _businessPhoneController.text = latestLocation.phone;
+        _businessTaxController.text = latestLocation.taxCode ?? '';
+        _lastSyncedBusinessId = latestBusinessId;
+      });
+    });
+  }
+
+  LocationEntity? _findActiveLocation(
+    List<LocationEntity> locations,
+    String businessId,
+  ) {
+    for (final location in locations) {
+      if (location.isActive && location.id == businessId) {
+        return location;
+      }
+    }
+    for (final location in locations) {
+      if (location.isActive) {
+        return location;
+      }
+    }
+    return locations.isNotEmpty ? locations.first : null;
   }
 
   void _onSave() {
@@ -235,6 +305,13 @@ class _AdvancedInvoiceTemplatePageState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final businessContext = context.watch<BusinessContext>();
+    final locationState = context.watch<LocationBloc>().state;
+
+    if (locationState is LocationsLoaded &&
+        businessContext.currentBusinessId != null) {
+      _syncBusinessInfoFromCurrentLocation();
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,

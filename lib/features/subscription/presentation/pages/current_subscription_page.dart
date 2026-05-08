@@ -27,6 +27,7 @@ class CurrentSubscriptionPage extends StatefulWidget {
 class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
   // Cached Firestore stream — must NOT be recreated on every build() call.
   Stream<DocumentSnapshot<Map<String, dynamic>>>? _usageStream;
+  String? _activeUsageTrackingOwnerProfileId;
   DocumentSnapshot<Map<String, dynamic>>? _lastValidSnapshot;
   bool _isLoading = false;
   bool _isOpeningPlans = false;
@@ -103,23 +104,33 @@ class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
     _ensureSubscriptionLoaded();
   }
 
+  void _ensureUsageStream(
+    SubscriptionRepository repo,
+    String? ownerProfileId,
+  ) {
+    if (_activeUsageTrackingOwnerProfileId != ownerProfileId) {
+      _usageStream = null;
+      _lastValidSnapshot = null;
+      _activeUsageTrackingOwnerProfileId = ownerProfileId;
+    }
+
+    _usageStream ??= repo.streamUsageTracking(ownerProfileId: ownerProfileId);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     // watch — rebuilds when updateCurrentSubscription + notifyListeners fires.
     final repo = context.watch<SubscriptionRepository>();
     final currentSub = repo.currentSubscriptionSnapshot;
-    final businessContext = Provider.of<BusinessContext>(
-      context,
-      listen: false,
-    );
+    final businessContext = context.watch<BusinessContext>();
     final isOwner = businessContext.isOwner;
 
     // Initialise Firestore stream once and cache it.
     final ownerProfileId = isOwner
         ? null
         : businessContext.currentOwnerProfileId;
-    _usageStream ??= repo.streamUsageTracking(ownerProfileId: ownerProfileId);
+    _ensureUsageStream(repo, ownerProfileId);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -189,7 +200,7 @@ class _CurrentSubscriptionPageState extends State<CurrentSubscriptionPage> {
     final ownerProfileId = businessContext.isOwner
         ? null
         : businessContext.currentOwnerProfileId;
-    _usageStream ??= repo.streamUsageTracking(ownerProfileId: ownerProfileId);
+    _ensureUsageStream(repo, ownerProfileId);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),

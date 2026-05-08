@@ -1,12 +1,18 @@
 import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../shared/context/business_context.dart';
 import 'models/subscription_models.dart';
 
 class SubscriptionApiService {
   final ApiClient _apiClient;
 
   SubscriptionApiService(this._apiClient);
+
+  int? _resolveBusinessLocationId({int? businessLocationId}) {
+    if (businessLocationId != null) return businessLocationId;
+    return int.tryParse(BusinessContext().currentBusinessId ?? '');
+  }
 
   Future<List<SubscriptionPlanDto>> getSubscriptionPlans({CancelToken? cancelToken}) async {
     final response = await _apiClient.get(
@@ -22,10 +28,35 @@ class SubscriptionApiService {
 
   Future<CurrentSubscriptionDto?> getCurrentSubscription({
     CancelToken? cancelToken,
+    int? businessLocationId,
   }) async {
-    final response = await _apiClient.get(
-      ApiEndpoints.currentSubscription,
+    final resolvedBusinessLocationId = _resolveBusinessLocationId(
+      businessLocationId: businessLocationId,
     );
+
+    late final ApiResponse<dynamic> response;
+    try {
+      // Backend contract (current): send businessLocationId in request body.
+      response = await _apiClient.post(
+        ApiEndpoints.currentSubscription,
+        body: {
+          if (resolvedBusinessLocationId != null)
+            'businessLocationId': resolvedBusinessLocationId,
+        },
+      );
+    } on ApiException catch (e) {
+      // Backward-compat fallback for environments that still expose GET.
+      if (e.statusCode != 404 && e.statusCode != 405) {
+        rethrow;
+      }
+      response = await _apiClient.get(
+        ApiEndpoints.currentSubscription,
+        queryParams: {
+          if (resolvedBusinessLocationId != null)
+            'businessLocationId': resolvedBusinessLocationId,
+        },
+      );
+    }
 
     final payload = response.data as Map<String, dynamic>;
     if (payload['data'] == null) {

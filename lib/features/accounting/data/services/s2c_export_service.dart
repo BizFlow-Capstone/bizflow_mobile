@@ -61,7 +61,6 @@ class S2cExportService {
 
   static Future<File?> export({
     required AccountingBook book,
-    required List<Map<String, dynamic>> dataRows,
     BookSectionsResponse? sectionsData,
     String businessName = '',
     String taxCode = '',
@@ -87,7 +86,7 @@ class S2cExportService {
       );
       _writeLabel(sheet, row: 6, label: 'Kỳ kê khai', value: periodLabel);
 
-      final summary = _resolveSummary(dataRows, sectionsData);
+      final summary = _resolveSummary(sectionsData);
       final signatureStartRow = _writeSummaryRows(sheet, summary);
 
       _writeSignatureBlock(sheet, startRow: signatureStartRow);
@@ -102,10 +101,7 @@ class S2cExportService {
     }
   }
 
-  static _S2cSummaryData _resolveSummary(
-    List<Map<String, dynamic>> dataRows,
-    BookSectionsResponse? sectionsData,
-  ) {
+  static _S2cSummaryData _resolveSummary(BookSectionsResponse? sectionsData) {
     final allSummaryRows = <SectionRowDto>[
       ...?sectionsData?.sections.expand((section) => section.rows),
       ...?sectionsData?.footerRows,
@@ -115,14 +111,12 @@ class S2cExportService {
         _findAmountByKeywords(allSummaryRows, const [
           'tổng doanh thu',
           'doanh thu',
-        ]) ??
-        _sumSectionAmounts(dataRows, 'revenue');
+        ]);
     final costTotal =
         _findAmountByKeywords(allSummaryRows, const [
           'tổng chi phí hợp lý',
           'chi phí hợp lý',
-        ]) ??
-        _sumSectionAmounts(dataRows, 'cost');
+        ]);
     final difference =
         _findAmountByKeywords(allSummaryRows, const [
           'chênh lệch',
@@ -136,8 +130,8 @@ class S2cExportService {
     return _S2cSummaryData(
       revenueTotal: revenueTotal,
       costTotal: costTotal,
-      revenueEntries: _buildFlatEntries(dataRows, sectionsData, 'revenue'),
-      costEntries: _buildFlatEntries(dataRows, sectionsData, 'cost'),
+      revenueEntries: _buildFlatEntries(sectionsData, 'revenue'),
+      costEntries: _buildFlatEntries(sectionsData, 'cost'),
       difference: difference,
       pitTax: pitTax,
     );
@@ -561,23 +555,6 @@ class S2cExportService {
     return num.tryParse(value.toString());
   }
 
-  static num? _sumSectionAmounts(
-    List<Map<String, dynamic>> dataRows,
-    String section,
-  ) {
-    num sum = 0;
-    var hasValue = false;
-    for (final row in dataRows) {
-      final rowSection = _inferSection(row)?.trim().toLowerCase();
-      if (rowSection != section) continue;
-      final value = _toNum(_pick(row, 'so_tien', _amountAliases));
-      if (value == null) continue;
-      sum += value;
-      hasValue = true;
-    }
-    return hasValue ? sum : null;
-  }
-
   static String? _inferSection(Map<String, dynamic> row) {
     const keys = ['section', 'Section', 'sectionType', 'kind', 'type'];
     for (final key in keys) {
@@ -590,45 +567,41 @@ class S2cExportService {
   }
 
   static List<_S2cEntry> _buildFlatEntries(
-    List<Map<String, dynamic>> dataRows,
     BookSectionsResponse? sectionsData,
     String sectionFilter,
   ) {
     final entries = <_S2cEntry>[];
-    final matchingRows =
-        dataRows.where((row) {
-          final rowSection = _inferSection(row)?.trim().toLowerCase();
-          final isCostLike = _pick(row, 'CostType', _costHints) != null;
-          if (sectionFilter == 'revenue') {
-            final isRevenueShape =
-                rowSection == 'revenue' ||
-                rowSection == null ||
-                rowSection.isEmpty;
-            return isRevenueShape && !isCostLike;
-          }
-          return rowSection == sectionFilter || isCostLike;
-        }).toList()..sort((a, b) {
-          final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
-          final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
-          if (da == null && db == null) return 0;
-          if (da == null) return 1;
-          if (db == null) return -1;
-          return da.compareTo(db); // Ascending (oldest first)
-        });
+    if (sectionsData == null) return entries;
 
-    for (final row in matchingRows) {
-      final amount = _toNum(_pick(row, 'so_tien', _amountAliases));
-      final rawNote =
-          _pick(row, 'dien_giai', _descAliases)?.toString().trim() ?? '';
-      if (amount == null || rawNote.isEmpty) continue;
-      entries.add(
-        _S2cEntry(
-          code: _pick(row, 'so_hieu', _codeAliases)?.toString() ?? '',
-          note: rawNote,
-          amount: amount,
-          date: _parseDate(_pick(row, 'ngay_thang', _dateAliases)),
-        ),
-      );
+    for (final section in sectionsData.sections) {
+      final normalizedSection = section.businessTypeId?.trim().toLowerCase() ?? '';
+      if (normalizedSection != sectionFilter) continue;
+
+      final rows = section.rows.where((row) {
+        final lineType = row.lineType.trim().toLowerCase();
+        if (lineType == 'section_subtotal') {
+          return true;
+        }
+        if (sectionFilter == 'cost' && lineType == 'cost_type_subtotal') {
+          return true;
+        }
+        return false;
+      });
+
+      for (final row in rows) {
+        final amount = _toNum(_pick(row.values, 'so_tien', _amountAliases));
+        final rawNote =
+            _pick(row.values, 'dien_giai', _descAliases)?.toString().trim() ?? '';
+        if (amount == null || rawNote.isEmpty) continue;
+        entries.add(
+          _S2cEntry(
+            code: _pick(row.values, 'so_hieu', _codeAliases)?.toString() ?? '',
+            note: rawNote,
+            amount: amount,
+            date: _parseDate(_pick(row.values, 'ngay_thang', _dateAliases)),
+          ),
+        );
+      }
     }
 
     return entries;

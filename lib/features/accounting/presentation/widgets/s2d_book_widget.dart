@@ -258,6 +258,7 @@ class S2dBookWidget extends StatelessWidget {
           case 'subtotal':
             tableRows.add(_buildSubtotalRow(row));
             break;
+          case 'balance_row':
           case 'opening_inventory':
           case 'inventory_inbound':
           case 'inventory_outbound':
@@ -853,7 +854,6 @@ class S2dBookWidget extends StatelessWidget {
   String _formatQty(dynamic value) {
     if (value == null) return '';
     if (value is num) {
-      if (value == 0) return '';
       return value % 1 == 0
           ? value.toInt().toString()
           : value.toStringAsFixed(2);
@@ -861,7 +861,6 @@ class S2dBookWidget extends StatelessWidget {
     if (value is String) {
       final parsed = num.tryParse(value);
       if (parsed != null) {
-        if (parsed == 0) return '';
         return parsed % 1 == 0
             ? parsed.toInt().toString()
             : parsed.toStringAsFixed(2);
@@ -874,13 +873,11 @@ class S2dBookWidget extends StatelessWidget {
   String _formatAmount(dynamic value) {
     if (value == null) return '';
     if (value is num) {
-      if (value == 0) return '';
       return CurrencyFormatter.formatVND(value);
     }
     if (value is String) {
       final parsed = num.tryParse(value);
       if (parsed != null) {
-        if (parsed == 0) return '';
         return CurrencyFormatter.formatVND(parsed);
       }
       return value;

@@ -146,15 +146,29 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
   }
 
   String _buildRawReferenceCode(GeneralLedgerEntryModel entry) {
+    // Reference display must use entry code, not source rootCode.
+    final entryCode = (entry.code ?? '').trim();
+    if (entryCode.isNotEmpty) {
+      return entryCode;
+    }
+
     final explicitCode = (entry.referenceCode ?? '').trim();
     if (explicitCode.isNotEmpty) {
       return explicitCode;
     }
 
-    final type = entry.referenceType.trim();
-    final id = entry.referenceId;
-    if (type.isNotEmpty && id != null) {
-      return '${type.toUpperCase()}-$id';
+    return '-';
+  }
+
+  String _buildRawEntityCode(GeneralLedgerEntryModel entry) {
+    final rootCode = (entry.rootCode ?? '').trim();
+    if (rootCode.isNotEmpty) {
+      return rootCode;
+    }
+
+    final entityId = entry.entityId;
+    if (entityId != null && entityId > 0) {
+      return entityId.toString();
     }
 
     return '-';
@@ -832,12 +846,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       final rows = <_LinkedEntityDetailRow>[
         _LinkedEntityDetailRow(
           label: l10n.translate('common.detail'),
-          value: revenue.id.toString(),
+          value: revenue.revenueCode.toString(),
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.document_number'),
           value: (() {
-            final doc = (revenue.documentNumber ?? revenue.revenueCode ?? revenue.referenceCode ?? '').trim();
+            final doc = (revenue.documentNumber ?? '').trim();
             return doc.isNotEmpty ? doc : '-';
           })(),
         ),
@@ -851,7 +865,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.channel'),
-          value: revenue.moneyChannel ?? '-',
+          value: revenue.moneyChannelLabel ?? revenue.moneyChannel ?? '-',
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.revenue_business_type'),
@@ -878,12 +892,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       final rows = <_LinkedEntityDetailRow>[
         _LinkedEntityDetailRow(
           label: l10n.translate('common.detail'),
-          value: cost.id.toString(),
+          value: cost.costCode.toString(),
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.document_number'),
           value: (() {
-            final doc = (cost.documentNumber ?? cost.costCode ?? cost.referenceCode ?? '').trim();
+            final doc = (cost.documentNumber ?? '').trim();
             return doc.isNotEmpty ? doc : '-';
           })(),
         ),
@@ -896,8 +910,12 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
           value: cost.description,
         ),
         _LinkedEntityDetailRow(
+          label: l10n.translate('accounting.ai_cost_type'),
+          value: cost.costTypeLabel ?? cost.costType ?? '-',
+        ),
+        _LinkedEntityDetailRow(
           label: l10n.translate('accounting.channel'),
-          value: cost.paymentMethod ?? '-',
+          value: cost.paymentMethodLabel ?? cost.paymentMethod ?? '-',
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.cost_date'),
@@ -919,7 +937,9 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       final rows = <_LinkedEntityDetailRow>[
         _LinkedEntityDetailRow(
           label: l10n.translate('common.detail'),
-          value: entry.entryId.toString(),
+          value: entityType == 'debtor_payment'
+              ? _buildRawEntityCode(entry)
+              : entry.entryId.toString(),
         ),
         _LinkedEntityDetailRow(
           label: l10n.translate('accounting.amount'),
@@ -963,6 +983,7 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
       languageCode: languageCode,
     );
     final displayReference = _buildRawReferenceCode(entry);
+    final displayEntity = _buildRawEntityCode(entry);
 
     final entityId = entry.entityId ?? 0;
 
@@ -1036,16 +1057,6 @@ class _AccountingGlTabState extends State<AccountingGlTab> {
                   context.tr(
                     'accounting.gl_detail_reference',
                     params: {'type': displayReference, 'id': ''},
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  context.tr(
-                    'accounting.gl_detail_entity',
-                    params: {
-                      'type': entry.entityType ?? '-',
-                      'id': (entry.entityId ?? '').toString(),
-                    },
                   ),
                 ),
                 if (entityId > 0) ...[

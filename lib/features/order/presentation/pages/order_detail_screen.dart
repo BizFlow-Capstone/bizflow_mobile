@@ -15,11 +15,11 @@ import '../../../../core/network/api_error_message_parser.dart';
 import '../../../../core/reference/presentation/bloc/reference_bloc.dart';
 import '../../../../core/reference/presentation/bloc/reference_event.dart';
 import '../../../../core/reference/presentation/bloc/reference_state.dart';
-import '../../../../core/reference/data/reference_item.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/dialogs/app_snackbar.dart';
+import '../../../../shared/context/business_context.dart';
 import '../../../../shared/utils/formatters.dart';
 import '../../../../shared/utils/string_utils.dart';
 import '../../../../shared/widgets/app_sync_status_text.dart';
@@ -27,9 +27,11 @@ import '../../../invoice_template/domain/entities/invoice_template_entity.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_bloc.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_event.dart';
 import '../../../invoice_template/presentation/bloc/invoice_template_state.dart';
+import '../../../location/domain/entities/location_entity.dart';
+import '../../../location/presentation/bloc/location_bloc.dart';
+import '../../../location/presentation/bloc/location_state.dart';
 import '../../../subscription/domain/subscription_feature_codes.dart';
 import '../../../subscription/presentation/utils/subscription_feature_guard.dart';
-import '../../../../shared/context/business_context.dart';
 import '../../../accounting/data/repositories/accounting_repository.dart';
 import '../../../accounting/domain/models/accounting_period.dart';
 import '../../data/order_api_service.dart';
@@ -63,9 +65,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   bool _canEditOrder(OrderEntity order) {
     // Rule 0: do not allow edit until accounting periods are loaded.
     if (!_periodsLoaded) return false;
-    // Rule 1: only block editing when the order's date falls into a closed period.
-    final orderDate = order.completedAt ?? order.createdAt;
-
+    // Rule 1: only block editing when the order's date falls into a finalized period.
+    final orderDate = order.completedAt ?? order.updatedAt ?? order.createdAt;
     final target = DateUtils.dateOnly(orderDate.toLocal());
     for (final period in _periods) {
       try {
@@ -73,8 +74,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         final end = DateUtils.dateOnly(DateTime.parse(period.endDate));
 
         if (!target.isBefore(start) && !target.isAfter(end)) {
-          // If the period that contains the order date is not open, block edit.
-          return period.isOpen;
+          // If the period that contains the order date is finalized, block edit.
+          return !period.isFinalized;
         }
       } catch (_) {
         // ignore malformed period dates
@@ -98,18 +99,54 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   bool _hideCancelForCompletedOrder(OrderEntity order) {
-    if (!order.isPublished || !_periodsLoaded) {
+    if (!order.isPublished) {
       return false;
     }
 
-    final orderDate = order.completedAt ?? order.createdAt;
-    for (final period in _periods) {
-      if (_isDateInPeriod(orderDate, period) && period.isFinalized) {
-        return true;
+    return !_canEditOrder(order);
+  }
+
+  LocationEntity? _findActiveLocation(
+    List<LocationEntity> locations,
+    String? businessId,
+  ) {
+    if ((businessId ?? '').isNotEmpty) {
+      for (final location in locations) {
+        if (location.isActive && location.id == businessId) {
+          return location;
+        }
       }
     }
 
-    return false;
+    for (final location in locations) {
+      if (location.isActive) {
+        return location;
+      }
+    }
+
+    return locations.isNotEmpty ? locations.first : null;
+  }
+
+  InvoiceTemplateEntity _mergeTemplateWithCurrentLocation(
+    InvoiceTemplateEntity template,
+  ) {
+    final locationState = context.read<LocationBloc>().state;
+    if (locationState is! LocationsLoaded) {
+      return template;
+    }
+
+    final currentLocation = _findActiveLocation(
+      locationState.locations,
+      context.read<BusinessContext>().currentBusinessId,
+    );
+    if (currentLocation == null) return template;
+
+    return template.copyWith(
+      businessName: currentLocation.name,
+      businessAddress: currentLocation.fullAddress,
+      businessPhone: currentLocation.phone,
+      businessTaxCode: currentLocation.taxCode ?? '',
+    );
   }
 
   @override
@@ -407,9 +444,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   InvoiceTemplateEntity _getTemplate() {
     final state = context.read<InvoiceTemplateBloc>().state;
-    return state is InvoiceTemplateLoaded
+    final template = state is InvoiceTemplateLoaded
         ? state.template
         : InvoiceTemplateEntity.empty();
+    return _mergeTemplateWithCurrentLocation(template);
   }
 
   String _pdfFormat(String text) => StringUtils.removeDiacritics(text);
@@ -542,11 +580,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         case 'unitPrice':
           return _pdfCurrency(item.price);
         case 'discount':
-          return '${item.discount.toStringAsFixed(0)}%';
+          return CurrencyFormatter.formatNumber(item.discount.round());
         case 'vat':
           return _pdfCurrency(0);
         case 'total':
-          return _pdfCurrency(item.total);
+          return _pdfCurrency((item.price * item.quantity - item.discount).clamp(0, double.infinity));
         default:
           return '';
       }
@@ -854,6 +892,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                 );
               }
 
+                final showEditAndCancelActions = detail.isPending ||
+                  (detail.isPublished && !_hideCancelForCompletedOrder(detail));
+
               return Column(
                 children: [
                   if (detail.status.toLowerCase() == 'completed')
@@ -892,9 +933,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                         ],
                       ),
                     ),
-                  if (detail.isPending ||
-                      (detail.isPublished &&
-                          !_hideCancelForCompletedOrder(detail))) ...[
+                      if (showEditAndCancelActions) ...[
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.md,
@@ -926,10 +965,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.sm),
-                          if ((detail.isPending ||
-                                  (detail.isPublished &&
-                                      !_hideCancelForCompletedOrder(detail))) &&
-                              _canEditOrder(detail))
+                          if (detail.isPending ||
+                              (detail.isPublished &&
+                                  !_hideCancelForCompletedOrder(detail)))
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: (_isCancelling || _isPublishing)

@@ -636,40 +636,71 @@ class S2cBookWidget extends StatelessWidget {
 
   List<_S2cEntry> _buildFlatEntries({required String sectionFilter}) {
     final entries = <_S2cEntry>[];
-    final matchingRows =
-        dataRows.where((row) {
-          final rowSection = _inferSection(row)?.trim().toLowerCase();
-          final isCostLike = _pickDyn(row, _costHints) != null;
-          if (sectionFilter == 'revenue') {
-            final isRevenueShape =
-                rowSection == 'revenue' ||
-                rowSection == null ||
-                rowSection.isEmpty;
-            return isRevenueShape && !isCostLike;
-          }
-          return rowSection == sectionFilter || isCostLike;
-        }).toList()..sort((a, b) {
-          final da = _parseDate(_pickDyn(a, _dateAliases));
-          final db = _parseDate(_pickDyn(b, _dateAliases));
-          if (da == null && db == null) return 0;
-          if (da == null) return 1;
-          if (db == null) return -1;
-          return db.compareTo(da); // Descending (newest first)
+    final sectionRows = sections.sections
+        .where(
+          (section) =>
+              (section.businessTypeId ?? '').trim().toLowerCase() ==
+              sectionFilter,
+        )
+        .expand((section) => section.rows)
+        .where((row) {
+          final lineType = row.lineType.trim().toLowerCase();
+          return lineType == 'section_subtotal' ||
+              lineType == 'cost_type_subtotal';
         });
 
-    for (final row in matchingRows) {
-      final amount = _toNum(_pickDyn(row, _soTienAliases));
-      final rawNote = _pickDyn(row, _descAliases)?.toString() ?? '';
+    for (final row in sectionRows) {
+      final amount = _toNum(_pickDyn(row.values, _soTienAliases));
+      final rawNote = _pickDyn(row.values, _descAliases)?.toString() ?? '';
       if (amount == null || rawNote.trim().isEmpty) continue;
       entries.add(
         _S2cEntry(
-          code: _pickDyn(row, _soHieuAliases)?.toString() ?? '',
+          code: _pickDyn(row.values, _soHieuAliases)?.toString() ?? '',
           note: rawNote,
-          explanation: _pickDyn(row, const ['explanation'])?.toString().trim(),
+          explanation: row.values['explanation']?.toString().trim(),
           amount: amount,
-          date: _parseDate(_pickDyn(row, _dateAliases)),
+          date: _parseDate(_pickDyn(row.values, _dateAliases)),
         ),
       );
+    }
+
+    if (entries.isEmpty) {
+      final matchingRows =
+          dataRows.where((row) {
+            final rowSection = _inferSection(row)?.trim().toLowerCase();
+            final isCostLike = _pickDyn(row, _costHints) != null;
+            if (sectionFilter == 'revenue') {
+              final isRevenueShape =
+                  rowSection == 'revenue' ||
+                  rowSection == null ||
+                  rowSection.isEmpty;
+              return isRevenueShape && !isCostLike;
+            }
+            return rowSection == sectionFilter || isCostLike;
+          }).toList()
+            ..sort((a, b) {
+              final da = _parseDate(_pickDyn(a, _dateAliases));
+              final db = _parseDate(_pickDyn(b, _dateAliases));
+              if (da == null && db == null) return 0;
+              if (da == null) return 1;
+              if (db == null) return -1;
+              return db.compareTo(da); // Descending (newest first)
+            });
+
+      for (final row in matchingRows) {
+        final amount = _toNum(_pickDyn(row, _soTienAliases));
+        final rawNote = _pickDyn(row, _descAliases)?.toString() ?? '';
+        if (amount == null || rawNote.trim().isEmpty) continue;
+        entries.add(
+          _S2cEntry(
+            code: _pickDyn(row, _soHieuAliases)?.toString() ?? '',
+            note: rawNote,
+            explanation: _pickDyn(row, const ['explanation'])?.toString().trim(),
+            amount: amount,
+            date: _parseDate(_pickDyn(row, _dateAliases)),
+          ),
+        );
+      }
     }
 
     return entries;

@@ -281,7 +281,6 @@ class ExcelExportService {
     if (_isS2cTemplate(book.templateCode)) {
       final file = await S2cExportService.export(
         book: book,
-        dataRows: rows,
         sectionsData: sectionsData,
         businessName: headerInfo?.businessName ?? '',
         taxCode: headerInfo?.taxCode ?? '',
