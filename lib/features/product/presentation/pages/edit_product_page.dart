@@ -1080,6 +1080,30 @@ class _EditProductPageState extends State<EditProductPage> {
                   hint: l10n.translate('product.description_hint'),
                   maxLines: 3,
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                Text.rich(
+                  TextSpan(
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: l10n.translate(
+                          'product.edit_product_stock_note_prefix',
+                        ),
+                      ),
+                      TextSpan(
+                        text: l10n.translate(
+                          'product.edit_product_stock_note_payment_method',
+                        ),
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 SizedBox(height: AppSpacing.xl),
 
                 // Action Buttons
