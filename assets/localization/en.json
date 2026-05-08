@@ -530,7 +530,8 @@
     "payment_method_hint": "Select method (optional)",
     "edit_import": "Edit Import",
     "edit_confirmed_warning": "This import is confirmed. Editing will create a new replacement import.",
-    "edit_confirmed_continue": "Continue Editing"
+    "edit_confirmed_continue": "Continue Editing",
+    "select_payment_method_required": "Please select a payment method"
   },
   "home": {
     "title": "Home",

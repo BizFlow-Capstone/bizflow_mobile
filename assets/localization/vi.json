@@ -531,7 +531,8 @@
     "payment_method_hint": "Chọn phương thức (nếu có)",
     "edit_import": "Sửa phiếu nhập",
     "edit_confirmed_warning": "Phiếu nhập đã xác nhận. Sửa sẽ tạo phiếu mới thay thế.",
-    "edit_confirmed_continue": "Tiếp tục sửa"
+    "edit_confirmed_continue": "Tiếp tục sửa",
+    "select_payment_method_required": "Vui lòng chọn phương thức thanh toán"
   },
   "home": {
     "title": "Trang chủ",
