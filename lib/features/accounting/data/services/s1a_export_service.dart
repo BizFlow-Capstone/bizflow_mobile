@@ -76,8 +76,8 @@ class S1aExportService {
 
       final sortedRows = List<Map<String, dynamic>>.from(dataRows)
         ..sort((a, b) {
-          final da = _parseDate(_pick(a, 'date', _dateAliases));
-          final db = _parseDate(_pick(b, 'date', _dateAliases));
+          final da = _parseDateForSort(_pick(a, 'date', _dateAliases));
+          final db = _parseDateForSort(_pick(b, 'date', _dateAliases));
           if (da == null && db == null) return 0;
           if (da == null) return 1;
           if (db == null) return -1;
@@ -449,6 +449,35 @@ class S1aExportService {
     final s = val.toString().trim();
     if (s.isEmpty) return null;
     return DateTime.tryParse(s);
+  }
+
+  /// Parse a value into a UTC instant for sorting.
+  ///
+  /// Interpretation rules:
+  /// - If value is a DateTime with `isUtc == true` return it as-is.
+  /// - If value is a DateTime without timezone or a string without offset,
+  ///   treat the components as occurring in timezone UTC+7 and convert to UTC.
+  /// - If string contains an explicit offset (e.g. Z or +07:00), parse normally
+  ///   and convert to UTC.
+  static DateTime? _parseDateForSort(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) {
+      if (val.isUtc) return val;
+      return DateTime.utc(val.year, val.month, val.day, val.hour, val.minute, val.second).subtract(const Duration(hours: 7));
+    }
+    final s = val.toString().trim();
+    if (s.isEmpty) return null;
+    // If string likely contains timezone offset or full ISO with offset, trust DateTime.parse
+    final hasOffset = RegExp(r'Z$|[+-]\d{2}(:?\d{2})?\$').hasMatch(s) || s.contains('T') && RegExp(r'[+-]\d{2}:?\d{2}').hasMatch(s);
+    if (hasOffset) {
+      try {
+        return DateTime.parse(s).toUtc();
+      } catch (_) {}
+    }
+    // Fallback: parse components then treat as in UTC+7
+    final parsed = DateTime.tryParse(s);
+    if (parsed == null) return null;
+    return DateTime.utc(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, parsed.second).subtract(const Duration(hours: 7));
   }
 
   static String _fmtDate(dynamic val) {
