@@ -563,9 +563,7 @@ class _DynamicPlanCard extends StatelessWidget {
       return displayName;
     }
 
-    if (feature.usageLimit == 0) {
-      return displayName;
-    }
+  
 
     return '$displayName: ${feature.usageLimit}';
   }
