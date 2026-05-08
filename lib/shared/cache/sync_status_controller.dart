@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 
 class SyncStatusState {
   final bool isSyncing;
@@ -45,8 +46,21 @@ class SyncStatusController extends ChangeNotifier {
     final hasChanged = _manualRefreshCallback != callback;
     _manualRefreshCallback = callback;
     if (hasChanged) {
-      notifyListeners();
+      _notifyListenersSafe();
     }
+  }
+
+  void _notifyListenersSafe() {
+    final binding = SchedulerBinding.instance;
+    if (binding.schedulerPhase == SchedulerPhase.transientCallbacks ||
+        binding.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      binding.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+      return;
+    }
+
+    notifyListeners();
   }
 
   /// Called by the refresh button in [AppSyncStatusText] to trigger a reload.
