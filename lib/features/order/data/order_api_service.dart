@@ -84,6 +84,36 @@ class OrderApiService {
     );
   }
 
+  void _tryThrowConfirmationFromError(dynamic responseData) {
+    try {
+      if (responseData is Map<String, dynamic>) {
+        final raw = responseData as Map<String, dynamic>;
+        final dynamic dataNode = raw['data'] ?? raw;
+
+        final warnings = <String>[];
+        final warningNode = (dataNode is Map<String, dynamic>) ? dataNode['warnings'] ?? raw['warnings'] : raw['warnings'];
+        if (warningNode is List) {
+          for (final item in warningNode) {
+            final text = item?.toString().trim() ?? '';
+            if (text.isNotEmpty) warnings.add(text);
+          }
+        }
+
+        final joined = warnings.join(' ').toUpperCase();
+        final requiresLowStock = joined.contains('LOW_STOCK_CONFIRM_REQUIRED') || (dataNode is Map && dataNode['requiresConfirmation'] == true);
+        final requiresCreditLimit = joined.contains('DEBTOR_CREDIT_LIMIT_EXCEEDED_CONFIRM_REQUIRED');
+
+        if (warnings.isNotEmpty || requiresLowStock || requiresCreditLimit) {
+          throw OrderConfirmationRequiredException(
+            warnings: warnings,
+            requiresLowStockConfirmation: requiresLowStock,
+            requiresCreditLimitConfirmation: requiresCreditLimit,
+          );
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Get all orders for the current user
   ///
   /// API: GET /api/order/my-orders?pageNumber=1&pageSize=20&status=DRAFT
@@ -126,6 +156,12 @@ class OrderApiService {
         // Parse raw JSON to DTO
         return OrderResponseDto.fromJson(response.data as Map<String, dynamic>);
       } else {
+        // Workaround: some backend flows return HTTP 400 with warnings instead
+        // of a success payload containing `requiresConfirmation`. Detect those
+        // and convert them to OrderConfirmationRequiredException so the
+        // frontend can show the same confirmation dialog and retry with
+        // confirmLowStock: true.
+        _tryThrowConfirmationFromError(response.data);
         throw Exception(response.message ?? _genericError);
       }
     } on ApiException {
@@ -152,6 +188,7 @@ class OrderApiService {
         final data = response.data as Map<String, dynamic>;
         return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
+        _tryThrowConfirmationFromError(response.data);
         throw Exception(response.message ?? _genericError);
       }
     } on ApiException {
@@ -338,7 +375,8 @@ class OrderApiService {
         _throwIfConfirmationRequired(data);
         return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
-        throw Exception(response.message ?? _genericError);
+          _tryThrowConfirmationFromError(response.data);
+          throw Exception(response.message ?? _genericError);
       }
     } on OrderConfirmationRequiredException {
       rethrow;
@@ -383,6 +421,7 @@ class OrderApiService {
         _throwIfConfirmationRequired(data);
         return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
+        _tryThrowConfirmationFromError(response.data);
         throw Exception(response.message ?? _genericError);
       }
     } on OrderConfirmationRequiredException {
@@ -418,6 +457,7 @@ class OrderApiService {
         _throwIfConfirmationRequired(data);
         return OrderDto.fromJson(_extractOrderPayload(data));
       } else {
+        _tryThrowConfirmationFromError(response.data);
         throw Exception(response.message ?? _genericError);
       }
     } on OrderConfirmationRequiredException {
