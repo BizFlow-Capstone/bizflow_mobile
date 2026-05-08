@@ -32,9 +32,13 @@ class NotificationRealtimeService {
       _hubConnection?.state == HubConnectionState.Connected;
 
   Future<void> initialize() async {
-    _connectivitySubscription = ConnectivityService().statusStream.listen((status) {
+    _connectivitySubscription = ConnectivityService().statusStream.listen((
+      status,
+    ) {
       if (status == ConnectivityStatus.online && !_isConnected) {
-        debugPrint('NotificationRealtimeService: Network restored, retrying connection...');
+        debugPrint(
+          'NotificationRealtimeService: Network restored, retrying connection...',
+        );
         unawaited(connect());
       }
     });
@@ -56,58 +60,80 @@ class NotificationRealtimeService {
     );
 
     for (final hubUrl in hubUrls) {
-      try {
-        final hubUri = Uri.parse(hubUrl);
-        final isLocalHttps =
-            hubUri.scheme == 'https' && _isLocalAddress(hubUri.host);
+      final hubUri = Uri.parse(hubUrl);
+      final isLocalHttps =
+          hubUri.scheme == 'https' && _isLocalAddress(hubUri.host);
+      final transports = <HttpTransportType?>[
+        if (isLocalHttps) HttpTransportType.LongPolling,
+        null,
+        HttpTransportType.LongPolling,
+      ];
 
-        final connection = HubConnectionBuilder()
-            .withUrl(
-              hubUrl,
-              options: HttpConnectionOptions(
-                accessTokenFactory: () async {
-                  return await _secureStorage.getAccessToken() ?? '';
-                },
-                requestTimeout: 8000,
-                transport: isLocalHttps ? HttpTransportType.LongPolling : null,
-                httpClient: isLocalHttps ? SignalRDevHttpClient() : null,
-              ),
-            )
-            .withAutomaticReconnect()
-            .build();
-
-        connection.on('notification.received', _handleNotificationReceived);
-        connection.onclose(({Exception? error}) {
-          debugPrint(
-            'NotificationRealtimeService: connection closed ${error ?? ''}'
-                .trim(),
-          );
-        });
-        connection.onreconnected(({String? connectionId}) {
-          debugPrint('NotificationRealtimeService: reconnected $connectionId');
-        });
-        connection.onreconnecting(({Exception? error}) {
-          debugPrint(
-            'NotificationRealtimeService: reconnecting ${error ?? ''}'.trim(),
-          );
-        });
-
-        final startFuture = connection.start();
-        if (startFuture == null) {
-          throw Exception('SignalR start returned null future.');
-        }
-        await startFuture.timeout(const Duration(seconds: 8));
-        _hubConnection = connection;
-        debugPrint('NotificationRealtimeService: Connected to $hubUrl');
-        return;
-      } catch (error) {
+      for (final transport in transports) {
         debugPrint(
-          'NotificationRealtimeService.connect failed at $hubUrl: $error',
+          'NotificationRealtimeService: connecting to $hubUrl using transport ${transport?.name ?? 'default'}',
         );
+        try {
+          if (await _tryConnect(hubUrl, transport, isLocalHttps)) {
+            return;
+          }
+        } catch (error) {
+          debugPrint(
+            'NotificationRealtimeService.connect failed at $hubUrl with transport ${transport?.name ?? 'default'}: $error',
+          );
+        }
       }
     }
 
     _hubConnection = null;
+  }
+
+  Future<bool> _tryConnect(
+    String hubUrl,
+    HttpTransportType? transport,
+    bool isLocalHttps,
+  ) async {
+    final connection = HubConnectionBuilder()
+        .withUrl(
+          hubUrl,
+          options: HttpConnectionOptions(
+            accessTokenFactory: () async {
+              return await _secureStorage.getAccessToken() ?? '';
+            },
+            requestTimeout: AppConfig.connectionTimeout.inMilliseconds,
+            transport: transport,
+            httpClient: isLocalHttps ? SignalRDevHttpClient() : null,
+          ),
+        )
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on('notification.received', _handleNotificationReceived);
+    connection.onclose(({Exception? error}) {
+      debugPrint(
+        'NotificationRealtimeService: connection closed ${error ?? ''}'.trim(),
+      );
+    });
+    connection.onreconnected(({String? connectionId}) {
+      debugPrint('NotificationRealtimeService: reconnected $connectionId');
+    });
+    connection.onreconnecting(({Exception? error}) {
+      debugPrint(
+        'NotificationRealtimeService: reconnecting ${error ?? ''}'.trim(),
+      );
+    });
+
+    final startFuture = connection.start();
+    if (startFuture == null) {
+      throw Exception('SignalR start returned null future.');
+    }
+
+    await startFuture.timeout(AppConfig.connectionTimeout);
+    _hubConnection = connection;
+    debugPrint(
+      'NotificationRealtimeService: Connected to $hubUrl (transport=${transport?.name ?? 'default'})',
+    );
+    return true;
   }
 
   Future<void> disconnect() async {

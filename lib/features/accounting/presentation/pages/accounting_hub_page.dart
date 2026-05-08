@@ -197,6 +197,10 @@ class _AccountingHubPageState extends State<AccountingHubPage>
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final locationId = context.read<BusinessContext>().currentBusinessId;
+      if (locationId != null) {
+        _lastLocationId = locationId;
+      }
       await _loadTab(safeInitialIndex);
       _loadReferences();
     });
@@ -812,6 +816,14 @@ class _AccountingHubPageState extends State<AccountingHubPage>
   @override
   Widget build(BuildContext context) {
     final locationId = context.watch<BusinessContext>().currentBusinessId;
+
+    if (locationId != null && locationId != _lastLocationId) {
+      _lastLocationId = locationId;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _loadTab(_tabController.index);
+      });
+    }
 
     return _buildScaffold(context, locationId);
   }
@@ -2341,7 +2353,8 @@ class _AccountingHubPageState extends State<AccountingHubPage>
 
     AppDialog.show(
       context,
-      title: (revenue.revenueCode ?? revenue.referenceCode ?? '').trim().isNotEmpty
+      title:
+          (revenue.revenueCode ?? revenue.referenceCode ?? '').trim().isNotEmpty
           ? (revenue.revenueCode ?? revenue.referenceCode ?? '').trim()
           : '-',
       confirmText: l10n.translate('common.close'),
