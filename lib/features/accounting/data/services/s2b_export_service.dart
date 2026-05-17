@@ -129,8 +129,8 @@ class S2bExportService {
     if (sectionsData.sections.isEmpty) {
       final sorted = List<Map<String, dynamic>>.from(dataRows)
         ..sort((a, b) {
-          final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
-          final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+          final da = _parseDateForSort(_pick(a, 'ngay_thang', _dateAliases));
+          final db = _parseDateForSort(_pick(b, 'ngay_thang', _dateAliases));
           if (da == null && db == null) return 0;
           if (da == null) return 1;
           if (db == null) return -1;
@@ -168,8 +168,8 @@ class S2bExportService {
             return dataRow['businessTypeId']?.toString() == filter;
           }).toList()
             ..sort((a, b) {
-              final da = _parseDate(_pick(a, 'ngay_thang', _dateAliases));
-              final db = _parseDate(_pick(b, 'ngay_thang', _dateAliases));
+              final da = _parseDateForSort(_pick(a, 'ngay_thang', _dateAliases));
+              final db = _parseDateForSort(_pick(b, 'ngay_thang', _dateAliases));
               if (da == null && db == null) return 0;
               if (da == null) return 1;
               if (db == null) return -1;
@@ -702,6 +702,26 @@ class S2bExportService {
     final s = val.toString().trim();
     if (s.isEmpty) return null;
     return DateTime.tryParse(s);
+  }
+
+  /// Parse value into UTC instant for sorting with timezone UTC+7 assumed
+  static DateTime? _parseDateForSort(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) {
+      if (val.isUtc) return val;
+      return DateTime.utc(val.year, val.month, val.day, val.hour, val.minute, val.second).subtract(const Duration(hours: 7));
+    }
+    final s = val.toString().trim();
+    if (s.isEmpty) return null;
+    final hasOffset = RegExp(r'Z$|[+-]\d{2}(:?\d{2})?\$').hasMatch(s) || s.contains('T') && RegExp(r'[+-]\d{2}:?\d{2}').hasMatch(s);
+    if (hasOffset) {
+      try {
+        return DateTime.parse(s).toUtc();
+      } catch (_) {}
+    }
+    final parsed = DateTime.tryParse(s);
+    if (parsed == null) return null;
+    return DateTime.utc(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, parsed.second).subtract(const Duration(hours: 7));
   }
 
   static String _fmtDate(dynamic value) {

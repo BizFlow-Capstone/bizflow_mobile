@@ -752,6 +752,33 @@ class _QuickAdjustStockDialogState extends State<_QuickAdjustStockDialog> {
                 labelText: l10n.translate('product.stock_adjust.memo'),
               ),
             ),
+            SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text.rich(
+                TextSpan(
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                  children: [
+                    TextSpan(
+                      text: l10n.translate(
+                        'product.stock_adjust.stock_note_prefix',
+                      ),
+                    ),
+                    TextSpan(
+                      text: l10n.translate(
+                        'product.stock_adjust.stock_note_payment_method',
+                      ),
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

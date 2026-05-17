@@ -219,7 +219,7 @@ class _StockImportViewState extends State<_StockImportView> {
 
   String _paymentMethodPlaceholder() {
     final languageCode = Localizations.localeOf(context).languageCode;
-    return languageCode == 'en' ? 'Not selected' : 'Chưa chọn';
+    return languageCode == 'en' ? 'Select payment method' : 'Chọn phương thức thanh toán';
   }
 
   String _resolvePaymentMethodLabel(String? code) {
@@ -623,6 +623,11 @@ class _StockImportViewState extends State<_StockImportView> {
       return;
     }
 
+    if (_selectedPaymentMethod == null || _selectedPaymentMethod!.trim().isEmpty || _selectedPaymentMethod == _paymentMethodPlaceholder()) {
+      _showErrorSnackBar(l10n.translate('stock_import.select_payment_method_required'));
+      return;
+    }
+
     final hasInvoiceImage =
         _selectedImagePath != null ||
         ((_existingImageUrl?.isNotEmpty == true) && !_removeImage);
@@ -695,6 +700,11 @@ class _StockImportViewState extends State<_StockImportView> {
     if (_isActionGuardLoading) return;
     if (_selectedItems.isEmpty) {
       _showErrorSnackBar(l10n.translate('stock_import.add_product_required'));
+      return;
+    }
+
+    if (_selectedPaymentMethod == null || _selectedPaymentMethod!.trim().isEmpty || _selectedPaymentMethod == _paymentMethodPlaceholder()) {
+      _showErrorSnackBar(l10n.translate('stock_import.select_payment_method_required'));
       return;
     }
 

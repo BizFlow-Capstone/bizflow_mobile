@@ -92,9 +92,9 @@ class S2dExportService {
       final openingSectionRow = _findS2dOpeningBalanceRow(categoryName, sectionsData);
       final rowForOpening = openingSectionRow?.values ??
           (sortedRows.isNotEmpty ? sortedRows.first : const <String, dynamic>{});
-      final closingRow = sortedRows.isNotEmpty
-          ? sortedRows.last
-          : rowForOpening as Map<String, dynamic>;
+      final closingSectionRow = _findS2dClosingBalanceRow(categoryName, sectionsData);
+      final rowForClosing = closingSectionRow?.values ??
+          (sortedRows.isNotEmpty ? sortedRows.last : const <String, dynamic>{});
       final totalImportQty = _sum(sortedRows, 'sl_nhap', _slNhapAliases);
       final totalImportValue = _sum(sortedRows, 'tien_nhap', _tienNhapAliases);
       final totalExportQty = _sum(sortedRows, 'sl_xuat', _slXuatAliases);
@@ -131,11 +131,11 @@ class S2dExportService {
         r++,
         label: 'Số dư cuối kỳ',
         unit:
-            _pick(closingRow ?? const {}, 'dvt', _dvtAliases)?.toString() ?? '',
-        unitPrice: _pick(closingRow ?? const {}, 'don_gia', _donGiaAliases),
-        balanceQty: _pick(closingRow ?? const {}, 'sl_ton', _slTonAliases),
+            _pick(rowForClosing ?? const {}, 'dvt', _dvtAliases)?.toString() ?? '',
+        unitPrice: _pick(rowForClosing ?? const {}, 'don_gia', _donGiaAliases),
+        balanceQty: _pick(rowForClosing ?? const {}, 'sl_ton', _slTonAliases),
         balanceValue: _pick(
-          closingRow ?? const {},
+          rowForClosing ?? const {},
           'tien_ton',
           _tienTonAliases,
         ),
@@ -417,26 +417,41 @@ class S2dExportService {
   }
 
   static int _compareRows(Map<String, dynamic> a, Map<String, dynamic> b) {
-    final aDate = _parseDate(_pick(a, 'ngay', _dateAliases));
-    final bDate = _parseDate(_pick(b, 'ngay', _dateAliases));
-    final dateCompare = (aDate ?? DateTime(1900)).compareTo(
-      bDate ?? DateTime(1900),
-    );
-    if (dateCompare != 0) return dateCompare;
-
-    final aSoHieu = int.tryParse(
-      _pick(a, 'so_hieu', _soHieuAliases)?.toString() ?? '',
-    );
-    final bSoHieu = int.tryParse(
-      _pick(b, 'so_hieu', _soHieuAliases)?.toString() ?? '',
-    );
-    return (aSoHieu ?? 0).compareTo(bSoHieu ?? 0);
+    final aDate = _parseDateForSort(_pick(a, 'ngay', _dateAliases));
+    final bDate = _parseDateForSort(_pick(b, 'ngay', _dateAliases));
+    if (aDate == null && bDate == null) return 0;
+    if (aDate == null) return 1;
+    if (bDate == null) return -1;
+    return aDate.compareTo(bDate);
   }
 
   static DateTime? _parseDate(dynamic value) {
     if (value == null) return null;
     try {
       return DateTime.parse(value.toString());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Parse value into UTC instant for sorting with timezone UTC+7 assumed
+  static DateTime? _parseDateForSort(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) {
+      if (val.isUtc) return val;
+      return DateTime.utc(val.year, val.month, val.day, val.hour, val.minute, val.second).subtract(const Duration(hours: 7));
+    }
+    final s = val.toString().trim();
+    if (s.isEmpty) return null;
+    final hasOffset = RegExp(r'Z$|[+-]\d{2}(:?\d{2})?\$').hasMatch(s) || s.contains('T') && RegExp(r'[+-]\d{2}:?\d{2}').hasMatch(s);
+    if (hasOffset) {
+      try {
+        return DateTime.parse(s).toUtc();
+      } catch (_) {}
+    }
+    try {
+      final parsed = DateTime.parse(s);
+      return DateTime.utc(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, parsed.second).subtract(const Duration(hours: 7));
     } catch (_) {
       return null;
     }
@@ -642,6 +657,33 @@ class S2dExportService {
       if (asUint8 is List<int>) return asUint8;
     } catch (_) {}
     return null;
+  }
+
+  static SectionRowDto? _findS2dClosingBalanceRow(
+    String categoryName,
+    BookSectionsResponse? sectionsData,
+  ) {
+    if (sectionsData == null || categoryName.trim().isEmpty) return null;
+
+    final normalizedCategory = categoryName.trim().toLowerCase();
+    final matchingSection = sectionsData.sections
+        .where((section) =>
+            section.businessTypeName?.trim().toLowerCase() == normalizedCategory)
+        .toList();
+    if (matchingSection.isEmpty) return null;
+
+    final closingRows = matchingSection.first.rows
+        .where((row) {
+          final type = row.lineType.trim().toLowerCase();
+          final description = row.values['dien_giai']?.toString().toLowerCase() ?? '';
+          return type == 'balance_row' &&
+              (description.contains('ton cuoi ky') ||
+               description.contains('số dư cuối kỳ') ||
+               description.contains('cuối kỳ'));
+        })
+        .toList();
+
+    return closingRows.isEmpty ? null : closingRows.first;
   }
 
   static String _escapeXml(String value) {
