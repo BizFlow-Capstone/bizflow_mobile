@@ -1,5 +1,9 @@
 # bizflow_mobile
 
+## Project Documentation
+
+- [Setup and Mobile UI Guide](Setup%20and%20Mobile%20UI%20Guide.md)
+
 # Flutter System Design – Instruction File
 
 Tài liệu này dùng như **kim chỉ nam** cho toàn bộ dự án Flutter: ai vào code cũng phải theo. Không giải thích lan man, chỉ nêu **quy tắc + cấu trúc + cách dùng**.
